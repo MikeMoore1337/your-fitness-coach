@@ -55,6 +55,7 @@ jobs:
       deploy: ${{ steps.provenance.outputs.deploy }}
       reason: ${{ steps.provenance.outputs.reason }}
       operation: ${{ steps.provenance.outputs.operation }}
+      current_master: ${{ steps.provenance.outputs.current_master }}
     env:
       DEPLOY_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.revision || github.event.workflow_run.head_sha }}
       CI_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.ci_run_id || github.event.workflow_run.id }}
@@ -106,6 +107,7 @@ jobs:
           current_master="$(gh api "repos/$REPOSITORY/git/ref/heads/master" --jq '.object.sha')"
           git fetch origin master --no-tags
           test "$(git rev-parse origin/master)" = "$current_master"
+          echo "current_master=$current_master" >> "$GITHUB_OUTPUT"
           if [ "$DEPLOY_OPERATION" = reconcile ]; then
             git merge-base --is-ancestor "$DEPLOY_SHA" "$current_master"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
@@ -357,6 +359,7 @@ jobs:
     env:
       REVISION: ${{ inputs.revision }}
       BASELINE_REVISION: 050bbd3f80aac0b8e84389fa3c4c28875df89066
+      TOOLING_REVISION: ${{ needs.authorize.outputs.current_master }}
       PROD_HOST: 77.91.90.171
       PROD_PORT: "1337"
       PROD_USER: yfc-deploy
@@ -368,9 +371,16 @@ jobs:
       - name: Check out current deployment tooling
         uses: actions/checkout@v4
         with:
-          ref: master
+          ref: ${{ needs.authorize.outputs.current_master }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify current deployment tooling revision
+        run: |
+          set -Eeuo pipefail
+          [[ "$TOOLING_REVISION" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$TOOLING_REVISION"
+          echo "REPAIR_TOOLING_REVISION=$TOOLING_REVISION"
 
       - name: Configure production SSH access
         env:
@@ -491,8 +501,23 @@ jobs:
           set -Eeuo pipefail
           bundle_root="$(mktemp -d)"
           git archive --format=tar "$REVISION" backend/alembic/versions docker-compose.yml deploy scripts | tar -xf - -C "$bundle_root"
-          install -m 755 scripts/deploy_production.sh "$bundle_root/scripts/deploy_production.sh"
-          install -m 755 scripts/zero_downtime_deploy.py "$bundle_root/scripts/zero_downtime_deploy.py"
+          tooling_paths=(
+            scripts/deploy_production.sh
+            scripts/zero_downtime_deploy.py
+            scripts/production_host_cleanup.py
+            scripts/configure_production_auth.py
+            scripts/configure_production_food_search.py
+            scripts/normalize_production_news_image_provider.py
+            scripts/configure_production_ai_coach.py
+            scripts/configure_production_nutrition_label_scan.py
+            scripts/configure_production_log_retention.py
+            scripts/check_online_migrations.py
+            scripts/continuous_deployment_probe.py
+            scripts/db_maintenance.py
+            scripts/check_deployment.py
+            scripts/check_seo_surface.py
+          )
+          git archive --format=tar "$TOOLING_REVISION" "${tooling_paths[@]}" | tar -xf - -C "$bundle_root"
           cp deployment-migration-manifest.json "$bundle_root/deployment-migration-manifest.json"
           bundle_tar="yfc-repair-$REVISION.tar"
           bundle_name="$bundle_tar.gz"
@@ -521,6 +546,7 @@ jobs:
           BUNDLE_NAME: ${{ steps.bundle.outputs.name }}
           BACKEND_IMAGE: ${{ steps.images.outputs.backend_image_ref }}
           BOT_IMAGE: ${{ steps.images.outputs.bot_image_ref }}
+          TOOLING_REVISION: ${{ needs.authorize.outputs.current_master }}
         run: |
           set -Eeuo pipefail
           test -n "$GHCR_TOKEN"
@@ -537,18 +563,25 @@ jobs:
              RELEASE_ROOT='$PROD_PATH/releases'
              RELEASE_PATH=\"\$RELEASE_ROOT/$REVISION\"
              STAGING_PATH=\"\$RELEASE_ROOT/.staging-repair-$REVISION-${{ github.run_id }}\"
-             mkdir -p \"\$RELEASE_ROOT\" \"\$STAGING_PATH\"
+             QUARANTINE_PATH=\"\$RELEASE_ROOT/.quarantine-repair-$REVISION-${{ github.run_id }}\"
+             mkdir -p \"\$RELEASE_ROOT\"
+             test ! -e \"\$STAGING_PATH\"
              tar -xzf '/tmp/$BUNDLE_NAME' -C \"\$STAGING_PATH\"
              printf '%s\\n' '$REVISION' > \"\$STAGING_PATH/.deployment-sha\"
-             if [ -e \"\$RELEASE_PATH/.deployment-sha\" ]; then
+             test -f '$PROD_PATH/.env'
+             install -m 600 '$PROD_PATH/.env' \"\$STAGING_PATH/.env\"
+             current_target=\"\$(readlink -f '$PROD_PATH/current' 2>/dev/null || true)\"
+             test \"\$current_target\" = \"\$RELEASE_ROOT/$BASELINE_REVISION\"
+             if [ -e \"\$RELEASE_PATH\" ] || [ -L \"\$RELEASE_PATH\" ]; then
+               test -f \"\$RELEASE_PATH/.deployment-sha\"
                test \"\$(cat \"\$RELEASE_PATH/.deployment-sha\")\" = '$REVISION'
-               rm -rf \"\$STAGING_PATH\"
-             else
-               mv \"\$STAGING_PATH\" \"\$RELEASE_PATH\"
              fi
-             cd \"\$RELEASE_PATH\"
+             echo 'REPAIR_TARGET_REVISION=$REVISION'
+             echo 'REPAIR_TOOLING_REVISION=$TOOLING_REVISION'
+             echo \"REPAIR_EXECUTION_ROOT=\$STAGING_PATH\"
+             cd \"\$STAGING_PATH\"
              export COMPOSE_PROJECT_NAME=fit-mini-app
-             export DEPLOY_ROOT=\"\$RELEASE_PATH\"
+             export DEPLOY_ROOT=\"\$STAGING_PATH\"
              export DEPLOY_STATE_ROOT='$PROD_PATH/.artifacts/operations/deployments'
              export DEPLOY_ARTIFACT_ROOT='$PROD_PATH/.artifacts'
              export DEPLOY_MIGRATION_MANIFEST=deployment-migration-manifest.json
@@ -579,6 +612,14 @@ jobs:
              BACKEND_IMAGE='$BACKEND_IMAGE' \
              BOT_IMAGE='$BOT_IMAGE' \
              bash scripts/deploy_production.sh '$REVISION' '$PROD_URL' '$PROD_PUBLIC_URL' '$PROD_ROLLOUT_MODE'
+             test \"\$(tr -d '\\r\\n' < \"\$active_marker\")\" = '$REVISION'
+             current_target=\"\$(readlink -f '$PROD_PATH/current' 2>/dev/null || true)\"
+             test \"\$current_target\" = \"\$RELEASE_ROOT/$BASELINE_REVISION\"
+             test ! -e \"\$QUARANTINE_PATH\"
+             if [ -e \"\$RELEASE_PATH\" ] || [ -L \"\$RELEASE_PATH\" ]; then
+               mv \"\$RELEASE_PATH\" \"\$QUARANTINE_PATH\"
+             fi
+             mv \"\$STAGING_PATH\" \"\$RELEASE_PATH\"
              install -m 600 \"\$RELEASE_PATH/.env\" '$PROD_PATH/.env'
              ln -sfn \"\$RELEASE_PATH\" '$PROD_PATH/current'
              python3 \"\$RELEASE_PATH/scripts/production_host_cleanup.py\" '$REVISION' \
