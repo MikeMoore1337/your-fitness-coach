@@ -18,7 +18,7 @@ def _repo(tmp_path: Path) -> Path:
     (root / "tests").mkdir(parents=True)
     (root / "docs").mkdir(parents=True)
     (root / "AGENTS.md").write_text(
-        "# Rules\n\nRecovery must remain read only and fail closed.\n",
+        "# Rules\n\nGitHub is the lifecycle source of truth.\n",
         encoding="utf-8",
     )
     (root / ".agents" / "README.md").write_text("# Agents\n", encoding="utf-8")
@@ -32,32 +32,32 @@ def _repo(tmp_path: Path) -> Path:
         "# Lifecycle\n", encoding="utf-8"
     )
     (root / "codex-backlog" / "GLOBAL_RULES.md").write_text("# Global\n", encoding="utf-8")
-    (root / "tests" / "test_controller.py").write_text(
-        "def test_recovery():\n    assert True\n\ndef test_delivery():\n    assert True\n",
+    (root / "tests" / "test_git_flow.py").write_text(
+        "def test_git_state():\n    assert True\n\ndef test_ci():\n    assert True\n",
         encoding="utf-8",
     )
     return root
 
 
 def _manifest(root: Path) -> None:
-    (root / ".agents" / "evals" / "lifecycle.json").write_text(
+    (root / ".agents" / "evals" / "github-flow.json").write_text(
         json.dumps(
             {
                 "schema_version": 1,
-                "suite": "lifecycle",
-                "description": "Controller regression contract",
+                "suite": "github-flow",
+                "description": "Git and GitHub regression contract",
                 "evals": [
                     {
-                        "id": "recovery",
+                        "id": "git-state",
                         "kind": "regression",
-                        "description": "Recovery remains safe",
-                        "pytest_nodeids": ["tests/test_controller.py::test_recovery"],
+                        "description": "Git state remains inspectable",
+                        "pytest_nodeids": ["tests/test_git_flow.py::test_git_state"],
                     },
                     {
-                        "id": "delivery",
+                        "id": "ci",
                         "kind": "capability",
-                        "description": "Delivery remains deterministic",
-                        "pytest_nodeids": ["tests/test_controller.py::test_delivery"],
+                        "description": "CI remains deterministic",
+                        "pytest_nodeids": ["tests/test_git_flow.py::test_ci"],
                     },
                 ],
             }
@@ -71,16 +71,16 @@ def test_eval_manifest_validation_and_selection(tmp_path: Path) -> None:
     _manifest(root)
 
     manifests = agent_harness.load_eval_manifests(root)
-    selected = agent_harness.select_evals(manifests, suite="lifecycle", eval_id="recovery")
+    selected = agent_harness.select_evals(manifests, suite="github-flow", eval_id="git-state")
 
     assert len(manifests) == 1
     assert selected == [
         {
-            "suite": "lifecycle",
-            "id": "recovery",
+            "suite": "github-flow",
+            "id": "git-state",
             "kind": "regression",
-            "description": "Recovery remains safe",
-            "pytest_nodeids": ["tests/test_controller.py::test_recovery"],
+            "description": "Git state remains inspectable",
+            "pytest_nodeids": ["tests/test_git_flow.py::test_git_state"],
         }
     ]
 
@@ -98,7 +98,7 @@ def test_eval_manifest_rejects_missing_test_function(tmp_path: Path) -> None:
                         "id": "missing",
                         "kind": "regression",
                         "description": "Missing test",
-                        "pytest_nodeids": ["tests/test_controller.py::test_missing"],
+                        "pytest_nodeids": ["tests/test_git_flow.py::test_missing"],
                     }
                 ],
             }
@@ -118,7 +118,7 @@ def test_eval_runner_reports_each_eval(tmp_path: Path) -> None:
 
     def fake_runner(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         calls.append(command)
-        returncode = 1 if command[-1].endswith("test_delivery") else 0
+        returncode = 1 if command[-1].endswith("test_ci") else 0
         return subprocess.CompletedProcess(
             command,
             returncode,
@@ -133,40 +133,7 @@ def test_eval_runner_reports_each_eval(tmp_path: Path) -> None:
     assert all(command[:3] == [agent_harness.sys.executable, "-m", "pytest"] for command in calls)
 
 
-def test_checkpoint_is_compact_read_only_projection() -> None:
-    checkpoint = agent_harness.build_checkpoint(
-        {
-            "task_id": "737",
-            "lifecycle_state": "ready-for-delivery",
-            "classification": "READY_FOR_DELIVERY",
-            "mutation_performed": False,
-            "branches": ["task/737-agent-harness-v11"],
-            "issues": [],
-            "worktrees": [{"dirty": [], "large_internal_detail": "drop-me"}],
-            "lease": {
-                "branch": "task/737-agent-harness-v11",
-                "base_sha": "a" * 40,
-                "head_sha": "b" * 40,
-                "ready_head_sha": "b" * 40,
-                "unrelated_internal_field": "drop-me",
-            },
-            "delivery": {
-                "owner": {
-                    "task_id": "737",
-                    "branch": "task/737-agent-harness-v11",
-                }
-            },
-        }
-    )
-
-    assert checkpoint["source_of_truth"] is False
-    assert checkpoint["mutation_performed"] is False
-    assert checkpoint["anchors"]["head_sha"] == "b" * 40
-    assert "unrelated_internal_field" not in checkpoint["anchors"]
-    assert "worktrees" not in checkpoint
-
-
-def test_reports_and_checkpoints_use_canonical_artifact_classes(tmp_path: Path) -> None:
+def test_eval_reports_use_canonical_artifact_class(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     report = {
         "schema_version": 1,
@@ -175,13 +142,13 @@ def test_reports_and_checkpoints_use_canonical_artifact_classes(tmp_path: Path) 
         "overall": "PASS",
         "evals": [
             {
-                "suite": "lifecycle",
-                "id": "recovery",
+                "suite": "github-flow",
+                "id": "git-state",
                 "kind": "regression",
                 "status": "PASS",
                 "returncode": 0,
                 "duration_seconds": 0.1,
-                "pytest_nodeids": ["tests/test_controller.py::test_recovery"],
+                "pytest_nodeids": ["tests/test_git_flow.py::test_git_state"],
                 "stdout": "",
                 "stderr": "",
             }
@@ -193,44 +160,13 @@ def test_reports_and_checkpoints_use_canonical_artifact_classes(tmp_path: Path) 
         report,
         artifact_root=root / ".artifacts",
     )
-    checkpoint = agent_harness.build_checkpoint(
-        {
-            "task_id": "737",
-            "lifecycle_state": "implementation",
-            "classification": "ACTIVE",
-            "mutation_performed": False,
-            "branches": ["task/737-agent-harness-v11"],
-            "issues": [],
-            "lease": {"branch": "task/737-agent-harness-v11"},
-            "delivery": {},
-        }
-    )
-    checkpoint_path = agent_harness.write_checkpoint(
-        root,
-        "737",
-        checkpoint,
-        artifact_root=root / ".artifacts",
-    )
-
     assert "/evidence/agent-evals/" in eval_path.as_posix()
-    assert checkpoint_path.as_posix().endswith("/temporary/agent-harness/checkpoint.json")
     manifest = json.loads((root / ".artifacts/tasks/737/manifest.json").read_text(encoding="utf-8"))
     classifications = {item["path"]: item["classification"] for item in manifest["entries"]}
-    assert classifications["temporary/agent-harness/checkpoint.json"] == "temporary"
     assert any(
         path.startswith("evidence/agent-evals/") and classification == "evidence"
         for path, classification in classifications.items()
     )
-
-
-def test_checkpoint_refuses_mutating_recovery_state() -> None:
-    with pytest.raises(agent_harness.AgentHarnessError, match="read-only"):
-        agent_harness.build_checkpoint(
-            {
-                "task_id": "737",
-                "mutation_performed": True,
-            }
-        )
 
 
 def test_learning_candidate_deduplicates_without_touching_canonical_docs(
@@ -239,12 +175,12 @@ def test_learning_candidate_deduplicates_without_touching_canonical_docs(
     root = _repo(tmp_path)
     agents_before = (root / "AGENTS.md").read_text(encoding="utf-8")
     kwargs = {
-        "pattern": "Recovery must remain read only and fail closed.",
+        "pattern": "GitHub is the lifecycle source of truth.",
         "evidence": ["Task 729", "Task 737"],
-        "why_reusable": "The recovery invariant applies across controller interruptions.",
+        "why_reusable": "The source-of-truth invariant applies across ordinary changes.",
         "destination": "AGENTS.md",
         "conflict_analysis": (
-            "Compatible with the existing recovery rule; likely update existing text."
+            "Compatible with the existing GitHub Flow rule; likely update existing text."
         ),
         "risk": "low",
         "action": "UPDATE_EXISTING",
@@ -315,4 +251,4 @@ def test_repository_agent_eval_manifests_are_valid() -> None:
 
     manifests = agent_harness.load_eval_manifests(repo_root)
 
-    assert any(manifest["suite"] == "lifecycle" for manifest in manifests)
+    assert any(manifest["suite"] == "github-flow" for manifest in manifests)

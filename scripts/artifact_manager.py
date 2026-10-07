@@ -1,9 +1,9 @@
-"""Manage repository-local task artifacts with fail-closed cleanup semantics.
+"""Manage repository-local task artifacts with bounded cleanup semantics.
 
 The manager deliberately uses only the Python standard library.  It treats the
 artifact root as a capability boundary: every mutation is resolved below the
-exact root, reparse points are refused, and generic cleanup never enters
-controller-managed worktrees or operational data.
+exact root, reparse points are refused, and generic cleanup never enters local
+worktrees or operational data.
 """
 
 from __future__ import annotations
@@ -33,7 +33,6 @@ CANONICAL_TOP_LEVEL = ("worktrees", "tasks", "runtime", "shared", "operations")
 LEGACY_RUNTIME_TOP_LEVEL = {"cache", "tmp", "tests"}
 LEGACY_PROTECTED_TOP_LEVEL = {
     "backups",
-    "controller-recovery",
     "deployments",
     "production-backups",
     "recovery",
@@ -70,17 +69,11 @@ LEGACY_EVIDENCE_TOP_LEVEL = {
     "working-notes",
 }
 DEFAULT_RETENTION = {
-    "temporary": "delete-after-terminal-success",
+    "temporary": "delete-after-use; bounded cleanup is best-effort",
     "evidence": "retain-for-review-and-investigation",
     "deliverables": "retain-until-exact-owner-disposition",
     "logs": "limited-retention; delete-after-closeout-when-not-needed",
 }
-TERMINAL_STATES = {"dev-ci-success", "finished", "terminal-success", "success"}
-# A deployed lease is still owned by the controller until ``finish`` records the final history
-# state.  It is nevertheless safe for task-scoped temporary-artifact cleanup.  Keep the old
-# production-success value readable for leases written before the lifecycle simplification.
-CONTROLLER_TERMINAL_LEASE_STATES = TERMINAL_STATES | {"production-success", "deployed", "done"}
-CONTROLLER_STATE_NAME = "codex-task-sessions-v1"
 FILE_ATTRIBUTE_REPARSE_POINT = 0x400
 FILE_ATTRIBUTE_DIRECTORY = 0x10
 WINDOWS_LX_SYMLINK_TAG = 0xA000001D
@@ -534,7 +527,6 @@ class ArtifactManager:
         root: Path,
         *,
         repo_root: Path | None = None,
-        controller_state_dir: Path | None = None,
         clock: Any = None,
     ) -> None:
         raw_root = Path(root).absolute()
@@ -542,9 +534,6 @@ class ArtifactManager:
             raise ArtifactSafetyError(f"Artifact root is a reparse point: {raw_root}")
         self.root = _resolved(raw_root)
         self.repo_root = _resolved(repo_root or self.root.parent)
-        self.controller_state_dir = (
-            _resolved(controller_state_dir) if controller_state_dir is not None else None
-        )
         self.clock = clock or utc_now
 
     @property
@@ -882,81 +871,6 @@ class ArtifactManager:
             "source": source,
         }
 
-    def _state_dir(self) -> Path | None:
-        if self.controller_state_dir is not None:
-            return self.controller_state_dir
-        git_dir = self.repo_root / ".git"
-        if git_dir.is_dir():
-            return git_dir / CONTROLLER_STATE_NAME
-        if git_dir.is_file():
-            completed = subprocess.run(
-                [
-                    "git",
-                    "-c",
-                    f"safe.directory={self.repo_root.as_posix()}",
-                    "rev-parse",
-                    "--git-common-dir",
-                ],
-                cwd=self.repo_root,
-                check=False,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-            )
-            if completed.returncode == 0 and completed.stdout.strip():
-                return Path(completed.stdout.strip()).resolve() / CONTROLLER_STATE_NAME
-        return None
-
-    def _controller_guard(self, *, task_id: str | None = None) -> list[str]:
-        state_dir = self._state_dir()
-        if state_dir is None or not state_dir.exists():
-            return []
-        issues: list[str] = []
-        lock = state_dir / "state.lock"
-        if lock.exists():
-            issues.append(f"controller state lock exists: {lock.name}")
-        leases = state_dir / "leases"
-        active_task_ids: list[str] = []
-        if leases.is_dir():
-            for path in sorted(leases.glob("*.json")):
-                payload = _read_json(path)
-                if not isinstance(payload, dict):
-                    issues.append(f"controller lease is not an object: {path.name}")
-                    continue
-                mode = str(payload.get("mode", ""))
-                lease_task = str(payload.get("task_id", ""))
-                if mode in {"integration", "release"}:
-                    issues.append(f"active incompatible controller lease: {path.name}")
-                    continue
-                if lease_task and lease_task != task_id:
-                    active_task_ids.append(lease_task)
-                elif (
-                    lease_task == task_id
-                    and str(payload.get("lifecycle_state", ""))
-                    not in CONTROLLER_TERMINAL_LEASE_STATES
-                ):
-                    issues.append(f"target task lease is not terminal: {path.name}")
-        if task_id is None and active_task_ids:
-            issues.append("active task leases protect shared artifact cleanup")
-        history_path = state_dir / "history" / "task-132.json"
-        if history_path.exists():
-            history = _read_json(history_path)
-            if isinstance(history, dict) and history.get("state") not in {
-                "finished",
-                "terminal-success",
-            }:
-                issues.append("Task 132 history is not terminally finished")
-        consumers = self.root / "runtime" / "consumers"
-        if consumers.is_dir():
-            for marker in sorted(consumers.glob("*.json")):
-                payload = _read_json(marker)
-                pid = payload.get("pid") if isinstance(payload, dict) else None
-                if not isinstance(pid, int) or pid <= 0:
-                    issues.append(f"invalid runtime consumer marker: {marker.name}")
-                elif _pid_alive(pid):
-                    issues.append(f"active runtime process consumer: {marker.name}")
-        return sorted(set(issues))
-
     def _worktree_inventory(self) -> list[dict[str, Any]]:
         completed = subprocess.run(
             [
@@ -995,16 +909,6 @@ class ArtifactManager:
             record = {}
         return result
 
-    def _task_terminal(self, task_id: str) -> bool:
-        state_dir = self._state_dir()
-        if state_dir is None:
-            return False
-        history_path = state_dir / "history" / f"task-{normalize_task_id(task_id)}.json"
-        if not history_path.exists():
-            return False
-        payload = _read_json(history_path)
-        return isinstance(payload, dict) and payload.get("state") in TERMINAL_STATES
-
     def _inventory_record(
         self,
         item: Mapping[str, Any],
@@ -1042,7 +946,6 @@ class ArtifactManager:
     ) -> list[dict[str, Any]]:
         if not self.root.exists():
             return []
-        guard = self._controller_guard()
         now = datetime.now(UTC)
         entries: list[dict[str, Any]] = []
         for item in _iter_entries(self.root):
@@ -1068,7 +971,7 @@ class ArtifactManager:
             if top == "worktrees":
                 classification, reason = (
                     "protected",
-                    "controller-managed worktree; never filesystem-delete",
+                    "local worktree; never filesystem-delete from artifact cleanup",
                 )
             elif top == "operations":
                 classification, reason = (
@@ -1090,16 +993,10 @@ class ArtifactManager:
                     )
                 elif len(relative.parts) >= 3 and relative.parts[2] == "temporary":
                     classification = "temporary"
-                    if self._task_terminal(task_id) and not guard:
-                        disposition, reason = (
-                            "DELETE",
-                            "exact task temporary data after terminal success",
-                        )
-                    else:
-                        disposition, reason = (
-                            "KEEP",
-                            "active or unproven task state protects temporary data",
-                        )
+                    disposition, reason = (
+                        "DELETE",
+                        "bounded task temporary data; cleanup is best-effort",
+                    )
                 elif len(relative.parts) >= 3 and relative.parts[2] in {
                     "evidence",
                     "deliverables",
@@ -1124,7 +1021,7 @@ class ArtifactManager:
                 classification = "temporary"
                 disposition = "KEEP"
                 reason = "runtime data is cleaned only by bounded stale-runtime policy"
-                if stale_runtime and runtime_ttl is not None and not guard:
+                if stale_runtime and runtime_ttl is not None:
                     try:
                         age = now - datetime.fromtimestamp(item["mtime_ns"] / 1_000_000_000, tz=UTC)
                     except (KeyError, ValueError, OSError):  # fmt: skip
@@ -1133,16 +1030,10 @@ class ArtifactManager:
                         disposition, reason = "DELETE", "bounded stale runtime candidate"
             elif top in LEGACY_RUNTIME_TOP_LEVEL:
                 classification = "temporary"
-                if guard:
-                    disposition, reason = (
-                        "KEEP",
-                        "shared legacy runtime cleanup blocked by active state",
-                    )
-                else:
-                    disposition, reason = (
-                        "DELETE",
-                        "legacy reproducible cache/test/temp data; migrate producers to runtime",
-                    )
+                disposition, reason = (
+                    "DELETE",
+                    "legacy reproducible cache/test/temp data; migrate producers to runtime",
+                )
             elif top in LEGACY_PROTECTED_TOP_LEVEL:
                 classification, disposition, reason = (
                     "protected",
@@ -1201,7 +1092,7 @@ class ArtifactManager:
             "generated_at": self.clock(),
             "entries": entries,
             "summary": self._summary(entries),
-            "safety": {"issues": self._controller_guard(), "worktrees": self._worktree_inventory()},
+            "safety": {"issues": [], "worktrees": self._worktree_inventory()},
             "validation": validation,
         }
 
@@ -1253,9 +1144,6 @@ class ArtifactManager:
         self, plan: Mapping[str, Any], *, approved_plan_sha256: str | None
     ) -> dict[str, Any]:
         entries = self._verify_plan(plan, approved_plan_sha256)
-        guard = self._controller_guard()
-        if guard:
-            raise ArtifactSafetyError("Cleanup blocked: " + "; ".join(guard))
         marker = self._plan_marker(str(plan["plan_sha256"]))
         previously_applied = marker.exists()
         mutations = [entry for entry in entries if entry.get("disposition") in {"DELETE", "MOVE"}]
@@ -1346,17 +1234,11 @@ class ArtifactManager:
         self,
         task_id: str,
         *,
-        terminal_state: str,
         apply: bool = True,
         include_prefixes: Sequence[str] = (),
         exclude_prefixes: Sequence[str] = (),
     ) -> dict[str, Any]:
         normalized = normalize_task_id(task_id)
-        if terminal_state not in TERMINAL_STATES:
-            raise ArtifactSafetyError(
-                f"Task {normalized} cleanup requires a terminal success state"
-            )
-        guard = self._controller_guard(task_id=normalized)
         task_root = self.task_root(normalized)
         temporary_root = _safe_relative(task_root, "temporary")
         try:
@@ -1389,7 +1271,7 @@ class ArtifactManager:
         excludes = self._normalize_scope_prefixes(exclude_prefixes, base="temporary")
         candidates: list[dict[str, Any]] = []
         inventory_paths: list[str] = []
-        safety_errors = list(guard)
+        safety_errors: list[str] = []
         for item in _iter_entries(temporary_root):
             if item["kind"] not in {"file", "reparse", "inaccessible"}:
                 continue
@@ -1600,17 +1482,6 @@ class ArtifactManager:
     ) -> dict[str, Any]:
         if max_entries < 1 or max_bytes < 1:
             raise ArtifactError("Runtime cleanup bounds must be positive")
-        guard = self._controller_guard()
-        if guard:
-            return {
-                "schema_version": SCHEMA_VERSION,
-                "operation": "cleanup-runtime",
-                "status": "blocked",
-                "cleanup_errors": [{"path": "runtime", "reason": issue} for issue in guard],
-                "removed": [],
-                "removed_count": 0,
-                "removed_bytes": 0,
-            }
         if plan is not None:
             if not apply:
                 return dict(plan)
@@ -1702,18 +1573,6 @@ class ArtifactManager:
 
         if max_entries < 1 or max_bytes < 1 or runtime_cap_bytes < 1:
             raise ArtifactError("Automatic cleanup bounds must be positive")
-        guard = self._controller_guard()
-        if guard:
-            return {
-                "schema_version": SCHEMA_VERSION,
-                "operation": "auto-cleanup",
-                "status": "blocked",
-                "cleanup_errors": [{"path": "artifacts", "reason": issue} for issue in guard],
-                "removed": [],
-                "removed_count": 0,
-                "removed_bytes": 0,
-            }
-
         excludes = tuple(_safe_relative_name(prefix) for prefix in exclude_prefixes)
         inventory = self._inventory(stale_runtime=True, runtime_ttl=runtime_ttl)
         candidates: list[dict[str, Any]] = []
@@ -1874,18 +1733,6 @@ def _path_is_under(path: Path, prefix: Path) -> bool:
     return path_parts[: len(prefix_parts)] == prefix_parts
 
 
-def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
-    return True
-
-
 def _parse_duration(value: str) -> timedelta:
     match = re.fullmatch(r"(?P<number>[0-9]+(?:\.[0-9]+)?)(?P<unit>[smhd])", value.strip().lower())
     if match is None:
@@ -1975,7 +1822,6 @@ def _parser() -> argparse.ArgumentParser:
 
     cleanup = subparsers.add_parser("cleanup-task")
     cleanup.add_argument("task_id")
-    cleanup.add_argument("--terminal-state", required=True)
     cleanup.add_argument("--dry-run", action="store_true")
     cleanup.add_argument("--include", action="append", default=[])
     cleanup.add_argument("--exclude", action="append", default=[])
@@ -2043,7 +1889,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         elif args.command == "cleanup-task":
             payload = manager.cleanup_task(
                 args.task_id,
-                terminal_state=args.terminal_state,
                 apply=not args.dry_run,
                 include_prefixes=args.include,
                 exclude_prefixes=args.exclude,

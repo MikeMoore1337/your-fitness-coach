@@ -213,7 +213,7 @@ def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> N
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     required = ci_contract.expected_jobs_for_groups(("quality",), event="pull_request")
-    assert "task-provenance" in required
+    assert "task-provenance" not in required
     assert "codeql-security" in required
     assert "security-audit" in required
     assert "review-contract" not in required
@@ -578,11 +578,11 @@ def test_scheduled_and_manual_routes_resolve_distinct_regression_profiles() -> N
     assert daily["outputs"]["run_scheduled_report"] is True
 
 
-def test_push_route_keeps_merge_provenance_and_container_delivery() -> None:
+def test_push_route_keeps_container_delivery() -> None:
     decision = ci_contract.route_repository(Path.cwd(), event="push")
 
-    assert decision["required_jobs"] == ["containers", "merge-provenance", "scope-router"]
-    assert decision["outputs"]["run_merge_provenance"] is True
+    assert decision["required_jobs"] == ["containers", "scope-router"]
+    assert "run_merge_provenance" not in decision["outputs"]
     assert decision["outputs"]["run_containers"] is True
 
 
@@ -686,11 +686,10 @@ def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
     assert 'if [ "$EVENT_NAME" = schedule ]; then' in workflow
     assert '[ "$TARGET_REF" != refs/heads/master ]' in workflow
     assert 'elif [ "$EVENT_NAME" = workflow_dispatch ]; then' in workflow
-    assert "refs/heads/master|refs/heads/task/*|refs/heads/recovery/*" in workflow
-    assert (
-        "Manual CI is restricted to refs/heads/master, refs/heads/task/* and refs/heads/recovery/*"
-        in workflow
-    )
+    assert "refs/heads/master" in workflow
+    assert "refs/heads/task/*" not in workflow
+    assert "refs/heads/recovery/*" not in workflow
+    assert 'test -n "$TARGET_REF"' in workflow
     assert "group: production" in deploy
     assert "cancel-in-progress: false" in deploy
 

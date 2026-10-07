@@ -2,16 +2,18 @@
 
 Role определяет ответственность прохода. Skill определяет профильные знания. Task определяет scope.
 
-Доступно шесть ролей:
+Доступно пять optional planning/verification roles:
 
 1. `orchestrator`
 2. `researcher`
 3. `product-lawyer`
 4. `implementer`
 5. `qa-verifier`
-6. `integration-release`
+GitHub Issues, branches, pull requests, Checks и Actions являются operational source of truth;
+отдельной release/integration роли нет.
 
-Lifecycle/severity/recheck/commit policy не дублируется здесь. Для backlog task canonical source - `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`.
+Severity/recheck/commit policy не дублируется здесь. Для обычной работы canonical path описан в
+`docs/development.md` и `docs/deployment.md`.
 
 Не создавать роль на каждый skill.
 

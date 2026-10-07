@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "suite": "github-flow",
+  "description": "Optional stateless Git/GitHub lifecycle regressions",
+  "evals": [
+    {
+      "id": "deploy-scope",
+      "kind": "regression",
+      "description": "Application deploy scope is derived from changed paths",
+      "pytest_nodeids": [
+        "tests/test_deployment_scope.py::test_docs_governance_tests_and_ci_only_do_not_deploy"
+      ]
+    },
+    {
+      "id": "native-concurrency",
+      "kind": "regression",
+      "description": "The production workflow uses native serialized concurrency",
+      "pytest_nodeids": [
+        "tests/test_release_safeguards.py::test_production_workflow_uses_native_concurrency"
+      ]
+    }
+  ]
+}

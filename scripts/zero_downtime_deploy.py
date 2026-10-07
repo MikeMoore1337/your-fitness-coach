@@ -17,11 +17,6 @@ from collections.abc import Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-try:
-    import fcntl
-except ImportError:  # pragma: no cover - production deployment runs on Linux
-    fcntl = None  # type: ignore[assignment]
-
 SLOTS = ("blue", "green")
 STATE_VERSION = 1
 
@@ -461,23 +456,6 @@ def _reclaim_single_slot_docker_space() -> None:
     """Remove only Docker data that is not referenced by any container."""
     _run(["docker", "image", "prune", "--all", "--force"])
     _run(["docker", "builder", "prune", "--all", "--force"])
-
-
-@contextlib.contextmanager
-def _deployment_lock(path: Path) -> Iterator[None]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a+", encoding="utf-8") as lock_file:
-        if fcntl is None:
-            yield
-            return
-        try:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as exc:
-            raise DeploymentError("another production deployment owns the host lock") from exc
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _switch_gateway(active_slot: str, fallback_slot: str) -> None:
@@ -1752,23 +1730,22 @@ def main() -> int:
     args = parser.parse_args()
     try:
         config = _config(args)
-        with _deployment_lock(config.state_root / "deployment.lock"):
-            if args.command == "bootstrap":
-                bootstrap_state(config)
-            elif args.command == "rollback":
-                rollback(config)
-            elif args.command == "single-slot":
-                evidence = single_slot_deploy(config)
-                print(
-                    f"Deployment verdict: {evidence.verdict}; "
-                    f"revision={evidence.target_revision}; slot={evidence.candidate_slot}"
-                )
-            else:
-                evidence = deploy(config)
-                print(
-                    f"Deployment verdict: {evidence.verdict}; "
-                    f"revision={evidence.target_revision}; slot={evidence.candidate_slot}"
-                )
+        if args.command == "bootstrap":
+            bootstrap_state(config)
+        elif args.command == "rollback":
+            rollback(config)
+        elif args.command == "single-slot":
+            evidence = single_slot_deploy(config)
+            print(
+                f"Deployment verdict: {evidence.verdict}; "
+                f"revision={evidence.target_revision}; slot={evidence.candidate_slot}"
+            )
+        else:
+            evidence = deploy(config)
+            print(
+                f"Deployment verdict: {evidence.verdict}; "
+                f"revision={evidence.target_revision}; slot={evidence.candidate_slot}"
+            )
     except (KeyError, OSError, ValueError, subprocess.CalledProcessError, DeploymentError) as exc:
         print(f"Production deployment failed: {exc}", file=sys.stderr)
         return 1

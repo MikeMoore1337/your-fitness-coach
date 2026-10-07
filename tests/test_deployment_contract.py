@@ -49,14 +49,16 @@ def test_deploy_bundle_includes_migration_sources() -> None:
     assert "backend/alembic/versions" in deploy
 
 
-def test_release_recovery_dispatch_requires_exact_ci_evidence() -> None:
+def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> None:
     root = Path(__file__).resolve().parents[1]
     deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
 
     assert "workflow_dispatch:" in deploy
-    assert '"recovery/**"' in deploy
-    assert "startsWith(github.event.workflow_run.head_branch, 'recovery/')" in deploy
-    assert "github.workflow_sha" in deploy
+    assert "group: production" in deploy
+    assert "cancel-in-progress: false" in deploy
+    assert "scripts/deployment_scope.py" in deploy
+    assert "github.workflow_sha" not in deploy
     assert "actions/runs/$CI_RUN_ID" in deploy
     assert ".head_sha == $sha" in deploy
     assert '.conclusion == "success"' in deploy
+    assert "task_session.py" not in deploy

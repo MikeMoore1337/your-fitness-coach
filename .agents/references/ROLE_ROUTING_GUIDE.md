@@ -1,35 +1,21 @@
-# Role routing guide v4
+# Role routing guide
 
-Canonical quality/QA severity, recheck limits, commit/finalization и lifecycle находятся в `codex-backlog/TASK_EXECUTION_LIFECYCLE.md`.
+Roles are optional responsibility hints for a Codex session. They do not own branches,
+pull requests, releases, queues, leases or persistent lifecycle state.
 
-Этот файл отвечает только за выбор роли.
+## Roles
 
-Runtime-routing normal delivery выполняется deterministic-модулем `scripts/agent_flow.py`.
-Он не заменяет task metadata: явные роли task остаются authoritative. Если явных ролей нет,
-router применяет только консервативные documented triggers и сохраняет bounded routing trace
-под task-scoped `.artifacts/.../evidence/agent-flow/`.
-
-
-## Роли
-
-| Роль | Когда использовать |
+| Role | Use when |
 | --- | --- |
-| `orchestrator` | Несколько реально независимых streams, сложная convergence/integration planning |
-| `researcher` | Отдельная неизвестность, которую выгодно закрыть read-only |
-| `product-lawyer` | Dedicated read-only legal-risk audit, legal register и owner decision package |
+| `orchestrator` | Several genuinely independent read-only planning streams need coordination |
+| `researcher` | A bounded unknown is best answered before implementation |
+| `product-lawyer` | Dedicated read-only legal-risk audit and owner decision package |
 | `implementer` | Production implementation |
-| `qa-verifier` | Фактическая risk-based behavioral verification |
-| `integration-release` | Merge/integration/release convergence |
+| `qa-verifier` | Risk-based behavioral verification |
 
-## Правила
+Normal integration is the native GitHub path: branch, PR, Checks, merge and Actions deployment.
+Use `scripts/agent_flow.py` only as optional local routing assistance; its failure must not block
+GitHub work.
 
-- Обычная feature-task имеет одного primary writer - `implementer`.
-- Не использовать `orchestrator` для локальной feature-task.
-- Не создавать `researcher` для обычного чтения файлов implementer'ом.
-- `product-lawyer` является primary role только для dedicated legal-risk task; обычная feature-task
-  сохраняет свою primary role и при trigger подключает `$ru-legal-risk` условно.
-- После owner decision legal remediation выполняется отдельной implementation task, а не ролью
-  `product-lawyer` автоматически.
-- `integration-release` не заменяет `release-manager`; роль задаёт ответственность, skill - профессиональный workflow.
-- Не создавать отдельные роли `designer`, `motion-designer`, `ai-engineer`, `security-reviewer` и т.п. Их знания выражаются skills.
-- Task metadata остаётся основным маршрутом для backlog task.
+Do not create a role per skill or a release-owner substitute. Use the smallest role/skill set that
+matches the actual change.

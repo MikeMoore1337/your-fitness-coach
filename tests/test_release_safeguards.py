@@ -24,8 +24,6 @@ def _sources() -> dict[str, str]:
         "capacity_audit": (
             root / ".github" / "workflows" / "production-capacity-audit.yml"
         ).read_text(encoding="utf-8"),
-        "controller": (root / "scripts" / "task_session.py").read_text(encoding="utf-8"),
-        "launcher": (root / "scripts" / "run_task_delivery.py").read_text(encoding="utf-8"),
         "dependency_doc": (root / "docs" / "dependency-automation.md").read_text(encoding="utf-8"),
     }
 
@@ -48,18 +46,16 @@ def _embedded_function(workflow_text: str, name: str, **globals_: object) -> Cal
     return cast(Callable[..., object], namespace[name])
 
 
-def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push() -> None:
+def test_ci_runs_application_checks_without_controller_gates() -> None:
     ci = _sources()["ci"]
 
     assert "branches: [master]" in ci
     assert "branches: [dev" not in ci
     assert "if: github.event_name == 'pull_request'" in ci
-    assert "task-provenance:" in ci
+    assert "task-provenance:" not in ci
     assert "review-contract:" not in ci
     assert "pull_request_review:" not in ci
-    assert "merge-provenance:" in ci
-    assert "Validate task provenance or trusted dependency bot identity" in ci
-    assert "TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}" in ci
+    assert "merge-provenance:" not in ci
     assert "CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}" in ci
     assert "SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}" in ci
     assert "codeql-security:" in ci
@@ -86,7 +82,7 @@ def test_python_script_ci_jobs_pin_supported_python_runtime() -> None:
     workflow = yaml.safe_load(_sources()["ci"])
     jobs = workflow["jobs"]
 
-    for job_name in ("task-provenance", "merge-provenance", "containers"):
+    for job_name in ("containers",):
         setup_python = next(
             step
             for step in jobs[job_name]["steps"]
@@ -147,12 +143,12 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
 
     assert "workflows: [CI]" in deploy
     assert "branches:" in deploy
-    assert "- master" in deploy
+    assert "branches: [master]" in deploy
     assert "sync-dev:" not in deploy
     assert "actions/create-github-app-token" not in deploy
     assert "deployment_contract.py refs" in deploy
     assert "bundle" in deploy.lower()
-    assert "controller-only governance merge" in deploy
+    assert "deployment_scope.py" in deploy
     assert "deploy=false" in deploy
     assert "if: needs.authorize.outputs.deploy == 'true'" in deploy
     assert "git fetch" not in deploy_script
@@ -162,36 +158,7 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
     assert "scripts/zero_downtime_deploy.py" in deploy_script
 
 
-def test_controller_release_skip_uses_exact_provenance_and_full_changed_file_inventory() -> None:
-    sources = _sources()
-    deploy = sources["deploy"]
-    controller = sources["controller"]
-    docs = Path(__file__).resolve().parents[1] / "docs" / "task-branch-integration.md"
-
-    assert "workflow_run.head_sha" in deploy
-    assert "actions/checkout@v4" in deploy
-    assert "ref: ${{ env.DEPLOY_SHA }}" in deploy
-    assert "classify-controller-release" in deploy
-    assert "CONTROLLER_ROWS" not in deploy
-    assert "codex/controller-[a-z0-9-]+" not in deploy
-    assert "controller-source" in deploy
-    assert "git rev-list --first-parent --no-merges" in deploy
-    assert "git rev-list --first-parent --merges --reverse" in deploy
-    assert "workflow_runs" in deploy
-    assert "pull_requests[]" in deploy
-    assert "/pulls/$pr_number" in deploy
-    assert "commits/$pr_head_sha/check-runs" in deploy
-    assert '"Deploy immutable tested bundle"' in deploy
-    assert '"skipped"' in deploy
-    assert "CONTROLLER_ALLOWED_PATHS" in controller
-    assert "pulls/{number}/files?per_page=100&page={page}" in controller
-    assert "len(files) != declared_count" in controller
-    assert "defaulting to application deployment" in controller
-    assert "verified provenance + exact changed-file allowlist" in docs.read_text(encoding="utf-8")
-    assert "Task-bound controller change" in docs.read_text(encoding="utf-8")
-
-
-def test_deploy_recovers_legacy_revision_before_migration_and_rollout() -> None:
+def test_deploy_reads_active_revision_before_migration_and_rollout() -> None:
     deploy = _sources()["deploy"]
 
     assert "latest_summary" in deploy
@@ -202,6 +169,18 @@ def test_deploy_recovers_legacy_revision_before_migration_and_rollout() -> None:
     assert "last-successful-revision" in deploy
     assert 'if [ -f \\"\\$active_marker\\" ]; then' in deploy
     assert 'install -d -m 700 \\"\\$(dirname \\"\\$active_marker\\")\\"' in deploy
+
+
+def test_manual_rollback_uses_native_actions_and_existing_production_safety() -> None:
+    deploy = _sources()["deploy"]
+
+    assert "operation:" in deploy
+    assert "options: [deploy, rollback]" in deploy
+    assert "rollback:" in deploy
+    assert "owner-authorized rollback" in deploy
+    assert "python3 scripts/zero_downtime_deploy.py rollback" in deploy
+    assert "scripts/task_session.py" not in deploy
+    assert "delivery owner" not in deploy
 
 
 def test_deploy_bounds_transient_production_ssh_failures() -> None:
@@ -419,66 +398,37 @@ def test_capacity_audit_cleans_ephemeral_ssh_material_on_every_exit() -> None:
     assert 'printf \'%s\\n\' "$PROD_SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"' in workflow_text
 
 
-def test_delivery_contract_is_master_only_and_github_gate_driven() -> None:
+def test_delivery_contract_is_github_flow_and_native_concurrency() -> None:
     sources = _sources()
-    controller = sources["controller"]
-    launcher = sources["launcher"]
-
-    assert 'TARGET_BASE_BRANCH = "master"' in controller
-    assert "base_origin_master_sha" in controller
-    assert "delivery_anchor" in controller
-    assert "PRE_PUSH_CI_PASS" not in controller
-    assert "delivery_generation" not in controller
-    assert "local_evidence" not in controller
-    assert "production-success" in controller
-    assert '"ready-for-delivery"' in controller
-    assert "delivery.json" in controller
-    assert "refresh_for_delivery" in controller
-    assert "GitHub" in controller or "github" in controller
-    assert "resolve-recovery" in controller
-    assert "owner_authorize" in controller
-    assert "request_codex_review" not in controller
-    assert "validate_codex_review" not in controller
-    assert "CODEX_REVIEW_MAX_ROUNDS" not in controller
-    assert "review_contract = validate_pull_request_review_contract" not in controller
-    assert "validate-pr-review" not in launcher
-    assert "--continue-queue" in launcher
-    assert "enqueue_integration" not in controller
-    assert "release_freeze" not in controller
-    assert "verify_dev_provenance" not in controller
-    assert "canonical_dev_worktree" not in controller
-    assert '"--owner-launch"' in launcher
-    assert '"--approve-for-me"' in launcher
-    assert "Do not merge" in controller
-    assert "Codex Code Review отключён" in launcher
-    assert "request-codex-review" not in launcher
-    assert "validate-codex-review" not in launcher
-    assert "Не запускай следующую product task" in launcher
+    deploy = yaml.safe_load(sources["deploy"])
+    assert deploy["concurrency"] == {"group": "production", "cancel-in-progress": False}
+    assert "GitHub Issue" in sources["agents"]
+    assert "protected `master`" in sources["global_rules"]
+    assert "local state machine" in sources["lifecycle"]
 
 
-def test_policy_docs_remove_dev_from_normal_delivery_and_keep_human_gates() -> None:
-    sources = _sources()
-    agents = sources["agents"]
-    global_rules = sources["global_rules"]
-    lifecycle = sources["lifecycle"]
+def test_production_workflow_uses_native_concurrency() -> None:
+    workflow = yaml.safe_load(_sources()["deploy"])
+    assert workflow["concurrency"]["group"] == "production"
+    assert workflow["concurrency"]["cancel-in-progress"] is False
 
-    assert "AUTO_RELEASE_ELIGIBLE" in agents
-    assert "AUTO_RELEASE_ELIGIBLE" in global_rules
-    assert "AUTO_RELEASE_ELIGIBLE" in lifecycle
-    assert "Direct push в `master` запрещён" in global_rules
-    assert "required check `checks`" in lifecycle
-    assert "PR master" in lifecycle
-    assert "implementation lane" in lifecycle
-    assert "delivery lane" in lifecycle
-    assert "Busy delivery/CI/production" in lifecycle
-    assert "Обычная task без `concurrency`" in lifecycle
-    assert "implementation exclusion" in lifecycle
-    assert "independent-write" in global_rules
-    assert "active `exclusive-write` несовместим" not in global_rules
-    assert "fast-forward/sync `dev`" not in lifecycle
-    assert "serial merge в `dev`" not in global_rules
-    assert "явно обязательный owner checkpoint/approve, human/device evidence" in lifecycle
-    assert "failure/rollback/manual-intervention verdict" in lifecycle.lower()
+
+def test_controller_entrypoints_and_host_lock_are_removed() -> None:
+    root = Path(__file__).resolve().parents[1]
+    for relative in (
+        "scripts/task_session.py",
+        "scripts/run_task_delivery.py",
+        "scripts/controller_v2.py",
+        "scripts/issue_workflow.py",
+        "scripts/worker_guard.py",
+    ):
+        assert not (root / relative).exists(), relative
+    deploy = _sources()["deploy"]
+    rollout = (root / "scripts/zero_downtime_deploy.py").read_text(encoding="utf-8")
+    assert "task_session.py" not in deploy
+    assert "classify-controller-release" not in deploy
+    assert "_deployment_lock" not in rollout
+    assert "import fcntl" not in rollout
 
 
 def test_existing_compact_and_slot_contracts_remain_intact() -> None:

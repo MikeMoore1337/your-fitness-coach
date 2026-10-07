@@ -1,9 +1,8 @@
-"""Deterministic role routing for the YFC task delivery lifecycle."""
+"""Optional deterministic role routing for local YFC work."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -30,7 +29,6 @@ WORKER_ROLES = (
     "implementer",
     "qa-verifier",
 )
-CONTROLLER_ROLE = "integration-release"
 ROLE_ORDER = {role: index for index, role in enumerate(WORKER_ROLES)}
 
 ROLE_PATTERNS: dict[str, tuple[str, ...]] = {
@@ -39,7 +37,6 @@ ROLE_PATTERNS: dict[str, tuple[str, ...]] = {
     "product-lawyer": (r"\bproduct[- ]lawyer\b",),
     "implementer": (r"\bimplementer\b",),
     "qa-verifier": (r"\bqa[- ]verifier\b", r"\bqa verifier\b"),
-    "integration-release": (r"\bintegration[- ]release\b",),
 }
 
 SURFACE_PATTERNS: dict[str, re.Pattern[str]] = {
@@ -178,9 +175,9 @@ def build_agent_flow(
 ) -> dict[str, Any]:
     """Build a bounded machine-readable role plan without copying private task prose."""
 
-    normalized_id = str(task_id).strip().upper()
-    if not re.fullmatch(r"[0-9]+[A-Z]?", normalized_id):
-        raise AgentFlowError(f"Invalid task id: {task_id!r}")
+    normalized_id = str(task_id).strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", normalized_id):
+        raise AgentFlowError(f"Invalid work label: {task_id!r}")
     if not task_text.strip():
         raise AgentFlowError("Task document is empty")
 
@@ -199,7 +196,6 @@ def build_agent_flow(
     inferred_qa = False
     inferred_roles: list[str] = []
     declared_roles = [role for role in (primary, *additional) if role]
-    declared_controller_role = CONTROLLER_ROLE in declared_roles
     declared_worker_roles = [role for role in declared_roles if role in WORKER_ROLES]
 
     if explicit_contract:
@@ -267,7 +263,7 @@ def build_agent_flow(
             "starts_at_percent": 75,
             "policy": (
                 "stop broad discovery, prioritize acceptance checks, targeted fixes, final "
-                "verification and lifecycle handoff; never skip required checks"
+                "verification and GitHub handoff; never skip required checks"
             ),
         },
         "max_collab_tool_calls": collab_budget,
@@ -283,7 +279,7 @@ def build_agent_flow(
             else "disabled"
         ),
         "parallel_production_writers": False,
-        "enforcement": "live-codex-jsonl-worker-guard",
+        "enforcement": "optional host-provided budget; GitHub remains authoritative",
     }
 
     roles = [
@@ -312,7 +308,6 @@ def build_agent_flow(
         "schema_version": AGENT_FLOW_SCHEMA_VERSION,
         "classification": "yfc-agent-flow-plan",
         "task_id": normalized_id,
-        "task_fingerprint_sha256": hashlib.sha256(task_text.encode("utf-8")).hexdigest(),
         "routing": {
             "source": "explicit-task-contract" if explicit_contract else "deterministic-inference",
             "task_type_present": bool(_task_type(task_text)),
@@ -322,7 +317,7 @@ def build_agent_flow(
             "detected_surfaces": list(surfaces),
             "cross_cutting": cross_cutting,
             "architecture_signal": architecture_signal,
-            "issue_contract_present": issue_contract is not None,
+            "github_issue_context_present": issue_contract is not None,
         },
         "graphify": {
             "bootstrap_required": graphify_required,
@@ -343,16 +338,6 @@ def build_agent_flow(
         "agent_budget": agent_budget,
         "worker_role_passes": roles,
         "skipped_worker_roles": list(skipped),
-        "controller_managed_roles": [
-            {
-                "name": CONTROLLER_ROLE,
-                "reason": (
-                    "explicit task declaration; execution remains controller-managed"
-                    if declared_controller_role
-                    else "normal YFC delivery convergence is controller-managed"
-                ),
-            }
-        ],
         "execution": {
             "mode": "single-worker-role-passes",
             "single_production_writer": True,
@@ -364,6 +349,7 @@ def build_agent_flow(
         },
         "prohibited_automatic_roles": ["reviewer", "security-reviewer", "adversarial-auditor"],
         "source_of_truth": [
+            "GitHub Issue/PR/Checks/Actions",
             "current source",
             "tests",
             "migrations",
@@ -387,14 +373,14 @@ def build_agent_flow_from_path(
 
 
 def render_agent_flow_prompt(plan: Mapping[str, Any]) -> str:
-    """Render the bounded routing plan for the single delivery worker."""
+    """Render an optional bounded routing plan for local work."""
 
     return (
         "Agent Flow v1 routing contract (deterministic, bounded):\n"
         + json.dumps(dict(plan), ensure_ascii=False, sort_keys=True)
         + "\n"
         "Execute only the listed worker role passes, in their listed order, inside the current "
-        "worker. If the environment already provides a safe collab/subagent mechanism, use it only "
+        "optional worker. If the environment already provides a safe collab/subagent mechanism, use it only "
         "within agent_budget and only for read-only planning/research work; never create another "
         "production writer. Do not install or invent an agent framework. Only implementer may write "
         "production code. "
@@ -407,7 +393,7 @@ def render_agent_flow_prompt(plan: Mapping[str, Any]) -> str:
         "If it is unavailable, apply the YFC minimalism ladder from AGENTS.md directly. "
         "Always verify source/tests/migrations/docs before writes. At 75% of the tool-action "
         "budget enter completion mode: stop broad discovery, prioritize acceptance checks, "
-        "targeted fixes, final verification and lifecycle handoff; never skip required checks.\n"
+        "targeted fixes, final verification and GitHub handoff; never skip required checks.\n"
     )
 
 

@@ -13,8 +13,6 @@ def test_ordinary_explicit_task_uses_only_declared_implementer() -> None:
 
 - **Тип:** Feature
 - **Основная роль:** implementer
-- **Дополнительные роли lifecycle:** integration-release
-
 Change a small Python helper with targeted tests.
 """,
     )
@@ -28,7 +26,7 @@ Change a small Python helper with targeted tests.
     assert plan["agent_budget"]["max_spawned_subagents"] == 0
     assert plan["agent_budget"]["max_collab_tool_calls"] == 0
     assert plan["agent_budget"]["max_completed_tool_actions"] == 160
-    assert plan["controller_managed_roles"][0]["name"] == "integration-release"
+    assert "controller_managed_roles" not in plan
 
 
 def test_research_discovery_without_role_contract_routes_to_researcher() -> None:
@@ -88,7 +86,7 @@ def test_explicit_roles_override_inferred_orchestrator_and_qa() -> None:
 
 - **Тип:** Feature
 - **Основная роль:** implementer
-- **Дополнительные роли lifecycle:** qa-verifier, integration-release
+- **Дополнительные роли lifecycle:** qa-verifier
 
 Change FastAPI backend, React UI and PostgreSQL migration for a user-facing workflow.
 """,
@@ -156,8 +154,8 @@ Change a helper. Private note: {secret_marker}
 
     serialized = json.dumps(plan, ensure_ascii=False)
     assert secret_marker not in serialized
-    assert plan["routing"]["issue_contract_present"] is True
-    assert len(plan["task_fingerprint_sha256"]) == 64
+    assert plan["routing"]["github_issue_context_present"] is True
+    assert "task_fingerprint_sha256" not in plan
 
 
 def test_explicit_ponytail_ultra_override_is_respected() -> None:

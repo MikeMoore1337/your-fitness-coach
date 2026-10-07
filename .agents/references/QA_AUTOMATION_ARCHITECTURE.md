@@ -2,11 +2,8 @@
 
 ## Purpose
 
-YFC сохраняет lifecycle roles:
-
-`implementer -> qa-verifier -> integration-release`.
-
-QA specialization выражается skills и рабочими профилями, а не вторым набором lifecycle agents.
+YFC keeps implementation and read-only QA roles as optional working modes.
+Merge, deployment and release state belongs to GitHub, not to an agent role.
 
 ## QA work profiles
 
@@ -15,7 +12,7 @@ QA specialization выражается skills и рабочими профиля
 | qa-architect | qa-verifier / orchestrator for genuine multi-stream scope | qa-engineer + coverage-analysis |
 | test-implementer | implementer | qa-engineer + relevant implementation skill |
 | test-reviewer | qa-verifier | qa-engineer + e2e-review or pytest-test-design |
-| ci-investigator | qa-verifier; integration-release only for release convergence | failure-triage + relevant framework skill |
+| ci-investigator | qa-verifier | failure-triage + relevant framework skill |
 | flaky-analyst | qa-verifier | flaky-analysis + relevant framework skill |
 | coverage-analyst | qa-verifier | coverage-analysis + qa-engineer |
 
@@ -47,7 +44,7 @@ Useful external references considered during design:
 - voidmatcha/e2e-skills - false-green review concepts and failure taxonomy (Apache-2.0);
 - mauricio2093/playwright-audit-skill - audit/evidence/reporting ideas; only general concepts were used.
 
-YFC project conventions, existing harnesses, lifecycle policy and Mobile/TMA evidence rules take precedence over generic examples from those projects.
+YFC project conventions, GitHub Flow, existing harnesses and Mobile/TMA evidence rules take precedence over generic examples from those projects.
 
 ## Routing principle
 

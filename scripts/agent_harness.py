@@ -1,8 +1,7 @@
-"""Deterministic, repository-local harness for YFC agent workflow quality.
+"""Optional deterministic harness for agent evals and owner-review candidates.
 
-The harness deliberately does not create a second lifecycle. Agent evals reuse
-existing pytest regressions, checkpoints are derived from TaskController
-recovery state, and learning output is only an owner-review candidate.
+Git and GitHub remain the lifecycle source of truth.  This module only runs
+declared pytest evals and writes derived evidence when explicitly requested.
 """
 
 from __future__ import annotations
@@ -26,7 +25,6 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution
 
 EVAL_SCHEMA_VERSION = 1
 REPORT_SCHEMA_VERSION = 1
-CHECKPOINT_SCHEMA_VERSION = 1
 LEARNING_SCHEMA_VERSION = 1
 EVAL_KINDS = {"capability", "regression"}
 LEARNING_ACTIONS = {"UPDATE_EXISTING", "NEW_SKILL", "DOC_ONLY", "REJECT"}
@@ -47,18 +45,6 @@ CANONICAL_INSTRUCTION_PATHS = (
     ".agents/README.md",
     "codex-backlog/TASK_EXECUTION_LIFECYCLE.md",
     "codex-backlog/GLOBAL_RULES.md",
-)
-CHECKPOINT_LEASE_FIELDS = (
-    "branch",
-    "worktree",
-    "base_sha",
-    "head_sha",
-    "ready_head_sha",
-    "pr_number",
-    "delivery_owner",
-    "deployed_sha",
-    "production_run_id",
-    "updated_at",
 )
 
 
@@ -112,6 +98,8 @@ def _assert_secret_free(value: Any, *, path: str = "$") -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             key_text = str(key)
+            if key_text == "token_overlap":
+                continue
             if SENSITIVE_KEY_RE.search(key_text) and item not in (None, "", [], {}):
                 raise AgentHarnessError(
                     f"Sensitive field is not allowed in harness artifact: {path}.{key_text}"
@@ -322,109 +310,13 @@ def write_eval_report(
         normalized,
         "evidence",
         f"evidence/agent-evals/{_timestamp_slug()}-{suffix}.json",
-        purpose="deterministic agent lifecycle eval report",
+        purpose="deterministic agent eval report",
         command="scripts/agent_harness.py eval run",
         owner="agent-harness",
     )
     payload = dict(report)
     payload["artifact_path"] = target.relative_to(repo_root).as_posix()
     _atomic_write_json(target, payload)
-    return target
-
-
-def recover_task_state(
-    repo_root: Path,
-    task_id: str,
-    *,
-    runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
-) -> dict[str, Any]:
-    normalized = normalize_task_id(task_id)
-    command = [
-        sys.executable,
-        str(repo_root / "scripts" / "task_session.py"),
-        "--repo",
-        str(repo_root),
-        "recover",
-        normalized,
-    ]
-    completed = runner(
-        command,
-        cwd=repo_root,
-        check=False,
-        text=True,
-        encoding="utf-8",
-        capture_output=True,
-    )
-    if completed.returncode != 0:
-        detail = (completed.stderr or completed.stdout or "unknown error").strip()
-        raise AgentHarnessError(f"Task recovery snapshot failed: {detail}")
-    try:
-        payload = json.loads(completed.stdout)
-    except json.JSONDecodeError as error:
-        raise AgentHarnessError("Task recovery returned invalid JSON") from error
-    if not isinstance(payload, dict):
-        raise AgentHarnessError("Task recovery snapshot must be a JSON object")
-    return payload
-
-
-def build_checkpoint(recovery: Mapping[str, Any]) -> dict[str, Any]:
-    if recovery.get("mutation_performed") is not False:
-        raise AgentHarnessError("Checkpoint requires read-only recovery state")
-    task_id = normalize_task_id(str(recovery.get("task_id", "")))
-    lease = recovery.get("lease")
-    lease_map = lease if isinstance(lease, Mapping) else {}
-    delivery = recovery.get("delivery")
-    delivery_map = delivery if isinstance(delivery, Mapping) else {}
-    owner = delivery_map.get("owner")
-    owner_map = owner if isinstance(owner, Mapping) else {}
-
-    anchors = {
-        key: lease_map[key]
-        for key in CHECKPOINT_LEASE_FIELDS
-        if key in lease_map and lease_map[key] not in (None, "", [], {})
-    }
-    checkpoint = {
-        "schema_version": CHECKPOINT_SCHEMA_VERSION,
-        "classification": "derived-agent-checkpoint",
-        "generated_at": utc_now(),
-        "source": "scripts/task_session.py recover",
-        "source_of_truth": False,
-        "task_id": task_id,
-        "lifecycle_state": recovery.get("lifecycle_state"),
-        "recovery_classification": recovery.get("classification"),
-        "anchors": anchors,
-        "branches": list(recovery.get("branches") or []),
-        "issues": list(recovery.get("issues") or []),
-        "delivery": {
-            "owner_task_id": owner_map.get("task_id"),
-            "owner_branch": owner_map.get("branch"),
-        },
-        "mutation_performed": False,
-    }
-    _assert_secret_free(checkpoint)
-    return checkpoint
-
-
-def write_checkpoint(
-    repo_root: Path,
-    task_id: str,
-    checkpoint: Mapping[str, Any],
-    *,
-    artifact_root: Path | None = None,
-) -> Path:
-    normalized = normalize_task_id(task_id)
-    if checkpoint.get("task_id") != normalized:
-        raise AgentHarnessError("Checkpoint task ID does not match requested task")
-    manager = ArtifactManager(artifact_root or repo_root / ".artifacts", repo_root=repo_root)
-    target = manager.allocate(
-        normalized,
-        "temporary",
-        "temporary/agent-harness/checkpoint.json",
-        purpose="derived read-only task checkpoint for session recovery",
-        command="scripts/agent_harness.py checkpoint",
-        owner="agent-harness",
-    )
-    _atomic_write_json(target, checkpoint)
     return target
 
 
@@ -593,9 +485,6 @@ def _parser() -> argparse.ArgumentParser:
     eval_run.add_argument("--eval-id")
     eval_run.add_argument("--task-id")
 
-    checkpoint = root.add_parser("checkpoint")
-    checkpoint.add_argument("task_id")
-
     learn = root.add_parser("learn")
     learn_commands = learn.add_subparsers(dest="learn_command", required=True)
     propose = learn_commands.add_parser("propose")
@@ -646,22 +535,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 }
             print(json.dumps(report, ensure_ascii=False, indent=2))
             return 0 if report["overall"] == "PASS" else 1
-
-        if args.command == "checkpoint":
-            recovery = recover_task_state(repo_root, args.task_id)
-            checkpoint_payload = build_checkpoint(recovery)
-            target = write_checkpoint(repo_root, args.task_id, checkpoint_payload)
-            print(
-                json.dumps(
-                    {
-                        **checkpoint_payload,
-                        "artifact_path": target.relative_to(repo_root).as_posix(),
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                )
-            )
-            return 0
 
         if args.command == "learn" and args.learn_command == "propose":
             candidate, target, duplicate = propose_learning_candidate(
