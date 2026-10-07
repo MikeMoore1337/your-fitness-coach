@@ -62,6 +62,7 @@ export const queryKeys = {
       day: (planDate: string) => ['nutrition', 'plans', 'day', planDate] as const,
       week: (weekStart: string) => ['nutrition', 'plans', 'week', weekStart] as const,
     },
+    groceryList: (weekStart: string) => ['nutrition', 'grocery-list', weekStart] as const,
   },
   notifications: {
     all: ['notifications'] as const,

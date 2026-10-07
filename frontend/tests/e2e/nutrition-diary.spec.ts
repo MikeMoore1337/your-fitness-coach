@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
 import type {
   FoodDiaryEntry,
   HydrationEntry,
@@ -294,6 +294,57 @@ async function mockNutritionApi(
   let plannerRevision = 1;
   let plannerStatus: 'planned' | 'consumed' | 'skipped' = 'planned';
   let plannerDiaryEntryId: number | null = null;
+  type MockGroceryItem = {
+    id: number;
+    source_kind: 'generated' | 'manual';
+    food_id: number | null;
+    name: string;
+    brand: string | null;
+    amount: string | null;
+    amount_unit: 'g' | 'ml' | 'piece' | 'serving' | null;
+    checked: boolean;
+    owned: boolean;
+    sources: Array<{
+      plan_item_id: number;
+      recipe_id: number | null;
+      plan_date: string;
+      meal_type: 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+      recipe_name: string;
+    }>;
+  };
+  let groceryGenerated = false;
+  let groceryItems: MockGroceryItem[] = [
+    {
+      id: 301,
+      source_kind: 'generated' as const,
+      food_id: oatmealFood.id,
+      name: oatmealFood.name,
+      brand: oatmealFood.brand,
+      amount: '150.000',
+      amount_unit: 'g' as const,
+      checked: false,
+      owned: false,
+      sources: [
+        {
+          plan_item_id: 101,
+          recipe_id: 41,
+          plan_date: '2026-08-19',
+          meal_type: 'breakfast' as const,
+          recipe_name: 'Каша с яблоком',
+        },
+      ],
+    },
+  ];
+  const groceryResponse = () => ({
+    id: 55,
+    week_start: '2026-08-17',
+    week_end: '2026-08-23',
+    generated: groceryGenerated,
+    refresh_required: false,
+    updated_at: '2026-08-19T08:00:00',
+    items: groceryGenerated ? groceryItems : [],
+    stale_sources: [],
+  });
   const plannerDay = (planDate: string) => ({
     plan_date: planDate,
     timezone: 'Europe/Moscow',
@@ -517,6 +568,47 @@ async function mockNutritionApi(
     }
     if (path === '/api/v1/nutrition/plans/day' && request.method() === 'GET') {
       return route.fulfill({ json: plannerDay(url.searchParams.get('plan_date') || '2026-08-19') });
+    }
+    if (path === '/api/v1/nutrition/grocery-list' && request.method() === 'GET') {
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path === '/api/v1/nutrition/grocery-list' && request.method() === 'PUT') {
+      groceryGenerated = true;
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path === '/api/v1/nutrition/grocery-list/items' && request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        name: string;
+        amount: string | null;
+        amount_unit: 'g' | 'ml' | 'piece' | 'serving' | null;
+      };
+      groceryItems = [
+        ...groceryItems,
+        {
+          id: 302,
+          source_kind: 'manual' as const,
+          food_id: null,
+          name: body.name,
+          brand: null,
+          amount: body.amount,
+          amount_unit: body.amount_unit,
+          checked: false,
+          owned: false,
+          sources: [],
+        },
+      ];
+      return route.fulfill({ status: 201, json: groceryResponse() });
+    }
+    if (path.startsWith('/api/v1/nutrition/grocery-list/items/') && request.method() === 'PATCH') {
+      const id = Number(path.split('/').at(-1));
+      const body = request.postDataJSON() as Partial<(typeof groceryItems)[number]>;
+      groceryItems = groceryItems.map((item) => (item.id === id ? { ...item, ...body } : item));
+      return route.fulfill({ json: groceryResponse() });
+    }
+    if (path.startsWith('/api/v1/nutrition/grocery-list/items/') && request.method() === 'DELETE') {
+      const id = Number(path.split('/').at(-1));
+      groceryItems = groceryItems.filter((item) => item.id !== id);
+      return route.fulfill({ json: groceryResponse() });
     }
     if (path === '/api/v1/nutrition/plans/week' && request.method() === 'GET') {
       const days = [
@@ -849,6 +941,84 @@ async function mockNutritionApi(
   };
 }
 
+async function assertTask748MobileSafeArea(page: Page, grocery: Locator): Promise<void> {
+  const controls: [Locator, Locator, Locator] = [
+    grocery.getByLabel('Название продукта'),
+    grocery.getByLabel('Количество'),
+    grocery.getByLabel('Единица'),
+  ];
+  const addButton = grocery.getByRole('button', { name: 'Добавить в список', exact: true });
+  const updateToast = page.locator('.toast').filter({ hasText: 'Список покупок обновлён' });
+
+  await grocery.getByRole('button', { name: 'Обновить список', exact: true }).click();
+  await expect(updateToast).toBeVisible();
+  await controls[0].fill('Соль');
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+
+  const readGeometry = () =>
+    page.evaluate(() => {
+      const readRect = (element: Element | null) => {
+        if (!element) return null;
+        const box = element.getBoundingClientRect();
+        return { top: box.top, right: box.right, bottom: box.bottom, left: box.left };
+      };
+      const action = Array.from(document.querySelectorAll<HTMLElement>('button')).find(
+        (element) => element.textContent?.trim() === 'Добавить в список',
+      );
+      return {
+        controls: [
+          readRect(document.querySelector('#grocery-manual-name')),
+          readRect(document.querySelector('#grocery-manual-amount')),
+          readRect(document.querySelector('#grocery-manual-unit')),
+        ],
+        action: readRect(action ?? null),
+        dock: readRect(document.querySelector('#appBottomNav')),
+        toast: readRect(document.querySelector('.toast:not([aria-hidden="true"])')),
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        scrollWidth: document.documentElement.scrollWidth,
+      };
+    });
+
+  await addButton.scrollIntoViewIfNeeded();
+  const actionGeometry = await readGeometry();
+  expect(actionGeometry.action).not.toBeNull();
+  expect(actionGeometry.controls[2]).not.toBeNull();
+  expect(actionGeometry.dock).not.toBeNull();
+  expect(actionGeometry.toast).not.toBeNull();
+  expect(actionGeometry.action!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.controls[2]!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.toast!.bottom).toBeLessThanOrEqual(actionGeometry.dock!.top);
+  expect(actionGeometry.action!.bottom).toBeLessThanOrEqual(actionGeometry.toast!.top);
+  expect(actionGeometry.action!.left).toBeGreaterThanOrEqual(0);
+  expect(actionGeometry.action!.right).toBeLessThanOrEqual(actionGeometry.viewport.width);
+  expect(actionGeometry.scrollWidth).toBeLessThanOrEqual(actionGeometry.viewport.width);
+
+  const actionTopBeforeToastDismiss = actionGeometry.action!.top;
+  const scrollYBeforeToastDismiss = await page.evaluate(() => window.scrollY);
+  for (const control of controls) {
+    await control.scrollIntoViewIfNeeded();
+    const controlGeometry = await readGeometry();
+    const controlIndex = controls.indexOf(control);
+    expect(controlGeometry.controls[controlIndex]).not.toBeNull();
+    expect(controlGeometry.controls[controlIndex]!.top).toBeGreaterThanOrEqual(0);
+    expect(controlGeometry.controls[controlIndex]!.bottom).toBeLessThanOrEqual(
+      controlGeometry.dock!.top,
+    );
+  }
+  await addButton.scrollIntoViewIfNeeded();
+  await expect(updateToast.getByRole('button', { name: 'Закрыть сообщение' })).toBeVisible();
+  await updateToast.getByRole('button', { name: 'Закрыть сообщение' }).click();
+  await expect(updateToast).toBeHidden();
+  expect(
+    Math.abs((await page.evaluate(() => window.scrollY)) - scrollYBeforeToastDismiss),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs((await addButton.boundingBox())!.y - actionTopBeforeToastDismiss),
+  ).toBeLessThanOrEqual(1);
+}
+
 test('Task 746 meal planner stays separate from diary on mobile day and week views', async ({
   page,
 }) => {
@@ -929,6 +1099,92 @@ test('Task 747 mocked TMA keeps plan fill explicit and bridges one planned item 
     expected_revision: 2,
   });
   await expect(planner.getByText('Съедено', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 748 grocery list derives recipe items and keeps manual changes usable on mobile', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  await expect(
+    page.getByTestId('meal-planner').getByText('Планирование питания', { exact: true }),
+  ).toBeVisible();
+  const grocery = page.getByTestId('grocery-list');
+  await expect(grocery).toBeVisible();
+  await expect(grocery.getByText('Планирование питания', { exact: true })).toBeVisible();
+  await expect(page.getByText('Nutrition Planning', { exact: true })).toHaveCount(0);
+  await grocery.locator('summary').click();
+  await expect(grocery.getByText('Список ещё не сформирован', { exact: true })).toBeVisible();
+  await grocery.getByRole('button', { name: 'Сформировать список', exact: true }).click();
+  await expect(grocery.getByText('Овсяная каша', { exact: true })).toBeVisible();
+  await expect(
+    grocery.getByText('Каша с яблоком · Завтрак · 19 авг.', { exact: true }),
+  ).toBeVisible();
+
+  const bought = grocery.getByRole('checkbox', { name: 'Куплено: Овсяная каша' });
+  await bought.click();
+  await expect(bought).toBeChecked();
+  const owned = grocery.getByRole('checkbox', { name: 'Уже есть: Овсяная каша' });
+  await owned.click();
+  await expect(owned).toBeChecked();
+  const addButton = grocery.getByRole('button', { name: 'Добавить в список', exact: true });
+  await assertTask748MobileSafeArea(page, grocery);
+  await addButton.click();
+
+  const manual = grocery.locator('.grocery-list__item').filter({ hasText: 'Соль' });
+  await expect(manual).toBeVisible();
+  await manual.getByRole('button', { name: 'Изменить', exact: true }).click();
+  await manual.getByLabel('Название').fill('Морская соль');
+  await manual.getByRole('button', { name: 'Сохранить', exact: true }).click();
+  await expect(grocery.getByText('Морская соль', { exact: true })).toBeVisible();
+  await manual.getByRole('button', { name: 'Удалить', exact: true }).click();
+  await expect(grocery.getByText('Морская соль', { exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+});
+
+test('Task 748 grocery list keeps its primary action clear in mocked TMA dark mode', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-task-748-init-data',
+        initDataUnsafe: {},
+        version: '8.0',
+        platform: 'android',
+        colorScheme: 'dark',
+        themeParams: {},
+        viewportHeight: 844,
+        viewportStableHeight: 844,
+        safeAreaInset: { top: 24, right: 0, bottom: 18, left: 0 },
+        contentSafeAreaInset: { top: 8, right: 0, bottom: 10, left: 0 },
+        ready() {},
+        expand() {},
+        onEvent() {},
+        offEvent() {},
+        setHeaderColor() {},
+        setBackgroundColor() {},
+        setBottomBarColor() {},
+      },
+    };
+  });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19#tgWebAppPlatform=android');
+
+  const grocery = page.getByTestId('grocery-list');
+  await expect(grocery).toBeVisible();
+  await grocery.locator('summary').click();
+  await grocery.getByRole('button', { name: 'Сформировать список', exact: true }).click();
+  await expect(grocery.getByText('Овсяная каша', { exact: true })).toBeVisible();
+  const bought = grocery.getByRole('checkbox', { name: 'Куплено: Овсяная каша' });
+  await bought.click();
+  await expect(bought).toBeChecked();
+  await assertTask748MobileSafeArea(page, grocery);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
 

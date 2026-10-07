@@ -69,7 +69,7 @@ class NutritionPlanItem(Base):
         CheckConstraint("amount > 0", name="ck_nutrition_plan_items_amount_positive"),
         CheckConstraint(
             "(item_kind = 'food' AND food_id IS NOT NULL AND recipe_id IS NULL) OR "
-            "(item_kind = 'recipe' AND recipe_id IS NOT NULL AND food_id IS NULL AND amount_unit = 'g')",
+            "(item_kind = 'recipe' AND food_id IS NULL AND amount_unit = 'g')",
             name="ck_nutrition_plan_items_single_source",
         ),
         CheckConstraint("position >= 0", name="ck_nutrition_plan_items_position_nonnegative"),

@@ -3624,6 +3624,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/nutrition/grocery-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Nutrition Grocery List */
+        get: operations["nutrition_grocery_list_api_v1_nutrition_grocery_list_get"];
+        /** Generate Nutrition Grocery List */
+        put: operations["generate_nutrition_grocery_list_api_v1_nutrition_grocery_list_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/grocery-list/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Nutrition Grocery Item */
+        post: operations["add_nutrition_grocery_item_api_v1_nutrition_grocery_list_items_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/nutrition/grocery-list/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Nutrition Grocery Item */
+        delete: operations["remove_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Patch Nutrition Grocery Item */
+        patch: operations["patch_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__patch"];
+        trace?: never;
+    };
     "/api/v1/nutrition/plans/week": {
         parameters: {
             query?: never;
@@ -10129,6 +10182,132 @@ export interface components {
             provider_status: "not_requested" | "not_needed" | "disabled" | "available" | "unavailable" | "rate_limited";
             /** Provider Statuses */
             provider_statuses?: components["schemas"]["FoodProviderStatusResponse"][];
+        };
+        /** GroceryListGenerateRequest */
+        GroceryListGenerateRequest: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+        };
+        /** GroceryListItemResponse */
+        GroceryListItemResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "generated" | "manual";
+            /** Food Id */
+            food_id: number | null;
+            /** Name */
+            name: string;
+            /** Brand */
+            brand: string | null;
+            /** Amount */
+            amount: string | null;
+            /** Amount Unit */
+            amount_unit: ("g" | "ml" | "piece" | "serving") | null;
+            /** Checked */
+            checked: boolean;
+            /** Owned */
+            owned: boolean;
+            /** Sources */
+            sources: components["schemas"]["GroceryListItemSourceResponse"][];
+        };
+        /** GroceryListItemSourceResponse */
+        GroceryListItemSourceResponse: {
+            /** Plan Item Id */
+            plan_item_id: number | null;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Recipe Name */
+            recipe_name: string;
+        };
+        /** GroceryListItemUpdate */
+        GroceryListItemUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "piece" | "serving") | null;
+            /** Checked */
+            checked?: boolean | null;
+            /** Owned */
+            owned?: boolean | null;
+        };
+        /** GroceryListManualItemCreate */
+        GroceryListManualItemCreate: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Name */
+            name: string;
+            /** Amount */
+            amount?: number | string | null;
+            /** Amount Unit */
+            amount_unit?: ("g" | "ml" | "piece" | "serving") | null;
+        };
+        /** GroceryListResponse */
+        GroceryListResponse: {
+            /** Id */
+            id: number | null;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /** Generated */
+            generated: boolean;
+            /** Refresh Required */
+            refresh_required: boolean;
+            /** Updated At */
+            updated_at: string | null;
+            /** Items */
+            items: components["schemas"]["GroceryListItemResponse"][];
+            /** Stale Sources */
+            stale_sources: components["schemas"]["GroceryListStaleSourceResponse"][];
+        };
+        /** GroceryListStaleSourceResponse */
+        GroceryListStaleSourceResponse: {
+            /** Plan Item Id */
+            plan_item_id: number;
+            /** Recipe Id */
+            recipe_id: number | null;
+            /**
+             * Plan Date
+             * Format: date
+             */
+            plan_date: string;
+            /**
+             * Meal Type
+             * @enum {string}
+             */
+            meal_type: "breakfast" | "lunch" | "dinner" | "snacks";
+            /** Source Name */
+            source_name: string;
+            /** Reason */
+            reason: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -24086,6 +24265,169 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NutritionPlanDayResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    nutrition_grocery_list_api_v1_nutrition_grocery_list_get: {
+        parameters: {
+            query: {
+                week_start: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_nutrition_grocery_list_api_v1_nutrition_grocery_list_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListGenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_nutrition_grocery_item_api_v1_nutrition_grocery_list_items_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListManualItemCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    patch_nutrition_grocery_item_api_v1_nutrition_grocery_list_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroceryListItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroceryListResponse"];
                 };
             };
             /** @description Validation Error */
