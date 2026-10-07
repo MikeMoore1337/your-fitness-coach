@@ -92,3 +92,12 @@ def test_lifecycle_milestone_migration_passes_the_online_rollout_gate(monkeypatc
         Path("backend/alembic/versions/0114_lifecycle_missed_workout_constraint.py")
     )
     checker["check_online_migrations"](active_revision, target_revision)
+
+
+def test_check_in_templates_migration_passes_the_online_rollout_gate() -> None:
+    root = Path(__file__).resolve().parents[2]
+    checker = runpy.run_path(str(root / "scripts" / "check_online_migrations.py"))
+
+    checker["validate_added_migration"](
+        root / "backend" / "alembic" / "versions" / "0127_configurable_check_in_templates.py"
+    )
