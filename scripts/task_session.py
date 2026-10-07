@@ -10472,7 +10472,11 @@ class TaskController:
         return None
 
     def _verified_subsequent_production_chain(
-        self, original_sha: str, master_sha: str
+        self,
+        original_sha: str,
+        master_sha: str,
+        *,
+        original_production_evidence: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         github = self._github()
         if not self.repository.is_ancestor(original_sha, master_sha):
@@ -10773,7 +10777,16 @@ class TaskController:
                 release_cache[sha] = self._successful_release_evidence(sha)
             return release_cache[sha]
 
-        original_production = release_for(original_sha)
+        if original_production_evidence is None:
+            original_production = release_for(original_sha)
+        else:
+            if (
+                original_production_evidence.get("deployed_sha") != original_sha
+                or original_production_evidence.get("deployment_success_verified") is not True
+            ):
+                raise TaskSessionError("Supplied original production evidence is invalid")
+            original_production = dict(original_production_evidence)
+            release_cache[original_sha] = original_production
         current_production_run = release_for(production_sha)
         if original_production is None:
             raise TaskSessionError("Original deployed SHA has no successful production evidence")
@@ -10893,7 +10906,7 @@ class TaskController:
                     "No successful production deployment exists for the exact deployed SHA"
                 ) from error
             raise TaskSessionError(str(error)) from error
-        return evidence.as_legacy_dict()
+        return evidence.as_dict() if manual else evidence.as_legacy_dict()
 
     def _verified_preserved_task_head_history(
         self,
@@ -11216,6 +11229,27 @@ class TaskController:
             StateStore.replace_json(history_path, current_history)
         return reconciliation
 
+    def reconcile_delivery(
+        self,
+        task_id: str,
+        *,
+        pr_number: int,
+        merge_sha: str,
+        deployed_sha: str,
+        production_run_id: int,
+        owner_authorize: bool,
+    ) -> dict[str, Any]:
+        """Canonical v2 entry point for a previously deployed task recovery."""
+
+        return self.reconcile_deployed_task_after_master_drift(
+            task_id,
+            pr_number=pr_number,
+            merge_sha=merge_sha,
+            deployed_sha=deployed_sha,
+            production_run_id=production_run_id,
+            owner_authorize=owner_authorize,
+        )
+
     def reconcile_deployed_task_after_master_drift(
         self,
         task_id: str,
@@ -11430,8 +11464,14 @@ class TaskController:
         feature_preservation = self._verified_task_feature_preservation(
             pr_number, merge_sha, master_sha
         )
-        production = self._verified_exact_production_run(merge_sha, production_run_id)
-        master_evidence = self._verified_subsequent_production_chain(merge_sha, master_sha)
+        production = self._verified_exact_production_run(
+            merge_sha, production_run_id, current_master_sha=master_sha
+        )
+        master_evidence = self._verified_subsequent_production_chain(
+            merge_sha,
+            master_sha,
+            original_production_evidence=production,
+        )
         now = utc_now()
         reconciliation = {
             "version": 1,
@@ -11510,11 +11550,23 @@ class TaskController:
                 raise TaskSessionError(
                     "Task feature preservation evidence changed during historical reconciliation"
                 )
-            if self._verified_exact_production_run(merge_sha, production_run_id) != production:
+            if (
+                self._verified_exact_production_run(
+                    merge_sha, production_run_id, current_master_sha=master_sha
+                )
+                != production
+            ):
                 raise TaskSessionError(
                     "Production deployment evidence changed during historical reconciliation"
                 )
-            if self._verified_subsequent_production_chain(merge_sha, master_sha) != master_evidence:
+            if (
+                self._verified_subsequent_production_chain(
+                    merge_sha,
+                    master_sha,
+                    original_production_evidence=production,
+                )
+                != master_evidence
+            ):
                 raise TaskSessionError(
                     "Subsequent master evidence changed during historical reconciliation"
                 )
@@ -11927,13 +11979,18 @@ class TaskController:
         ):
             raise TaskSessionError("finish refuses stale task feature-preservation evidence")
         production_run_id = production.get("run_id")
-        if self._verified_exact_production_run(deployed_sha, production_run_id) != dict(production):
+        current_production = self._verified_exact_production_run(
+            deployed_sha, production_run_id, current_master_sha=master_sha
+        )
+        if current_production != dict(production):
             raise TaskSessionError("finish refuses stale historical production evidence")
         master_evidence = audit.get("verified_master_evidence")
         if not isinstance(master_evidence, Mapping):
             raise TaskSessionError(invalid)
         current_master_evidence = self._verified_subsequent_production_chain(
-            deployed_sha, master_sha
+            deployed_sha,
+            master_sha,
+            original_production_evidence=current_production,
         )
         if current_master_evidence != master_evidence:
             raise TaskSessionError("finish refuses stale historical master evidence")
@@ -12491,6 +12548,13 @@ def _parser() -> argparse.ArgumentParser:
     reconcile_historical.add_argument("--deployed-sha", required=True)
     reconcile_historical.add_argument("--production-run", type=int, required=True)
     reconcile_historical.add_argument("--owner-authorize", action="store_true")
+    reconcile_delivery = subparsers.add_parser("reconcile-delivery")
+    reconcile_delivery.add_argument("task_id")
+    reconcile_delivery.add_argument("--pr", type=int, required=True)
+    reconcile_delivery.add_argument("--merge-sha", required=True)
+    reconcile_delivery.add_argument("--deployed-sha", required=True)
+    reconcile_delivery.add_argument("--production-run", type=int, required=True)
+    reconcile_delivery.add_argument("--owner-authorize", action="store_true")
     recover = subparsers.add_parser("recover")
     recover.add_argument("task_id")
     finish = subparsers.add_parser("finish")
@@ -12753,6 +12817,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "reconcile-deployed-task-after-master-drift":
             _print(
                 controller.reconcile_deployed_task_after_master_drift(
+                    args.task_id,
+                    pr_number=args.pr,
+                    merge_sha=args.merge_sha,
+                    deployed_sha=args.deployed_sha,
+                    production_run_id=args.production_run,
+                    owner_authorize=args.owner_authorize,
+                )
+            )
+            return 0
+        if args.command == "reconcile-delivery":
+            _print(
+                controller.reconcile_delivery(
                     args.task_id,
                     pr_number=args.pr,
                     merge_sha=args.merge_sha,
