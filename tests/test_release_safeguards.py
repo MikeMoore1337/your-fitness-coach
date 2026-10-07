@@ -204,6 +204,38 @@ def test_manual_repair_is_native_ancestor_checked_and_reuses_single_slot_rollout
     assert "deployment.lock" not in deploy
 
 
+def test_manual_repair_always_executes_fresh_current_tooling() -> None:
+    deploy = _sources()["deploy"]
+    repair = deploy.split("  repair:\n", 1)[1].split("  reconcile:\n", 1)[0]
+
+    assert "TOOLING_REVISION: ${{ needs.authorize.outputs.current_master }}" in repair
+    assert "ref: ${{ needs.authorize.outputs.current_master }}" in repair
+    assert 'git archive --format=tar "$REVISION"' in repair
+    assert 'git archive --format=tar "$TOOLING_REVISION"' in repair
+    assert repair.index('git archive --format=tar "$REVISION"') < repair.index(
+        'git archive --format=tar "$TOOLING_REVISION"'
+    )
+    for path in (
+        "scripts/deploy_production.sh",
+        "scripts/zero_downtime_deploy.py",
+        "scripts/production_host_cleanup.py",
+        "scripts/check_online_migrations.py",
+        "scripts/continuous_deployment_probe.py",
+        "scripts/db_maintenance.py",
+        "scripts/check_deployment.py",
+        "scripts/check_seo_surface.py",
+    ):
+        assert path in repair
+    assert "REPAIR_TARGET_REVISION=$REVISION" in repair
+    assert "REPAIR_TOOLING_REVISION=$TOOLING_REVISION" in repair
+    assert r"echo \"REPAIR_EXECUTION_ROOT=\$STAGING_PATH\"" in repair
+    assert r"cd \"\$STAGING_PATH\"" in repair
+    assert r"rm -rf \"\$STAGING_PATH\"" not in repair
+    assert r"test \"\$current_target\" = \"\$RELEASE_ROOT/$BASELINE_REVISION\"" in repair
+    assert r"mv \"\$STAGING_PATH\" \"\$RELEASE_PATH\"" in repair
+    assert "QUARANTINE_PATH" in repair
+
+
 def test_repair_preflight_uses_symbolic_alembic_revision_parser() -> None:
     deploy = _sources()["deploy"]
 
