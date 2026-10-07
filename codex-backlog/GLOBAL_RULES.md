@@ -27,9 +27,10 @@ release integrity, not local worktree cleanliness or optional metadata.
 ## Deployment
 
 After a successful merge, GitHub Actions uses stateless changed-path classification. Runtime,
-migration, image, production configuration and deployment-helper changes deploy an immutable
-bundle, perform safe migrations, rollout and production smoke. Documentation, backlog, governance,
-tests-only and local tooling do not deploy the application.
+migration, image, production configuration and scripts copied into an application image deploy an
+immutable bundle, perform safe migrations, rollout and production smoke. Documentation, backlog,
+governance, tests-only, CI/deploy workflows and host-side delivery tooling do not redeploy an
+unchanged application.
 
 Production serialization is Actions `concurrency.group: production` with
 `cancel-in-progress: false`. Existing deployment evidence, health checks, migration sequencing,

@@ -9,17 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Deploy the current master revision or roll back the active release
+        description: Deploy, reconcile existing runtime provenance, or roll back the active release
         required: true
         default: deploy
         type: choice
-        options: [deploy, rollback]
+        options: [deploy, reconcile, rollback]
       revision:
-        description: Exact current master SHA (deploy) or active production SHA (rollback)
+        description: Exact tested SHA (deploy/reconcile) or active production SHA (rollback)
         required: true
         type: string
       ci_run_id:
-        description: Successful post-merge CI run ID for a manual deployment
+        description: Successful CI run ID for a manual deploy or provenance reconciliation
         required: false
         type: string
       reason:
@@ -68,12 +68,14 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact successful CI evidence
-        if: env.DEPLOY_OPERATION == 'deploy'
+        if: env.DEPLOY_OPERATION == 'deploy' || env.DEPLOY_OPERATION == 'reconcile'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
         run: |
           set -Eeuo pipefail
+          [[ "$DEPLOY_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CI_RUN_ID" =~ ^[0-9]+$ ]]
           ci_run="$(gh api "repos/$REPOSITORY/actions/runs/$CI_RUN_ID")"
           printf '%s\n' "$ci_run"
           jq -e \
@@ -102,6 +104,15 @@ jobs:
             exit 0
           fi
           current_master="$(gh api "repos/$REPOSITORY/git/ref/heads/master" --jq '.object.sha')"
+          git fetch origin master --no-tags
+          test "$(git rev-parse origin/master)" = "$current_master"
+          if [ "$DEPLOY_OPERATION" = reconcile ]; then
+            git merge-base --is-ancestor "$DEPLOY_SHA" "$current_master"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "reason=owner-authorized metadata-only production provenance reconciliation" >> "$GITHUB_OUTPUT"
+            echo "Authorized provenance reconciliation for tested ancestor $DEPLOY_SHA"
+            exit 0
+          fi
           test "$current_master" = "$DEPLOY_SHA"
           base_sha="$(git rev-parse "$DEPLOY_SHA^1")"
           scope="$(python scripts/deployment_scope.py \
@@ -173,6 +184,7 @@ jobs:
         run: |
           set -Eeuo pipefail
           ACTIVE_REVISION=""
+          ACTIVE_AUDIT=""
           for attempt in 1 2 3; do
             if ACTIVE_REVISION="$(ssh \
               -o BatchMode=yes \
@@ -182,48 +194,9 @@ jobs:
               -o ConnectionAttempts=1 \
               -p "$PROD_PORT" \
               "$PROD_USER@$PROD_HOST" \
-              "set -Eeuo pipefail
-            marker='$PROD_PATH/.artifacts/operations/deployments/last-successful-revision'
-            if [ -f \"\$marker\" ]; then
-              cat \"\$marker\"
-              exit 0
-            fi
-            # Legacy single-slot deployments may retain evidence without the marker file.
-            state_root='$PROD_PATH/.artifacts/operations/deployments'
-            if [ -d \"\$state_root\" ]; then
-              latest_summary=\"\$(
-                find \"\$state_root\" -mindepth 2 -maxdepth 2 -type f -name summary.json -printf '%T@ %p\\n' |
-                  sort -nr |
-                  cut -d' ' -f2- |
-                  while IFS= read -r summary; do
-                    revision=\"\$(python3 -c 'import json,sys; value=json.load(open(sys.argv[1], encoding=\"utf-8\")); print(value.get(\"target_revision\", \"\") if value.get(\"verdict\") == \"active\" else \"\")' \"\$summary\")\"
-                    if [[ \"\$revision\" =~ ^[0-9a-f]{40}$ ]]; then
-                      printf '%s\\n' \"\$revision\"
-                      break
-                    fi
-                  done
-              )\"
-              if [ -n \"\$latest_summary\" ]; then
-                printf '%s\\n' \"\$latest_summary\"
-                exit 0
-              fi
-            fi
-            container_for_service() {
-              local service=\"\$1\"
-              local containers
-              containers=\$(docker ps --filter \"label=com.docker.compose.service=\$service\" --format '{{.ID}}')
-              test \"\$(printf '%s\\n' \"\$containers\" | sed '/^$/d' | wc -l)\" -eq 1
-              printf '%s\\n' \"\$containers\"
-            }
-            backend_container=\$(container_for_service backend)
-            bot_container=\$(container_for_service bot)
-            backend_image=\$(docker inspect --format '{{.Config.Image}}' \"\$backend_container\")
-            bot_image=\$(docker inspect --format '{{.Config.Image}}' \"\$bot_container\")
-            backend_revision=\$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' \"\$backend_image\")
-            bot_revision=\$(docker image inspect --format '{{index .Config.Labels \"org.opencontainers.image.revision\"}}' \"\$bot_image\")
-            test \"\$backend_revision\" = \"\$bot_revision\"
-            printf '%s\\n' \"\$backend_revision\"
-          ")"; then
+              "python3 - snapshot --app-root '$PROD_PATH'" \
+              < scripts/production_provenance.py)"; then
+              ACTIVE_AUDIT="$ACTIVE_REVISION"
               break
             fi
             if [ "$attempt" -eq 3 ]; then
@@ -234,8 +207,25 @@ jobs:
             echo "Active revision SSH read attempt $attempt failed; retrying in $delay seconds" >&2
             sleep "$delay"
           done
+          if [ -z "$ACTIVE_AUDIT" ]; then
+            echo "Production provenance audit returned no result" >&2
+            exit 1
+          fi
+          status="$(jq -r '.status // empty' <<<"$ACTIVE_REVISION")"
+          recorded_revision="$(jq -r '.recorded_revision // empty' <<<"$ACTIVE_REVISION")"
+          runtime_revision="$(jq -r '.runtime_revision // empty' <<<"$ACTIVE_REVISION")"
+          if [ "$status" != OK ]; then
+            echo "Production provenance preflight failed: status=$status recorded=$recorded_revision runtime=$runtime_revision" >&2
+            printf '%s\n' "$ACTIVE_REVISION" >&2
+            exit 1
+          fi
+          if [ "$recorded_revision" != "$runtime_revision" ]; then
+            echo "Production provenance mismatch before transfer: recorded=$recorded_revision runtime=$runtime_revision" >&2
+            exit 1
+          fi
+          ACTIVE_REVISION="$runtime_revision"
           if [[ ! "$ACTIVE_REVISION" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "Production active revision is missing or not a full lowercase SHA" >&2
+            echo "Production runtime revision is missing or not a full lowercase SHA" >&2
             exit 1
           fi
           if ! git merge-base --is-ancestor "$ACTIVE_REVISION" "$DEPLOY_SHA"; then
@@ -312,12 +302,8 @@ jobs:
              export DEPLOY_MIGRATION_MANIFEST=deployment-migration-manifest.json
              export DEPLOY_SINGLE_SLOT_CONFIRMED_SHA='$DEPLOY_SHA'
              active_marker='$PROD_PATH/.artifacts/operations/deployments/last-successful-revision'
-             if [ -f \"\$active_marker\" ]; then
-               test \"\$(tr -d '\\r\\n' < \"\$active_marker\")\" = '$ACTIVE_REVISION'
-             else
-               install -d -m 700 \"\$(dirname \"\$active_marker\")\"
-               printf '%s\\n' '$ACTIVE_REVISION' > \"\$active_marker\"
-             fi
+             test -f \"\$active_marker\"
+             test \"\$(tr -d '\\r\\n' < \"\$active_marker\")\" = '$ACTIVE_REVISION'
              registry_login_succeeded=false
              DOCKER_CONFIG_DIR=\$(mktemp -d)
              trap 'rm -rf \"\$DOCKER_CONFIG_DIR\"' EXIT
@@ -348,8 +334,128 @@ jobs:
                --tmp-root /tmp \
                --warning-free-mb 3072 \
                --stale-ttl-hours 24 \
-               --docker-prune
+              --docker-prune
               rm -f '/tmp/$BUNDLE_NAME'"
+
+  reconcile:
+    name: Reconcile verified production provenance metadata
+    needs: authorize
+    if: needs.authorize.outputs.operation == 'reconcile'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    environment: production
+    env:
+      REVISION: ${{ inputs.revision }}
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: "1337"
+      PROD_USER: yfc-deploy
+      PROD_PATH: /srv/yfc/fit-mini-app
+      PROD_URL: https://app.your-fitness-coach.ru
+      PROD_PUBLIC_URL: https://your-fitness-coach.ru
+    steps:
+      - name: Check out current reconciliation helper
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Configure production SSH access
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Read-only production provenance audit
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - snapshot --app-root '$PROD_PATH'" \
+            < scripts/production_provenance.py | tee provenance-before.json
+          jq -e \
+            --arg expected "$REVISION" \
+            '(.runtime_revision == $expected) and
+             (.runtime_uniform == true) and
+             ((.services | keys | sort) == ["backend", "bot", "worker"]) and
+             ((.errors | length) == 0) and
+             (.status == "OK" or .status == "PROVENANCE_RECONCILIATION_REQUIRED") and
+             (.recorded_revision | test("^[0-9a-f]{40}$"))' \
+            provenance-before.json >/dev/null
+
+      - name: Verify public application and SEO smoke before metadata change
+        run: |
+          set -Eeuo pipefail
+          python scripts/check_deployment.py "$PROD_URL" --expected-environment prod
+          python scripts/check_seo_surface.py "$PROD_PUBLIC_URL" --timeout 15
+
+      - name: Reconcile marker and current symlink without application mutation
+        run: |
+          set -Eeuo pipefail
+          result="$(ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - reconcile --app-root '$PROD_PATH' --expected-revision '$REVISION'" \
+            < scripts/production_provenance.py)"
+          printf '%s\n' "$result" | tee provenance-reconcile.json
+          jq -e \
+            --arg expected "$REVISION" \
+            '(.status == "RECONCILED") and
+             (.application_mutation == false) and
+             (.post_marker == $expected)' \
+            provenance-reconcile.json >/dev/null
+          echo "RECONCILIATION=PASS"
+          echo "RECONCILIATION_APPLICATION_MUTATION=false"
+
+      - name: Verify reconciled production provenance
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - snapshot --app-root '$PROD_PATH'" \
+            < scripts/production_provenance.py | tee provenance-after.json
+          jq -e \
+            --arg expected "$REVISION" \
+            '(.status == "OK") and
+             (.recorded_revision == $expected) and
+             (.runtime_revision == $expected) and
+             (.runtime_uniform == true) and
+             (.current.target == .release.path) and
+             ((.errors | length) == 0)' \
+            provenance-after.json >/dev/null
+
+      - name: Verify public application and SEO smoke after metadata change
+        run: |
+          set -Eeuo pipefail
+          python scripts/check_deployment.py "$PROD_URL" --expected-environment prod
+          python scripts/check_seo_surface.py "$PROD_PUBLIC_URL" --timeout 15
 
   rollback:
     name: Roll back known production release

@@ -52,11 +52,10 @@ _DEPLOY_FILES = {
     "uv.lock",
     "frontend/package.json",
     "frontend/package-lock.json",
-    "scripts/check_online_migrations.py",
-    "scripts/deploy_production.sh",
-    "scripts/deployment_contract.py",
-    "scripts/production_host_cleanup.py",
-    "scripts/zero_downtime_deploy.py",
+    # These scripts are copied into the application image and can change its
+    # runtime behavior.  Host-side delivery helpers remain tooling-only.
+    "scripts/check_deployment.py",
+    "scripts/fetch_rapidocr_models.py",
 }
 
 
