@@ -8,6 +8,64 @@ SHA_B = "b" * 40
 
 
 @pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ("0126_plan_source_constraint (head)", {"0126_plan_source_constraint"}),
+        ("0125_grocery_lists (head)", {"0125_grocery_lists"}),
+        ("abcdef1234567890 (head)", {"abcdef1234567890"}),
+        ("", set()),
+        ("not a revision line", set()),
+        (
+            "0126_plan_source_constraint (head)\n0127_another_head (head)",
+            {"0126_plan_source_constraint", "0127_another_head"},
+        ),
+    ],
+)
+def test_parse_alembic_revisions_supports_symbolic_hex_like_and_multiple_heads(
+    output: str, expected: set[str]
+) -> None:
+    assert provenance.parse_alembic_revisions(output) == expected
+
+
+@pytest.mark.parametrize(
+    ("current", "heads", "expected"),
+    [
+        ({"0126_plan_source_constraint"}, {"0126_plan_source_constraint"}, True),
+        (
+            {"0125_grocery_lists", "0126_plan_source_constraint"},
+            {"0126_plan_source_constraint"},
+            True,
+        ),
+        (set(), {"0126_plan_source_constraint"}, False),
+        ({"0126_plan_source_constraint"}, set(), False),
+        ({"not a revision line"}, {"0126_plan_source_constraint"}, False),
+        ({"0125_grocery_lists"}, {"0126_plan_source_constraint"}, False),
+    ],
+)
+def test_alembic_revision_consistency_is_fail_closed(
+    current: set[str], heads: set[str], expected: bool
+) -> None:
+    assert provenance.alembic_revisions_are_consistent(current, heads) is expected
+
+
+def test_database_snapshot_parses_symbolic_revision_output(monkeypatch) -> None:
+    outputs = iter(
+        [
+            "INFO [alembic.runtime.migration] Context impl PostgresqlImpl.\n"
+            "0126_plan_source_constraint (head)\n",
+            "0126_plan_source_constraint (head)\n",
+        ]
+    )
+    monkeypatch.setattr(provenance, "_run", lambda _command: next(outputs))
+
+    result = provenance._database_snapshot("backend-container")
+
+    assert result["current_revisions"] == ["0126_plan_source_constraint"]
+    assert result["head_revisions"] == ["0126_plan_source_constraint"]
+    assert result["consistent"] is True
+
+
+@pytest.mark.parametrize(
     ("recorded", "runtime", "expected"),
     [
         (SHA_A, [SHA_A, SHA_A, SHA_A], "OK"),
