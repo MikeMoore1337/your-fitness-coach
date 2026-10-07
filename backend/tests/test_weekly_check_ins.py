@@ -5,10 +5,12 @@ from decimal import Decimal
 
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.food import Food
 from fitminiapp_api.models.food_diary import FoodDiaryDayStatus, FoodDiaryEntry
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.notification import Notification, NotificationSetting
 from fitminiapp_api.models.nutrition import NutritionTarget
+from fitminiapp_api.models.nutrition_plan import NutritionPlan, NutritionPlanItem
 from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User
 from fitminiapp_api.services import measurements as measurements_service
 from fitminiapp_api.services import notifications as notifications_service
@@ -338,6 +340,149 @@ def test_weekly_review_separates_diary_states_and_only_marks_selected_low_days(
     assert updated["nutrition"]["fasted_days"] == 1
     assert updated["nutrition"]["unlogged_days"] == 2
     assert updated["nutrition"]["suspicious_low_days"] == []
+
+
+def test_weekly_planning_review_compares_plan_to_diary_and_confirms_carry_forward(
+    client, monkeypatch
+) -> None:
+    headers = _auth(client, 34_152)
+    user_id = _user_id(34_152)
+    fixed_local_day = date(2026, 8, 21)
+    week_start = date(2026, 8, 17)
+    monkeypatch.setattr(check_in_service, "today_for_user", lambda _user: fixed_local_day)
+
+    with get_session_context() as db:
+        food = Food(
+            name="Плановый йогурт",
+            energy_kcal_per_100g=Decimal("120"),
+            protein_g_per_100g=Decimal("10"),
+            fat_g_per_100g=Decimal("3"),
+            carbs_g_per_100g=Decimal("8"),
+            fiber_g_per_100g=Decimal("0"),
+            standard_serving_amount=None,
+            standard_serving_unit=None,
+            standard_serving_weight_g=None,
+            food_type="system",
+            owner_user_id=None,
+            provenance="internal",
+            source_name="yfc-test",
+            trust_level="verified",
+            status="active",
+        )
+        db.add(food)
+        db.flush()
+        food_id = food.id
+        db.add(
+            NutritionTarget(
+                user_id=user_id,
+                assigned_by_user_id=user_id,
+                effective_from=date(2026, 8, 1),
+                source="manual",
+                calories=2000,
+                protein_g=140,
+                fat_g=70,
+                carbs_g=200,
+            )
+        )
+        for plan_date in (date(2026, 8, 18), date(2026, 8, 19)):
+            plan = NutritionPlan(user_id=user_id, plan_date=plan_date, revision=1)
+            plan.items.append(
+                NutritionPlanItem(
+                    item_kind="food",
+                    food_id=food_id,
+                    meal_type="lunch",
+                    position=0,
+                    amount=Decimal("100"),
+                    amount_unit="g",
+                    source_name=food.name,
+                    status="planned",
+                )
+            )
+            db.add(plan)
+
+    diary = client.post(
+        "/api/v1/nutrition/diary/entries",
+        headers=headers,
+        json={
+            "food_id": food_id,
+            "diary_date": "2026-08-18",
+            "meal_type": "lunch",
+            "amount": "100",
+            "amount_unit": "g",
+        },
+    )
+    assert diary.status_code == 201, diary.text
+
+    current = client.get("/api/v1/check-ins/weekly/current", headers=headers)
+    assert current.status_code == 200, current.text
+    review = current.json()["summary"]["nutrition"]["planning_review"]
+    assert review["availability"] == "available"
+    assert review["planned_days"] == 2
+    assert review["consumed_days"] == 1
+    assert review["pending_days"] == 2
+    assert review["repeated_miss_dates"] == ["2026-08-18", "2026-08-19"]
+    assert review["planned_total"]["energy_kcal"] == "240.00"
+    assert review["consumed_total"]["energy_kcal"] == "120.00"
+    days = {day["diary_date"]: day for day in review["days"]}
+    assert days["2026-08-18"]["consumed"]["energy_kcal"] == "120.00"
+    assert days["2026-08-19"]["consumed"] is None
+    assert [proposal["source_date"] for proposal in review["proposals"]] == [
+        "2026-08-18",
+        "2026-08-19",
+    ]
+
+    payload = {
+        "week_start": week_start.isoformat(),
+        "adjustments": [
+            {
+                "source_date": proposal["source_date"],
+                "target_date": proposal["target_date"],
+                "source_revision": proposal["source_revision"],
+                "target_revision": proposal["target_revision"],
+            }
+            for proposal in review["proposals"]
+        ],
+    }
+    other_headers = _auth(client, 34_153)
+    foreign = client.post(
+        "/api/v1/check-ins/weekly/planning-review/confirm",
+        headers={**other_headers, "Idempotency-Key": "weekly-review-plan-749-other"},
+        json=payload,
+    )
+    assert foreign.status_code == 409
+    assert "34_152" not in foreign.text
+
+    confirmed = client.post(
+        "/api/v1/check-ins/weekly/planning-review/confirm",
+        headers={**headers, "Idempotency-Key": "weekly-review-plan-749"},
+        json=payload,
+    )
+    assert confirmed.status_code == 200, confirmed.text
+    assert confirmed.json()["replayed"] is False
+    assert confirmed.json()["planning_review"]["proposals"] == []
+
+    with get_session_context() as db:
+        copied_plans = (
+            db.query(NutritionPlan)
+            .filter(
+                NutritionPlan.user_id == user_id,
+                NutritionPlan.plan_date.in_((date(2026, 8, 25), date(2026, 8, 26))),
+            )
+            .all()
+        )
+        assert len(copied_plans) == 2
+        assert all(len(plan.items) == 1 for plan in copied_plans)
+        assert all(plan.items[0].status == "planned" for plan in copied_plans)
+        assert all(plan.items[0].diary_entry_id is None for plan in copied_plans)
+        assert db.query(FoodDiaryEntry).filter(FoodDiaryEntry.user_id == user_id).count() == 1
+
+    replay = client.post(
+        "/api/v1/check-ins/weekly/planning-review/confirm",
+        headers={**headers, "Idempotency-Key": "weekly-review-plan-749"},
+        json=payload,
+    )
+    assert replay.status_code == 200, replay.text
+    assert replay.json()["replayed"] is True
 
 
 def test_weekly_review_flags_explicitly_complete_zero_day_without_counting_unlogged_day(

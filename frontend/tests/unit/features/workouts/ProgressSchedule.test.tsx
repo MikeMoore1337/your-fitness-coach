@@ -192,6 +192,66 @@ const weeklyCheckIn = {
         carbs_g: 190,
       },
       suspicious_low_days: suspiciousLowDays,
+      planning_review: {
+        week_start: '2030-01-07',
+        week_end: '2030-01-13',
+        availability: 'available',
+        days: [
+          {
+            diary_date: '2030-01-08',
+            observed: true,
+            plan_status: 'partial',
+            plan_revision: 2,
+            planned_items: 1,
+            consumed_items: 0,
+            pending_items: 1,
+            skipped_items: 0,
+            planned: {
+              energy_kcal: '120.00',
+              protein_g: '10.00',
+              fat_g: '3.00',
+              carbs_g: '8.00',
+              fiber_g: '0.00',
+            },
+            consumed: null,
+            target: {
+              energy_kcal: '2000.00',
+              protein_g: '150.00',
+              fat_g: '70.00',
+              carbs_g: '190.00',
+            },
+          },
+        ],
+        planned_days: 1,
+        target_days: 1,
+        consumed_days: 0,
+        pending_days: 1,
+        repeated_miss_dates: [],
+        planned_total: {
+          energy_kcal: '120.00',
+          protein_g: '10.00',
+          fat_g: '3.00',
+          carbs_g: '8.00',
+          fiber_g: '0.00',
+        },
+        consumed_total: null,
+        target_total: {
+          energy_kcal: '2000.00',
+          protein_g: '150.00',
+          fat_g: '70.00',
+          carbs_g: '190.00',
+        },
+        proposals: [
+          {
+            source_date: '2030-01-08',
+            target_date: '2030-01-15',
+            source_revision: 2,
+            target_revision: 0,
+            pending_item_count: 1,
+            target_item_count: 0,
+          },
+        ],
+      },
     },
     weight_trend: null,
     anthropometry_trends: [],
@@ -323,6 +383,17 @@ describe('ProgressSchedule', () => {
       if (path === '/api/v1/check-ins/weekly' && init?.method === 'POST') {
         return new Response(JSON.stringify({ id: 1 }), { status: 201 });
       }
+      if (path === '/api/v1/check-ins/weekly/planning-review/confirm' && init?.method === 'POST') {
+        return new Response(
+          JSON.stringify({
+            week_start: '2030-01-07',
+            week_end: '2030-01-13',
+            replayed: false,
+            planning_review: { ...weeklyCheckIn.summary.nutrition.planning_review, proposals: [] },
+          }),
+          { status: 200 },
+        );
+      }
       if (path === '/api/v1/nutrition/diary/status' && init?.method === 'PUT') {
         return new Response(JSON.stringify({ status: 'incomplete' }), { status: 200 });
       }
@@ -442,6 +513,40 @@ describe('ProgressSchedule', () => {
             adherence_difficulty: null,
             note: 'Больше сна',
             energy_calibration_id: null,
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('keeps the next-plan adjustment preview-only until explicit confirmation', async () => {
+    renderPanel();
+
+    expect(await screen.findByText('Предпросмотр следующего плана')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить перенос' }));
+    const dialog = screen.getByRole('dialog', { name: 'Перенести незавершённое?' });
+    expect(dialog).toBeInTheDocument();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      '/api/v1/check-ins/weekly/planning-review/confirm',
+      expect.anything(),
+    );
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Перенести' }));
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/v1/check-ins/weekly/planning-review/confirm',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            week_start: '2030-01-07',
+            adjustments: [
+              {
+                source_date: '2030-01-08',
+                target_date: '2030-01-15',
+                source_revision: 2,
+                target_revision: 0,
+              },
+            ],
           }),
         }),
       ),

@@ -1,9 +1,12 @@
-from datetime import date, datetime
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from fitminiapp_api.schemas.data_quality import ProgressDataSufficiency
+from fitminiapp_api.schemas.food_diary import FoodDiaryNutrition, FoodDiaryTargets
 from fitminiapp_api.schemas.nutrition import EnergyCalibrationResponse
 from fitminiapp_api.schemas.progress import (
     AdherenceComponent,
@@ -50,6 +53,46 @@ class WeeklyCheckInNutritionSummary(BaseModel):
     exact_entry_count: int | None = Field(default=0, ge=0)
     approximate_entry_count: int | None = Field(default=0, ge=0)
     partial_entry_count: int | None = Field(default=0, ge=0)
+    planning_review: WeeklyPlanningReviewSummary | None = None
+
+
+class WeeklyPlanningDaySummary(BaseModel):
+    diary_date: date
+    observed: bool
+    plan_status: Literal["no_plan", "planned", "partial", "complete"]
+    plan_revision: int = Field(ge=0)
+    planned_items: int = Field(ge=0)
+    consumed_items: int = Field(ge=0)
+    pending_items: int = Field(ge=0)
+    skipped_items: int = Field(ge=0)
+    planned: FoodDiaryNutrition
+    consumed: FoodDiaryNutrition | None = None
+    target: FoodDiaryTargets | None = None
+
+
+class WeeklyPlanningProposal(BaseModel):
+    source_date: date
+    target_date: date
+    source_revision: int = Field(ge=0)
+    target_revision: int = Field(ge=0)
+    pending_item_count: int = Field(gt=0)
+    target_item_count: int = Field(ge=0)
+
+
+class WeeklyPlanningReviewSummary(BaseModel):
+    week_start: date
+    week_end: date
+    availability: Literal["available", "no_plan", "no_target", "no_data"]
+    days: list[WeeklyPlanningDaySummary]
+    planned_days: int = Field(ge=0)
+    target_days: int = Field(ge=0)
+    consumed_days: int = Field(ge=0)
+    pending_days: int = Field(ge=0)
+    repeated_miss_dates: list[date] = Field(default_factory=list)
+    planned_total: FoodDiaryNutrition
+    consumed_total: FoodDiaryNutrition | None = None
+    target_total: FoodDiaryTargets | None = None
+    proposals: list[WeeklyPlanningProposal] = Field(default_factory=list)
 
 
 class WeeklyCheckInAdaptiveSummary(BaseModel):
@@ -131,6 +174,46 @@ class WeeklyCheckInCurrentResponse(BaseModel):
     existing: WeeklyCheckInResponse | None = None
     summary: WeeklyCheckInSummary
     progress_action: ProgressWeeklyActionResponse
+
+
+class WeeklyPlanningAdjustment(BaseModel):
+    source_date: date
+    target_date: date
+    source_revision: int = Field(ge=0)
+    target_revision: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def require_next_week_target(self) -> WeeklyPlanningAdjustment:
+        if self.target_date != self.source_date + timedelta(days=7):
+            raise ValueError("planning adjustments must target the same weekday next week")
+        return self
+
+
+class WeeklyPlanningReviewConfirmRequest(BaseModel):
+    week_start: date
+    adjustments: list[WeeklyPlanningAdjustment] = Field(min_length=1, max_length=7)
+
+    @model_validator(mode="after")
+    def validate_week_and_dates(self) -> WeeklyPlanningReviewConfirmRequest:
+        if self.week_start.weekday() != 0:
+            raise ValueError("week_start must be a Monday")
+        source_dates = [item.source_date for item in self.adjustments]
+        if len(source_dates) != len(set(source_dates)):
+            raise ValueError("planning adjustments must use unique source dates")
+        week_end = self.week_start + timedelta(days=6)
+        if any(
+            item.source_date < self.week_start or item.source_date > week_end
+            for item in self.adjustments
+        ):
+            raise ValueError("planning adjustments must belong to the selected week")
+        return self
+
+
+class WeeklyPlanningReviewConfirmResponse(BaseModel):
+    week_start: date
+    week_end: date
+    replayed: bool
+    planning_review: WeeklyPlanningReviewSummary
 
 
 class WeeklyCheckInHistoryResponse(BaseModel):

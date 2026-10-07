@@ -3016,6 +3016,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/check-ins/weekly/planning-review/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Weekly Planning Review Action */
+        post: operations["confirm_weekly_planning_review_action_api_v1_check_ins_weekly_planning_review_confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/check-ins/weekly": {
         parameters: {
             query?: never;
@@ -15484,6 +15501,7 @@ export interface components {
              * @default 0
              */
             partial_entry_count: number | null;
+            planning_review?: components["schemas"]["WeeklyPlanningReviewSummary"] | null;
         };
         /** WeeklyCheckInProgressionSummary */
         WeeklyCheckInProgressionSummary: {
@@ -15636,6 +15654,133 @@ export interface components {
             /** Completed Workouts */
             completed_workouts: number;
             adherence: components["schemas"]["AdherenceComponent"];
+        };
+        /** WeeklyPlanningAdjustment */
+        WeeklyPlanningAdjustment: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Source Revision */
+            source_revision: number;
+            /** Target Revision */
+            target_revision: number;
+        };
+        /** WeeklyPlanningDaySummary */
+        WeeklyPlanningDaySummary: {
+            /**
+             * Diary Date
+             * Format: date
+             */
+            diary_date: string;
+            /** Observed */
+            observed: boolean;
+            /**
+             * Plan Status
+             * @enum {string}
+             */
+            plan_status: "no_plan" | "planned" | "partial" | "complete";
+            /** Plan Revision */
+            plan_revision: number;
+            /** Planned Items */
+            planned_items: number;
+            /** Consumed Items */
+            consumed_items: number;
+            /** Pending Items */
+            pending_items: number;
+            /** Skipped Items */
+            skipped_items: number;
+            planned: components["schemas"]["FoodDiaryNutrition"];
+            consumed?: components["schemas"]["FoodDiaryNutrition"] | null;
+            target?: components["schemas"]["FoodDiaryTargets"] | null;
+        };
+        /** WeeklyPlanningProposal */
+        WeeklyPlanningProposal: {
+            /**
+             * Source Date
+             * Format: date
+             */
+            source_date: string;
+            /**
+             * Target Date
+             * Format: date
+             */
+            target_date: string;
+            /** Source Revision */
+            source_revision: number;
+            /** Target Revision */
+            target_revision: number;
+            /** Pending Item Count */
+            pending_item_count: number;
+            /** Target Item Count */
+            target_item_count: number;
+        };
+        /** WeeklyPlanningReviewConfirmRequest */
+        WeeklyPlanningReviewConfirmRequest: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /** Adjustments */
+            adjustments: components["schemas"]["WeeklyPlanningAdjustment"][];
+        };
+        /** WeeklyPlanningReviewConfirmResponse */
+        WeeklyPlanningReviewConfirmResponse: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /** Replayed */
+            replayed: boolean;
+            planning_review: components["schemas"]["WeeklyPlanningReviewSummary"];
+        };
+        /** WeeklyPlanningReviewSummary */
+        WeeklyPlanningReviewSummary: {
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Availability
+             * @enum {string}
+             */
+            availability: "available" | "no_plan" | "no_target" | "no_data";
+            /** Days */
+            days: components["schemas"]["WeeklyPlanningDaySummary"][];
+            /** Planned Days */
+            planned_days: number;
+            /** Target Days */
+            target_days: number;
+            /** Consumed Days */
+            consumed_days: number;
+            /** Pending Days */
+            pending_days: number;
+            /** Repeated Miss Dates */
+            repeated_miss_dates?: string[];
+            planned_total: components["schemas"]["FoodDiaryNutrition"];
+            consumed_total?: components["schemas"]["FoodDiaryNutrition"] | null;
+            target_total?: components["schemas"]["FoodDiaryTargets"] | null;
+            /** Proposals */
+            proposals?: components["schemas"]["WeeklyPlanningProposal"][];
         };
         /** WorkoutAdaptationApplyRequest */
         WorkoutAdaptationApplyRequest: {
@@ -22757,6 +22902,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyCheckInCurrentResponse"];
+                };
+            };
+        };
+    };
+    confirm_weekly_planning_review_action_api_v1_check_ins_weekly_planning_review_confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyPlanningReviewConfirmRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyPlanningReviewConfirmResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
