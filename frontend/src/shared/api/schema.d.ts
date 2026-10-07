@@ -1726,6 +1726,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/workflow-automation/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Workflow Automation Preview */
+        get: operations["coach_workflow_automation_preview_api_v1_coach_workflow_automation_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-automation/evaluate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Workflow Automation Evaluate */
+        post: operations["coach_workflow_automation_evaluate_api_v1_coach_workflow_automation_evaluate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/capacity": {
         parameters: {
             query?: never;
@@ -8768,6 +8802,78 @@ export interface components {
              * @enum {string}
              */
             state: "open" | "completed";
+        };
+        /** CoachWorkflowAutomationResponse */
+        CoachWorkflowAutomationResponse: {
+            /**
+             * Ruleset Version
+             * @constant
+             */
+            ruleset_version: "coach-workflow-v1";
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "preview" | "evaluated";
+            /** Events Evaluated */
+            events_evaluated: number;
+            /** Proposals */
+            proposals?: components["schemas"]["CoachWorkflowProposal"][];
+            /** Tasks Created */
+            tasks_created: number;
+            /** Tasks Reused */
+            tasks_reused: number;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachWorkflowProposal */
+        CoachWorkflowProposal: {
+            /** Key */
+            key: string;
+            /**
+             * Event Kind
+             * @enum {string}
+             */
+            event_kind: "check_in_submitted" | "missed_workout" | "review_due" | "program_revision_ready";
+            /** Rule Id */
+            rule_id: string;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * Source Kind
+             * @enum {string}
+             */
+            source_kind: "weekly_check_in" | "workout" | "program" | "client" | "manual";
+            /** Source Id */
+            source_id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Title */
+            title: string;
+            /** Reason */
+            reason: string;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "urgent" | "soon";
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "draft" | "created" | "already_processed";
+            /** Task Id */
+            task_id?: number | null;
+            /** Task State */
+            task_state?: ("open" | "completed") | null;
         };
         /** DailyValuePercent */
         DailyValuePercent: {
@@ -20849,6 +20955,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_workflow_automation_preview_api_v1_coach_workflow_automation_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachWorkflowAutomationResponse"];
+                };
+            };
+        };
+    };
+    coach_workflow_automation_evaluate_api_v1_coach_workflow_automation_evaluate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachWorkflowAutomationResponse"];
                 };
             };
         };

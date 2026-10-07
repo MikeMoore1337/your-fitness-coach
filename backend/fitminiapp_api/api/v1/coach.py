@@ -56,6 +56,9 @@ from fitminiapp_api.schemas.coach_reviews import (
     CoachCheckInReviewListResponse,
     CoachCheckInReviewRequest,
 )
+from fitminiapp_api.schemas.coach_workflow_automation import (
+    CoachWorkflowAutomationResponse,
+)
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -139,6 +142,7 @@ from fitminiapp_api.services.coach_reviews import (
     list_coach_check_in_reviews,
     review_coach_check_in,
 )
+from fitminiapp_api.services.coach_workflow_automation import evaluate_coach_workflow
 from fitminiapp_api.services.exercise_catalog import _effective_exercise_id, list_exercises
 from fitminiapp_api.services.measurements import (
     MeasurementError,
@@ -332,6 +336,32 @@ def coach_inbox(
     db: Session = Depends(get_db),
 ) -> CoachInboxResponse:
     return CoachInboxResponse.model_validate(build_coach_inbox(db, current_user, limit=limit))
+
+
+@router.get(
+    "/workflow-automation/preview",
+    response_model=CoachWorkflowAutomationResponse,
+)
+def coach_workflow_automation_preview(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachWorkflowAutomationResponse:
+    return CoachWorkflowAutomationResponse.model_validate(
+        evaluate_coach_workflow(db, current_user, apply=False)
+    )
+
+
+@router.post(
+    "/workflow-automation/evaluate",
+    response_model=CoachWorkflowAutomationResponse,
+)
+def coach_workflow_automation_evaluate(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachWorkflowAutomationResponse:
+    return CoachWorkflowAutomationResponse.model_validate(
+        evaluate_coach_workflow(db, current_user, apply=True)
+    )
 
 
 @router.get("/capacity", response_model=CoachCapacityResponse)

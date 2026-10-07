@@ -810,6 +810,64 @@ async function mockCoachWorkspace(
           generated_at: `${operationDate}T10:00:00Z`,
         },
       });
+    if (path.endsWith('/coach/workflow-automation/preview'))
+      return route.fulfill({
+        json: {
+          ruleset_version: 'coach-workflow-v1',
+          mode: 'preview',
+          events_evaluated: 1,
+          proposals: [
+            {
+              key: 'check_in_submitted:11:901:check-in-submitted-v1',
+              event_kind: 'check_in_submitted',
+              rule_id: 'check-in-submitted-v1',
+              client_id: 11,
+              client_name: 'Анна Петрова',
+              source_kind: 'weekly_check_in',
+              source_id: 901,
+              occurred_at: '2026-08-17T10:00:00',
+              title: 'Проверить недельный итог',
+              reason: 'Клиент отправил недельный итог; проверьте его вручную.',
+              priority: 'urgent',
+              outcome: 'draft',
+              task_id: null,
+              task_state: null,
+            },
+          ],
+          tasks_created: 0,
+          tasks_reused: 0,
+          generated_at: '2026-08-20T10:00:00',
+        },
+      });
+    if (path.endsWith('/coach/workflow-automation/evaluate') && request.method() === 'POST')
+      return route.fulfill({
+        json: {
+          ruleset_version: 'coach-workflow-v1',
+          mode: 'evaluated',
+          events_evaluated: 1,
+          proposals: [
+            {
+              key: 'check_in_submitted:11:901:check-in-submitted-v1',
+              event_kind: 'check_in_submitted',
+              rule_id: 'check-in-submitted-v1',
+              client_id: 11,
+              client_name: 'Анна Петрова',
+              source_kind: 'weekly_check_in',
+              source_id: 901,
+              occurred_at: '2026-08-17T10:00:00',
+              title: 'Проверить недельный итог',
+              reason: 'Клиент отправил недельный итог; проверьте его вручную.',
+              priority: 'urgent',
+              outcome: 'created',
+              task_id: 902,
+              task_state: 'open',
+            },
+          ],
+          tasks_created: 1,
+          tasks_reused: 0,
+          generated_at: '2026-08-20T10:00:00',
+        },
+      });
     if (path.endsWith('/coach/attention'))
       return route.fulfill({
         json:
@@ -2616,4 +2674,29 @@ test('Task 751 check-in templates stay usable on desktop and mobile', async ({ p
   await expect(page.getByTestId('coach-check-in-templates')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await expect(page.getByRole('button', { name: 'Создать шаблон', exact: true })).toBeVisible();
+});
+
+test('Task 753 workflow automation stays pending and fits desktop and mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockCoachWorkspace(page, { operations: 'empty' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+
+  const workflow = page.getByTestId('coach-workflow-automation');
+  await expect(workflow).toBeVisible();
+  await expect(workflow.getByText('Черновик', { exact: true })).toBeVisible();
+  await expect(
+    workflow.getByText('Черновик задачи требует подтверждения тренера.', { exact: true }),
+  ).toBeVisible();
+
+  await workflow.getByRole('button', { name: 'Собрать предложения', exact: true }).click();
+  await expect(workflow.getByText('Открыто', { exact: true })).toBeVisible();
+  await expect(workflow.getByRole('link', { name: 'Открыть задачу', exact: true })).toHaveAttribute(
+    'href',
+    '/coach?tab=tools&tool=tasks',
+  );
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(workflow).toBeVisible();
 });

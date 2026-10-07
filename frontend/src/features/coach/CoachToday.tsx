@@ -5,6 +5,7 @@ import { api } from '../../shared/api/client';
 import { queryKeys } from '../../shared/queryKeys';
 import type { CoachClientFilter } from './coachWorkspace';
 import { CoachInbox } from './CoachInbox';
+import { CoachWorkflowAutomation } from './CoachWorkflowAutomation';
 import { Badge, Button, ErrorState, LoadingState } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 
@@ -56,6 +57,7 @@ export function CoachToday({
       </header>
 
       <CoachInbox onAction={onAttentionAction} />
+      <CoachWorkflowAutomation />
 
       <section
         className="coach-today__section coach-today__capacity"

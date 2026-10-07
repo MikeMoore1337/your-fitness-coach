@@ -19,6 +19,7 @@ export const queryKeys = {
   trainer: {
     attention: ['coach', 'attention'] as const,
     inbox: ['coach', 'inbox'] as const,
+    workflowAutomation: ['coach', 'workflow-automation'] as const,
     capacity: ['coach', 'capacity'] as const,
     checkInReviews: (status: 'pending' | 'reviewed' = 'pending') =>
       ['coach', 'check-in-reviews', status] as const,
