@@ -3489,6 +3489,54 @@ def test_reconcile_delivery_accepts_manual_recovery_release_logs(
     assert controller.finish("746")["cleanup_performed"] is True
 
 
+def test_reconcile_delivery_accepts_manual_recovery_deployment_status_on_run_head(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    _configure_manual_recovery_release(fixture)
+    fixture["github"].successful_deployments.add((fixture["master_sha"], "production"))
+
+    reconciliation = fixture["controller"].reconcile_delivery(
+        "746",
+        pr_number=764,
+        merge_sha=fixture["merge_sha"],
+        deployed_sha=fixture["merge_sha"],
+        production_run_id=9000,
+        owner_authorize=True,
+    )
+
+    status = reconciliation["verified_master_evidence"]["intervening_commits"][-1]
+    assert status["commit_sha"] == fixture["master_sha"]
+    assert status["manual_recovery_deployment_status"] == {
+        "classification": "manual-recovery-run-associated-with-run-head",
+        "run_id": 9000,
+        "run_head_sha": fixture["master_sha"],
+        "deployed_sha": fixture["merge_sha"],
+    }
+    assert fixture["controller"].finish("746")["cleanup_performed"] is True
+
+
+def test_reconcile_delivery_rejects_unrelated_controller_deployment_status(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    _configure_manual_recovery_release(fixture)
+    unrelated_controller_sha = fixture["later"][1]["merge_sha"]
+    fixture["github"].successful_deployments.add((unrelated_controller_sha, "production"))
+
+    with pytest.raises(
+        task_session.TaskSessionError, match="unexpectedly has a production deployment"
+    ):
+        fixture["controller"].reconcile_delivery(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=True,
+        )
+
+
 def test_reconcile_delivery_rejects_contradictory_manual_release_marker(
     repository: tuple[Path, Any],
 ) -> None:
