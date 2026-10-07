@@ -10496,6 +10496,24 @@ class TaskController:
         classified_nested_commits: set[str] = set()
         previous_sha = original_sha
         previous_merged_at: datetime | None = None
+        manual_recovery_overlay: dict[str, Any] | None = None
+        if isinstance(original_production_evidence, Mapping):
+            manual_run_head_sha = str(original_production_evidence.get("run_head_sha", ""))
+            manual_run_id = original_production_evidence.get("run_id")
+            if (
+                original_production_evidence.get("verification_mode")
+                == "owner-authorized-manual-release-log"
+                and original_production_evidence.get("deployed_sha") == original_sha
+                and original_production_evidence.get("deployment_success_verified") is True
+                and re.fullmatch(r"[0-9a-f]{40}", manual_run_head_sha) is not None
+                and type(manual_run_id) is int
+                and manual_run_id > 0
+            ):
+                manual_recovery_overlay = {
+                    "run_id": manual_run_id,
+                    "run_head_sha": manual_run_head_sha,
+                    "deployed_sha": original_sha,
+                }
         for commit_sha in master_commits:
             details = self.repository.git("show", "-s", "--format=%P%n%s", commit_sha)
             lines = details.splitlines()
@@ -10663,10 +10681,19 @@ class TaskController:
                     raise TaskSessionError(
                         f"Controller PR #{pr_number} lacks proof that application deployment was skipped"
                     )
+                manual_recovery_deployment_status = None
                 if github.has_successful_deployment(commit_sha, "production"):
-                    raise TaskSessionError(
-                        f"Controller commit {commit_sha} unexpectedly has a production deployment"
-                    )
+                    if (
+                        manual_recovery_overlay is None
+                        or manual_recovery_overlay["run_head_sha"] != commit_sha
+                    ):
+                        raise TaskSessionError(
+                            f"Controller commit {commit_sha} unexpectedly has a production deployment"
+                        )
+                    manual_recovery_deployment_status = {
+                        "classification": "manual-recovery-run-associated-with-run-head",
+                        **manual_recovery_overlay,
+                    }
                 record = {
                     "commit_sha": commit_sha,
                     "parent_sha": previous_sha,
@@ -10681,6 +10708,8 @@ class TaskController:
                     "changed_paths": changed_paths,
                     "release": controller_release,
                 }
+                if manual_recovery_deployment_status is not None:
+                    record["manual_recovery_deployment_status"] = manual_recovery_deployment_status
             else:
                 task_match = re.match(
                     rf"^\[Task (?P<task_id>{TASK_ID_PATTERN})\]", subject, re.IGNORECASE
