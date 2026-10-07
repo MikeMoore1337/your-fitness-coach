@@ -395,6 +395,7 @@ class FakeGitHub:
         self.runs: dict[int, dict[str, Any]] = {}
         self.workflow_runs_by_sha: dict[str, list[dict[str, Any]]] = {}
         self.workflow_jobs_by_run: dict[int, list[dict[str, Any]]] = {}
+        self.workflow_logs_by_job: dict[int, str] = {}
         self.current_production_deployment: dict[str, Any] | None = None
         self.issues: dict[int, dict[str, Any]] = {}
         self.issue_comment_map: dict[int, list[dict[str, Any]]] = {}
@@ -443,6 +444,9 @@ class FakeGitHub:
 
     def workflow_jobs(self, run_id: int) -> list[dict[str, Any]]:
         return self.workflow_jobs_by_run.get(run_id, [])
+
+    def workflow_job_logs(self, job_id: int) -> str:
+        return self.workflow_logs_by_job[job_id]
 
     def latest_deployment_status(self, environment: str) -> dict[str, Any] | None:
         assert environment == "production"
@@ -3420,6 +3424,79 @@ def test_reconcile_historical_deployed_task_rejects_changed_delivery_snapshot(
 
     with pytest.raises(task_session.TaskSessionError, match="unchanged delivery snapshot"):
         controller.reconcile_deployed_task_after_master_drift(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=True,
+        )
+
+
+def _configure_manual_recovery_release(
+    fixture: dict[str, Any], *, wrong_marker: bool = False
+) -> None:
+    github = fixture["github"]
+    target_sha = str(fixture["merge_sha"])
+    github.successful_deployments.discard((target_sha, "production"))
+    github.runs[9000].update(
+        {
+            "event": "workflow_dispatch",
+            "head_branch": "master",
+            "head_sha": fixture["master_sha"],
+        }
+    )
+    deploy_sha = "f" * 40 if wrong_marker else target_sha
+    github.workflow_jobs_by_run[9000] = [
+        {
+            "id": 19000,
+            "name": "Authorize exact merged master revision",
+            "conclusion": "success",
+        },
+        {
+            "id": 19001,
+            "name": "Deploy immutable tested bundle",
+            "conclusion": "success",
+        },
+    ]
+    github.workflow_logs_by_job[19001] = (
+        f"DEPLOY_SHA: {target_sha}\n"
+        f"DEPLOY_SHA={target_sha}\n"
+        f"Production deployment completed: {deploy_sha}\n"
+    )
+
+
+def test_reconcile_delivery_accepts_manual_recovery_release_logs(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    _configure_manual_recovery_release(fixture)
+    controller = fixture["controller"]
+
+    reconciliation = controller.reconcile_delivery(
+        "746",
+        pr_number=764,
+        merge_sha=fixture["merge_sha"],
+        deployed_sha=fixture["merge_sha"],
+        production_run_id=9000,
+        owner_authorize=True,
+    )
+
+    production = reconciliation["production"]
+    assert production["verification_mode"] == "owner-authorized-manual-release-log"
+    assert production["run_head_sha"] == fixture["master_sha"]
+    assert production["deployed_sha"] == fixture["merge_sha"]
+    assert controller.finish("746")["cleanup_performed"] is True
+
+
+def test_reconcile_delivery_rejects_contradictory_manual_release_marker(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository)
+    _configure_manual_recovery_release(fixture, wrong_marker=True)
+
+    with pytest.raises(task_session.TaskSessionError, match="exact production completion marker"):
+        fixture["controller"].reconcile_delivery(
             "746",
             pr_number=764,
             merge_sha=fixture["merge_sha"],

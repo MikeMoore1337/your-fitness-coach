@@ -81,6 +81,7 @@ class ProductionEvidence:
             "run_url": self.run_url,
             "requested_sha": self.requested_sha,
             "head_sha": self.run_head_sha,
+            "run_head_sha": self.run_head_sha,
             "run_head_branch": self.run_head_branch,
             "run_event": self.run_event,
             "run_conclusion": self.run_conclusion,
