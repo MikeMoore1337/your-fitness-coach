@@ -54,6 +54,8 @@ def test_release_recovery_dispatch_requires_exact_ci_evidence() -> None:
     deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
 
     assert "workflow_dispatch:" in deploy
+    assert '"recovery/**"' in deploy
+    assert "startsWith(github.event.workflow_run.head_branch, 'recovery/')" in deploy
     assert "github.workflow_sha" in deploy
     assert "actions/runs/$CI_RUN_ID" in deploy
     assert ".head_sha == $sha" in deploy
