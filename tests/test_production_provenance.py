@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -5,6 +6,126 @@ from scripts import production_provenance as provenance
 
 SHA_A = "a" * 40
 SHA_B = "b" * 40
+IMAGE_REPOSITORY = "ghcr.io/example/your-fitness-coach-backend"
+IMAGE_DIGEST = "sha256:" + "d" * 64
+
+
+@pytest.mark.parametrize(
+    ("image_ref", "repo_digests"),
+    [
+        (f"{IMAGE_REPOSITORY}:{SHA_A}", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"]),
+        (f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"]),
+    ],
+)
+def test_validate_image_reference_accepts_verified_tag_or_digest(
+    image_ref: str, repo_digests: list[str]
+) -> None:
+    provenance._validate_image_reference(
+        image_ref,
+        revision=SHA_A,
+        repo_digests=repo_digests,
+    )
+
+
+@pytest.mark.parametrize(
+    ("image_ref", "repo_digests", "revision"),
+    [
+        (f"{IMAGE_REPOSITORY}:{SHA_B}", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"], SHA_A),
+        (f"{IMAGE_REPOSITORY}:latest", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"], SHA_A),
+        (f"{IMAGE_REPOSITORY}@sha256:{'e' * 63}", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"], SHA_A),
+        (f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}", [], SHA_A),
+        (
+            f"ghcr.io/other/repository@{IMAGE_DIGEST}",
+            [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"],
+            SHA_A,
+        ),
+        (IMAGE_REPOSITORY, [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"], SHA_A),
+        (f"{IMAGE_REPOSITORY}:{SHA_A}", [f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"], ""),
+    ],
+)
+def test_validate_image_reference_rejects_unverified_forms(
+    image_ref: str, repo_digests: list[str], revision: str
+) -> None:
+    with pytest.raises(provenance.ProvenanceError):
+        provenance._validate_image_reference(
+            image_ref,
+            revision=revision,
+            repo_digests=repo_digests,
+        )
+
+
+def test_service_snapshot_accepts_production_digest_reference(monkeypatch) -> None:
+    image_ref = f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"
+    image_id = "sha256:" + "i" * 64
+    responses = {
+        ("docker", "ps"): "backend-container\n",
+        ("docker", "inspect", "backend-container"): json.dumps(
+            [
+                {
+                    "Config": {"Image": image_ref},
+                    "State": {"Status": "running", "Health": {"Status": "healthy"}},
+                    "Image": image_id,
+                }
+            ]
+        ),
+        ("docker", "image", "inspect", image_ref): json.dumps(
+            [
+                {
+                    "Config": {"Labels": {provenance.REVISION_LABEL: SHA_A}},
+                    "Id": image_id,
+                    "RepoDigests": [image_ref],
+                }
+            ]
+        ),
+    }
+
+    def run(command: list[str]) -> str:
+        if command[:2] == ["docker", "ps"]:
+            return responses[("docker", "ps")]
+        return responses[tuple(command[:4])]
+
+    monkeypatch.setattr(provenance, "_run", run)
+
+    result = provenance._service_snapshot("backend")
+
+    assert result["image_ref"] == image_ref
+    assert result["revision"] == SHA_A
+    assert result["immutable_image"] is True
+
+
+def test_service_snapshot_rejects_container_image_id_mismatch(monkeypatch) -> None:
+    image_ref = f"{IMAGE_REPOSITORY}@{IMAGE_DIGEST}"
+    responses = {
+        ("docker", "ps"): "backend-container\n",
+        ("docker", "inspect", "backend-container"): json.dumps(
+            [
+                {
+                    "Config": {"Image": image_ref},
+                    "State": {"Status": "running", "Health": {"Status": "healthy"}},
+                    "Image": "sha256:" + "c" * 64,
+                }
+            ]
+        ),
+        ("docker", "image", "inspect", image_ref): json.dumps(
+            [
+                {
+                    "Config": {"Labels": {provenance.REVISION_LABEL: SHA_A}},
+                    "Id": "sha256:" + "i" * 64,
+                    "RepoDigests": [image_ref],
+                }
+            ]
+        ),
+    }
+
+    def run(command: list[str]) -> str:
+        if command[:2] == ["docker", "ps"]:
+            return responses[("docker", "ps")]
+        return responses[tuple(command[:4])]
+
+    monkeypatch.setattr(provenance, "_run", run)
+
+    with pytest.raises(provenance.ProvenanceError, match="immutable image ID"):
+        provenance._service_snapshot("backend")
 
 
 @pytest.mark.parametrize(
@@ -104,6 +225,14 @@ def _verified_snapshot(runtime_revision: str = SHA_B) -> dict[str, object]:
     }
 
 
+def test_verification_rejects_runtime_revision_not_expected() -> None:
+    snapshot = _verified_snapshot(runtime_revision=SHA_B)
+
+    errors = provenance._verification_errors(snapshot, SHA_A)
+
+    assert any("runtime revision" in error for error in errors)
+
+
 def test_reconcile_changes_only_existing_metadata(monkeypatch, tmp_path: Path) -> None:
     snapshot = _verified_snapshot()
     writes: list[tuple[Path, str]] = []
@@ -162,7 +291,7 @@ def test_deploy_preflight_is_before_bundle_transfer_and_reconcile_is_metadata_on
         < workflow.index("Transfer immutable bundle to production")
     )
     assert "Production provenance mismatch before transfer" in workflow
-    assert "options: [deploy, repair, reconcile, rollback]" in workflow
+    assert "options: [deploy, repair, verify, reconcile, rollback]" in workflow
     reconcile = workflow.split("\n  reconcile:\n", maxsplit=1)[1].split(
         "\n  rollback:", maxsplit=1
     )[0]

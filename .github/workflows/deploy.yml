@@ -9,13 +9,13 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Deploy, repair an interrupted release, reconcile metadata, or roll back
+        description: Deploy, repair, verify, reconcile metadata, or roll back production
         required: true
         default: deploy
         type: choice
-        options: [deploy, repair, reconcile, rollback]
+        options: [deploy, repair, verify, reconcile, rollback]
       revision:
-        description: Exact tested SHA (deploy/repair/reconcile) or active production SHA (rollback)
+        description: Expected production SHA for verify; exact tested SHA for deploy/repair/reconcile; active SHA for rollback
         required: true
         type: string
       ci_run_id:
@@ -44,7 +44,7 @@ jobs:
       github.event.workflow_run.head_branch == 'master') ||
       (github.event_name == 'workflow_dispatch' &&
       inputs.revision != '' && inputs.reason != '' &&
-      (inputs.operation == 'rollback' || inputs.ci_run_id != ''))
+      (inputs.operation == 'rollback' || inputs.operation == 'verify' || inputs.ci_run_id != ''))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -64,7 +64,7 @@ jobs:
       - name: Check out exact requested revision
         uses: actions/checkout@v4
         with:
-          ref: ${{ env.DEPLOY_SHA }}
+          ref: ${{ inputs.operation == 'verify' && 'master' || env.DEPLOY_SHA }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -108,6 +108,12 @@ jobs:
           git fetch origin master --no-tags
           test "$(git rev-parse origin/master)" = "$current_master"
           echo "current_master=$current_master" >> "$GITHUB_OUTPUT"
+          if [ "$DEPLOY_OPERATION" = verify ]; then
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "reason=owner-authorized read-only production provenance verification" >> "$GITHUB_OUTPUT"
+            echo "Authorized read-only production verification against expected revision $DEPLOY_SHA"
+            exit 0
+          fi
           if [ "$DEPLOY_OPERATION" = reconcile ]; then
             git merge-base --is-ancestor "$DEPLOY_SHA" "$current_master"
             echo "deploy=false" >> "$GITHUB_OUTPUT"
@@ -673,6 +679,93 @@ jobs:
           python scripts/check_deployment.py "$PROD_URL" --expected-environment prod
           python scripts/check_seo_surface.py "$PROD_PUBLIC_URL" --timeout 15
           echo "REPAIR_COMPLETED=true"
+
+  verify:
+    name: Verify production provenance (read-only)
+    needs: authorize
+    if: needs.authorize.outputs.operation == 'verify'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    environment: production
+    env:
+      REVISION: ${{ inputs.revision }}
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: "1337"
+      PROD_USER: yfc-deploy
+      PROD_PATH: /srv/yfc/fit-mini-app
+      PROD_URL: https://app.your-fitness-coach.ru
+      PROD_PUBLIC_URL: https://your-fitness-coach.ru
+    steps:
+      - name: Check out current tested verifier
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.authorize.outputs.current_master }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Configure production SSH access
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Read-only production provenance verification
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - verify --app-root '$PROD_PATH' --expected-revision '$REVISION'" \
+            < scripts/production_provenance.py | tee provenance-verify.json
+          jq -e \
+            --arg expected "$REVISION" \
+            --arg current "$PROD_PATH/releases/$REVISION" \
+            '(.status == "VERIFIED") and
+             (.recorded_revision == $expected) and
+             (.runtime_revision == $expected) and
+             (.runtime_uniform == true) and
+             (.current.target == $current) and
+             (.release.exists_and_matches == true) and
+             (.database.consistent == true) and
+             ((.errors | length) == 0) and
+             (.services.backend.revision == $expected) and
+             (.services.backend.health == "healthy") and
+             (.services.backend.immutable_image == true) and
+             ((.services.backend.image_ref | type) == "string" and (.services.backend.image_ref | contains("@sha256:"))) and
+             (.services.worker.revision == $expected) and
+             (.services.worker.health == "healthy") and
+             (.services.worker.immutable_image == true) and
+             ((.services.worker.image_ref | type) == "string" and (.services.worker.image_ref | contains("@sha256:"))) and
+             (.services.bot.revision == $expected) and
+             (.services.bot.status == "running") and
+             (.services.bot.immutable_image == true) and
+             ((.services.bot.image_ref | type) == "string" and (.services.bot.image_ref | contains("@sha256:"))) and
+             (.services.bot.runtime_markers.polling_file_lock_acquired == true) and
+             (.services.bot.runtime_markers.telegram_polling_started == true) and
+             (any(.summaries[]?; .target_revision == $expected and .verdict == "active"))' \
+            provenance-verify.json >/dev/null
+
+      - name: Verify public application and SEO smoke (read-only)
+        run: |
+          set -Eeuo pipefail
+          python scripts/check_deployment.py "$PROD_URL" --expected-environment prod
+          python scripts/check_seo_surface.py "$PROD_PUBLIC_URL" --timeout 15
+          echo "VERIFY_MUTATION=false"
 
   reconcile:
     name: Reconcile verified production provenance metadata
