@@ -1,0 +1,567 @@
+name: Production capacity audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-gate:
+    name: Owner-only gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Verify repository owner
+        env:
+          ACTOR: ${{ github.actor }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -Eeuo pipefail
+          if [[ "$ACTOR" != "$REPOSITORY_OWNER" ]]; then
+            echo "Owner-only gate rejected this run."
+            exit 1
+          fi
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "Default-branch gate rejected this run."
+            exit 1
+          fi
+
+  audit:
+    name: Read-only production capacity probe
+    needs: owner-gate
+    if: needs.owner-gate.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    permissions:
+      contents: read
+    env:
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: "1337"
+      PROD_USER: yfc-deploy
+      PROD_PATH: /srv/yfc/fit-mini-app
+    steps:
+      - name: Prepare ephemeral SSH files
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          ssh_dir="$(mktemp -d "$RUNNER_TEMP/yfc-capacity-ssh.XXXXXX")"
+          chmod 700 "$ssh_dir"
+          printf 'SSH_DIR=%s\n' "$ssh_dir" >> "$GITHUB_ENV"
+          printf '%s\n' "$PROD_SSH_KEY" > "$ssh_dir/id_ed25519"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"
+          chmod 600 "$ssh_dir/id_ed25519" "$ssh_dir/known_hosts"
+
+      - name: Build read-only remote probe
+        run: |
+          set -Eeuo pipefail
+          probe_script="$RUNNER_TEMP/yfc-capacity-probe.sh"
+          cat > "$probe_script" <<'REMOTE_PROBE'
+          set -Eeuo pipefail
+          exec python3 - <<'REMOTE_PYTHON'
+          import json
+          import os
+          import platform
+          import re
+          import subprocess
+          import sys
+          import time
+          from pathlib import Path
+
+          APP_ROOT = Path(os.environ["PROD_PATH"])
+          DEPLOYMENT_ROOT = APP_ROOT / ".artifacts" / "operations" / "deployments"
+
+          def command(args):
+              try:
+                  return subprocess.run(
+                      args,
+                      capture_output=True,
+                      check=False,
+                      text=True,
+                      timeout=10,
+                  )
+              except (OSError, subprocess.SubprocessError):
+                  return None
+
+          def meminfo():
+              values = {}
+              try:
+                  for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+                      key, raw_value = line.split(":", 1)
+                      parts = raw_value.split()
+                      if parts and parts[0].isdigit():
+                          values[key] = int(parts[0])
+              except (OSError, UnicodeError, ValueError):
+                  return {}
+              return values
+
+          def load_average():
+              try:
+                  values = Path("/proc/loadavg").read_text(encoding="ascii").split()
+                  return tuple(float(value) for value in values[:3])
+              except (OSError, UnicodeError, ValueError):
+                  return (None, None, None)
+
+          SIZE_FACTORS = {
+              "B": 1,
+              "KB": 1000,
+              "MB": 1000**2,
+              "GB": 1000**3,
+              "TB": 1000**4,
+              "KIB": 1024,
+              "MIB": 1024**2,
+              "GIB": 1024**3,
+              "TIB": 1024**4,
+          }
+
+          def parse_size(value):
+              match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)", value.strip())
+              if match is None:
+                  return None
+              factor = SIZE_FACTORS.get(match.group(2).upper())
+              if factor is None:
+                  return None
+              return int(float(match.group(1)) * factor)
+
+          def docker_snapshot():
+              result = command(
+                  [
+                      "docker",
+                      "stats",
+                      "--no-stream",
+                      "--format",
+                      "{{.MemUsage}}\t{{.PIDs}}",
+                  ]
+              )
+              if result is None or result.returncode != 0:
+                  return None
+              total_bytes = 0
+              max_bytes = 0
+              total_pids = 0
+              valid = True
+              for line in result.stdout.splitlines():
+                  parts = line.split("\t", 1)
+                  if len(parts) != 2:
+                      valid = False
+                      continue
+                  memory_text, pid_text = parts
+                  used_bytes = parse_size(memory_text.split("/", 1)[0])
+                  if used_bytes is None or not pid_text.isdigit():
+                      valid = False
+                      continue
+                  total_bytes += used_bytes
+                  max_bytes = max(max_bytes, used_bytes)
+                  total_pids += int(pid_text)
+              return {
+                  "total_bytes": total_bytes,
+                  "max_bytes": max_bytes,
+                  "pids": total_pids,
+                  "valid": valid,
+              }
+
+          docker_ps = command(["docker", "ps", "-q"])
+          docker_available = docker_ps is not None and docker_ps.returncode == 0
+          docker_ids = docker_ps.stdout.splitlines() if docker_available else []
+          docker_running = str(len(docker_ids)) if docker_available else "UNAVAILABLE"
+
+          service_names = set()
+          if docker_available:
+              services = command(
+                  [
+                      "docker",
+                      "ps",
+                      "--filter",
+                      "label=com.docker.compose.project=fit-mini-app",
+                      "--format",
+                      '{{.Label "com.docker.compose.service"}}',
+                  ]
+              )
+              if services is not None and services.returncode == 0:
+                  service_names = {
+                      value for value in services.stdout.splitlines() if value
+                  }
+
+          def service_mode(*names):
+              selected = [name for name in names if name in service_names]
+              if len(selected) != 1:
+                  return "unknown"
+              return {
+                  "backend": "legacy",
+                  "worker": "legacy",
+                  "bot": "legacy",
+                  "backend-blue": "blue",
+                  "worker-blue": "blue",
+                  "bot-blue": "blue",
+                  "backend-green": "green",
+                  "worker-green": "green",
+                  "bot-green": "green",
+              }.get(selected[0], "unknown")
+
+          if docker_available:
+              db_running = str("db" in service_names).lower()
+              edge_running = str("edge" in service_names).lower()
+              caddy_running = str("caddy" in service_names).lower()
+              cloudflared_running = str("cloudflared" in service_names).lower()
+              backend_mode = service_mode("backend", "backend-blue", "backend-green")
+              worker_mode = service_mode("worker", "worker-blue", "worker-green")
+              bot_mode = service_mode("bot", "bot-blue", "bot-green")
+          else:
+              db_running = edge_running = caddy_running = cloudflared_running = "UNAVAILABLE"
+              backend_mode = worker_mode = bot_mode = "UNAVAILABLE"
+
+          containers_with_memory_limit = "UNAVAILABLE"
+          containers_without_memory_limit = "UNAVAILABLE"
+          if docker_available:
+              with_limit = 0
+              without_limit = 0
+              limits_known = True
+              for container_id in docker_ids:
+                  inspected = command(
+                      [
+                          "docker",
+                          "inspect",
+                          "--format",
+                          "{{.HostConfig.Memory}}",
+                          container_id,
+                      ]
+                  )
+                  raw_limit = inspected.stdout.strip() if inspected and inspected.returncode == 0 else ""
+                  if not raw_limit.isdigit():
+                      limits_known = False
+                  elif int(raw_limit) > 0:
+                      with_limit += 1
+                  else:
+                      without_limit += 1
+              if limits_known:
+                  containers_with_memory_limit = str(with_limit)
+                  containers_without_memory_limit = str(without_limit)
+
+          ram_samples = []
+          load_samples = []
+          docker_memory_samples = []
+          last_memory = {}
+          last_loads = (None, None, None)
+          last_docker = None
+          for sample_index in range(6):
+              last_memory = meminfo()
+              last_loads = load_average()
+              last_docker = docker_snapshot() if docker_available else None
+              ram_samples.append(last_memory.get("MemAvailable"))
+              load_samples.append(last_loads[0])
+              docker_memory_samples.append(
+                  last_docker["total_bytes"]
+                  if last_docker is not None and last_docker["valid"]
+                  else None
+              )
+              if sample_index < 5:
+                  time.sleep(10)
+
+          def rounded_mib(value):
+              return "UNAVAILABLE" if value is None else str(round(value / 1024))
+
+          def aggregate_mib(values, divisor):
+              if any(value is None for value in values):
+                  return ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+              converted = [value / divisor for value in values]
+              return tuple(
+                  str(round(item))
+                  for item in (min(converted), sum(converted) / len(converted), max(converted))
+              )
+
+          ram_min_mib, ram_avg_mib, ram_max_mib = aggregate_mib(ram_samples, 1024)
+          _, docker_memory_avg_mib, docker_memory_max_mib = aggregate_mib(
+              docker_memory_samples, 1024**2
+          )
+          load_1m_max = (
+              "UNAVAILABLE"
+              if any(value is None for value in load_samples)
+              else str(max(load_samples))
+          )
+
+          ram_total_mib = rounded_mib(last_memory.get("MemTotal"))
+          ram_available_mib = rounded_mib(last_memory.get("MemAvailable"))
+          if last_memory.get("MemTotal", 0) > 0 and last_memory.get("MemAvailable") is not None:
+              ram_available_percent = f"{last_memory['MemAvailable'] * 100 / last_memory['MemTotal']:.1f}"
+          else:
+              ram_available_percent = "UNAVAILABLE"
+          swap_total_mib = rounded_mib(last_memory.get("SwapTotal"))
+          swap_free_mib = rounded_mib(last_memory.get("SwapFree"))
+
+          def disk_usage(inodes=False):
+              result = command(["df", "-Pi" if inodes else "-Pk", "/"])
+              if result is None or result.returncode != 0:
+                  return None
+              fields = result.stdout.strip().splitlines()[-1].split()
+              if len(fields) < 5 or not fields[4].rstrip("%").isdigit():
+                  return None
+              return int(fields[1]), int(fields[3]), int(fields[4].rstrip("%"))
+
+          root_disk = disk_usage()
+          if root_disk is None:
+              root_total_mib = root_free_mib = root_free_percent = "UNAVAILABLE"
+          else:
+              root_total_mib = str(round(root_disk[0] / 1024))
+              root_free_mib = str(round(root_disk[1] / 1024))
+              root_free_percent = str(100 - root_disk[2])
+          root_inodes = disk_usage(inodes=True)
+          root_inodes_free_percent = (
+              "UNAVAILABLE" if root_inodes is None else str(100 - root_inodes[2])
+          )
+
+          if last_docker is not None and last_docker["valid"]:
+              docker_total_memory_used_mib = str(round(last_docker["total_bytes"] / 1024**2))
+              docker_max_single_container_memory_mib = str(
+                  round(last_docker["max_bytes"] / 1024**2)
+              )
+              docker_total_pids = str(last_docker["pids"])
+          else:
+              docker_total_memory_used_mib = "UNAVAILABLE"
+              docker_max_single_container_memory_mib = "UNAVAILABLE"
+              docker_total_pids = "UNAVAILABLE"
+
+          port_5678 = "UNAVAILABLE"
+          ss_result = command(["ss", "-lntH"])
+          if ss_result is not None and ss_result.returncode == 0:
+              listeners = (
+                  line.split()[3]
+                  for line in ss_result.stdout.splitlines()
+                  if len(line.split()) >= 4
+              )
+              port_5678 = "BUSY" if any(
+                  address.rsplit(":", 1)[-1] == "5678" for address in listeners
+              ) else "FREE"
+
+          postgres = {
+              "version_major": "UNAVAILABLE",
+              "max_connections": "UNAVAILABLE",
+              "current_connections": "UNAVAILABLE",
+              "connection_headroom": "UNAVAILABLE",
+              "total_database_size_mib": "UNAVAILABLE",
+              "shared_buffers_mib": "UNAVAILABLE",
+          }
+          if docker_available:
+              db_result = command(
+                  [
+                      "docker",
+                      "ps",
+                      "--filter",
+                      "label=com.docker.compose.project=fit-mini-app",
+                      "--filter",
+                      "label=com.docker.compose.service=db",
+                      "--format",
+                      "{{.ID}}",
+                  ]
+              )
+              db_ids = (
+                  db_result.stdout.splitlines()
+                  if db_result is not None and db_result.returncode == 0
+                  else []
+              )
+              if len(db_ids) == 1:
+                  sql = """SELECT 'version_major=' || (current_setting('server_version_num')::int / 10000);
+          SELECT 'max_connections=' || current_setting('max_connections')::int;
+          SELECT 'current_connections=' || count(*) FROM pg_stat_activity;
+          SELECT 'total_database_size_bytes=' || COALESCE(sum(pg_database_size(datname)), 0) FROM pg_database WHERE datallowconn;
+          SELECT 'shared_buffers=' || current_setting('shared_buffers');"""
+                  pg_result = command(
+                      [
+                          "docker",
+                          "exec",
+                          "--user",
+                          "postgres",
+                          db_ids[0],
+                          "psql",
+                          "-X",
+                          "-qAt",
+                          "-v",
+                          "ON_ERROR_STOP=1",
+                          "--dbname=postgres",
+                          "-c",
+                          sql,
+                      ]
+                  )
+                  raw_lines = (
+                      pg_result.stdout.splitlines()
+                      if pg_result is not None and pg_result.returncode == 0
+                      else []
+                  )
+                  parsed = {
+                      line.split("=", 1)[0]: line.split("=", 1)[1]
+                      for line in raw_lines
+                      if "=" in line
+                  }
+                  for key in ("version_major", "max_connections", "current_connections"):
+                      if parsed.get(key, "").isdigit():
+                          postgres[key] = parsed[key]
+                  if postgres["max_connections"].isdigit() and postgres["current_connections"].isdigit():
+                      postgres["connection_headroom"] = str(
+                          int(postgres["max_connections"]) - int(postgres["current_connections"])
+                      )
+                  if parsed.get("total_database_size_bytes", "").isdigit():
+                      postgres["total_database_size_mib"] = str(
+                          round(int(parsed["total_database_size_bytes"]) / 1024**2)
+                      )
+                  shared_buffers = re.fullmatch(
+                      r"([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)",
+                      parsed.get("shared_buffers", ""),
+                  )
+                  if shared_buffers is not None:
+                      factor = {
+                          "B": 1,
+                          "KB": 1024,
+                          "MB": 1024**2,
+                          "GB": 1024**3,
+                          "TB": 1024**4,
+                      }.get(shared_buffers.group(2).upper())
+                      if factor is not None:
+                          postgres["shared_buffers_mib"] = str(
+                              round(float(shared_buffers.group(1)) * factor / 1024**2)
+                          )
+
+          def historical_capacity_metrics():
+              fields = ("cpu_count", "memory_available_mb", "disk_available_mb")
+              records = []
+              try:
+                  candidates = sorted(
+                      (path for path in DEPLOYMENT_ROOT.glob("*/summary.json") if path.is_file()),
+                      key=lambda path: path.stat().st_mtime,
+                      reverse=True,
+                  )[:5]
+              except OSError:
+                  candidates = []
+              for path in candidates:
+                  try:
+                      value = json.loads(path.read_text(encoding="utf-8"))
+                      capacity = value.get("capacity") if isinstance(value, dict) else None
+                      if isinstance(capacity, dict) and all(
+                          isinstance(capacity.get(field), int)
+                          and not isinstance(capacity.get(field), bool)
+                          for field in fields
+                      ):
+                          records.append(tuple(capacity[field] for field in fields))
+                  except (OSError, TypeError, ValueError):
+                      continue
+              if not records:
+                  return ("UNAVAILABLE", "0", "UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+              return (
+                  "AVAILABLE",
+                  str(len(records)),
+                  str(min(record[0] for record in records)),
+                  str(min(record[1] for record in records)),
+                  str(min(record[2] for record in records)),
+              )
+
+          (
+              historical_capacity,
+              historical_sample_count,
+              historical_cpu_count_min,
+              historical_ram_available_min_mib,
+              historical_disk_free_min_mib,
+          ) = historical_capacity_metrics()
+
+          cpu_count = os.cpu_count()
+          if cpu_count is None:
+              nproc = command(["nproc"])
+              if nproc is not None and nproc.returncode == 0 and nproc.stdout.strip().isdigit():
+                  cpu_count = int(nproc.stdout.strip())
+          if cpu_count is None:
+              print("Required host CPU metric was unavailable.", file=sys.stderr)
+              raise SystemExit(1)
+
+          arch = platform.machine()
+          if not re.fullmatch(r"[A-Za-z0-9_.-]+", arch):
+              arch = "unknown"
+          load1, load5, load15 = last_loads
+          print("\n".join(
+              [
+                  "PRODUCTION_CAPACITY_PROBE=PASS",
+                  f"CPU_COUNT={cpu_count}",
+                  f"ARCH={arch}",
+                  f"LOAD_1M={load1 if load1 is not None else 'UNAVAILABLE'}",
+                  f"LOAD_5M={load5 if load5 is not None else 'UNAVAILABLE'}",
+                  f"LOAD_15M={load15 if load15 is not None else 'UNAVAILABLE'}",
+                  f"LOAD_1M_MAX={load_1m_max}",
+                  f"RAM_TOTAL_MIB={ram_total_mib}",
+                  f"RAM_AVAILABLE_MIB={ram_available_mib}",
+                  f"RAM_AVAILABLE_PERCENT={ram_available_percent}",
+                  f"RAM_AVAILABLE_MIN_MIB={ram_min_mib}",
+                  f"RAM_AVAILABLE_AVG_MIB={ram_avg_mib}",
+                  f"RAM_AVAILABLE_MAX_MIB={ram_max_mib}",
+                  f"SWAP_TOTAL_MIB={swap_total_mib}",
+                  f"SWAP_FREE_MIB={swap_free_mib}",
+                  f"ROOT_DISK_TOTAL_MIB={root_total_mib}",
+                  f"ROOT_DISK_FREE_MIB={root_free_mib}",
+                  f"ROOT_DISK_FREE_PERCENT={root_free_percent}",
+                  f"ROOT_INODES_FREE_PERCENT={root_inodes_free_percent}",
+                  "SAMPLE_COUNT=6",
+                  f"DOCKER_RUNNING_CONTAINERS={docker_running}",
+                  f"DOCKER_TOTAL_MEMORY_USED_MIB={docker_total_memory_used_mib}",
+                  f"DOCKER_MAX_SINGLE_CONTAINER_MEMORY_MIB={docker_max_single_container_memory_mib}",
+                  f"DOCKER_TOTAL_PIDS={docker_total_pids}",
+                  f"DOCKER_MEMORY_MAX_MIB={docker_memory_max_mib}",
+                  f"DOCKER_MEMORY_AVG_MIB={docker_memory_avg_mib}",
+                  "DOCKER_IMAGES_SIZE_MIB=UNAVAILABLE",
+                  f"CONTAINERS_WITH_MEMORY_LIMIT={containers_with_memory_limit}",
+                  f"CONTAINERS_WITHOUT_MEMORY_LIMIT={containers_without_memory_limit}",
+                  f"DB_RUNNING={db_running}",
+                  f"EDGE_RUNNING={edge_running}",
+                  f"CADDY_RUNNING={caddy_running}",
+                  f"CLOUDFLARED_RUNNING={cloudflared_running}",
+                  f"BACKEND_MODE={backend_mode}",
+                  f"WORKER_MODE={worker_mode}",
+                  f"BOT_MODE={bot_mode}",
+                  f"POSTGRES_VERSION_MAJOR={postgres['version_major']}",
+                  f"POSTGRES_MAX_CONNECTIONS={postgres['max_connections']}",
+                  f"POSTGRES_CURRENT_CONNECTIONS={postgres['current_connections']}",
+                  f"POSTGRES_CONNECTION_HEADROOM={postgres['connection_headroom']}",
+                  f"POSTGRES_TOTAL_DATABASE_SIZE_MIB={postgres['total_database_size_mib']}",
+                  f"POSTGRES_SHARED_BUFFERS_MIB={postgres['shared_buffers_mib']}",
+                  f"PORT_5678={port_5678}",
+                  f"HISTORICAL_CAPACITY={historical_capacity}",
+                  f"HISTORICAL_SAMPLE_COUNT={historical_sample_count}",
+                  f"HISTORICAL_CPU_COUNT_MIN={historical_cpu_count_min}",
+                  f"HISTORICAL_RAM_AVAILABLE_MIN_MIB={historical_ram_available_min_mib}",
+                  f"HISTORICAL_DISK_FREE_MIN_MIB={historical_disk_free_min_mib}",
+                  "NO_PRODUCTION_MUTATIONS=true",
+              ]
+          ))
+          REMOTE_PYTHON
+          REMOTE_PROBE
+          chmod 700 "$probe_script"
+
+      - name: Run read-only production probe
+        run: |
+          set -Eeuo pipefail
+          ssh_error="$RUNNER_TEMP/yfc-capacity-ssh.err"
+          if ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -o UserKnownHostsFile="$SSH_DIR/known_hosts" \
+            -o IdentityFile="$SSH_DIR/id_ed25519" \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "PROD_PATH=$PROD_PATH bash -s" < "$RUNNER_TEMP/yfc-capacity-probe.sh" 2>"$ssh_error"; then
+            :
+          else
+            echo "Production capacity probe did not complete." >&2
+            exit 1
+          fi
+
+      - name: Remove ephemeral SSH material
+        if: always()
+        run: |
+          set -Eeuo pipefail
+          if [[ -v SSH_DIR && "$SSH_DIR" == "$RUNNER_TEMP"/yfc-capacity-ssh.* && -d "$SSH_DIR" ]]; then
+            shred -u "$SSH_DIR/id_ed25519" "$SSH_DIR/known_hosts" 2>/dev/null || true
+            rm -rf -- "$SSH_DIR"
+          fi
+          rm -f -- "$RUNNER_TEMP/yfc-capacity-probe.sh" "$RUNNER_TEMP/yfc-capacity-ssh.err"
