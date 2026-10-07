@@ -397,6 +397,7 @@ class FakeGitHub:
         self.workflow_jobs_by_run: dict[int, list[dict[str, Any]]] = {}
         self.workflow_logs_by_job: dict[int, str] = {}
         self.current_production_deployment: dict[str, Any] | None = None
+        self.current_production_deployment_history: list[dict[str, Any]] = []
         self.issues: dict[int, dict[str, Any]] = {}
         self.issue_comment_map: dict[int, list[dict[str, Any]]] = {}
 
@@ -448,8 +449,20 @@ class FakeGitHub:
     def workflow_job_logs(self, job_id: int) -> str:
         return self.workflow_logs_by_job[job_id]
 
-    def latest_deployment_status(self, environment: str) -> dict[str, Any] | None:
+    def latest_deployment_status(
+        self, environment: str, *, successful_only: bool = False
+    ) -> dict[str, Any] | None:
         assert environment == "production"
+        if self.current_production_deployment_history:
+            candidates = self.current_production_deployment_history[::-1]
+            if successful_only:
+                candidates = [item for item in candidates if item.get("state") == "success"]
+            return candidates[0] if candidates else None
+        if successful_only and (
+            self.current_production_deployment is None
+            or self.current_production_deployment.get("state") != "success"
+        ):
+            return None
         return self.current_production_deployment
 
     def active_workflow_runs(self) -> list[dict[str, Any]]:
@@ -3118,6 +3131,7 @@ def _prepare_historical_deployed_task_reconciliation(
     foreign_head_history: bool = False,
     revert_feature: bool = False,
     released_delivery: bool = False,
+    include_no_runtime_task: bool = False,
 ) -> dict[str, Any]:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, "746"
@@ -3326,6 +3340,113 @@ def _prepare_historical_deployed_task_reconciliation(
             }
         )
         previous_sha = merge_sha
+    if include_no_runtime_task:
+        task_id = "793"
+        pr_number = 795
+        branch_name = "task/793-production-capacity-audit"
+        _git(root, "switch", "-c", branch_name)
+        workflow_path = root / ".github" / "workflows" / "production-capacity-audit.yml"
+        workflow_path.parent.mkdir(parents=True, exist_ok=True)
+        workflow_path.write_text("name: production-capacity-audit\n", encoding="utf-8")
+        safeguard_path = root / "tests" / "test_release_safeguards.py"
+        safeguard_path.parent.mkdir(parents=True, exist_ok=True)
+        safeguard_path.write_text("def test_read_only_capacity_probe(): pass\n", encoding="utf-8")
+        _git(root, "add", "-A")
+        _git(root, "commit", "-m", "[Task 793] Add manual production capacity audit")
+        head_sha = _git(root, "rev-parse", "HEAD")
+        _git(root, "switch", "master")
+        _git(
+            root,
+            "merge",
+            "--no-ff",
+            branch_name,
+            "-m",
+            f"Merge pull request #{pr_number} from owner/{branch_name}",
+        )
+        merge_sha = _git(root, "rev-parse", "HEAD")
+        pr_body = (
+            "## Explicit boundary\n"
+            "This PR does not dispatch the production workflow, deploy, or mutate production.\n"
+        )
+        github.pulls[pr_number] = {
+            "number": pr_number,
+            "title": "[Task 793] Add manual production capacity audit workflow",
+            "body": pr_body,
+            "state": "closed",
+            "merged_at": "2026-10-06T06:00:00Z",
+            "merge_commit_sha": merge_sha,
+            "commits": 1,
+            "changed_files": 2,
+            "base": {
+                "ref": "master",
+                "sha": previous_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+            "head": {
+                "ref": branch_name,
+                "sha": head_sha,
+                "repo": {"full_name": "owner/repository"},
+            },
+        }
+        github.commits[pr_number] = [
+            {
+                "sha": head_sha,
+                "commit": {"message": "[Task 793] Add manual production capacity audit"},
+            }
+        ]
+        github.files[pr_number] = [
+            {"filename": ".github/workflows/production-capacity-audit.yml"},
+            {"filename": "tests/test_release_safeguards.py"},
+        ]
+        github.checks[head_sha] = [_success_check(head_sha)]
+        github.associated_pulls_by_commit[merge_sha] = [github.pulls[pr_number]]
+        release_run_id = 9200
+        github.workflow_runs_by_sha[merge_sha] = [
+            {
+                "id": release_run_id,
+                "name": "Release production",
+                "head_sha": merge_sha,
+                "status": "completed",
+                "conclusion": "cancelled",
+                "html_url": "https://example.invalid/actions/runs/9200",
+            }
+        ]
+        github.workflow_jobs_by_run[release_run_id] = [
+            {"name": "Authorize exact merged master revision", "conclusion": "success"},
+            {"name": "Deploy immutable tested bundle", "conclusion": "cancelled"},
+        ]
+        github.issues[793] = {
+            "number": 793,
+            "state": "closed",
+            "body": (
+                "## Safety contract\n"
+                "No deployment or production mutation is allowed by this task.\n"
+            ),
+        }
+        previous_production = github.current_production_deployment
+        failed_status = {
+            "deployment_id": 9900,
+            "sha": merge_sha,
+            "environment": "production",
+            "state": "error",
+            "updated_at": "2026-10-06T06:01:00Z",
+            "log_url": "https://example.invalid/deployments/9900",
+        }
+        github.current_production_deployment_history = [
+            *([previous_production] if previous_production is not None else []),
+            failed_status,
+        ]
+        github.current_production_deployment = failed_status
+        later_records.append(
+            {
+                "number": pr_number,
+                "task_id": task_id,
+                "merge_sha": merge_sha,
+                "head_sha": head_sha,
+                "release_run_id": release_run_id,
+            }
+        )
+        previous_sha = merge_sha
     _git(root, "push", "origin", "master")
     _git(root, "fetch", "origin", "master")
     github.master_sha = previous_sha
@@ -3514,6 +3635,58 @@ def test_reconcile_delivery_accepts_manual_recovery_deployment_status_on_run_hea
         "deployed_sha": fixture["merge_sha"],
     }
     assert fixture["controller"].finish("746")["cleanup_performed"] is True
+
+
+def test_reconcile_delivery_accepts_explicit_no_runtime_task_and_ignores_failed_latest_deploy(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(
+        repository, include_no_runtime_task=True
+    )
+    _configure_manual_recovery_release(fixture)
+
+    reconciliation = fixture["controller"].reconcile_delivery(
+        "746",
+        pr_number=764,
+        merge_sha=fixture["merge_sha"],
+        deployed_sha=fixture["merge_sha"],
+        production_run_id=9000,
+        owner_authorize=True,
+    )
+
+    no_runtime = reconciliation["verified_master_evidence"]["intervening_commits"][-1]
+    assert no_runtime["classification"] == "task-no-deploy"
+    assert no_runtime["release"]["result"] == "verified-no-runtime-change"
+    last_successful_product = next(item for item in fixture["later"] if item["number"] == 743)
+    assert (
+        reconciliation["verified_master_evidence"]["current_production"]["deployed_sha"]
+        == (last_successful_product["merge_sha"])
+    )
+    assert fixture["controller"].finish("746")["cleanup_performed"] is True
+
+
+def test_reconcile_delivery_rejects_explicit_no_runtime_task_with_successful_deployment(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(
+        repository, include_no_runtime_task=True
+    )
+    _configure_manual_recovery_release(fixture)
+    no_runtime_sha = fixture["later"][-1]["merge_sha"]
+    fixture["github"].successful_deployments.add((no_runtime_sha, "production"))
+
+    with pytest.raises(
+        task_session.TaskSessionError,
+        match="Explicit no-runtime Task PR #795 has a successful production deployment",
+    ):
+        fixture["controller"].reconcile_delivery(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=True,
+        )
 
 
 def test_reconcile_delivery_rejects_unrelated_controller_deployment_status(

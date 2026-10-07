@@ -129,6 +129,7 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "tests/test_worker_guard.py",
     }
 )
+NON_RUNTIME_TASK_PATH_PREFIXES = (".github/workflows/", "tests/")
 TASK_DEPENDENCY_RE = re.compile(r"(?im)^Depends-on:\s*(?P<value>.+)$")
 TASK_FILE_RE = re.compile(rf"^(?P<task_id>{TASK_ID_PATTERN})-(?P<slug>.+)\.md$", re.IGNORECASE)
 TASK_STATE_VERSION = 2
@@ -1643,34 +1644,40 @@ class GitHubClient:
                 return pull_requests
             page += 1
 
-    def latest_deployment_status(self, environment: str) -> dict[str, Any] | None:
+    def latest_deployment_status(
+        self, environment: str, *, successful_only: bool = False
+    ) -> dict[str, Any] | None:
         deployments = [
             item
             for item in self.api(f"deployments?environment={environment}&per_page=100")
             if item.get("environment") == environment
         ]
-        if not deployments:
-            return None
-        deployment = max(
+        for deployment in sorted(
             deployments,
             key=lambda item: (str(item.get("created_at", "")), int(item.get("id", 0))),
-        )
-        deployment_id = deployment.get("id")
-        if type(deployment_id) is not int or deployment_id <= 0:
-            raise TaskSessionError("GitHub returned an invalid production deployment ID")
-        statuses = self.api(f"deployments/{deployment_id}/statuses?per_page=1")
-        if not statuses:
-            raise TaskSessionError("Latest production deployment has no status")
-        status = statuses[0]
-        return {
-            "deployment_id": deployment_id,
-            "sha": deployment.get("sha"),
-            "environment": deployment.get("environment"),
-            "state": status.get("state"),
-            "created_at": deployment.get("created_at"),
-            "updated_at": status.get("updated_at") or status.get("created_at"),
-            "log_url": status.get("log_url"),
-        }
+            reverse=True,
+        ):
+            deployment_id = deployment.get("id")
+            if type(deployment_id) is not int or deployment_id <= 0:
+                raise TaskSessionError("GitHub returned an invalid production deployment ID")
+            statuses = self.api(f"deployments/{deployment_id}/statuses?per_page=1")
+            if not statuses:
+                if successful_only:
+                    continue
+                raise TaskSessionError("Latest production deployment has no status")
+            status = statuses[0]
+            if successful_only and status.get("state") != "success":
+                continue
+            return {
+                "deployment_id": deployment_id,
+                "sha": deployment.get("sha"),
+                "environment": deployment.get("environment"),
+                "state": status.get("state"),
+                "created_at": deployment.get("created_at"),
+                "updated_at": status.get("updated_at") or status.get("created_at"),
+                "log_url": status.get("log_url"),
+            }
+        return None
 
     def branch_head(self, branch: str) -> str:
         payload = self.api(f"git/ref/heads/{branch}")
@@ -10471,6 +10478,117 @@ class TaskController:
                 }
         return None
 
+    def _verified_explicit_no_runtime_task(
+        self,
+        *,
+        task_id: str,
+        commit_sha: str,
+        pr_number: int,
+        pull_request: Mapping[str, Any],
+        changed_paths: Sequence[str],
+        files: Sequence[Mapping[str, Any]],
+        changed_files: int,
+    ) -> dict[str, Any] | None:
+        """Verify a legacy task whose own contract forbids runtime mutation."""
+
+        normalized_paths = sorted(str(path).replace("\\", "/") for path in changed_paths if path)
+        if not normalized_paths or any(
+            not any(path.startswith(prefix) for prefix in NON_RUNTIME_TASK_PATH_PREFIXES)
+            for path in normalized_paths
+        ):
+            return None
+        pr_paths = sorted(
+            str(item.get("filename", "")).replace("\\", "/")
+            for item in files
+            if isinstance(item, Mapping) and str(item.get("filename", ""))
+        )
+        if pr_paths != normalized_paths:
+            return None
+        validate_task_pull_request_files(files, expected_count=changed_files)
+
+        pull_request_body = str(pull_request.get("body", ""))
+        pull_request_text = pull_request_body.casefold()
+        if not (
+            "## explicit boundary" in pull_request_text
+            and "does not" in pull_request_text
+            and "deploy" in pull_request_text
+            and "production" in pull_request_text
+        ):
+            return None
+
+        github = self._github()
+        try:
+            issue = github.api(f"issues/{int(normalize_task_id(task_id))}")
+        except KeyError, OSError, TaskSessionError, ValueError:
+            return None
+        if not isinstance(issue, Mapping) or issue.get("number") != int(normalize_task_id(task_id)):
+            return None
+        issue_text = str(issue.get("body", "")).casefold()
+        if not (
+            "## safety contract" in issue_text
+            and "production mutation" in issue_text
+            and re.search(r"\bno\b[^\n]{0,240}\bdeploy(?:ment)?\b", issue_text)
+        ):
+            return None
+
+        if github.has_successful_deployment(commit_sha, "production"):
+            raise TaskSessionError(
+                f"Explicit no-runtime Task PR #{pr_number} has a successful production deployment"
+            )
+
+        release_runs = [
+            item
+            for item in github.workflow_runs("deploy.yml", commit_sha)
+            if item.get("name") == "Release production"
+            and item.get("head_sha") == commit_sha
+            and item.get("status") == "completed"
+            and type(item.get("id")) is int
+            and item.get("id", 0) > 0
+        ]
+        release_evidence: list[dict[str, Any]] = []
+        for run in sorted(release_runs, key=lambda item: item["id"]):
+            jobs = github.workflow_jobs(run["id"])
+            deploy_jobs = [
+                job for job in jobs if job.get("name") == "Deploy immutable tested bundle"
+            ]
+            if len(deploy_jobs) > 1:
+                raise TaskSessionError(
+                    f"Explicit no-runtime Task PR #{pr_number} has ambiguous deploy jobs"
+                )
+            deploy_conclusion = (
+                str(deploy_jobs[0].get("conclusion", "")) if deploy_jobs else "missing"
+            )
+            if deploy_conclusion == "success":
+                raise TaskSessionError(
+                    f"Explicit no-runtime Task PR #{pr_number} has a successful deploy job"
+                )
+            authorize_jobs = [
+                job for job in jobs if job.get("name") == "Authorize exact merged master revision"
+            ]
+            release_evidence.append(
+                {
+                    "run_id": run["id"],
+                    "run_url": run.get("html_url"),
+                    "run_conclusion": str(run.get("conclusion", "")).lower(),
+                    "authorization_job": (
+                        str(authorize_jobs[0].get("conclusion", ""))
+                        if len(authorize_jobs) == 1
+                        else "missing-or-ambiguous"
+                    ),
+                    "application_deploy_job": deploy_conclusion,
+                }
+            )
+
+        return {
+            "result": "verified-no-runtime-change",
+            "task_id": normalize_task_id(task_id),
+            "pr_number": pr_number,
+            "deployment_required": False,
+            "application_deployment_verified": False,
+            "contract_source": "issue-safety-contract-and-pr-explicit-boundary",
+            "release_runs": release_evidence,
+        }
+
     def _verified_subsequent_production_chain(
         self,
         original_sha: str,
@@ -10743,6 +10861,16 @@ class TaskController:
                     files=files,
                     changed_files=changed_files,
                 )
+                if no_deploy_release is None:
+                    no_deploy_release = self._verified_explicit_no_runtime_task(
+                        task_id=task_id,
+                        commit_sha=commit_sha,
+                        pr_number=pr_number,
+                        pull_request=pull_request,
+                        changed_paths=changed_paths,
+                        files=files,
+                        changed_files=changed_files,
+                    )
                 record = {
                     "commit_sha": commit_sha,
                     "parent_sha": previous_sha,
@@ -10770,7 +10898,7 @@ class TaskController:
         if every_commit - set(master_commits) - classified_nested_commits:
             raise TaskSessionError("Intervening master history contains an unclassified commit")
 
-        deployment = github.latest_deployment_status("production")
+        deployment = github.latest_deployment_status("production", successful_only=True)
         if (
             not isinstance(deployment, Mapping)
             or deployment.get("environment") != "production"
