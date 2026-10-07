@@ -75,24 +75,36 @@ test('Task 543 keeps one Coach Today clients destination', async ({ page }) => {
     viewportStableHeight: 844,
   });
   await installPlatformApi(page, { fixedDate: FIXED_DATE, trainerActive: true });
-  await page.route('**/api/v1/coach/attention**', async (route) => {
+  await page.route('**/api/v1/coach/inbox**', async (route) => {
     await route.fulfill({
       json: {
+        date: FIXED_DATE,
+        timezone: 'Europe/Moscow',
         total: 1,
+        counts: {
+          attention: 1,
+          pending_reviews: 1,
+          tasks: 0,
+          sessions: 0,
+          packages: 0,
+          payments: 0,
+        },
         generated_at: `${FIXED_DATE}T12:00:00Z`,
         items: [
           {
-            key: 'weekly_check_in:11:44',
-            kind: 'weekly_check_in',
+            key: 'attention:weekly_check_in:11:44',
+            kind: 'attention',
             client: { id: 11, name: 'Анна Петрова' },
             title: 'Новый недельный итог',
             reason: 'Клиент заполнил недельный итог.',
             source_kind: 'weekly_check_in',
             source_id: 44,
-            source_state: 'completed',
             action: 'review_check_in',
             destination: '/coach?client_id=11&focus=weekly_check_in',
             created_at: `${FIXED_DATE}T11:00:00Z`,
+            priority: 'urgent',
+            due_at: null,
+            evidence: [],
           },
         ],
       },

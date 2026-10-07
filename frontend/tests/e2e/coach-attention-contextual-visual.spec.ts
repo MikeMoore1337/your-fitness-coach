@@ -232,37 +232,51 @@ test('Task 284 attention center renders a compact deterministic trainer surface'
     fixedDate: FIXED_DATE,
     trainerActive: true,
   });
-  await page.route('**/api/v1/coach/attention**', async (route) => {
+  await page.route('**/api/v1/coach/inbox**', async (route) => {
     await route.fulfill({
       json: {
+        date: FIXED_DATE,
+        timezone: 'Europe/Moscow',
         total: 2,
+        counts: {
+          attention: 2,
+          pending_reviews: 1,
+          tasks: 0,
+          sessions: 0,
+          packages: 0,
+          payments: 0,
+        },
         generated_at: '2026-09-06T12:00:00Z',
         items: [
           {
-            key: 'weekly_check_in:11:44',
-            kind: 'weekly_check_in',
+            key: 'attention:weekly_check_in:11:44',
+            kind: 'attention',
             client: { id: 11, name: 'Анна Петрова' },
             title: 'Новый недельный итог',
             reason: 'Клиент заполнил недельный итог.',
             source_kind: 'weekly_check_in',
             source_id: 44,
-            source_state: 'completed',
             action: 'review_check_in',
             destination: '/coach?client_id=11&focus=weekly_check_in',
             created_at: '2026-09-06T11:00:00Z',
+            priority: 'urgent',
+            due_at: null,
+            evidence: [],
           },
           {
-            key: 'workout_feedback:11:43',
-            kind: 'workout_feedback',
+            key: 'attention:workout_feedback:11:43',
+            kind: 'attention',
             client: { id: 11, name: 'Анна Петрова' },
             title: 'Новая обратная связь по тренировке',
             reason: 'Клиент отметил тренировку как «тяжелее, чем ожидалось».',
             source_kind: 'workout',
             source_id: 43,
-            source_state: 'harder_than_expected',
             action: 'review_workout',
             destination: '/coach?client_id=11&workout_id=43',
             created_at: '2026-09-06T10:00:00Z',
+            priority: 'urgent',
+            due_at: null,
+            evidence: [],
           },
         ],
       },
@@ -273,7 +287,7 @@ test('Task 284 attention center renders a compact deterministic trainer surface'
   await page.goto('/coach');
 
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
-  const center = page.getByRole('region', { name: 'Требует внимания' });
+  const center = page.getByTestId('coach-inbox');
   await expect(center).toBeVisible();
   await expect(center).toContainText('Анна Петрова');
   await expect(center).toContainText('Новый недельный итог');

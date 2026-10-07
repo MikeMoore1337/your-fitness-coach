@@ -270,6 +270,7 @@ async function mockCoachWorkspace(
   options: {
     attention?: 'empty' | 'actionable';
     operations?: 'empty' | 'seeded';
+    review?: 'empty' | 'pending';
   } = {},
 ) {
   const feedbackComments: Array<{
@@ -387,7 +388,7 @@ async function mockCoachWorkspace(
           low_packages: [],
           payment_facts: [],
         };
-  let reviewPending = true;
+  let reviewPending = options.review !== 'empty';
   const reviewItem = () => ({
     id: 901,
     client_id: 11,
@@ -409,6 +410,108 @@ async function mockCoachWorkspace(
     follow_up: null,
     created_at: '2026-08-17T10:00:00',
   });
+  const inboxItems = () => {
+    const items: Array<Record<string, unknown>> = [];
+    if (options.attention === 'actionable') {
+      items.push({
+        key: 'attention:without_program:12:12',
+        kind: 'attention',
+        client: { id: 12, name: 'Борис Александрович С Очень Длинной Фамилией' },
+        title: 'Нужно назначить программу',
+        reason: 'У активного клиента пока нет действующей программы.',
+        source_kind: 'client',
+        source_id: 12,
+        action: 'assign_program',
+        destination: '/coach?client_id=12',
+        priority: 'normal',
+        created_at: `${operationDate}T10:00:00Z`,
+        due_at: null,
+        evidence: [],
+      });
+    }
+    if (reviewPending) {
+      items.push({
+        key: 'check-in:901',
+        kind: 'check_in',
+        client: { id: 11, name: 'Анна Петрова' },
+        title: 'Новый недельный итог',
+        reason: 'Клиент заполнил недельный итог.',
+        source_kind: 'weekly_check_in',
+        source_id: 901,
+        action: 'review_check_in',
+        destination: '/coach?client_id=11&focus=weekly_check_in',
+        priority: 'urgent',
+        created_at: '2026-08-17T10:00:00Z',
+        due_at: null,
+        evidence: [],
+      });
+    }
+    if (options.operations === 'seeded') {
+      items.push(
+        {
+          key: 'session:601',
+          kind: 'session',
+          client: { id: 11, name: 'Анна Петрова' },
+          title: 'Встреча сегодня',
+          reason: '18:30 · 60 мин.',
+          source_kind: 'session',
+          source_id: 601,
+          action: 'open_schedule',
+          destination: '/coach?tab=tools&tool=schedule',
+          priority: 'soon',
+          created_at: seededSession.created_at,
+          due_at: seededSession.starts_at,
+          evidence: [],
+        },
+        {
+          key: 'task:602',
+          kind: 'task',
+          client: { id: 12, name: seededTask.client_name },
+          title: seededTask.title,
+          reason: seededTask.reason,
+          source_kind: 'manual',
+          source_id: 602,
+          action: 'open_task',
+          destination: '/coach?tab=tools&tool=tasks',
+          priority: 'urgent',
+          created_at: seededTask.created_at,
+          due_at: seededTask.due_at,
+          evidence: [],
+        },
+        {
+          key: 'package:701',
+          kind: 'package',
+          client: { id: 11, name: 'Анна Петрова' },
+          title: 'Пакет требует проверки',
+          reason: 'Осталось встреч: 2.',
+          source_kind: 'package',
+          source_id: 701,
+          action: 'open_finance',
+          destination: '/coach?tab=tools&tool=finance',
+          priority: 'soon',
+          created_at: seededPackage.updated_at,
+          due_at: null,
+          evidence: [],
+        },
+        {
+          key: 'payment:703',
+          kind: 'payment',
+          client: { id: 11, name: 'Анна Петрова' },
+          title: 'Ожидается оплата',
+          reason: 'Статус: partial · RUB.',
+          source_kind: 'payment',
+          source_id: 703,
+          action: 'open_finance',
+          destination: '/coach?tab=tools&tool=finance',
+          priority: 'normal',
+          created_at: seededPayment.updated_at,
+          due_at: null,
+          evidence: [],
+        },
+      );
+    }
+    return items;
+  };
   await page.route('**/api/v1/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -539,6 +642,24 @@ async function mockCoachWorkspace(
               ? [{ key: 'attention', count: 1, action: 'attention' }]
               : [{ key: 'open_tasks', count: 1, action: 'tasks' }],
           generated_at: '2026-08-20T10:00:00Z',
+        },
+      });
+    if (path.endsWith('/coach/inbox'))
+      return route.fulfill({
+        json: {
+          date: operationDate,
+          timezone: 'Europe/Moscow',
+          items: inboxItems(),
+          total: inboxItems().length,
+          counts: {
+            attention: options.attention === 'actionable' ? 1 : 0,
+            pending_reviews: reviewPending ? 1 : 0,
+            tasks: operations.overdue_tasks.length + operations.due_tasks.length,
+            sessions: operations.sessions.length,
+            packages: operations.low_packages.length,
+            payments: operations.payment_facts.length,
+          },
+          generated_at: `${operationDate}T10:00:00Z`,
         },
       });
     if (path.endsWith('/coach/attention'))
@@ -1279,9 +1400,9 @@ test('Issue 388 оставляет Today компактным и ведёт CRM-
 
   await expect(page.getByRole('heading', { name: 'Сегодня', exact: true })).toBeVisible();
   await expect(page.getByTestId('coach-tools-hub')).toHaveCount(0);
-  await expect(page.locator('.coach-operations__overview')).toBeVisible();
-  await expect(page.locator('.coach-operations__agenda')).toHaveCount(0);
-  await expect(page.getByText('Проверить технику приседа', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.coach-inbox')).toBeVisible();
+  await expect(page.locator('.coach-operations__overview')).toHaveCount(0);
+  await expect(page.getByText('Проверить технику приседа', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 
   await expect(page.getByRole('button', { name: 'Открыть клиентов', exact: true })).toHaveCount(0);
@@ -1435,13 +1556,13 @@ test('Task 291 сохраняет плотную desktop-композицию и
 
 test('Task 291 спокойно показывает отсутствие срочных действий', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await mockCoachWorkspace(page);
+  await mockCoachWorkspace(page, { review: 'empty' });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
   await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
-  await expect(page.getByText('Срочных действий нет')).toBeVisible();
+  await expect(page.getByText('Новых действий нет')).toBeVisible();
   await expect(
-    page.getByText('Здесь появятся только конкретные новые состояния клиента.'),
+    page.getByText('Здесь появится только следующий шаг, выведенный из текущих данных кабинета.'),
   ).toBeVisible();
   await captureTask291Evidence(page, 'today-no-attention-mobile-light');
 });
@@ -2011,7 +2132,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
   await mockCoachWorkspace(page, { attention: 'actionable', operations: 'seeded' });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await expect(page.locator('.coach-attention-center')).toBeVisible();
+  await expect(page.locator('.coach-inbox')).toBeVisible();
   await page.screenshot({
     path: `${task525VisualDir}/coach-home-desktop-light.png`,
     fullPage: true,
@@ -2140,7 +2261,7 @@ test('task 525 visual package covers operational workspace states', async ({ pag
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/coach');
-  await expect(page.locator('.coach-attention-center')).toBeVisible();
+  await expect(page.locator('.coach-inbox')).toBeVisible();
   const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
   expect(scrollWidth).toBeLessThanOrEqual(390);
   await page.screenshot({ path: `${task525VisualDir}/mobile-attention-queue.png`, fullPage: true });
@@ -2158,10 +2279,10 @@ test('task 525 visual package covers operational workspace states', async ({ pag
 
 test('task 525 visual package covers empty and permission-error states', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await mockCoachWorkspace(page, { attention: 'empty', operations: 'empty' });
+  await mockCoachWorkspace(page, { attention: 'empty', operations: 'empty', review: 'empty' });
   await page.goto('/coach');
   await page.getByRole('button', { name: 'Тренер' }).click();
-  await expect(page.getByText('Срочных действий нет')).toBeVisible();
+  await expect(page.getByText('Новых действий нет')).toBeVisible();
   await page.screenshot({ path: `${task525VisualDir}/empty-low-data.png`, fullPage: true });
 
   await page.route('**/api/v1/coach/check-ins/review*', async (route) => {

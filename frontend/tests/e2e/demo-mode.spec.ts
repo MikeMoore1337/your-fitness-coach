@@ -863,6 +863,53 @@ function transport(snapshot: DemoSessionSnapshot, path: string, method: string, 
       bottlenecks: [{ key: 'attention', count: 1, action: 'attention' }],
       generated_at: '2026-09-15T10:00:00Z',
     };
+  if (path.startsWith('/api/v1/coach/inbox'))
+    return {
+      date: '2026-09-15',
+      timezone: 'Europe/Moscow',
+      items: [
+        {
+          key: 'attention:without_program:51003:51003',
+          kind: 'attention',
+          client: { id: 51003, name: 'Иван' },
+          title: 'Нет активной программы',
+          reason: 'Назначьте следующий рабочий план клиента.',
+          source_kind: 'client',
+          source_id: 51003,
+          action: 'assign_program',
+          destination: '/coach?client_id=51003',
+          priority: 'normal',
+          created_at: '2026-09-15T10:00:00Z',
+          due_at: null,
+          evidence: [],
+        },
+        {
+          key: 'task:51003:demo-1',
+          kind: 'task',
+          client: { id: 51003, name: 'Иван' },
+          title: 'Проверить следующий шаг клиента',
+          reason: 'Демо-задача для рабочего маршрута тренера.',
+          source_kind: 'task',
+          source_id: 52001,
+          action: 'open_task',
+          destination: '/coach?tab=tools&tool=tasks',
+          priority: 'soon',
+          created_at: '2026-09-15T10:00:00Z',
+          due_at: '2026-09-15T18:00:00Z',
+          evidence: [],
+        },
+      ],
+      total: 2,
+      counts: {
+        attention: 1,
+        pending_reviews: 0,
+        tasks: 1,
+        sessions: 0,
+        packages: 0,
+        payments: 0,
+      },
+      generated_at: '2026-09-15T10:00:00Z',
+    };
   if (path.startsWith('/api/v1/coach/attention'))
     return {
       items: [
@@ -1315,7 +1362,7 @@ test('trainer demo follows the connected Today-to-Today route', async ({ page })
   await installDemoTransport(page);
   await page.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
   await expect(page.getByRole('heading', { name: 'Сегодня', level: 1 })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Требует внимания' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Следующий шаг по клиентам' })).toBeVisible();
   await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-start.png`);
 
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
@@ -1338,7 +1385,8 @@ test('trainer demo follows the connected Today-to-Today route', async ({ page })
   await captureTask293Evidence(page, `${TASK_293_VARIANT}-trainer-demo-operations.png`);
 
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
-  await page.getByRole('button', { name: /Задачи клиентов/ }).click();
+  const taskLink = page.getByRole('link', { name: 'Открыть задачи', exact: true });
+  await taskLink.click();
   await expect(page.locator('#coach-tasks-title')).toBeVisible();
   await page.getByRole('button', { name: 'Продолжить', exact: true }).click();
   await expect(page.locator('#coach-tasks-title')).toBeFocused();
