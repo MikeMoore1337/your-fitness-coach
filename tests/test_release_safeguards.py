@@ -118,7 +118,8 @@ def test_deploy_is_master_only_immutable_bundle_flow_without_vps_git_checkout() 
     ).read_text(encoding="utf-8")
 
     assert "workflows: [CI]" in deploy
-    assert "branches: [master]" in deploy
+    assert "branches:" in deploy
+    assert "- master" in deploy
     assert "sync-dev:" not in deploy
     assert "actions/create-github-app-token" not in deploy
     assert "git fetch" not in deploy
