@@ -410,6 +410,154 @@ async function mockCoachWorkspace(
     follow_up: null,
     created_at: '2026-08-17T10:00:00',
   });
+  const reviewWorkspace = {
+    client_id: 11,
+    client_name: 'Анна Петрова',
+    state: 'available',
+    previous_check_in: {
+      id: 900,
+      week_start: '2026-08-03',
+      week_end: '2026-08-09',
+      submitted_on: '2026-08-10',
+      status: 'completed',
+      training: {
+        planned_workouts: 3,
+        completed_workouts: 2,
+        adherence_percent: 66.7,
+        volume_kg: 980,
+        training_load: 3,
+        recovery: 3,
+        adherence_difficulty: 3,
+      },
+      progression: { training_volume_kg: 980, new_personal_records: 1 },
+      nutrition: {
+        logged_days: 4,
+        complete_days: 3,
+        average_calories: 1980,
+        target_calories: 2100,
+        average_protein_g: 125,
+        target_protein_g: 140,
+      },
+      measurements: {
+        weight_kg: 69,
+        weight_change_kg: 0,
+        waist_cm: 87,
+        latest_measured_on: '2026-08-09',
+      },
+    },
+    current_check_in: {
+      id: 901,
+      week_start: '2026-08-10',
+      week_end: '2026-08-16',
+      submitted_on: '2026-08-17',
+      status: 'completed',
+      training: {
+        planned_workouts: 3,
+        completed_workouts: 3,
+        adherence_percent: 100,
+        volume_kg: 1200,
+        training_load: 3,
+        recovery: 4,
+        adherence_difficulty: 2,
+      },
+      progression: { training_volume_kg: 1200, new_personal_records: 2 },
+      nutrition: {
+        logged_days: 6,
+        complete_days: 5,
+        average_calories: 2050,
+        target_calories: 2100,
+        average_protein_g: 142,
+        target_protein_g: 140,
+      },
+      measurements: {
+        weight_kg: 68.5,
+        weight_change_kg: -0.5,
+        waist_cm: 86,
+        latest_measured_on: '2026-08-18',
+      },
+    },
+    training_actuals: {
+      planned_workouts: 3,
+      completed_workouts: 3,
+      adherence_percent: 100,
+      volume_kg: 1200,
+      training_load: 3,
+      recovery: 4,
+      adherence_difficulty: 2,
+    },
+    progression_facts: { training_volume_kg: 1200, new_personal_records: 2 },
+    nutrition: {
+      logged_days: 6,
+      complete_days: 5,
+      average_calories: 2050,
+      target_calories: 2100,
+      average_protein_g: 142,
+      target_protein_g: 140,
+    },
+    measurements: {
+      weight_kg: 68.5,
+      weight_change_kg: -0.5,
+      waist_cm: 86,
+      latest_measured_on: '2026-08-18',
+    },
+    current_program: {
+      id: 701,
+      title: 'Силовая база · четыре недели',
+      status: 'active',
+      start_date: '2026-08-03',
+      duration_weeks: 4,
+      current_revision_number: 2,
+      workouts_total: 12,
+      workouts_completed: 5,
+      next_workout_date: '2026-08-22',
+    },
+    private_notes: [
+      {
+        session_id: 601,
+        starts_at_utc: '2026-08-18T15:30:00Z',
+        status: 'completed',
+        text: 'Тренеру: обсудить технику приседа.',
+      },
+    ],
+    meaningful_changes: [
+      {
+        domain: 'training',
+        key: 'training.completed_workouts',
+        label: 'Завершённые тренировки',
+        previous: 2,
+        current: 3,
+      },
+      {
+        domain: 'progression',
+        key: 'progression.training_volume_kg',
+        label: 'Объём тренинга',
+        previous: 980,
+        current: 1200,
+      },
+      {
+        domain: 'nutrition',
+        key: 'nutrition.logged_days',
+        label: 'Дни с дневником питания',
+        previous: 4,
+        current: 6,
+      },
+      {
+        domain: 'measurements',
+        key: 'measurements.weight_kg',
+        label: 'Последний вес',
+        previous: 69,
+        current: 68.5,
+      },
+    ],
+    actions: {
+      review_status: 'pending',
+      review_response: null,
+      reviewed_at: null,
+      follow_up: null,
+      program_proposals: [],
+      next_reviews: [],
+    },
+  };
   const inboxItems = () => {
     const items: Array<Record<string, unknown>> = [];
     if (options.attention === 'actionable') {
@@ -817,7 +965,11 @@ async function mockCoachWorkspace(
     if (path.endsWith('/coach/packages')) return route.fulfill({ json: operations.low_packages });
     if (path.endsWith('/coach/payments')) return route.fulfill({ json: operations.payment_facts });
     if (path.endsWith('/coach/tasks'))
-      return route.fulfill({ json: [...operations.overdue_tasks, ...operations.due_tasks] });
+      return request.method() === 'POST'
+        ? route.fulfill({ json: seededTask })
+        : route.fulfill({ json: [...operations.overdue_tasks, ...operations.due_tasks] });
+    if (/\/coach\/tasks\/\d+\/state$/.test(path) && request.method() === 'PATCH')
+      return route.fulfill({ json: { ...seededTask, state: 'completed' } });
     if (path.endsWith('/coach/agenda'))
       return route.fulfill({
         json: {
@@ -854,6 +1006,8 @@ async function mockCoachWorkspace(
           },
         ],
       });
+    if (path.endsWith('/coach/clients/11/review-workspace'))
+      return route.fulfill({ json: reviewWorkspace });
     if (path.endsWith('/coach/clients')) return route.fulfill({ json: clients });
     if (/\/coach\/clients\/\d+\/operations$/.test(path))
       return route.fulfill({ json: { sessions: [], packages: [], payments: [], tasks: [] } });
@@ -1267,6 +1421,41 @@ test('trainer loads the canonical workload contract only on request', async ({ p
   await expect(page.getByText('Грудные', { exact: true })).toBeVisible();
   expect(trainingRequests).toHaveLength(1);
   expect(trainingRequests[0]).toContain('/coach/clients/11/training-analytics?period_days=30');
+});
+
+test('Task 752 review workspace composes facts and keeps actions explicit on desktop and mobile', async ({
+  page,
+}) => {
+  await openCoach(page);
+  await page
+    .getByRole('button', { name: /Анна Петрова/ })
+    .first()
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Данные клиента' })
+    .getByRole('link', { name: 'Проверка', exact: true })
+    .click();
+
+  const workspace = page.getByTestId('coach-review-workspace');
+  await expect(workspace).toBeVisible();
+  await expect(workspace.getByText('Значимые изменения', { exact: true })).toBeVisible();
+  await expect(
+    workspace.getByText('Тренеру: обсудить технику приседа.', { exact: true }),
+  ).toBeVisible();
+  await expect(workspace.getByText(/^Текущий итог:/)).toBeVisible();
+
+  await workspace
+    .getByLabel('Основание предложения')
+    .fill('Обсудить увеличение объёма после следующего review.');
+  await workspace.getByLabel('Срок предложения').fill('2030-01-10T12:00');
+  await workspace.getByRole('button', { name: 'Зафиксировать предложение', exact: true }).click();
+  await expect(page.getByText('Действие тренера зафиксировано', { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(
+    workspace.getByRole('heading', { name: 'Ответ и следующий шаг', exact: true }),
+  ).toBeVisible();
 });
 
 test('Task 291 показывает action-first Today и ленивый контекст клиента', async ({ page }) => {

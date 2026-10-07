@@ -50,6 +50,7 @@ from fitminiapp_api.schemas.coach_crm import (
     CoachTaskStateUpdate,
 )
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.coach_review_workspace import CoachReviewWorkspaceResponse
 from fitminiapp_api.schemas.coach_reviews import (
     CoachCheckInReviewItem,
     CoachCheckInReviewListResponse,
@@ -132,6 +133,7 @@ from fitminiapp_api.services.coach_crm import (
     update_task_state,
 )
 from fitminiapp_api.services.coach_inbox import build_coach_inbox
+from fitminiapp_api.services.coach_review_workspace import build_coach_review_workspace
 from fitminiapp_api.services.coach_reviews import (
     CoachReviewError,
     list_coach_check_in_reviews,
@@ -360,6 +362,19 @@ def coach_check_in_reviews(
             offset=offset,
         )
     )
+
+
+@router.get(
+    "/clients/{client_id}/review-workspace",
+    response_model=CoachReviewWorkspaceResponse,
+)
+def coach_client_review_workspace(
+    client_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachReviewWorkspaceResponse:
+    client = _managed_client(db, current_user, client_id)
+    return build_coach_review_workspace(db, current_user, client)
 
 
 @router.post(

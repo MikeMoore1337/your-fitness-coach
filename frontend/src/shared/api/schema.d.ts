@@ -1760,6 +1760,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/clients/{client_id}/review-workspace": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Client Review Workspace */
+        get: operations["coach_client_review_workspace_api_v1_coach_clients__client_id__review_workspace_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/check-ins/{check_in_id}/review": {
         parameters: {
             query?: never;
@@ -8348,6 +8365,186 @@ export interface components {
             target_template_exercise_id?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** CoachReviewActionState */
+        CoachReviewActionState: {
+            /**
+             * Review Status
+             * @enum {string}
+             */
+            review_status: "pending" | "reviewed" | "no_check_in";
+            /** Review Response */
+            review_response?: string | null;
+            /** Reviewed At */
+            reviewed_at?: string | null;
+            follow_up?: components["schemas"]["CoachTaskResponse"] | null;
+            /** Program Proposals */
+            program_proposals?: components["schemas"]["CoachTaskResponse"][];
+            /** Next Reviews */
+            next_reviews?: components["schemas"]["CoachTaskResponse"][];
+        };
+        /** CoachReviewChange */
+        CoachReviewChange: {
+            /**
+             * Domain
+             * @enum {string}
+             */
+            domain: "training" | "progression" | "nutrition" | "measurements";
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Previous */
+            previous?: number | null;
+            /** Current */
+            current?: number | null;
+        };
+        /** CoachReviewCheckInSnapshot */
+        CoachReviewCheckInSnapshot: {
+            /** Id */
+            id: number;
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
+            /**
+             * Week End
+             * Format: date
+             */
+            week_end: string;
+            /**
+             * Submitted On
+             * Format: date
+             */
+            submitted_on: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "completed" | "skipped";
+            training: components["schemas"]["CoachReviewTrainingFacts"];
+            progression: components["schemas"]["CoachReviewProgressionFacts"];
+            nutrition: components["schemas"]["CoachReviewNutritionFacts"];
+            measurements: components["schemas"]["CoachReviewMeasurementFacts"];
+        };
+        /** CoachReviewMeasurementFacts */
+        CoachReviewMeasurementFacts: {
+            /** Weight Kg */
+            weight_kg?: number | null;
+            /** Weight Change Kg */
+            weight_change_kg?: number | null;
+            /** Waist Cm */
+            waist_cm?: number | null;
+            /** Latest Measured On */
+            latest_measured_on?: string | null;
+        };
+        /** CoachReviewNutritionFacts */
+        CoachReviewNutritionFacts: {
+            /** Logged Days */
+            logged_days?: number | null;
+            /** Complete Days */
+            complete_days?: number | null;
+            /** Average Calories */
+            average_calories?: number | null;
+            /** Target Calories */
+            target_calories?: number | null;
+            /** Average Protein G */
+            average_protein_g?: number | null;
+            /** Target Protein G */
+            target_protein_g?: number | null;
+        };
+        /** CoachReviewPrivateNote */
+        CoachReviewPrivateNote: {
+            /** Session Id */
+            session_id: number;
+            /**
+             * Starts At Utc
+             * Format: date-time
+             */
+            starts_at_utc: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "completed" | "cancelled" | "no_show";
+            /** Text */
+            text: string;
+        };
+        /** CoachReviewProgram */
+        CoachReviewProgram: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "scheduled" | "active" | "paused" | "completed" | "terminated" | "archived";
+            /**
+             * Start Date
+             * Format: date
+             */
+            start_date: string;
+            /** Duration Weeks */
+            duration_weeks: number;
+            /** Current Revision Number */
+            current_revision_number: number;
+            /** Workouts Total */
+            workouts_total: number;
+            /** Workouts Completed */
+            workouts_completed: number;
+            /** Next Workout Date */
+            next_workout_date?: string | null;
+        };
+        /** CoachReviewProgressionFacts */
+        CoachReviewProgressionFacts: {
+            /** Training Volume Kg */
+            training_volume_kg?: number | null;
+            /** New Personal Records */
+            new_personal_records?: number | null;
+        };
+        /** CoachReviewTrainingFacts */
+        CoachReviewTrainingFacts: {
+            /** Planned Workouts */
+            planned_workouts?: number | null;
+            /** Completed Workouts */
+            completed_workouts?: number | null;
+            /** Adherence Percent */
+            adherence_percent?: number | null;
+            /** Volume Kg */
+            volume_kg?: number | null;
+            /** Training Load */
+            training_load?: number | null;
+            /** Recovery */
+            recovery?: number | null;
+            /** Adherence Difficulty */
+            adherence_difficulty?: number | null;
+        };
+        /** CoachReviewWorkspaceResponse */
+        CoachReviewWorkspaceResponse: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "available" | "partial" | "no_data";
+            previous_check_in?: components["schemas"]["CoachReviewCheckInSnapshot"] | null;
+            current_check_in?: components["schemas"]["CoachReviewCheckInSnapshot"] | null;
+            training_actuals: components["schemas"]["CoachReviewTrainingFacts"];
+            progression_facts: components["schemas"]["CoachReviewProgressionFacts"];
+            nutrition: components["schemas"]["CoachReviewNutritionFacts"];
+            measurements: components["schemas"]["CoachReviewMeasurementFacts"];
+            current_program?: components["schemas"]["CoachReviewProgram"] | null;
+            /** Private Notes */
+            private_notes?: components["schemas"]["CoachReviewPrivateNote"][];
+            /** Meaningful Changes */
+            meaningful_changes?: components["schemas"]["CoachReviewChange"][];
+            actions: components["schemas"]["CoachReviewActionState"];
         };
         /** CoachSessionCreate */
         CoachSessionCreate: {
@@ -20696,6 +20893,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoachCheckInReviewListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_client_review_workspace_api_v1_coach_clients__client_id__review_workspace_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachReviewWorkspaceResponse"];
                 };
             };
             /** @description Validation Error */

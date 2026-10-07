@@ -116,7 +116,7 @@ export function CoachCheckInReviews({ timezone = 'Europe/Moscow' }: { timezone?:
                       <h3>{item.client_name}</h3>
                       <p>
                         Отправлен {item.submitted_on} ·{' '}
-                        <AppLink to={`/coach?client_id=${item.client_id}&focus=weekly_check_in`}>
+                        <AppLink to={`/coach?client_id=${item.client_id}&focus=review_workspace`}>
                           открыть профиль клиента
                         </AppLink>
                       </p>
