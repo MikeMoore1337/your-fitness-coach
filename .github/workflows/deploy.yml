@@ -464,15 +464,19 @@ jobs:
              printf '%s\\n' '---HEADS---'
              docker compose exec -T backend alembic heads" | tee db-before.txt
           python - <<'PY'
-          import re
           from pathlib import Path
+
+          from scripts.production_provenance import (
+              alembic_revisions_are_consistent,
+              parse_alembic_revisions,
+          )
 
           current_text, heads_text = Path("db-before.txt").read_text(encoding="utf-8").split(
               "---HEADS---", 1
           )
-          current = set(re.findall(r"\b[0-9a-f]{8,40}\b", current_text))
-          heads = set(re.findall(r"\b[0-9a-f]{8,40}\b", heads_text))
-          if not current or not heads or not heads.issubset(current):
+          current = parse_alembic_revisions(current_text)
+          heads = parse_alembic_revisions(heads_text)
+          if not alembic_revisions_are_consistent(current, heads):
               raise SystemExit(
                   f"database migration state is not a known head: current={sorted(current)} heads={sorted(heads)}"
               )

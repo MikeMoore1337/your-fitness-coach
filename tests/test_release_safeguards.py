@@ -204,6 +204,14 @@ def test_manual_repair_is_native_ancestor_checked_and_reuses_single_slot_rollout
     assert "deployment.lock" not in deploy
 
 
+def test_repair_preflight_uses_symbolic_alembic_revision_parser() -> None:
+    deploy = _sources()["deploy"]
+
+    assert "parse_alembic_revisions" in deploy
+    assert "alembic_revisions_are_consistent" in deploy
+    assert 're.findall(r"\\b[0-9a-f]{8,40}\\b"' not in deploy
+
+
 def test_deploy_bounds_transient_production_ssh_failures() -> None:
     deploy = _sources()["deploy"]
 

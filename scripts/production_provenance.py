@@ -17,7 +17,7 @@ import re
 import subprocess
 import sys
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -26,6 +26,8 @@ DIGEST_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 REVISION_LABEL = "org.opencontainers.image.revision"
 BOT_RUNTIME_MARKERS = ("polling_file_lock_acquired", "telegram_polling_started")
 SERVICES = ("backend", "worker", "bot")
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+ALEMBIC_REVISION_LINE_RE = re.compile(r"(?P<revision>[^\s()]+)(?:\s+\([^)]*\))?")
 
 
 class ProvenanceError(RuntimeError):
@@ -34,6 +36,26 @@ class ProvenanceError(RuntimeError):
 
 def is_full_sha(value: object) -> bool:
     return isinstance(value, str) and SHA_RE.fullmatch(value) is not None
+
+
+def parse_alembic_revisions(output: str) -> set[str]:
+    """Extract revision tokens from deterministic ``alembic`` output lines."""
+
+    revisions: set[str] = set()
+    for raw_line in output.splitlines():
+        line = ANSI_ESCAPE_RE.sub("", raw_line).strip()
+        if not line:
+            continue
+        match = ALEMBIC_REVISION_LINE_RE.fullmatch(line)
+        if match:
+            revisions.add(match.group("revision"))
+    return revisions
+
+
+def alembic_revisions_are_consistent(current: Collection[str], heads: Collection[str]) -> bool:
+    """Return whether current database revisions include every Alembic head."""
+
+    return bool(current) and bool(heads) and set(heads).issubset(current)
 
 
 def classify_marker_runtime(recorded_revision: object, runtime_revisions: Sequence[object]) -> str:
@@ -179,9 +201,9 @@ def _service_snapshot(service: str) -> dict[str, object]:
 def _database_snapshot(container_id: str) -> dict[str, object]:
     current = _run(["docker", "exec", container_id, "alembic", "current"])
     heads = _run(["docker", "exec", container_id, "alembic", "heads"])
-    current_revisions = sorted(set(re.findall(r"\b[0-9a-f]{8,40}\b", current)))
-    head_revisions = sorted(set(re.findall(r"\b[0-9a-f]{8,40}\b", heads)))
-    consistent = bool(head_revisions) and set(head_revisions).issubset(current_revisions)
+    current_revisions = sorted(parse_alembic_revisions(current))
+    head_revisions = sorted(parse_alembic_revisions(heads))
+    consistent = alembic_revisions_are_consistent(current_revisions, head_revisions)
     return {
         "current": current.strip(),
         "heads": heads.strip(),
