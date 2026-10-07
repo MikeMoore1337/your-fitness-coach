@@ -9,21 +9,21 @@ on:
   workflow_dispatch:
     inputs:
       operation:
-        description: Deploy, reconcile existing runtime provenance, or roll back the active release
+        description: Deploy, repair an interrupted release, reconcile metadata, or roll back
         required: true
         default: deploy
         type: choice
-        options: [deploy, reconcile, rollback]
+        options: [deploy, repair, reconcile, rollback]
       revision:
-        description: Exact tested SHA (deploy/reconcile) or active production SHA (rollback)
+        description: Exact tested SHA (deploy/repair/reconcile) or active production SHA (rollback)
         required: true
         type: string
       ci_run_id:
-        description: Successful CI run ID for a manual deploy or provenance reconciliation
+        description: Successful CI run ID for manual deploy, repair, or provenance reconciliation
         required: false
         type: string
       reason:
-        description: Owner-authorized reason for a manual deployment or rollback
+        description: Owner-authorized reason for a manual deployment, repair, or rollback
         required: true
         type: string
 
@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify exact successful CI evidence
-        if: env.DEPLOY_OPERATION == 'deploy' || env.DEPLOY_OPERATION == 'reconcile'
+        if: env.DEPLOY_OPERATION == 'deploy' || env.DEPLOY_OPERATION == 'repair' || env.DEPLOY_OPERATION == 'reconcile'
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
@@ -111,6 +111,13 @@ jobs:
             echo "deploy=false" >> "$GITHUB_OUTPUT"
             echo "reason=owner-authorized metadata-only production provenance reconciliation" >> "$GITHUB_OUTPUT"
             echo "Authorized provenance reconciliation for tested ancestor $DEPLOY_SHA"
+            exit 0
+          fi
+          if [ "$DEPLOY_OPERATION" = repair ]; then
+            git merge-base --is-ancestor "$DEPLOY_SHA" "$current_master"
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            echo "reason=owner-authorized repair of an interrupted production release" >> "$GITHUB_OUTPUT"
+            echo "Authorized production repair for tested ancestor $DEPLOY_SHA"
             exit 0
           fi
           test "$current_master" = "$DEPLOY_SHA"
@@ -336,6 +343,290 @@ jobs:
                --stale-ttl-hours 24 \
               --docker-prune
               rm -f '/tmp/$BUNDLE_NAME'"
+
+  repair:
+    name: Repair known production release
+    needs: authorize
+    if: needs.authorize.outputs.operation == 'repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: read
+    environment: production
+    env:
+      REVISION: ${{ inputs.revision }}
+      BASELINE_REVISION: 050bbd3f80aac0b8e84389fa3c4c28875df89066
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: "1337"
+      PROD_USER: yfc-deploy
+      PROD_PATH: /srv/yfc/fit-mini-app
+      PROD_URL: https://app.your-fitness-coach.ru
+      PROD_PUBLIC_URL: https://your-fitness-coach.ru
+      PROD_ROLLOUT_MODE: single-slot
+    steps:
+      - name: Check out current deployment tooling
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Configure production SSH access
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Resolve immutable target image references
+        id: images
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          backend_ref="$(python scripts/deployment_contract.py refs --repository "$REPOSITORY" --revision "$REVISION" --kind backend | sed -n 's/^image_ref=//p')"
+          bot_ref="$(python scripts/deployment_contract.py refs --repository "$REPOSITORY" --revision "$REVISION" --kind bot | sed -n 's/^image_ref=//p')"
+          test -n "$backend_ref" -a -n "$bot_ref"
+          echo "backend_image_ref=$backend_ref" >> "$GITHUB_OUTPUT"
+          echo "bot_image_ref=$bot_ref" >> "$GITHUB_OUTPUT"
+
+      - name: Verify target images and OCI provenance before transfer
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend_image_ref }}
+          BOT_IMAGE: ${{ steps.images.outputs.bot_image_ref }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$GHCR_TOKEN"
+          printf '%s\n' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          for image in "$BACKEND_IMAGE" "$BOT_IMAGE"; do
+            docker pull "$image"
+            revision_label="$(docker image inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+            test "$revision_label" = "$REVISION"
+            image_id="$(docker image inspect "$image" --format '{{.Id}}')"
+            [[ "$image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+            digest="$(docker image inspect "$image" --format '{{range .RepoDigests}}{{println .}}{{end}}' | sed -n 's/.*@\(sha256:[0-9a-f]\{64\}\)$/\1/p' | head -n 1)"
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+            echo "Verified immutable image: ${image%@*}@$digest revision=$revision_label"
+          done
+
+      - name: Verify migration safety from durable baseline
+        run: |
+          set -Eeuo pipefail
+          python scripts/check_online_migrations.py \
+            "$BASELINE_REVISION" "$REVISION" \
+            --write-manifest --output deployment-migration-manifest.json
+          cat deployment-migration-manifest.json
+
+      - name: Read-only production repair preflight
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - snapshot --app-root '$PROD_PATH'" \
+            < scripts/production_provenance.py | tee provenance-before.json
+          jq -e \
+            --arg baseline "$BASELINE_REVISION" \
+            --arg current "$PROD_PATH/releases/$BASELINE_REVISION" \
+            '(.recorded_revision == $baseline) and
+             (.current.target == $current) and
+             (.runtime_uniform == false) and
+             (.status == "INVALID_RUNTIME" or .status == "MIXED_RUNTIME")' \
+            provenance-before.json >/dev/null
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "set -Eeuo pipefail
+             test -f '$PROD_PATH/releases/$BASELINE_REVISION/.deployment-sha'
+             test \"\$(tr -d '\\r\\n' < '$PROD_PATH/releases/$BASELINE_REVISION/.deployment-sha')\" = '$BASELINE_REVISION'
+             export COMPOSE_PROJECT_NAME=fit-mini-app
+             cd '$PROD_PATH/current'
+             docker compose exec -T backend alembic current
+             printf '%s\\n' '---HEADS---'
+             docker compose exec -T backend alembic heads" | tee db-before.txt
+          python - <<'PY'
+          import re
+          from pathlib import Path
+
+          current_text, heads_text = Path("db-before.txt").read_text(encoding="utf-8").split(
+              "---HEADS---", 1
+          )
+          current = set(re.findall(r"\b[0-9a-f]{8,40}\b", current_text))
+          heads = set(re.findall(r"\b[0-9a-f]{8,40}\b", heads_text))
+          if not current or not heads or not heads.issubset(current):
+              raise SystemExit(
+                  f"database migration state is not a known head: current={sorted(current)} heads={sorted(heads)}"
+              )
+          print(f"DB_CURRENT_REVISIONS={','.join(sorted(current))}")
+          print(f"DB_HEAD_REVISIONS={','.join(sorted(heads))}")
+          PY
+          echo "PRE_REPAIR_AUDIT=PASS"
+
+      - name: Build immutable repair bundle with current delivery tooling
+        id: bundle
+        run: |
+          set -Eeuo pipefail
+          bundle_root="$(mktemp -d)"
+          git archive --format=tar "$REVISION" backend/alembic/versions docker-compose.yml deploy scripts | tar -xf - -C "$bundle_root"
+          install -m 755 scripts/deploy_production.sh "$bundle_root/scripts/deploy_production.sh"
+          install -m 755 scripts/zero_downtime_deploy.py "$bundle_root/scripts/zero_downtime_deploy.py"
+          cp deployment-migration-manifest.json "$bundle_root/deployment-migration-manifest.json"
+          bundle_tar="yfc-repair-$REVISION.tar"
+          bundle_name="$bundle_tar.gz"
+          tar --create --file="$bundle_tar" --directory="$bundle_root" .
+          gzip -n "$bundle_tar"
+          echo "name=$bundle_name" >> "$GITHUB_OUTPUT"
+
+      - name: Transfer immutable repair bundle
+        env:
+          BUNDLE_NAME: ${{ steps.bundle.outputs.name }}
+        run: |
+          set -Eeuo pipefail
+          scp \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -P "$PROD_PORT" \
+            "$BUNDLE_NAME" \
+            "$PROD_USER@$PROD_HOST:/tmp/$BUNDLE_NAME"
+
+      - name: Run existing single-slot deployment mechanism for repair
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUNDLE_NAME: ${{ steps.bundle.outputs.name }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend_image_ref }}
+          BOT_IMAGE: ${{ steps.images.outputs.bot_image_ref }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$GHCR_TOKEN"
+          printf '%s\n' "$GHCR_TOKEN" | ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "set -Eeuo pipefail
+             IFS= read -r GHCR_TOKEN
+             RELEASE_ROOT='$PROD_PATH/releases'
+             RELEASE_PATH=\"\$RELEASE_ROOT/$REVISION\"
+             STAGING_PATH=\"\$RELEASE_ROOT/.staging-repair-$REVISION-${{ github.run_id }}\"
+             mkdir -p \"\$RELEASE_ROOT\" \"\$STAGING_PATH\"
+             tar -xzf '/tmp/$BUNDLE_NAME' -C \"\$STAGING_PATH\"
+             printf '%s\\n' '$REVISION' > \"\$STAGING_PATH/.deployment-sha\"
+             if [ -e \"\$RELEASE_PATH/.deployment-sha\" ]; then
+               test \"\$(cat \"\$RELEASE_PATH/.deployment-sha\")\" = '$REVISION'
+               rm -rf \"\$STAGING_PATH\"
+             else
+               mv \"\$STAGING_PATH\" \"\$RELEASE_PATH\"
+             fi
+             cd \"\$RELEASE_PATH\"
+             export COMPOSE_PROJECT_NAME=fit-mini-app
+             export DEPLOY_ROOT=\"\$RELEASE_PATH\"
+             export DEPLOY_STATE_ROOT='$PROD_PATH/.artifacts/operations/deployments'
+             export DEPLOY_ARTIFACT_ROOT='$PROD_PATH/.artifacts'
+             export DEPLOY_MIGRATION_MANIFEST=deployment-migration-manifest.json
+             export DEPLOY_SINGLE_SLOT_CONFIRMED_SHA='$REVISION'
+             export DEPLOY_REPAIR_MODE=true
+             export DEPLOY_REPAIR_BASELINE_SHA='$BASELINE_REVISION'
+             active_marker='$PROD_PATH/.artifacts/operations/deployments/last-successful-revision'
+             test -f \"\$active_marker\"
+             test \"\$(tr -d '\\r\\n' < \"\$active_marker\")\" = '$BASELINE_REVISION'
+             registry_login_succeeded=false
+             DOCKER_CONFIG_DIR=\$(mktemp -d)
+             trap 'rm -rf \"\$DOCKER_CONFIG_DIR\"' EXIT
+             export DOCKER_CONFIG=\"\$DOCKER_CONFIG_DIR\"
+             for attempt in 1 2 3 4 5; do
+               if printf '%s' \"\$GHCR_TOKEN\" | docker login ghcr.io --username '$GITHUB_ACTOR' --password-stdin >/dev/null; then
+                 registry_login_succeeded=true
+                 break
+               fi
+               if [ \"\$attempt\" -eq 5 ]; then break; fi
+               delay=\$((attempt * 10))
+               echo \"GHCR login attempt \$attempt failed; retrying in \$delay seconds\" >&2
+               sleep \"\$delay\"
+             done
+             if [ \"\$registry_login_succeeded\" != true ]; then
+               echo 'GHCR login failed after 5 attempts' >&2
+               exit 1
+             fi
+             BACKEND_IMAGE='$BACKEND_IMAGE' \
+             BOT_IMAGE='$BOT_IMAGE' \
+             bash scripts/deploy_production.sh '$REVISION' '$PROD_URL' '$PROD_PUBLIC_URL' '$PROD_ROLLOUT_MODE'
+             install -m 600 \"\$RELEASE_PATH/.env\" '$PROD_PATH/.env'
+             ln -sfn \"\$RELEASE_PATH\" '$PROD_PATH/current'
+             python3 \"\$RELEASE_PATH/scripts/production_host_cleanup.py\" '$REVISION' \
+               --app-root '$PROD_PATH' \
+               --backup-keep 5 \
+               --previous-releases 2 \
+               --tmp-root /tmp \
+               --warning-free-mb 3072 \
+               --docker-prune
+             rm -f '/tmp/$BUNDLE_NAME'"
+
+      - name: Verify repaired production provenance
+        run: |
+          set -Eeuo pipefail
+          ssh \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 \
+            -o ConnectionAttempts=1 \
+            -p "$PROD_PORT" \
+            "$PROD_USER@$PROD_HOST" \
+            "python3 - snapshot --app-root '$PROD_PATH'" \
+            < scripts/production_provenance.py | tee provenance-after.json
+          jq -e \
+            --arg expected "$REVISION" \
+            --arg current "$PROD_PATH/releases/$REVISION" \
+            '(.status == "OK") and
+             (.recorded_revision == $expected) and
+             (.runtime_revision == $expected) and
+             (.runtime_uniform == true) and
+             (.current.target == $current) and
+             (.release.exists_and_matches == true) and
+             (.database.consistent == true) and
+             ((.errors | length) == 0) and
+             (.services.backend.revision == $expected) and
+             (.services.backend.health == "healthy") and
+             (.services.worker.revision == $expected) and
+             (.services.worker.health == "healthy") and
+             (.services.bot.revision == $expected) and
+             (.services.bot.status == "running") and
+             (.services.bot.runtime_markers.polling_file_lock_acquired == true) and
+             (.services.bot.runtime_markers.telegram_polling_started == true) and
+             (any(.summaries[]?; .target_revision == $expected and .verdict == "active"))' \
+            provenance-after.json >/dev/null
+
+      - name: Verify repaired application and SEO smoke
+        run: |
+          set -Eeuo pipefail
+          python scripts/check_deployment.py "$PROD_URL" --expected-environment prod
+          python scripts/check_seo_surface.py "$PROD_PUBLIC_URL" --timeout 15
+          echo "REPAIR_COMPLETED=true"
 
   reconcile:
     name: Reconcile verified production provenance metadata
