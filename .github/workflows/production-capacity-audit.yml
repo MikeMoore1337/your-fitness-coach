@@ -274,8 +274,8 @@ jobs:
                   for item in (min(converted), sum(converted) / len(converted), max(converted))
               )
 
-          ram_min, ram_avg, ram_max = aggregate_mib(ram_samples, 1024)
-          docker_memory_max, docker_memory_avg, _ = aggregate_mib(
+          ram_min_mib, ram_avg_mib, ram_max_mib = aggregate_mib(ram_samples, 1024)
+          _, docker_memory_avg_mib, docker_memory_max_mib = aggregate_mib(
               docker_memory_samples, 1024**2
           )
           load_1m_max = (
@@ -424,29 +424,46 @@ jobs:
                               round(float(shared_buffers.group(1)) * factor / 1024**2)
                           )
 
-          historical_capacity = "UNAVAILABLE"
-          try:
-              candidates = sorted(
-                  (path for path in DEPLOYMENT_ROOT.glob("*/summary.json") if path.is_file()),
-                  key=lambda path: path.stat().st_mtime,
-                  reverse=True,
-              )[:5]
+          def historical_capacity_metrics():
+              fields = ("cpu_count", "memory_available_mb", "disk_available_mb")
+              records = []
+              try:
+                  candidates = sorted(
+                      (path for path in DEPLOYMENT_ROOT.glob("*/summary.json") if path.is_file()),
+                      key=lambda path: path.stat().st_mtime,
+                      reverse=True,
+                  )[:5]
+              except OSError:
+                  candidates = []
               for path in candidates:
                   try:
                       value = json.loads(path.read_text(encoding="utf-8"))
-                      capacity = value.get("capacity")
-                      fields = ("cpu_count", "memory_available_mb", "disk_available_mb")
+                      capacity = value.get("capacity") if isinstance(value, dict) else None
                       if isinstance(capacity, dict) and all(
                           isinstance(capacity.get(field), int)
                           and not isinstance(capacity.get(field), bool)
                           for field in fields
                       ):
-                          historical_capacity = "AVAILABLE"
-                          break
+                          records.append(tuple(capacity[field] for field in fields))
                   except (OSError, TypeError, ValueError):
                       continue
-          except OSError:
-              pass
+              if not records:
+                  return ("UNAVAILABLE", "0", "UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+              return (
+                  "AVAILABLE",
+                  str(len(records)),
+                  str(min(record[0] for record in records)),
+                  str(min(record[1] for record in records)),
+                  str(min(record[2] for record in records)),
+              )
+
+          (
+              historical_capacity,
+              historical_sample_count,
+              historical_cpu_count_min,
+              historical_ram_available_min_mib,
+              historical_disk_free_min_mib,
+          ) = historical_capacity_metrics()
 
           cpu_count = os.cpu_count()
           if cpu_count is None:
@@ -473,9 +490,9 @@ jobs:
                   f"RAM_TOTAL_MIB={ram_total_mib}",
                   f"RAM_AVAILABLE_MIB={ram_available_mib}",
                   f"RAM_AVAILABLE_PERCENT={ram_available_percent}",
-                  f"RAM_AVAILABLE_MIN={ram_min}",
-                  f"RAM_AVAILABLE_AVG={ram_avg}",
-                  f"RAM_AVAILABLE_MAX={ram_max}",
+                  f"RAM_AVAILABLE_MIN_MIB={ram_min_mib}",
+                  f"RAM_AVAILABLE_AVG_MIB={ram_avg_mib}",
+                  f"RAM_AVAILABLE_MAX_MIB={ram_max_mib}",
                   f"SWAP_TOTAL_MIB={swap_total_mib}",
                   f"SWAP_FREE_MIB={swap_free_mib}",
                   f"ROOT_DISK_TOTAL_MIB={root_total_mib}",
@@ -487,8 +504,8 @@ jobs:
                   f"DOCKER_TOTAL_MEMORY_USED_MIB={docker_total_memory_used_mib}",
                   f"DOCKER_MAX_SINGLE_CONTAINER_MEMORY_MIB={docker_max_single_container_memory_mib}",
                   f"DOCKER_TOTAL_PIDS={docker_total_pids}",
-                  f"DOCKER_MEMORY_MAX_MIB={docker_memory_max}",
-                  f"DOCKER_MEMORY_AVG_MIB={docker_memory_avg}",
+                  f"DOCKER_MEMORY_MAX_MIB={docker_memory_max_mib}",
+                  f"DOCKER_MEMORY_AVG_MIB={docker_memory_avg_mib}",
                   "DOCKER_IMAGES_SIZE_MIB=UNAVAILABLE",
                   f"CONTAINERS_WITH_MEMORY_LIMIT={containers_with_memory_limit}",
                   f"CONTAINERS_WITHOUT_MEMORY_LIMIT={containers_without_memory_limit}",
@@ -507,6 +524,10 @@ jobs:
                   f"POSTGRES_SHARED_BUFFERS_MIB={postgres['shared_buffers_mib']}",
                   f"PORT_5678={port_5678}",
                   f"HISTORICAL_CAPACITY={historical_capacity}",
+                  f"HISTORICAL_SAMPLE_COUNT={historical_sample_count}",
+                  f"HISTORICAL_CPU_COUNT_MIN={historical_cpu_count_min}",
+                  f"HISTORICAL_RAM_AVAILABLE_MIN_MIB={historical_ram_available_min_mib}",
+                  f"HISTORICAL_DISK_FREE_MIN_MIB={historical_disk_free_min_mib}",
                   "NO_PRODUCTION_MUTATIONS=true",
               ]
           ))

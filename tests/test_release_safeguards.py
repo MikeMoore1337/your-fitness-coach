@@ -1,6 +1,12 @@
+import ast
+import json
+import os
 import re
+import textwrap
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import yaml
 
@@ -22,6 +28,24 @@ def _sources() -> dict[str, str]:
         "launcher": (root / "scripts" / "run_task_delivery.py").read_text(encoding="utf-8"),
         "dependency_doc": (root / "docs" / "dependency-automation.md").read_text(encoding="utf-8"),
     }
+
+
+def _embedded_function(workflow_text: str, name: str, **globals_: object) -> Callable[..., object]:
+    match = re.search(
+        r"(?ms)^[ \t]+exec python3 - <<'REMOTE_PYTHON'\r?\n"
+        r"(?P<script>.*?)^[ \t]+REMOTE_PYTHON$",
+        workflow_text,
+    )
+    assert match is not None
+    tree = ast.parse(textwrap.dedent(match.group("script")))
+    function = next(
+        node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == name
+    )
+    module = ast.Module(body=[function], type_ignores=[])
+    ast.fix_missing_locations(module)
+    namespace: dict[str, object] = {"__builtins__": __builtins__, **globals_}
+    exec(compile(module, "<embedded-capacity-probe>", "exec"), namespace)
+    return cast(Callable[..., object], namespace[name])
 
 
 def test_ci_runs_full_regression_on_task_pr_and_only_provenance_on_master_push() -> None:
@@ -232,11 +256,12 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
         "PRODUCTION_CAPACITY_PROBE=PASS",
         "CPU_COUNT=",
         "ARCH=",
-        "RAM_AVAILABLE_MIN=",
-        "RAM_AVAILABLE_AVG=",
-        "RAM_AVAILABLE_MAX=",
+        "RAM_AVAILABLE_MIN_MIB=",
+        "RAM_AVAILABLE_AVG_MIB=",
+        "RAM_AVAILABLE_MAX_MIB=",
         "DOCKER_TOTAL_MEMORY_USED_MIB=",
         "DOCKER_MEMORY_MAX_MIB=",
+        "DOCKER_MEMORY_AVG_MIB=",
         "POSTGRES_MAX_CONNECTIONS=",
         "POSTGRES_CURRENT_CONNECTIONS=",
         "POSTGRES_CONNECTION_HEADROOM=",
@@ -245,6 +270,10 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
         "WORKER_MODE=",
         "BOT_MODE=",
         "HISTORICAL_CAPACITY=",
+        "HISTORICAL_SAMPLE_COUNT=",
+        "HISTORICAL_CPU_COUNT_MIN=",
+        "HISTORICAL_RAM_AVAILABLE_MIN_MIB=",
+        "HISTORICAL_DISK_FREE_MIN_MIB=",
         "NO_PRODUCTION_MUTATIONS=true",
     ):
         assert output in workflow_text
@@ -290,6 +319,88 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
     assert "POSTGRES_DB" not in workflow_text
     assert 'DEPLOYMENT_ROOT.glob("*/summary.json")' in workflow_text
     assert ")[:5]" in workflow_text
+    for legacy_field in (
+        "RAM_AVAILABLE_MIN=",
+        "RAM_AVAILABLE_AVG=",
+        "RAM_AVAILABLE_MAX=",
+    ):
+        assert legacy_field not in workflow_text
+
+
+def test_capacity_audit_preserves_docker_min_avg_max_semantics() -> None:
+    workflow_text = _sources()["capacity_audit"]
+    aggregate_mib = _embedded_function(workflow_text, "aggregate_mib")
+    samples_mib = [400, 450, 600, 500, 550, 480]
+
+    assert aggregate_mib([value * 1024**2 for value in samples_mib], 1024**2) == (
+        "400",
+        "497",
+        "600",
+    )
+    assert re.search(
+        r"docker_memory_avg_mib,\s*docker_memory_max_mib\s*=\s*aggregate_mib\(\s*"
+        r"docker_memory_samples,\s*1024\*\*2\s*\)",
+        workflow_text,
+    )
+    assert 'f"DOCKER_MEMORY_MAX_MIB={docker_memory_max_mib}"' in workflow_text
+    assert 'f"DOCKER_MEMORY_AVG_MIB={docker_memory_avg_mib}"' in workflow_text
+
+
+def test_capacity_audit_historical_metrics_are_bounded_allowlisted_and_worst_case(
+    tmp_path: Path,
+) -> None:
+    workflow_text = _sources()["capacity_audit"]
+    historical_capacity_metrics = _embedded_function(
+        workflow_text,
+        "historical_capacity_metrics",
+        DEPLOYMENT_ROOT=tmp_path,
+        json=json,
+    )
+    summaries = (
+        {"capacity": {"cpu_count": 2, "memory_available_mb": 1600, "disk_available_mb": 5000}},
+        {"capacity": {"cpu_count": 2, "memory_available_mb": 1200, "disk_available_mb": 4300}},
+        {"capacity": {"cpu_count": 2, "memory_available_mb": 1450, "disk_available_mb": 4700}},
+        {"capacity": {"cpu_count": 2, "memory_available_mb": 1500}},
+        {"capacity": {"cpu_count": True, "memory_available_mb": 1000, "disk_available_mb": 4000}},
+        {
+            "capacity": {
+                "cpu_count": 99,
+                "memory_available_mb": 1,
+                "disk_available_mb": 1,
+                "secret": "must-not-be-read-or-printed",
+            },
+            "metadata": {"revision": "must-not-be-read-or-printed"},
+        },
+    )
+    for index, summary in enumerate(summaries):
+        summary_path = tmp_path / f"deployment-{index}" / "summary.json"
+        summary_path.parent.mkdir()
+        summary_path.write_text(json.dumps(summary), encoding="utf-8")
+        timestamp = 100 + len(summaries) - index
+        os.utime(summary_path, (timestamp, timestamp))
+
+    assert historical_capacity_metrics() == ("AVAILABLE", "3", "2", "1200", "4300")
+    assert "must-not-be-read-or-printed" not in str(historical_capacity_metrics())
+    empty_root = tmp_path / "empty"
+    empty_root.mkdir()
+    unavailable_metrics = _embedded_function(
+        workflow_text,
+        "historical_capacity_metrics",
+        DEPLOYMENT_ROOT=empty_root,
+        json=json,
+    )
+    assert unavailable_metrics() == (
+        "UNAVAILABLE",
+        "0",
+        "UNAVAILABLE",
+        "UNAVAILABLE",
+        "UNAVAILABLE",
+    )
+    assert 'fields = ("cpu_count", "memory_available_mb", "disk_available_mb")' in workflow_text
+    assert "records.append(tuple(capacity[field] for field in fields))" in workflow_text
+    assert "str(min(record[0] for record in records))" in workflow_text
+    assert "str(min(record[1] for record in records))" in workflow_text
+    assert "str(min(record[2] for record in records))" in workflow_text
 
 
 def test_capacity_audit_cleans_ephemeral_ssh_material_on_every_exit() -> None:
