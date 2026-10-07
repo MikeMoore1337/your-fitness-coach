@@ -503,7 +503,7 @@ def _error_code(exc: Exception) -> tuple[str, str]:
             "Отдых между силовыми подходами должен составлять не менее 15 секунд.",
         ),
     }
-    return mapping.get(str(exc), ("apply_failed", "Не удалось применить rollout к клиенту."))
+    return mapping.get(str(exc), ("apply_failed", "Не удалось применить шаблон к клиенту."))
 
 
 def _already_applied(db: Session, program_id: int, rollout_id: str) -> bool:
@@ -525,10 +525,12 @@ def apply_coach_program_rollout(
     header_idempotency_key: str | None,
 ) -> dict[str, Any]:
     if not payload.confirmed:
-        raise CoachProgramRolloutError("Для rollout требуется явное подтверждение тренера", 422)
+        raise CoachProgramRolloutError(
+            "Для применения шаблона требуется явное подтверждение тренера", 422
+        )
     idempotency_key = (header_idempotency_key or payload.idempotency_key or "").strip()
     if len(idempotency_key) < 8:
-        raise CoachProgramRolloutError("Для rollout требуется Idempotency-Key", 422)
+        raise CoachProgramRolloutError("Для применения шаблона требуется Idempotency-Key", 422)
 
     template = _load_rollout_template(db, coach, payload.template_id)
     current_fingerprint = _template_fingerprint(template)
@@ -557,7 +559,7 @@ def apply_coach_program_rollout(
         and existing_start.details.get("request_fingerprint") != request_fingerprint
     ):
         raise CoachProgramRolloutError(
-            "Этот Idempotency-Key уже использован для другого rollout", 409
+            "Этот Idempotency-Key уже использован для другого применения шаблона", 409
         )
     if existing_start is None:
         record_audit_event(
@@ -619,7 +621,7 @@ def apply_coach_program_rollout(
                             "program_id": locked_program.id,
                             "status": "already_applied",
                             "code": "already_applied",
-                            "detail": "Этот rollout уже применён к клиенту.",
+                            "detail": "Этот шаблон уже применён к клиенту.",
                             "current_revision_number": locked_program.current_revision_number,
                         }
                     )
@@ -657,7 +659,7 @@ def apply_coach_program_rollout(
                         "program_id": target.program_id,
                         "status": "applied",
                         "code": "applied",
-                        "detail": "Rollout применён к будущим тренировкам.",
+                        "detail": "Шаблон применён к будущим тренировкам.",
                         "workouts_updated": workouts_updated,
                         "current_revision_number": revision_number,
                     }
@@ -665,7 +667,7 @@ def apply_coach_program_rollout(
         except CoachProgramRolloutError as exc:
             if exc.detail.startswith("rollout_classification:"):
                 code = exc.detail.split(":", 1)[1]
-                detail = "Клиент не прошёл безопасную классификацию rollout."
+                detail = "Клиент не прошёл проверку безопасности для применения шаблона."
             else:
                 code, detail = "manual_review_required", exc.detail
             result = {
@@ -718,7 +720,7 @@ def apply_coach_program_rollout(
                     "program_id": target.program_id,
                     "status": "failed",
                     "code": "apply_failed",
-                    "detail": "Не удалось применить rollout к клиенту.",
+                    "detail": "Не удалось применить шаблон к клиенту.",
                 }
             )
             record_audit_event(

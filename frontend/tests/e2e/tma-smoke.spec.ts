@@ -467,6 +467,15 @@ test('program history keeps current block, readable revisions and workout return
     );
     await history.getByText('Все этапы и изменения').click();
     await expect(history.getByRole('heading', { name: 'Тренировочные блоки' })).toBeVisible();
+    await expect(
+      history.locator('.program-history__disclosure > summary > .disclosure-icon'),
+    ).toBeVisible();
+    const historyBody = history.locator('.program-history__body');
+    await expect(historyBody).toHaveCSS('border-top-style', 'none');
+    await expect(historyBody.locator('.program-history__region').nth(1)).toHaveCSS(
+      'border-top-style',
+      'none',
+    );
     const blockTimeline = history.locator('.program-block-timeline');
     await expect(blockTimeline.getByText('Вводный этап')).toBeVisible();
     await expect(

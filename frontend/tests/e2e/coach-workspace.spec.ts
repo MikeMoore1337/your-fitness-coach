@@ -1142,7 +1142,7 @@ async function mockCoachWorkspace(
               program_id: 701,
               status: 'applied',
               code: 'applied',
-              detail: 'Rollout применён к будущим тренировкам.',
+              detail: 'Шаблон применён к будущим тренировкам.',
               workouts_updated: 6,
               current_revision_number: 3,
             },
@@ -2818,8 +2818,16 @@ test('Product V10 B5 rollout preview keeps compatible and manual cases visible',
     const rollout = operations.locator('.coach-program-rollout');
     await rollout.locator(':scope > summary').click();
     await rollout.getByRole('button', { name: 'Собрать предпросмотр', exact: true }).click();
+    await expect(
+      rollout.getByText('Проверить применение выбранного шаблона', { exact: true }),
+    ).toBeVisible();
     await expect(rollout.getByText('Совместимо', { exact: true })).toBeVisible();
     await expect(rollout.getByText('Нужна ручная проверка', { exact: true })).toHaveCount(2);
+    await expect(rollout.getByLabel('Причина применения')).toBeVisible();
+    await expect(
+      rollout.getByRole('button', { name: 'Применить к 1 клиенту', exact: true }),
+    ).toBeVisible();
+    expect(await rollout.textContent()).not.toMatch(/rollout/i);
     return rollout;
   };
 

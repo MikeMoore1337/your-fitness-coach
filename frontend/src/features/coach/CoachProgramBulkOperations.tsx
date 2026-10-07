@@ -157,6 +157,16 @@ function rolloutReasonLabels(codes: string[]): string {
   return codes.map((code) => labels[code] ?? code).join(' ');
 }
 
+function clientCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'клиенту' : 'клиентам'}`;
+}
+
+function createIdempotencyKey(): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `rollout-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
 export function CoachProgramBulkOperations({
   programs,
   selectedClients,
@@ -413,8 +423,7 @@ export function CoachProgramBulkOperations({
       setRolloutResults([]);
       setRolloutResultsKey('');
     },
-    onError: () =>
-      toast('Не удалось собрать предпросмотр rollout. Обновите данные и повторите.', 'error'),
+    onError: () => toast('Не удалось собрать предпросмотр. Обновите данные и повторите.', 'error'),
   });
 
   const rolloutApplyMutation = useMutation({
@@ -462,13 +471,13 @@ export function CoachProgramBulkOperations({
       ]);
       toast(
         result.failed_count
-          ? `Rollout применён: ${result.applied_count}. Не выполнено: ${result.failed_count}.`
-          : `Rollout применён к ${result.applied_count} клиентам.`,
+          ? 'Не удалось применить шаблон. Обновите предпросмотр и повторите.'
+          : `Шаблон применён к ${clientCountLabel(result.applied_count)}.`,
         result.failed_count ? 'error' : 'success',
       );
     },
     onError: () =>
-      toast('Не удалось применить rollout. Обновите предпросмотр и повторите.', 'error'),
+      toast('Не удалось применить шаблон. Обновите предпросмотр и повторите.', 'error'),
   });
 
   const scheduleCommonRevision = async (event: FormEvent<HTMLFormElement>) => {
@@ -556,18 +565,15 @@ export function CoachProgramBulkOperations({
   const confirmRollout = async () => {
     if (!currentRolloutPreview || !applyableRolloutTargets.length || !rolloutReason.trim()) return;
     const approved = await confirm({
-      title: 'Подтвердить rollout шаблона?',
+      title: 'Применить шаблон?',
       message: [
-        `Шаблон «${currentRolloutPreview.template_title}» обновит только будущие запланированные тренировки у ${applyableRolloutTargets.length} клиентов.`,
+        `Шаблон «${currentRolloutPreview.template_title}» обновит только будущие запланированные тренировки у ${applyableRolloutTargets.length} ${applyableRolloutTargets.length === 1 ? 'клиента' : 'клиентов'}.`,
         'Завершённые тренировки не изменятся. Клиенты с персонализацией или ручной проверкой будут пропущены.',
       ].join(' '),
-      confirmText: `Подтвердить · ${applyableRolloutTargets.length}`,
+      confirmText: `Применить к ${clientCountLabel(applyableRolloutTargets.length)}`,
     });
     if (!approved) return;
-    const idempotencyKey =
-      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-        ? crypto.randomUUID()
-        : `rollout-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const idempotencyKey = createIdempotencyKey();
     rolloutApplyMutation.mutate({ preview: currentRolloutPreview, idempotencyKey });
   };
 
@@ -599,7 +605,7 @@ export function CoachProgramBulkOperations({
     >
       {selectedTemplate && (
         <details className="coach-program-rollout">
-          <summary>Проверить безопасный rollout выбранного шаблона</summary>
+          <summary>Проверить применение выбранного шаблона</summary>
           {!selectedClients.length ? (
             <EmptyState title="Сначала выберите клиентов" text="Выбор клиентов находится выше." />
           ) : (
@@ -661,7 +667,7 @@ export function CoachProgramBulkOperations({
                         К применению готово: {applyableRolloutTargets.length}. Остальные клиенты
                         будут пропущены до отдельной ручной проверки.
                       </p>
-                      <Field label="Причина rollout" labelFor="coach-rollout-reason">
+                      <Field label="Причина применения" labelFor="coach-rollout-reason">
                         <Input
                           id="coach-rollout-reason"
                           required
@@ -677,11 +683,11 @@ export function CoachProgramBulkOperations({
                       >
                         {rolloutApplyMutation.isPending
                           ? 'Применяем…'
-                          : `Проверено и применить · ${applyableRolloutTargets.length}`}
+                          : `Применить к ${clientCountLabel(applyableRolloutTargets.length)}`}
                       </Button>
                     </>
                   ) : (
-                    <p role="status">Нет клиентов, готовых к безопасному применению rollout.</p>
+                    <p role="status">Нет клиентов, готовых к безопасному применению шаблона.</p>
                   )}
                 </div>
               )}

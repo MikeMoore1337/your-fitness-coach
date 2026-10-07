@@ -2415,7 +2415,7 @@ def handle_demo_transport(
                     "program_id": int(target.get("program_id", 0)),
                     "status": "failed",
                     "code": "demo_mode",
-                    "detail": "Rollout недоступен в демо-режиме.",
+                    "detail": "Шаблон недоступен в демо-режиме.",
                     "workouts_updated": 0,
                     "current_revision_number": None,
                 }

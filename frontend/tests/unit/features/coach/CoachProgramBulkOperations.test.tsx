@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -337,7 +337,7 @@ describe('CoachProgramBulkOperations', () => {
                 program_id: 44,
                 status: 'applied',
                 code: 'applied',
-                detail: 'Rollout применён к будущим тренировкам.',
+                detail: 'Шаблон применён к будущим тренировкам.',
                 workouts_updated: 4,
                 current_revision_number: 8,
               },
@@ -356,15 +356,23 @@ describe('CoachProgramBulkOperations', () => {
     });
     renderBulk([program(44, 71, 7), program(45, 72, 4)], clients, template);
 
-    fireEvent.click(screen.getByText('Проверить безопасный rollout выбранного шаблона'));
+    fireEvent.click(screen.getByText('Проверить применение выбранного шаблона'));
     fireEvent.click(await screen.findByRole('button', { name: 'Собрать предпросмотр' }));
 
     expect(await screen.findByText('Совместимо')).toBeInTheDocument();
     expect(screen.getByText('Нужна ручная проверка')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Проверено и применить · 1' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить · 1' }));
+    expect(screen.queryByText(/rollout/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Причина применения')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Применить к 1 клиенту' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Применить шаблон?' })).toBeInTheDocument();
+    fireEvent.click(
+      within(dialog).getByRole('button', {
+        name: 'Применить к 1 клиенту',
+      }),
+    );
 
-    expect(await screen.findByText('Rollout применён к будущим тренировкам.')).toBeInTheDocument();
+    expect(await screen.findByText('Шаблон применён к будущим тренировкам.')).toBeInTheDocument();
     await waitFor(() => expect(requests).toHaveLength(1));
     expect(requests[0]?.body).toMatchObject({
       template_id: 5,
