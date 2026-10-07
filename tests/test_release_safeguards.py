@@ -231,6 +231,17 @@ def test_manual_repair_always_executes_fresh_current_tooling() -> None:
     assert r"echo \"REPAIR_EXECUTION_ROOT=\$STAGING_PATH\"" in repair
     assert r"cd \"\$STAGING_PATH\"" in repair
     assert r"rm -rf \"\$STAGING_PATH\"" not in repair
+    staging_absence_check = r"test ! -e \"\$STAGING_PATH\""
+    staging_create = r"install -d -m 700 \"\$STAGING_PATH\""
+    extraction = r"tar -xzf '/tmp/$BUNDLE_NAME' -C \"\$STAGING_PATH\""
+    assert staging_absence_check in repair
+    assert staging_create in repair
+    assert extraction in repair
+    assert (
+        repair.index(staging_absence_check)
+        < repair.index(staging_create)
+        < repair.index(extraction)
+    )
     assert r"test \"\$current_target\" = \"\$RELEASE_ROOT/$BASELINE_REVISION\"" in repair
     assert r"mv \"\$STAGING_PATH\" \"\$RELEASE_PATH\"" in repair
     assert "QUARANTINE_PATH" in repair

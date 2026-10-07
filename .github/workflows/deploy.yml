@@ -566,6 +566,7 @@ jobs:
              QUARANTINE_PATH=\"\$RELEASE_ROOT/.quarantine-repair-$REVISION-${{ github.run_id }}\"
              mkdir -p \"\$RELEASE_ROOT\"
              test ! -e \"\$STAGING_PATH\"
+             install -d -m 700 \"\$STAGING_PATH\"
              tar -xzf '/tmp/$BUNDLE_NAME' -C \"\$STAGING_PATH\"
              printf '%s\\n' '$REVISION' > \"\$STAGING_PATH/.deployment-sha\"
              test -f '$PROD_PATH/.env'
