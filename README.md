@@ -18,7 +18,7 @@ deploy/         Caddy edge configuration
 scripts/        проверки, генераторы, backup/restore и deployment helpers
 tests/          cross-stack integration tests
 docs/           публичные русскоязычные product и architecture contracts
-codex-backlog/  публичные lifecycle rules и исторический release context
+codex-backlog/  roadmap/specification и исторический project context
 .agents/        роли, skills и verification references для Codex
 .artifacts/     canonical task/runtime/operations artifacts; не коммитится
 ```
@@ -228,7 +228,7 @@ keyboard, BackButton и lifecycle contracts, но не заменяют Telegram
 - contributor architecture и task boundaries: [`AGENTS.md`](AGENTS.md);
 - Mobile Web/TMA test contract: [`docs/mobile-tma-quality-gate.md`](docs/mobile-tma-quality-gate.md);
 - public content и SEO boundaries: [`docs/seo/public-content.md`](docs/seo/public-content.md);
-- blue/green production contract: [`docs/production-deployment.md`](docs/production-deployment.md);
+- production delivery contract: [`docs/deployment.md`](docs/deployment.md);
 - domain contracts: [`docs/exercise-domain.md`](docs/exercise-domain.md),
   [`docs/food-domain.md`](docs/food-domain.md) и
   [`docs/training-analytics.md`](docs/training-analytics.md);
@@ -243,23 +243,21 @@ legal-risk и owner-only документы также не публикуютс
 ## Production и deployment
 
 Новая production revision попадает в удалённый `master` только как результат merged pull request.
-Ruleset требует green check `checks`, запрещает direct push, force-push и удаление `master`; workflow
-дополнительно проверяет provenance exact SHA и его соответствие текущему `origin/master`.
+Ruleset требует green check `checks`, запрещает direct push и force-push. После успешного CI на
+`master` `.github/workflows/deploy.yml` получает изменённые пути из Git: application-affecting
+изменения запускают deploy, а docs/governance-only изменения завершаются без application deploy.
 
-Merge PR является release authorization. После него человек не участвует в normal deployment path:
-post-merge CI публикует проверенные immutable images и автоматически запускает
-`.github/workflows/deploy.yml`; `production` environment не содержит reviewers или wait timer.
-Workflow собирает bundle из exact commit и передаёт его на host вместе с image refs и migration
-manifest. Fail-closed `scripts/deploy_production.sh` проверяет `.deployment-sha`, затем выполняет
-preflight, PostgreSQL backup, migrations, blue/green rollout, smoke/observation gates и
-автоматический возврат прежнего slot при ошибке до commit state; host не требует Git checkout.
+Production serialization выполняется GitHub Actions `concurrency` с группой `production`.
+Workflow собирает bundle из exact merge SHA, передаёт immutable image refs и migration manifest,
+а `scripts/deploy_production.sh` выполняет preflight, backup, migrations, rollout, smoke и
+rollback при ошибке. Deployment evidence и активная revision сохраняются на production host и
+читаются следующим запуском; локальный controller state не нужен.
 
-`workflow_dispatch` CI используется только для bounded scheduled regression на `master` с явным
-выбором `daily` или `weekly`; он не выбирает произвольный production SHA и не запускает deploy.
-History rewrite, direct/force push, ручные production-команды,
-bootstrap, восстановление инфраструктуры, DNS/Cloudflare/secrets и deployment SHA вне текущего
-merged `master` остаются exceptional production actions и требуют отдельного owner approval,
-проверенной backup-ветки и operator preflight.
+`workflow_dispatch` в release workflow поддерживает owner-authorized deploy проверенной revision и
+rollback активной revision. Обычный recovery продолжается по Git/GitHub: `git status`, branch/log,
+`gh pr view` и `gh run list`. History rewrite, direct/force push, secrets, ручные production-команды,
+bootstrap инфраструктуры и опасные data operations остаются exceptional actions и требуют
+отдельного owner approval.
 
 ## Ограничения
 

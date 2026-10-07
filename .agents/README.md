@@ -1,6 +1,7 @@
 # YFC Codex skills v10 - focused contracts
 
-Skills задают профессиональный способ выполнения работы. Role задаёт ответственность прохода, task - scope и результат.
+Skills задают профессиональный способ выполнения работы. Optional role задаёт ответственность
+сессии, а GitHub Issue/PR задают scope и operational result.
 
 ## Базовые правила
 
@@ -9,7 +10,7 @@ Skills задают профессиональный способ выполне
 3. Skill не расширяет scope.
 4. Для обычной implementation task держи примерно 2-5 core skills.
 5. QA: `$qa-engineer` как strategy/router + обычно не более 1-2 профильных skills.
-6. Не создавать отдельного lifecycle agent на каждый skill или QA-профиль.
+6. Не создавать отдельного agent на каждый skill или QA-профиль.
 7. Большой end-to-end scope координирует role `orchestrator`, а не специальный meta-skill.
 8. `commercial-product-builder` удалён в v6 как дублирующий orchestration/lifecycle.
 9. Отдельного `ai-engineer` нет: AI/LLM/AI Coach scope принадлежит `$llm-engineer`.

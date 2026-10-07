@@ -144,93 +144,14 @@ def test_cleanup_task_is_exact_idempotent_and_preserves_evidence(tmp_path: Path)
     )
     evidence.write_text("keep\n", encoding="utf-8")
 
-    result = manager.cleanup_task("133", terminal_state="finished")
+    result = manager.cleanup_task("133")
     assert result["status"] == "completed"
     assert result["removed_count"] == 1
     assert not (temporary / "generated.txt").exists()
     assert evidence.exists()
-    second = manager.cleanup_task("133", terminal_state="finished")
+    second = manager.cleanup_task("133")
     assert second["status"] == "completed"
     assert second["removed_count"] == 0
-
-
-def test_cleanup_task_blocks_non_terminal_target_lease(tmp_path: Path) -> None:
-    manager = _manager(
-        tmp_path,
-    )
-    state = tmp_path / "state"
-    (state / "leases").mkdir(parents=True)
-    (state / "leases" / "task-133.json").write_text(
-        json.dumps({"task_id": "133", "mode": "write", "lifecycle_state": "implementation"}),
-        encoding="utf-8",
-    )
-    manager.controller_state_dir = state
-    target = manager.allocate_directory(
-        "133",
-        "temporary",
-        "temporary/run",
-        purpose="active output",
-        command="test",
-    )
-    (target / "open.txt").write_text("keep\n", encoding="utf-8")
-    result = manager.cleanup_task("133", terminal_state="finished")
-    assert result["status"] == "blocked"
-    assert (target / "open.txt").exists()
-    assert result["cleanup_errors"]
-    assert result["preserved"] == ["tasks/133/temporary/run/open.txt"]
-
-
-def test_cleanup_task_allows_production_success_target_lease(tmp_path: Path) -> None:
-    manager = _manager(tmp_path)
-    state = tmp_path / "state"
-    (state / "leases").mkdir(parents=True)
-    (state / "leases" / "task-133.json").write_text(
-        json.dumps({"task_id": "133", "mode": "write", "lifecycle_state": "production-success"}),
-        encoding="utf-8",
-    )
-    manager.controller_state_dir = state
-    target = manager.allocate_directory(
-        "133",
-        "temporary",
-        "temporary/run",
-        purpose="terminal closeout output",
-        command="test",
-    )
-    artifact = target / "closeout.txt"
-    artifact.write_text("remove after production success\n", encoding="utf-8")
-
-    result = manager.cleanup_task("133", terminal_state="finished")
-
-    assert result["status"] == "completed"
-    assert result["removed_count"] == 1
-    assert not artifact.exists()
-
-
-def test_shared_cleanup_blocks_parallel_lease_and_unfinished_task_132(tmp_path: Path) -> None:
-    manager = _manager(tmp_path)
-    state = tmp_path / "state"
-    (state / "leases").mkdir(parents=True)
-    (state / "history").mkdir()
-    (state / "leases" / "task-134.json").write_text(
-        json.dumps({"task_id": "134", "mode": "write", "lifecycle_state": "implementation"}),
-        encoding="utf-8",
-    )
-    (state / "history" / "task-132.json").write_text(
-        json.dumps({"state": "integration"}), encoding="utf-8"
-    )
-    manager.controller_state_dir = state
-    runtime = manager.root / "runtime" / "cache"
-    runtime.mkdir(parents=True, exist_ok=True)
-    target = runtime / "cache.bin"
-    target.write_bytes(b"cache")
-
-    plan = manager.dry_run()
-
-    assert plan["summary"]["counts"]["DELETE"] == 0
-    assert any("active task leases" in issue for issue in plan["safety"]["issues"])
-    assert any("Task 132" in issue for issue in plan["safety"]["issues"])
-    with pytest.raises(artifact_manager.ArtifactSafetyError, match="Cleanup blocked"):
-        manager.apply_plan(plan, approved_plan_sha256=plan["plan_sha256"])
 
 
 def test_dry_run_apply_requires_exact_unchanged_plan_and_is_idempotent(tmp_path: Path) -> None:
@@ -382,9 +303,7 @@ def test_cleanup_task_counts_only_selected_scope(tmp_path: Path) -> None:
     worker_file.write_bytes(b"worker")
     delivery_file.write_bytes(b"delivery")
 
-    result = manager.cleanup_task(
-        "133", terminal_state="finished", exclude_prefixes=("temporary/delivery",)
-    )
+    result = manager.cleanup_task("133", exclude_prefixes=("temporary/delivery",))
 
     assert result["status"] == "completed"
     assert result["removed_bytes"] == len(b"worker")
@@ -412,7 +331,7 @@ def test_cleanup_task_stops_on_target_drift(
         return original_fingerprint(path)
 
     monkeypatch.setattr(artifact_manager, "_file_fingerprint", change_before_fingerprint)
-    drift = manager.cleanup_task("133", terminal_state="finished")
+    drift = manager.cleanup_task("133")
     assert drift["status"] == "partial-failure"
     assert drift["cleanup_errors"]
     assert target.exists()
@@ -485,9 +404,7 @@ def test_cleanup_task_removes_only_contained_relative_symlink_entry(
     ordinary = temporary / "ordinary.txt"
     ordinary.write_text("remove ordinary file\n", encoding="utf-8")
 
-    result = manager.cleanup_task(
-        "133", terminal_state="finished", exclude_prefixes=("temporary/target",)
-    )
+    result = manager.cleanup_task("133", exclude_prefixes=("temporary/target",))
 
     assert result["status"] == "completed"
     assert result["removed_count"] == 2
@@ -495,9 +412,7 @@ def test_cleanup_task_removes_only_contained_relative_symlink_entry(
     assert not os.path.lexists(link)
     assert not ordinary.exists()
     assert target.read_text(encoding="utf-8") == "keep target contents\n"
-    second = manager.cleanup_task(
-        "133", terminal_state="finished", exclude_prefixes=("temporary/target",)
-    )
+    second = manager.cleanup_task("133", exclude_prefixes=("temporary/target",))
     assert second["status"] == "completed"
     assert second["removed_count"] == 0
     assert second["removed_reparse_count"] == 0
@@ -525,7 +440,7 @@ def test_cleanup_task_blocks_reparse_targets_outside_exact_temporary(
     ordinary = temporary / "a-ordinary.txt"
     ordinary.write_text("blocked with unsafe link\n", encoding="utf-8")
 
-    result = manager.cleanup_task("133", terminal_state="finished")
+    result = manager.cleanup_task("133")
 
     assert result["status"] == "blocked"
     assert result["cleanup_errors"]
@@ -591,7 +506,7 @@ def test_cleanup_task_blocks_unreadable_reparse_target(
 
         monkeypatch.setattr(artifact_manager, "_reparse_fingerprint", unreadable)
 
-    result = manager.cleanup_task("133", terminal_state="finished")
+    result = manager.cleanup_task("133")
 
     assert result["status"] == "blocked"
     assert result["cleanup_errors"]
@@ -623,7 +538,6 @@ def test_cleanup_task_blocks_inaccessible_parent_of_selected_scope(
 
     result = manager.cleanup_task(
         "133",
-        terminal_state="finished",
         include_prefixes=("temporary/worker/generated",),
     )
 
@@ -670,9 +584,7 @@ def test_cleanup_task_removes_contained_junction_entry_only(tmp_path: Path) -> N
             manager.root, Path("tasks/133/temporary/z-junction/keep.txt")
         )
 
-    result = manager.cleanup_task(
-        "133", terminal_state="finished", exclude_prefixes=("temporary/junction-target",)
-    )
+    result = manager.cleanup_task("133", exclude_prefixes=("temporary/junction-target",))
 
     assert result["status"] == "completed"
     assert result["removed_reparse_count"] == 1
@@ -729,7 +641,7 @@ def test_cleanup_task_stops_when_reparse_entry_changes_after_inventory(
 
         monkeypatch.setattr(artifact_manager, "_reparse_fingerprint", change_fake_entry)
 
-    result = manager.cleanup_task("133", terminal_state="finished")
+    result = manager.cleanup_task("133")
 
     assert result["status"] == "partial-failure"
     assert result["cleanup_errors"]
@@ -791,32 +703,6 @@ def test_auto_cleanup_removes_only_policy_delete_candidates(tmp_path: Path) -> N
     assert not legacy.exists()
     assert not runtime.exists()
     assert protected.exists()
-
-
-def test_auto_cleanup_is_non_mutating_while_controller_state_is_active(tmp_path: Path) -> None:
-    manager = _manager(tmp_path)
-    manager.ensure_layout()
-    state = tmp_path / "controller-state"
-    (state / "leases").mkdir(parents=True)
-    (state / "leases" / "task-900.json").write_text(
-        json.dumps(
-            {
-                "task_id": "900",
-                "mode": "write",
-                "lifecycle_state": "working",
-            }
-        ),
-        encoding="utf-8",
-    )
-    manager.controller_state_dir = state
-    legacy = manager.root / "cache" / "keep.bin"
-    legacy.parent.mkdir(parents=True, exist_ok=True)
-    legacy.write_bytes(b"keep")
-
-    result = manager.auto_cleanup(runtime_ttl=timedelta(hours=1))
-
-    assert result["status"] == "blocked"
-    assert legacy.exists()
 
 
 def test_auto_cleanup_enforces_runtime_size_cap_for_young_files(tmp_path: Path) -> None:

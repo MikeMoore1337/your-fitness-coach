@@ -41,7 +41,7 @@ def test_qa_profiles_do_not_duplicate_lifecycle_roles() -> None:
     manifest = json.loads((ROOT / ".agents/MANIFEST.json").read_text(encoding="utf-8"))
     roles = set(manifest["roles"])
     assert QA_PROFILES.isdisjoint(roles)
-    assert {"implementer", "qa-verifier", "integration-release"} <= roles
+    assert {"implementer", "qa-verifier"} <= roles
 
 
 def test_qa_router_and_routing_guide_reference_specialists() -> None:

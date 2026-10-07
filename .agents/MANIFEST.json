@@ -53,8 +53,7 @@
     "researcher",
     "product-lawyer",
     "implementer",
-    "qa-verifier",
-    "integration-release"
+    "qa-verifier"
   ],
   "deprecated_skills": [
     "commercial-product-builder"
@@ -70,31 +69,30 @@
     ],
     "wow_is_first_class_quality": true
   },
-  "routing_model": "focused-core-plus-conditional-skills; task-declared-lifecycle-roles; qa-strategy-plus-specialists",
-  "role_count": 6,
+  "routing_model": "focused-core-plus-conditional-skills; optional role planning; qa-strategy-plus-specialists",
+  "role_count": 5,
   "notes": [
     "commercial-product-builder removed because orchestration belongs to role orchestrator",
     "mobile-engineer narrowed to smartphone runtime/lifecycle",
     "landing-art-director is a marketing overlay, not a second product-designer",
     "llm-engineer expanded to AI/LLM product engineering and AI Coach",
     "motion-design-engineer and ui-prototyper added",
-    "role contracts slimmed; lifecycle policy remains canonical in TASK_EXECUTION_LIFECYCLE.md",
+    "role contracts slimmed; GitHub Flow remains the delivery policy",
     "product-lawyer and ru-legal-risk provide read-only Russian legal-risk audit and owner decision routing",
     "QA v8 keeps qa-engineer as strategy/router and adds focused testing, E2E review, triage, flakiness and coverage skills",
     "QA work profiles are modes, not additional lifecycle roles",
     "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow",
     "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional",
-    "Agent Harness v11 adapts eval/checkpoint/controlled-learning ideas without Claude-specific hooks, session transcript persistence or automatic instruction promotion"
+    "Agent Harness v12 keeps optional pytest evals and owner-review learning candidates without lifecycle state"
   ],
   "agent_harness": {
     "script": "scripts/agent_harness.py",
     "eval_root": ".agents/evals",
     "features": [
       "deterministic-pytest-backed-evals",
-      "derived-read-only-task-checkpoints",
       "owner-reviewable-learning-candidates"
     ],
     "source_of_truth": false,
-    "generated_artifacts": ".artifacts/tasks/<TASK_ID>/{temporary,evidence,deliverables}"
+    "generated_artifacts": ".artifacts/tasks/<LABEL>/{temporary,evidence,deliverables}"
   }
 }

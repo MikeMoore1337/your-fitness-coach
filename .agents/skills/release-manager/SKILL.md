@@ -54,7 +54,7 @@ Release notes должны говорить о пользовательски/о
 contracts, background jobs, feature flags и external dependencies. Не предполагай конкретную
 схему deployment. Авторизация production deployment определяется repository-wide правилами;
 подготовка и локальная проверка сами по себе её не создают. В этом репозитории новая production
-revision входит в remote `master` только через merged PR с green check `checks`. Merge является
-release authorization и автоматически запускает post-merge CI, exact-SHA provenance gate и
-production workflow без отдельного ручного approval. Direct/force push, history rewrite и manual
-production actions вне этого normal path требуют отдельного owner approval, backup и preflight.
+revision входит в remote `master` только через merged PR с green check `checks`. GitHub Actions
+проверяет merge SHA, определяет changed-path scope и запускает production workflow для application
+changes. Direct/force push, history rewrite и manual production actions вне этого normal path
+требуют отдельного owner approval, backup и preflight.

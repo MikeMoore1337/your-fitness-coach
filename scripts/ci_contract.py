@@ -329,16 +329,16 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-m",
                 "pytest",
                 "tests/test_release_safeguards.py",
-                "tests/test_task_session.py",
                 "tests/test_ci_contract.py",
                 "tests/test_ci_timing.py",
                 "tests/test_agent_flow.py",
-                "tests/test_worker_guard.py",
+                "tests/test_qa_skill_architecture.py",
+                "tests/test_quality_gate_policy.py",
                 "tests/test_skill_safety.py",
                 "tests/test_skillspector_guard.py",
-                "tests/test_run_task_delivery.py",
                 "tests/test_scheduled_regression.py",
                 "tests/test_deployment_contract.py",
+                "tests/test_deployment_scope.py",
                 "tests/test_online_migrations.py",
                 "tests/test_zero_downtime_deploy.py",
                 "-q",
@@ -530,7 +530,6 @@ GROUP_TO_JOB: dict[str, str] = {
 
 ROUTER_JOB_NAMES: tuple[str, ...] = (
     "scope-router",
-    "task-provenance",
     "codeql-security",
     "security-audit",
     "quality",
@@ -546,7 +545,6 @@ ROUTER_JOB_NAMES: tuple[str, ...] = (
     "containers",
     "critical-smoke",
     "workflow-contracts",
-    "merge-provenance",
     "scheduled-report",
 )
 
@@ -564,7 +562,6 @@ ROUTER_OUTPUTS: dict[str, str] = {
     "containers": "run_containers",
     "critical-smoke": "run_critical_smoke",
     "workflow-contracts": "run_workflow_contracts",
-    "merge-provenance": "run_merge_provenance",
     "scheduled-report": "run_scheduled_report",
 }
 
@@ -786,11 +783,8 @@ def expected_jobs_for_groups(groups: Sequence[str], *, event: str = "pull_reques
         raise CIContractError(f"Unknown CI groups in expected result set: {unknown_groups}")
     jobs = {"scope-router"}
     if event == "pull_request":
-        jobs.add("task-provenance")
         jobs.add("codeql-security")
         jobs.add("security-audit")
-    elif event == "push":
-        jobs.add("merge-provenance")
     elif event in {"schedule", "workflow_dispatch"}:
         jobs.add("scheduled-report")
     for group in groups:
@@ -933,7 +927,7 @@ def route_repository(
             profile="post-merge",
             paths=[],
             signals={"post_merge": True},
-            reasons=["master push runs exact provenance and immutable container delivery"],
+            reasons=["master push runs the release contract and immutable container delivery"],
             groups=("container-contract",),
             event=event,
         )
@@ -1490,7 +1484,6 @@ def validate_contract() -> None:
         "containers",
         "critical-smoke",
         "workflow-contracts",
-        "merge-provenance",
         "scheduled-report",
     }:
         raise CIContractError("CI router outputs do not cover the stable job set")

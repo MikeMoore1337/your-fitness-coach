@@ -65,7 +65,6 @@ jobs:
       run_workflow_config: ${{ steps.route.outputs.run_workflow_config }}
       run_image_contract: ${{ steps.route.outputs.run_image_contract }}
       run_deployment_contract: ${{ steps.route.outputs.run_deployment_contract }}
-      run_merge_provenance: ${{ steps.route.outputs.run_merge_provenance }}
       run_scheduled_report: ${{ steps.route.outputs.run_scheduled_report }}
     steps:
       - uses: actions/checkout@v4
@@ -91,13 +90,7 @@ jobs:
               exit 1
             fi
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
-            case "$TARGET_REF" in
-              refs/heads/master|refs/heads/task/*|refs/heads/recovery/*) ;;
-              *)
-                echo "Manual CI is restricted to refs/heads/master, refs/heads/task/* and refs/heads/recovery/*" >&2
-                exit 1
-                ;;
-            esac
+            test -n "$TARGET_REF"
           fi
           if [ "$EVENT_NAME" = pull_request ]; then
             python scripts/ci_contract.py route \
@@ -120,42 +113,6 @@ jobs:
               --event "$EVENT_NAME" \
               --github-output "$GITHUB_OUTPUT"
           fi
-
-  task-provenance:
-    name: Task provenance
-    needs: scope-router
-    if: github.event_name == 'pull_request' && needs.scope-router.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Validate task provenance or trusted dependency bot identity
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/task_session.py validate-pr --event "$GITHUB_EVENT_PATH"
-
-  merge-provenance:
-    name: Merged master provenance
-    needs: scope-router
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.scope-router.result == 'success' && needs.scope-router.outputs.run_merge_provenance == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - name: Verify exact merged task PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python scripts/task_session.py verify-master-merge --sha "$GITHUB_SHA"
 
   quality:
     name: Python quality
@@ -1235,7 +1192,7 @@ jobs:
     name: ${{ github.event_name == 'pull_request' && 'checks' || 'branch-checks' }}
     if: always()
     needs:
-      [scope-router, task-provenance, codeql-security, security-audit, merge-provenance, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
+      [scope-router, codeql-security, security-audit, quality, policy, frontend, frontend-smoke, frontend-mobile-regression, frontend-mobile-regression-extended, frontend-cross-browser, python-tests, migrated-stack, dependency-audit, containers, critical-smoke, workflow-contracts, scheduled-report]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1251,10 +1208,8 @@ jobs:
           REQUIRED_GROUPS: ${{ needs.scope-router.outputs.required_groups }}
           SKIPPED_GROUPS: ${{ needs.scope-router.outputs.skipped_groups }}
           SCOPE_ROUTER_RESULT: ${{ needs.scope-router.result }}
-          TASK_PROVENANCE_RESULT: ${{ needs.task-provenance.result }}
           CODEQL_SECURITY_RESULT: ${{ needs.codeql-security.result }}
           SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}
-          MERGE_PROVENANCE_RESULT: ${{ needs.merge-provenance.result }}
           QUALITY_RESULT: ${{ needs.quality.result }}
           POLICY_RESULT: ${{ needs.policy.result }}
           FRONTEND_RESULT: ${{ needs.frontend.result }}
@@ -1282,10 +1237,8 @@ jobs:
 
           result_names = (
               "scope-router",
-              "task-provenance",
               "codeql-security",
               "security-audit",
-              "merge-provenance",
               "quality",
               "policy",
               "frontend",

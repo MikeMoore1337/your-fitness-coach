@@ -8,13 +8,16 @@ Tasks `00-55` завершены и не переигрываются. Их task
 - `Условные skills` - не открывать заранее; подключать только при подтверждённом trigger.
 - `Дополнительные роли lifecycle` - точный маршрут, а не рекомендация добавить ещё роли.
 - Self-review выполняет primary agent в текущей сессии; отдельного reviewer нет. Для применимой QA использовать `$qa-engineer`.
-- Task-файл остаётся source of truth при расхождении с этой сводкой.
+- GitHub Issue остаётся task source of truth; linked task/spec files are optional context.
+- `integration-release` is retired. Release and deployment are GitHub Actions behavior, not a
+  role or lifecycle owner. Historical rows below use `qa-verifier` where a read-only release
+  audit profile is useful.
 
 ## UX-reset cycle addendum
 
 | Task | Core skills | Primary role |
 |---:|---|---|
-| `113` | `$platform-engineer`, `$release-manager`, `$qa-engineer` | `integration-release` |
+| `113` | `$platform-engineer`, `$release-manager`, `$qa-engineer` | `qa-verifier` |
 | `114` | `$qa-engineer`, `$frontend-engineer`, `$backend-engineer`, `$data-engineer` | `implementer` |
 | `115A` | `$product-discovery`, `$product-designer`, `$ui-audit`, `$ui-prototyper` | `researcher` |
 | `116` | `$product-designer`, `$frontend-engineer`, `$mobile-engineer`, `$ui-audit` | `implementer` |
@@ -78,5 +81,5 @@ Conditional skills и дополнительные lifecycle roles берутс�
 | `76` | `76-skill-aware-retrospective-release-audit.md` | `$solution-architect` | не загружать все сразу; audit streams: fitness/content -> `$fitness-domain-reviewer`, `$evidence-content-editor`; UX/a11y/analytics -> `$accessibility-engineer`, `$ui-audit`, `$mobile-engineer`, `$product-analytics-engineer`, `$motion-design-engineer` только для нового риска после `75A`; security/privacy -> `$security-engineer`, `$privacy-engineer`; architecture/data/perf -> `$data-engineer`, `$backend-engineer`, `$frontend-engineer`, `$performance-engineer`; Telegram -> `$telegram-engineer`, `$mobile-engineer` | **`orchestrator`** | self-review в текущей сессии по отдельным audit streams; `implementer` только для подтверждённых `BLOCKER/HIGH`; `qa-verifier` только для перепроверки исправленных `BLOCKER/HIGH` |
 | `76A` | `76a-pre-human-adversarial-negative-destructive-testing-gate.md` | `$qa-engineer`, `$ui-audit` | `$security-engineer` для auth/authorization/data isolation; `$performance-engineer` для bounded concurrency/resource checks; профильный frontend/backend skill только для подтверждённой remediation | **`qa-verifier`** | `implementer` только для подтверждённых blocking fixes; targeted retest исправленного finding set |
 | `77` | `77-real-user-usability-validation.md` | `$ux-researcher` | `$mobile-engineer` только для smartphone/TMA research setup; `$product-analytics-engineer` только для проверки уже существующего privacy-safe event evidence; `$accessibility-engineer` только если наблюдение указывает на accessibility barrier; `$product-designer` только для owner-approved remediation, меняющей composition/primary action | **`orchestrator`** | `implementer` только для owner-approved release blockers после фактических сессий; `qa-verifier` только для retest этих исправлений |
-| `78` | `78-production-operational-readiness.md` | `$release-manager`, `$platform-engineer`, `$security-engineer`, `$privacy-engineer`, `$observability-engineer` | `$data-engineer`/`$backend-engineer` только по конкретному migration/runtime risk; `$performance-engineer` только по release metric gap; `$telegram-engineer` только по Telegram production evidence | **`integration-release`** | нет - task `79` содержит финальные deterministic checks и применимые owner gates |
+| `78` | `78-production-operational-readiness.md` | `$release-manager`, `$platform-engineer`, `$security-engineer`, `$privacy-engineer`, `$observability-engineer` | `$data-engineer`/`$backend-engineer` только по конкретному migration/runtime risk; `$performance-engineer` только по release metric gap; `$telegram-engineer` только по Telegram production evidence | **`qa-verifier`** | нет - task `79` содержит финальные deterministic checks и применимые owner gates |
 | `79` | `79-final-integrated-release-audit.md` | `$release-manager` | загружать последовательно по audit stream, не все сразу: security/privacy -> `$security-engineer`, `$privacy-engineer`; operations -> `$platform-engineer`, `$observability-engineer`, `$performance-engineer`; client -> `$mobile-engineer`, `$telegram-engineer`, `$accessibility-engineer`, `$ui-audit`, `$motion-design-engineer` только при unresolved risk после `75A`; public -> `$seo-auditor`; domain -> `$fitness-domain-reviewer` | **`implementer`** | `qa-verifier` для финальной risk-based regression evidence; новых feature-ролей не подключать |
