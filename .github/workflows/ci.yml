@@ -92,9 +92,9 @@ jobs:
             fi
           elif [ "$EVENT_NAME" = workflow_dispatch ]; then
             case "$TARGET_REF" in
-              refs/heads/master|refs/heads/task/*) ;;
+              refs/heads/master|refs/heads/task/*|refs/heads/recovery/*) ;;
               *)
-                echo "Manual CI is restricted to refs/heads/master and refs/heads/task/*" >&2
+                echo "Manual CI is restricted to refs/heads/master, refs/heads/task/* and refs/heads/recovery/*" >&2
                 exit 1
                 ;;
             esac
