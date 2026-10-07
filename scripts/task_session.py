@@ -32,6 +32,7 @@ from uuid import uuid4
 try:
     from scripts.agent_flow import AgentFlowError, build_agent_flow_from_path
     from scripts.artifact_manager import ArtifactError, ArtifactManager
+    from scripts.controller_v2 import ControllerV2Error, verify_production_evidence
     from scripts.issue_workflow import (
         CONTROL_STATES,
         DEFAULT_QUEUE_BUDGET,
@@ -50,6 +51,7 @@ try:
 except ModuleNotFoundError:
     from agent_flow import AgentFlowError, build_agent_flow_from_path
     from artifact_manager import ArtifactError, ArtifactManager
+    from controller_v2 import ControllerV2Error, verify_production_evidence
     from issue_workflow import (
         CONTROL_STATES,
         DEFAULT_QUEUE_BUDGET,
@@ -105,6 +107,7 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "scripts/archive_backlog_task.py",
         "scripts/codeql_sarif_gate.py",
         "scripts/artifact_manager.py",
+        "scripts/controller_v2.py",
         "scripts/agent_flow.py",
         "scripts/issue_workflow.py",
         "scripts/run_task_delivery.py",
@@ -114,6 +117,7 @@ CONTROLLER_ALLOWED_PATHS = frozenset(
         "tests/test_archive_backlog_task.py",
         "tests/test_ci_contract.py",
         "tests/test_codeql_sarif_gate.py",
+        "tests/test_controller_v2.py",
         "tests/test_artifact_manager.py",
         "tests/test_agent_flow.py",
         "tests/test_deployment_contract.py",
@@ -1607,6 +1611,20 @@ class GitHubClient:
             if len(batch) < 100:
                 return jobs
             page += 1
+
+    def workflow_job_logs(self, job_id: int) -> str:
+        if type(job_id) is not int or job_id <= 0:
+            raise TaskSessionError("GitHub workflow job ID must be a positive integer")
+        result = _run(
+            [
+                "gh",
+                "api",
+                "--allow-escape-sequences",
+                f"repos/{self.repo_slug}/actions/jobs/{job_id}/logs",
+            ],
+            cwd=self.repository.current_worktree,
+        )
+        return result.stdout
 
     def pull_requests_for_commit(self, sha: str) -> list[dict[str, Any]]:
         pull_requests: list[dict[str, Any]] = []
@@ -10817,7 +10835,11 @@ class TaskController:
         }
 
     def _verified_exact_production_run(
-        self, deployed_sha: str, production_run_id: int
+        self,
+        deployed_sha: str,
+        production_run_id: int,
+        *,
+        current_master_sha: str | None = None,
     ) -> dict[str, Any]:
         if type(production_run_id) is not int or production_run_id <= 0:
             raise TaskSessionError(
@@ -10832,28 +10854,46 @@ class TaskController:
             raise TaskSessionError(
                 f"Production run {production_run_id} is unavailable for reconciliation"
             ) from error
-        if (
-            not isinstance(run, Mapping)
-            or run.get("id") != production_run_id
-            or run.get("name") != "Release production"
-            or run.get("head_sha") != deployed_sha
-            or run.get("status") != "completed"
-            or str(run.get("conclusion", "")).lower() != "success"
-        ):
-            raise TaskSessionError("Production run is not successful for the exact deployed SHA")
-        if not github.has_successful_deployment(deployed_sha, "production"):
-            raise TaskSessionError(
-                "No successful production deployment exists for the exact deployed SHA"
+        if not isinstance(run, Mapping):
+            raise TaskSessionError("Production run response is not an object")
+        jobs = github.workflow_jobs(production_run_id)
+        manual = run.get("event") == "workflow_dispatch"
+        deploy_logs = None
+        if manual:
+            deploy_jobs = [
+                job for job in jobs if job.get("name") == "Deploy immutable tested bundle"
+            ]
+            if len(deploy_jobs) != 1 or type(deploy_jobs[0].get("id")) is not int:
+                raise TaskSessionError("Manual production run has no unique deploy job")
+            try:
+                deploy_logs = github.workflow_job_logs(deploy_jobs[0]["id"])
+            except AttributeError as error:
+                raise TaskSessionError(
+                    "GitHub client cannot retrieve manual production deploy logs"
+                ) from error
+        try:
+            evidence = verify_production_evidence(
+                run,
+                jobs,
+                deployed_sha,
+                current_master_sha=(
+                    current_master_sha or (github.branch_head("master") if manual else None)
+                ),
+                is_ancestor=self.repository.is_ancestor if manual else None,
+                deployment_api_success=github.has_successful_deployment(deployed_sha, "production"),
+                deploy_logs=deploy_logs,
             )
-        return {
-            "run_id": production_run_id,
-            "run_url": run.get("html_url"),
-            "head_sha": deployed_sha,
-            "run_conclusion": "success",
-            "environment": "production",
-            "deployed_sha": deployed_sha,
-            "deployment_success_verified": True,
-        }
+        except (ControllerV2Error, KeyError, OSError, TaskSessionError) as error:
+            if (
+                not manual
+                and str(error)
+                == "automatic production evidence requires a successful deployment API status"
+            ):
+                raise TaskSessionError(
+                    "No successful production deployment exists for the exact deployed SHA"
+                ) from error
+            raise TaskSessionError(str(error)) from error
+        return evidence.as_legacy_dict()
 
     def _verified_preserved_task_head_history(
         self,
