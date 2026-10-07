@@ -14,6 +14,7 @@ import {
 } from '../../features/coach/CoachOperationsPanel';
 import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHub';
 import { CoachCheckInReviews } from '../../features/coach/CoachCheckInReviews';
+import { CoachCheckInTemplates } from '../../features/coach/CoachCheckInTemplates';
 import { CoachRosterAnalytics } from '../../features/coach/CoachRosterAnalytics';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
@@ -437,6 +438,7 @@ function operationalStatusLabel(status: Client['operational_status']): string {
 
 const coachToolValues: readonly CoachTool[] = [
   'reviews',
+  'templates',
   'analytics',
   'schedule',
   'tasks',
@@ -1661,6 +1663,11 @@ export default function CoachPage({
           <>
             {activeTool === 'reviews' ? (
               <CoachCheckInReviews timezone={user.profile?.timezone} />
+            ) : activeTool === 'templates' ? (
+              <CoachCheckInTemplates
+                canManage={capabilities.canManageCoach}
+                clients={activeClients}
+              />
             ) : activeTool === 'analytics' ? (
               <CoachRosterAnalytics
                 clients={clients.data ?? []}

@@ -22,6 +22,9 @@ export const queryKeys = {
     capacity: ['coach', 'capacity'] as const,
     checkInReviews: (status: 'pending' | 'reviewed' = 'pending') =>
       ['coach', 'check-in-reviews', status] as const,
+    checkInTemplates: ['coach', 'check-in-templates'] as const,
+    checkInTemplateHistory: (templateId: number) =>
+      ['coach', 'check-in-template-history', templateId] as const,
     operationsToday: ['coach', 'operations', 'today'] as const,
     agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,
@@ -39,6 +42,9 @@ export const queryKeys = {
     packages: ['coach', 'packages'] as const,
     payments: ['coach', 'payments'] as const,
     tasks: ['coach', 'tasks'] as const,
+  },
+  checkInTemplates: {
+    assigned: ['check-in-templates', 'assigned'] as const,
   },
   workoutComments: {
     client: (workoutId: number) => ['workout', workoutId, 'comments'] as const,

@@ -209,6 +209,10 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
         "opaque AI Coach message request keys used only for idempotency"
     ),
     "nutrition_plan_operations": "idempotency fingerprints used only for planner write safety",
+    "coach_check_in_templates": "private trainer-owned check-in templates and helper text",
+    "coach_check_in_template_versions": "private trainer-owned check-in field definitions",
+    "coach_check_in_assignments": "coach-client check-in assignment metadata",
+    "coach_check_in_responses": "health-adjacent check-in responses kept out of generic archives",
 }
 
 

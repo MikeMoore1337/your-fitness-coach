@@ -18,6 +18,17 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.check_in import WeeklyCheckInHistoryResponse
+from fitminiapp_api.schemas.check_in_templates import (
+    CheckInTemplateAssignmentCreate,
+    CheckInTemplateAssignmentResponse,
+    CheckInTemplateCreate,
+    CheckInTemplateListResponse,
+    CheckInTemplateResponse,
+    CheckInTemplateResponseHistory,
+    CheckInTemplateStateUpdate,
+    CheckInTemplateVersionCreate,
+    CheckInTemplateVersionResponse,
+)
 from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
 from fitminiapp_api.schemas.coach_crm import (
@@ -85,6 +96,15 @@ from fitminiapp_api.services.analytics import (
     build_workout_timeline,
 )
 from fitminiapp_api.services.audit import record_audit_event
+from fitminiapp_api.services.check_in_templates import (
+    CheckInTemplateError,
+    assign_template,
+    create_template,
+    create_template_version,
+    list_response_history,
+    list_templates,
+    set_template_active,
+)
 from fitminiapp_api.services.coach_attention import build_coach_attention
 from fitminiapp_api.services.coach_capacity import build_coach_capacity_snapshot
 from fitminiapp_api.services.coach_clients import (
@@ -174,6 +194,10 @@ CoachCrmIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
+CheckInTemplateIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
 
 
 def _crm_error(exc: CoachCrmError) -> HTTPException:
@@ -185,6 +209,10 @@ def _comment_error(exc: WorkoutCommentError) -> HTTPException:
 
 
 def _review_error(exc: CoachReviewError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _check_in_template_error(exc: CheckInTemplateError) -> HTTPException:
     return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -348,6 +376,116 @@ def review_coach_check_in_route(
         return review_coach_check_in(db, current_user, check_in_id, payload)
     except CoachReviewError as exc:
         raise _review_error(exc) from exc
+
+
+@router.get("/check-in-templates", response_model=CheckInTemplateListResponse)
+def coach_check_in_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateListResponse:
+    return CheckInTemplateListResponse.model_validate(list_templates(db, current_user))
+
+
+@router.post(
+    "/check-in-templates",
+    response_model=CheckInTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_check_in_template(
+    payload: CheckInTemplateCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponse:
+    try:
+        return CheckInTemplateResponse.model_validate(
+            create_template(db, current_user, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.post(
+    "/check-in-templates/{template_id}/versions",
+    response_model=CheckInTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_check_in_template_version(
+    template_id: int,
+    payload: CheckInTemplateVersionCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateVersionResponse:
+    try:
+        return CheckInTemplateVersionResponse.model_validate(
+            create_template_version(db, current_user, template_id, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.patch(
+    "/check-in-templates/{template_id}",
+    response_model=CheckInTemplateResponse,
+)
+def update_coach_check_in_template_state(
+    template_id: int,
+    payload: CheckInTemplateStateUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponse:
+    try:
+        return CheckInTemplateResponse.model_validate(
+            set_template_active(db, current_user, template_id, payload.is_active)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.post(
+    "/check-in-templates/{template_id}/assignments",
+    response_model=CheckInTemplateAssignmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_coach_check_in_template(
+    template_id: int,
+    payload: CheckInTemplateAssignmentCreate,
+    idempotency_key: CheckInTemplateIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateAssignmentResponse:
+    try:
+        return CheckInTemplateAssignmentResponse.model_validate(
+            assign_template(db, current_user, template_id, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
+
+
+@router.get(
+    "/check-in-templates/{template_id}/responses",
+    response_model=CheckInTemplateResponseHistory,
+)
+def coach_check_in_template_responses(
+    template_id: int,
+    client_id: int | None = Query(default=None, gt=0),
+    limit: int = Query(default=50, ge=1, le=100),
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponseHistory:
+    try:
+        return CheckInTemplateResponseHistory.model_validate(
+            list_response_history(
+                db,
+                current_user,
+                template_id,
+                client_id,
+                limit=limit,
+            )
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc
 
 
 @router.get("/operations/today", response_model=CoachOperationsTodayResponse)

@@ -94,6 +94,11 @@ const WeeklyCheckInCard = lazy(() =>
     default: module.WeeklyCheckInCard,
   })),
 );
+const AssignedCheckInTemplates = lazy(() =>
+  import('../../features/workouts/AssignedCheckInTemplates').then((module) => ({
+    default: module.AssignedCheckInTemplates,
+  })),
+);
 const WorkoutHistory = lazy(() =>
   import('../../features/workouts/WorkoutHistory').then((module) => ({
     default: module.WorkoutHistory,
@@ -490,6 +495,7 @@ export default function MiniAppPage({
                             autoFocus={focusWeeklyReview}
                             userId={user?.id ?? 'anonymous'}
                           />
+                          <AssignedCheckInTemplates readOnly={!capabilities.canMutateProgress} />
                         </fieldset>
                       </>
                     ) : progressView === 'history' ? (

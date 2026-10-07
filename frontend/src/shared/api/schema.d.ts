@@ -1777,6 +1777,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/check-in-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Templates */
+        get: operations["coach_check_in_templates_api_v1_coach_check_in_templates_get"];
+        put?: never;
+        /** Create Coach Check In Template */
+        post: operations["create_coach_check_in_template_api_v1_coach_check_in_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Check In Template Version */
+        post: operations["create_coach_check_in_template_version_api_v1_coach_check_in_templates__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Check In Template State */
+        patch: operations["update_coach_check_in_template_state_api_v1_coach_check_in_templates__template_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Coach Check In Template */
+        post: operations["assign_coach_check_in_template_api_v1_coach_check_in_templates__template_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/check-in-templates/{template_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Check In Template Responses */
+        get: operations["coach_check_in_template_responses_api_v1_coach_check_in_templates__template_id__responses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/operations/today": {
         parameters: {
             query?: never;
@@ -3062,6 +3148,40 @@ export interface paths {
         put?: never;
         /** Create Weekly Check In */
         post: operations["create_weekly_check_in_api_v1_check_ins_weekly_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/check-ins/templates/assigned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assigned Check In Templates */
+        get: operations["assigned_check_in_templates_api_v1_check_ins_templates_assigned_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/check-ins/templates/assignments/{assignment_id}/responses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit Assigned Check In Template */
+        post: operations["submit_assigned_check_in_template_api_v1_check_ins_templates_assignments__assignment_id__responses_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6487,6 +6607,41 @@ export interface components {
              */
             replace_active: boolean;
         };
+        /** AssignedCheckInTemplateListResponse */
+        AssignedCheckInTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["AssignedCheckInTemplateResponse"][];
+        };
+        /** AssignedCheckInTemplateResponse */
+        AssignedCheckInTemplateResponse: {
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+            /** Version */
+            version: number;
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldResponseDefinition"][];
+            /**
+             * Next Due On
+             * Format: date
+             */
+            next_due_on: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "active";
+        };
         /** AuthTokenRequest */
         AuthTokenRequest: {
             /** Token */
@@ -7254,6 +7409,249 @@ export interface components {
             zone: number;
             /** Duration Minutes */
             duration_minutes: number;
+        };
+        /** CheckInFieldCatalogItem */
+        CheckInFieldCatalogItem: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /** Label */
+            label: string;
+            /**
+             * Value Type
+             * @constant
+             */
+            value_type: "score";
+            /** Min Value */
+            min_value: number;
+            /** Max Value */
+            max_value: number;
+        };
+        /** CheckInFieldDefinition */
+        CheckInFieldDefinition: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /**
+             * Required
+             * @default true
+             */
+            required: boolean;
+        };
+        /** CheckInFieldResponseDefinition */
+        CheckInFieldResponseDefinition: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "recovery" | "hunger" | "training_load" | "adherence_difficulty";
+            /** Label */
+            label: string;
+            /**
+             * Value Type
+             * @constant
+             */
+            value_type: "score";
+            /** Min Value */
+            min_value: number;
+            /** Max Value */
+            max_value: number;
+            /** Required */
+            required: boolean;
+        };
+        /** CheckInTemplateAssignmentCreate */
+        CheckInTemplateAssignmentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+            /** Due On */
+            due_on?: string | null;
+        };
+        /** CheckInTemplateAssignmentResponse */
+        CheckInTemplateAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "revoked";
+            /**
+             * Next Due On
+             * Format: date
+             */
+            next_due_on: string;
+            /** Last Response At */
+            last_response_at?: string | null;
+        };
+        /** CheckInTemplateCreate */
+        CheckInTemplateCreate: {
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldDefinition"][];
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+        };
+        /** CheckInTemplateListResponse */
+        CheckInTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["CheckInTemplateResponse"][];
+            /** Field Catalog */
+            field_catalog: components["schemas"]["CheckInFieldCatalogItem"][];
+        };
+        /** CheckInTemplateResponse */
+        CheckInTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /**
+             * Cadence
+             * @enum {string}
+             */
+            cadence: "weekly" | "biweekly" | "monthly";
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["CheckInTemplateVersionResponse"] | null;
+            /** Assignments */
+            assignments?: components["schemas"]["CheckInTemplateAssignmentResponse"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CheckInTemplateResponseHistory */
+        CheckInTemplateResponseHistory: {
+            /** Items */
+            items?: components["schemas"]["CheckInTemplateResponseHistoryItem"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+        };
+        /** CheckInTemplateResponseHistoryItem */
+        CheckInTemplateResponseHistoryItem: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Values */
+            values: {
+                [key: string]: number;
+            };
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+        };
+        /** CheckInTemplateResponseItem */
+        CheckInTemplateResponseItem: {
+            /** Id */
+            id: number;
+            /** Assignment Id */
+            assignment_id: number;
+            /** Template Id */
+            template_id: number;
+            /** Template Name */
+            template_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Due On
+             * Format: date
+             */
+            due_on: string;
+            /** Values */
+            values: {
+                [key: string]: number;
+            };
+            /**
+             * Submitted At
+             * Format: date-time
+             */
+            submitted_at: string;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
+        /** CheckInTemplateResponseSubmit */
+        CheckInTemplateResponseSubmit: {
+            /** Values */
+            values?: {
+                [key: string]: number;
+            };
+        };
+        /** CheckInTemplateStateUpdate */
+        CheckInTemplateStateUpdate: {
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** CheckInTemplateVersionCreate */
+        CheckInTemplateVersionCreate: {
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldDefinition"][];
+        };
+        /** CheckInTemplateVersionResponse */
+        CheckInTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Fields */
+            fields: components["schemas"]["CheckInFieldResponseDefinition"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** ClientResponse */
         ClientResponse: {
@@ -20346,6 +20744,204 @@ export interface operations {
             };
         };
     };
+    coach_check_in_templates_api_v1_coach_check_in_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_check_in_template_api_v1_coach_check_in_templates_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_check_in_template_version_api_v1_coach_check_in_templates__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_check_in_template_state_api_v1_coach_check_in_templates__template_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateStateUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_coach_check_in_template_api_v1_coach_check_in_templates__template_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateAssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_check_in_template_responses_api_v1_coach_check_in_templates__template_id__responses_get: {
+        parameters: {
+            query?: {
+                client_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponseHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     coach_operations_today_api_v1_coach_operations_today_get: {
         parameters: {
             query?: never;
@@ -23117,6 +23713,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WeeklyCheckInResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assigned_check_in_templates_api_v1_check_ins_templates_assigned_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignedCheckInTemplateListResponse"];
+                };
+            };
+        };
+    };
+    submit_assigned_check_in_template_api_v1_check_ins_templates_assignments__assignment_id__responses_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                assignment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInTemplateResponseSubmit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInTemplateResponseItem"];
                 };
             };
             /** @description Validation Error */
