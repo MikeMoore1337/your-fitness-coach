@@ -333,7 +333,11 @@ export function CoachProgramOperations({
           ))}
         </ul>
       )}
-      <CoachProgramBulkOperations programs={programs} selectedClients={selectedClients} />
+      <CoachProgramBulkOperations
+        programs={programs}
+        selectedClients={selectedClients}
+        selectedTemplate={selectedTemplate}
+      />
     </Card>
   );
 }

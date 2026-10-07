@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { installTelegramHarness } from './fixtures/mobile-tma';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -271,6 +272,7 @@ async function mockCoachWorkspace(
     attention?: 'empty' | 'actionable';
     operations?: 'empty' | 'seeded';
     review?: 'empty' | 'pending';
+    rollout?: boolean;
   } = {},
 ) {
   const feedbackComments: Array<{
@@ -672,6 +674,8 @@ async function mockCoachWorkspace(
       return route.fulfill({ status: 401, json: { detail: 'No refresh cookie' } });
     if (path.endsWith('/auth/dev-login'))
       return route.fulfill({ json: { access_token: 'coach-token', token_type: 'bearer' } });
+    if (path.endsWith('/auth/telegram/init'))
+      return route.fulfill({ json: { access_token: 'coach-token', token_type: 'bearer' } });
     if (path.endsWith('/me'))
       return route.fulfill({
         json: {
@@ -1063,6 +1067,91 @@ async function mockCoachWorkspace(
             current_revision_number: 2,
           },
         ],
+      });
+    if (path.endsWith('/programs/templates/mine') && options.rollout)
+      return route.fulfill({
+        json: [
+          {
+            id: 17,
+            title: 'Силовая база · четыре недели',
+            goal: 'maintenance',
+            level: 'intermediate',
+            default_duration_weeks: 4,
+          },
+        ],
+      });
+    if (path.endsWith('/coach/program-rollouts/preview') && options.rollout)
+      return route.fulfill({
+        json: {
+          template_id: 17,
+          template_title: 'Силовая база · четыре недели',
+          template_fingerprint: 'c'.repeat(64),
+          targets: [
+            {
+              client_id: 11,
+              client_name: 'Анна Петрова',
+              program_id: 701,
+              current_revision_number: 2,
+              classification: 'compatible',
+              can_apply: true,
+              reason_codes: ['prescription_changes'],
+              diff: [
+                {
+                  week_number: 1,
+                  day_number: 1,
+                  exercise_title: 'Присед со штангой',
+                  change: 'updated',
+                  current: '3×8',
+                  proposed: '4×8',
+                },
+              ],
+            },
+            {
+              client_id: 12,
+              client_name: 'Борис Александрович С Очень Длинной Фамилией',
+              program_id: 702,
+              current_revision_number: 3,
+              classification: 'manual_review_required',
+              can_apply: false,
+              reason_codes: ['schedule_mismatch'],
+              diff: [],
+            },
+            {
+              client_id: 13,
+              client_name: 'Мария Орлова',
+              program_id: null,
+              current_revision_number: null,
+              classification: 'manual_review_required',
+              can_apply: false,
+              reason_codes: ['no_active_program'],
+              diff: [],
+            },
+          ],
+          generated_at: '2026-10-07T10:00:00Z',
+        },
+      });
+    if (path.endsWith('/coach/program-rollouts/apply') && options.rollout)
+      return route.fulfill({
+        json: {
+          rollout_id: 'd'.repeat(64),
+          template_id: 17,
+          results: [
+            {
+              client_id: 11,
+              client_name: 'Анна Петрова',
+              program_id: 701,
+              status: 'applied',
+              code: 'applied',
+              detail: 'Шаблон применён к будущим тренировкам.',
+              workouts_updated: 6,
+              current_revision_number: 3,
+            },
+          ],
+          applied_count: 1,
+          already_applied_count: 0,
+          failed_count: 0,
+          completed_at: '2026-10-07T10:01:00Z',
+        },
       });
     if (path.endsWith('/coach/clients/11/review-workspace'))
       return route.fulfill({ json: reviewWorkspace });
@@ -2699,4 +2788,87 @@ test('Task 753 workflow automation stays pending and fits desktop and mobile', a
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await expect(workflow).toBeVisible();
+});
+
+test('Product V10 B5 rollout preview keeps compatible and manual cases visible', async ({
+  browser,
+  page,
+}) => {
+  const prepareRollout = async (targetPage: Page, telegram = false) => {
+    await targetPage.goto(telegram ? '/coach?tgWebAppPlatform=android' : '/coach');
+    if (!telegram) {
+      await targetPage.getByRole('button', { name: 'Тренер' }).click();
+    }
+    await expect(targetPage.getByRole('button', { name: 'Пригласить клиента' })).toBeVisible();
+    const programsLink = trainerPrimaryNavigation(targetPage).getByRole('link', {
+      name: 'Программы',
+      exact: true,
+    });
+    if (await programsLink.count()) {
+      await programsLink.click();
+    } else {
+      await targetPage.getByRole('link', { name: 'Программы', exact: true }).click();
+    }
+    const programsCard = targetPage.locator('.coach-programs-card');
+    await programsCard.locator(':scope > summary').click();
+    const operations = targetPage.locator('.coach-program-operations');
+    await operations.locator(':scope > summary').click();
+    await operations.getByLabel('Базовый шаблон').selectOption('17');
+    await operations.getByRole('button', { name: 'Выбрать всех', exact: true }).click();
+    const rollout = operations.locator('.coach-program-rollout');
+    await rollout.locator(':scope > summary').click();
+    await rollout.getByRole('button', { name: 'Собрать предпросмотр', exact: true }).click();
+    await expect(
+      rollout.getByText('Проверить применение выбранного шаблона', { exact: true }),
+    ).toBeVisible();
+    await expect(rollout.getByText('Совместимо', { exact: true })).toBeVisible();
+    await expect(rollout.getByText('Нужна ручная проверка', { exact: true })).toHaveCount(2);
+    await expect(rollout.getByLabel('Причина применения')).toBeVisible();
+    await expect(
+      rollout.getByRole('button', { name: 'Применить к 1 клиенту', exact: true }),
+    ).toBeVisible();
+    expect(await rollout.textContent()).not.toMatch(/rollout/i);
+    return rollout;
+  };
+
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockCoachWorkspace(page, { rollout: true });
+  const desktopRollout = await prepareRollout(page);
+  await page.screenshot({
+    path: '../.artifacts/tasks/754/evidence/screenshots/owner-approval/desktop-light-rollout.png',
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(desktopRollout).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({
+    path: '../.artifacts/tasks/754/evidence/screenshots/owner-approval/mobile-web-light-rollout.png',
+    fullPage: true,
+  });
+
+  const tmaContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    reducedMotion: 'reduce',
+  });
+  const tmaPage = await tmaContext.newPage();
+  await installTelegramHarness(tmaPage, {
+    colorScheme: 'dark',
+    safeAreaInset: { top: 16, right: 0, bottom: 20, left: 0 },
+  });
+  await mockCoachWorkspace(tmaPage, { rollout: true });
+  const tmaRollout = await prepareRollout(tmaPage, true);
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  expect(await tmaPage.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    390,
+  );
+  await tmaPage.screenshot({
+    path: '../.artifacts/tasks/754/evidence/screenshots/owner-approval/mocked-tma-dark-rollout.png',
+    fullPage: true,
+  });
+  await expect(tmaRollout).toBeVisible();
+  await tmaContext.close();
 });

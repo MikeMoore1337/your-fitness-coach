@@ -836,6 +836,8 @@ def apply_imported_template_revision(
     *,
     expected_revision_number: int,
     import_id: str,
+    rollout_id: str | None = None,
+    reason: str | None = None,
 ) -> tuple[UserProgram, int, int]:
     program, role = get_program_for_actor(db, actor, program_id, lock=True)
     _ensure_program_mutable(program)
@@ -986,23 +988,32 @@ def apply_imported_template_revision(
         program,
         actor=actor,
         change_kind="plan_updated",
-        reason="Импорт новой ревизии программы",
+        reason=reason or "Импорт новой ревизии программы",
         changed_fields={
-            "operation": "program_import_revision",
+            "operation": "program_rollout" if rollout_id is not None else "program_import_revision",
             "import_id": import_id,
             "previous_template_id": prior_template_id,
             "template_id": loaded_template.id,
             "workouts_updated": len(future_workouts),
+            **({"rollout_id": rollout_id} if rollout_id is not None else {}),
         },
     )
     record_audit_event(
         db,
         actor_user_id=actor.id,
         target_user_id=program.user_id,
-        action="program_import.revision_confirmed",
+        action=(
+            "coach.program_rollout.applied"
+            if rollout_id is not None
+            else "program_import.revision_confirmed"
+        ),
         resource_type="user_program",
         resource_id=program.id,
-        details={"import_id": import_id, "revision_number": revision.revision_number},
+        details={
+            "import_id": import_id,
+            "revision_number": revision.revision_number,
+            **({"rollout_id": rollout_id} if rollout_id is not None else {}),
+        },
     )
     if role == "trainer":
         queue_notification(

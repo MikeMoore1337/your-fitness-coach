@@ -7519,7 +7519,6 @@ button.notification-row__main:focus-visible {
   display: grid;
   gap: var(--v2-space-5);
   padding-top: var(--v2-space-3);
-  border-top: 1px solid var(--v2-border);
 }
 
 .app-section--programs .program-history__region {
@@ -7530,7 +7529,6 @@ button.notification-row__main:focus-visible {
 
 .app-section--programs .program-history__region + .program-history__region {
   padding-top: var(--v2-space-5);
-  border-top: 1px solid var(--v2-border);
 }
 
 .app-section--programs .program-history__heading p,
