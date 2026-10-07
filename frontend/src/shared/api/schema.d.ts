@@ -1760,6 +1760,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/program-rollouts/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Program Rollout Preview */
+        post: operations["coach_program_rollout_preview_api_v1_coach_program_rollouts_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/program-rollouts/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Coach Program Rollout Apply */
+        post: operations["coach_program_rollout_apply_api_v1_coach_program_rollouts_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/capacity": {
         parameters: {
             query?: never;
@@ -8399,6 +8433,141 @@ export interface components {
             target_template_exercise_id?: number | null;
             /** Reason */
             reason?: string | null;
+        };
+        /** CoachProgramRolloutApplyRequest */
+        CoachProgramRolloutApplyRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Template Fingerprint */
+            template_fingerprint: string;
+            /** Targets */
+            targets: components["schemas"]["CoachProgramRolloutTarget"][];
+            /**
+             * Confirmed
+             * @default false
+             */
+            confirmed: boolean;
+            /** Reason */
+            reason: string;
+            /** Idempotency Key */
+            idempotency_key?: string | null;
+        };
+        /** CoachProgramRolloutApplyResponse */
+        CoachProgramRolloutApplyResponse: {
+            /** Rollout Id */
+            rollout_id: string;
+            /** Template Id */
+            template_id: number;
+            /** Results */
+            results: components["schemas"]["CoachProgramRolloutResult"][];
+            /** Applied Count */
+            applied_count: number;
+            /** Already Applied Count */
+            already_applied_count: number;
+            /** Failed Count */
+            failed_count: number;
+            /**
+             * Completed At
+             * Format: date-time
+             */
+            completed_at: string;
+        };
+        /** CoachProgramRolloutClientPreview */
+        CoachProgramRolloutClientPreview: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Program Id */
+            program_id?: number | null;
+            /** Current Revision Number */
+            current_revision_number?: number | null;
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "compatible" | "personalization_required" | "manual_review_required";
+            /** Can Apply */
+            can_apply: boolean;
+            /** Reason Codes */
+            reason_codes?: string[];
+            /** Diff */
+            diff?: components["schemas"]["CoachProgramRolloutDiff"][];
+        };
+        /** CoachProgramRolloutDiff */
+        CoachProgramRolloutDiff: {
+            /** Week Number */
+            week_number: number;
+            /** Day Number */
+            day_number: number;
+            /** Exercise Title */
+            exercise_title: string;
+            /**
+             * Change
+             * @enum {string}
+             */
+            change: "added" | "updated" | "removed";
+            /** Current */
+            current?: string | null;
+            /** Proposed */
+            proposed?: string | null;
+        };
+        /** CoachProgramRolloutPreviewRequest */
+        CoachProgramRolloutPreviewRequest: {
+            /** Template Id */
+            template_id: number;
+            /** Client Ids */
+            client_ids: number[];
+        };
+        /** CoachProgramRolloutPreviewResponse */
+        CoachProgramRolloutPreviewResponse: {
+            /** Template Id */
+            template_id: number;
+            /** Template Title */
+            template_title: string;
+            /** Template Fingerprint */
+            template_fingerprint: string;
+            /** Targets */
+            targets: components["schemas"]["CoachProgramRolloutClientPreview"][];
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** CoachProgramRolloutResult */
+        CoachProgramRolloutResult: {
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Program Id */
+            program_id: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "applied" | "already_applied" | "failed";
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /**
+             * Workouts Updated
+             * @default 0
+             */
+            workouts_updated: number;
+            /** Current Revision Number */
+            current_revision_number?: number | null;
+        };
+        /** CoachProgramRolloutTarget */
+        CoachProgramRolloutTarget: {
+            /** Client Id */
+            client_id: number;
+            /** Program Id */
+            program_id: number;
+            /** Expected Revision Number */
+            expected_revision_number: number;
         };
         /** CoachReviewActionState */
         CoachReviewActionState: {
@@ -20995,6 +21164,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CoachWorkflowAutomationResponse"];
+                };
+            };
+        };
+    };
+    coach_program_rollout_preview_api_v1_coach_program_rollouts_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachProgramRolloutPreviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachProgramRolloutPreviewResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_program_rollout_apply_api_v1_coach_program_rollouts_apply_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachProgramRolloutApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachProgramRolloutApplyResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

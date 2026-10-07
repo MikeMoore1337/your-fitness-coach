@@ -50,6 +50,12 @@ from fitminiapp_api.schemas.coach_crm import (
     CoachTaskStateUpdate,
 )
 from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.coach_program_rollout import (
+    CoachProgramRolloutApplyRequest,
+    CoachProgramRolloutApplyResponse,
+    CoachProgramRolloutPreviewRequest,
+    CoachProgramRolloutPreviewResponse,
+)
 from fitminiapp_api.schemas.coach_review_workspace import CoachReviewWorkspaceResponse
 from fitminiapp_api.schemas.coach_reviews import (
     CoachCheckInReviewItem,
@@ -136,6 +142,11 @@ from fitminiapp_api.services.coach_crm import (
     update_task_state,
 )
 from fitminiapp_api.services.coach_inbox import build_coach_inbox
+from fitminiapp_api.services.coach_program_rollout import (
+    CoachProgramRolloutError,
+    apply_coach_program_rollout,
+    preview_coach_program_rollout,
+)
 from fitminiapp_api.services.coach_review_workspace import build_coach_review_workspace
 from fitminiapp_api.services.coach_reviews import (
     CoachReviewError,
@@ -201,6 +212,10 @@ CoachCrmIdempotencyKey = Annotated[
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
 CheckInTemplateIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
+CoachProgramRolloutIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
@@ -362,6 +377,46 @@ def coach_workflow_automation_evaluate(
     return CoachWorkflowAutomationResponse.model_validate(
         evaluate_coach_workflow(db, current_user, apply=True)
     )
+
+
+@router.post(
+    "/program-rollouts/preview",
+    response_model=CoachProgramRolloutPreviewResponse,
+)
+def coach_program_rollout_preview(
+    payload: CoachProgramRolloutPreviewRequest,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachProgramRolloutPreviewResponse:
+    try:
+        return CoachProgramRolloutPreviewResponse.model_validate(
+            preview_coach_program_rollout(db, current_user, payload)
+        )
+    except CoachProgramRolloutError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+
+
+@router.post(
+    "/program-rollouts/apply",
+    response_model=CoachProgramRolloutApplyResponse,
+)
+def coach_program_rollout_apply(
+    payload: CoachProgramRolloutApplyRequest,
+    idempotency_key: CoachProgramRolloutIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachProgramRolloutApplyResponse:
+    try:
+        return CoachProgramRolloutApplyResponse.model_validate(
+            apply_coach_program_rollout(
+                db,
+                current_user,
+                payload,
+                header_idempotency_key=idempotency_key,
+            )
+        )
+    except CoachProgramRolloutError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
 
 
 @router.get("/capacity", response_model=CoachCapacityResponse)

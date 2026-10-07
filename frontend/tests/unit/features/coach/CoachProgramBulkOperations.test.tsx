@@ -2,7 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Client, CoachAssignedProgram } from '../../../../src/shared/api/types';
+import type {
+  Client,
+  CoachAssignedProgram,
+  ProgramTemplate,
+} from '../../../../src/shared/api/types';
 import { CoachProgramBulkOperations } from '../../../../src/features/coach/CoachProgramBulkOperations';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 
@@ -33,14 +37,22 @@ function program(id: number, clientId: number, revision: number): CoachAssignedP
   };
 }
 
-function renderBulk(programs: CoachAssignedProgram[], selected = clients.slice(0, 2)) {
+function renderBulk(
+  programs: CoachAssignedProgram[],
+  selected = clients.slice(0, 2),
+  selectedTemplate?: ProgramTemplate,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <CoachProgramBulkOperations programs={programs} selectedClients={selected} />
+        <CoachProgramBulkOperations
+          programs={programs}
+          selectedClients={selected}
+          selectedTemplate={selectedTemplate}
+        />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -263,5 +275,101 @@ describe('CoachProgramBulkOperations', () => {
     await user.click(screen.getByText('Проверить одинаковые предложения прогрессии'));
     expect(proposalDetails).toHaveAttribute('open');
     expect(revisionDetails).not.toHaveAttribute('open');
+  });
+
+  it('previews compatible clients and skips manual-review targets before confirmation', async () => {
+    const template = { id: 5, title: 'Новый блок' } as ProgramTemplate;
+    const requests: Array<{ url: string; body: Record<string, unknown> }> = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith('/program-rollouts/preview')) {
+        return new Response(
+          JSON.stringify({
+            template_id: 5,
+            template_title: 'Новый блок',
+            template_fingerprint: 'a'.repeat(64),
+            targets: [
+              {
+                client_id: 71,
+                client_name: 'Анна',
+                program_id: 44,
+                current_revision_number: 7,
+                classification: 'compatible',
+                can_apply: true,
+                reason_codes: ['prescription_changes'],
+                diff: [
+                  {
+                    week_number: 1,
+                    day_number: 1,
+                    exercise_title: 'Жим лёжа',
+                    change: 'updated',
+                    current: '2×8-10',
+                    proposed: '3×8-10',
+                  },
+                ],
+              },
+              {
+                client_id: 72,
+                client_name: 'Иван',
+                program_id: 45,
+                current_revision_number: 4,
+                classification: 'manual_review_required',
+                can_apply: false,
+                reason_codes: ['schedule_mismatch'],
+                diff: [],
+              },
+            ],
+            generated_at: '2026-10-07T10:00:00',
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.endsWith('/program-rollouts/apply')) {
+        requests.push({ url, body: JSON.parse(String(init?.body)) });
+        return new Response(
+          JSON.stringify({
+            rollout_id: 'b'.repeat(64),
+            template_id: 5,
+            results: [
+              {
+                client_id: 71,
+                client_name: 'Анна',
+                program_id: 44,
+                status: 'applied',
+                code: 'applied',
+                detail: 'Rollout применён к будущим тренировкам.',
+                workouts_updated: 4,
+                current_revision_number: 8,
+              },
+            ],
+            applied_count: 1,
+            already_applied_count: 0,
+            failed_count: 0,
+            completed_at: '2026-10-07T10:01:00',
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: `Unexpected request: ${url}` }), {
+        status: 500,
+      });
+    });
+    renderBulk([program(44, 71, 7), program(45, 72, 4)], clients, template);
+
+    fireEvent.click(screen.getByText('Проверить безопасный rollout выбранного шаблона'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Собрать предпросмотр' }));
+
+    expect(await screen.findByText('Совместимо')).toBeInTheDocument();
+    expect(screen.getByText('Нужна ручная проверка')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Проверено и применить · 1' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Подтвердить · 1' }));
+
+    expect(await screen.findByText('Rollout применён к будущим тренировкам.')).toBeInTheDocument();
+    await waitFor(() => expect(requests).toHaveLength(1));
+    expect(requests[0]?.body).toMatchObject({
+      template_id: 5,
+      confirmed: true,
+      targets: [{ client_id: 71, program_id: 44, expected_revision_number: 7 }],
+    });
   });
 });

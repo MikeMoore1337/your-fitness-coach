@@ -1,10 +1,24 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
-import type { ApiSchemas, Client, CoachAssignedProgram, Exercise } from '../../shared/api/types';
+import type {
+  ApiSchemas,
+  Client,
+  CoachAssignedProgram,
+  Exercise,
+  ProgramTemplate,
+} from '../../shared/api/types';
 import { queryKeys } from '../../shared/queryKeys';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { Button, EmptyState, Field, Input, LoadingState, Select } from '../../shared/ui/common';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Field,
+  Input,
+  LoadingState,
+  Select,
+} from '../../shared/ui/common';
 
 type RevisionScope = ApiSchemas['CoachProgramExerciseCreate']['effective_scope'];
 type ProposalList = ApiSchemas['ProgramProgressionProposalList'];
@@ -12,6 +26,8 @@ type ProposalExercise = ApiSchemas['ProgramProgressionProposalExercise'];
 type Proposal = NonNullable<ProposalExercise['guidance']['proposal']>;
 type RevisionResponse = ApiSchemas['CoachProgramExerciseAssignmentResponse'];
 type ReviewResponse = ApiSchemas['ProgressionProposalReviewResponse'];
+type RolloutPreview = ApiSchemas['CoachProgramRolloutPreviewResponse'];
+type RolloutResult = ApiSchemas['CoachProgramRolloutResult'];
 
 type ProgramTarget = {
   clientName: string;
@@ -110,12 +126,45 @@ function formatDate(value: string): string {
   return `${value.slice(8, 10)}.${value.slice(5, 7)}.${value.slice(0, 4)}`;
 }
 
+function rolloutClassificationLabel(
+  value: ApiSchemas['CoachProgramRolloutClientPreview']['classification'],
+): string {
+  return {
+    compatible: 'Совместимо',
+    personalization_required: 'Нужна персонализация',
+    manual_review_required: 'Нужна ручная проверка',
+  }[value];
+}
+
+function rolloutChangeLabel(value: ApiSchemas['CoachProgramRolloutDiff']['change']): string {
+  return { added: 'добавить', updated: 'обновить', removed: 'убрать' }[value];
+}
+
+function rolloutReasonLabels(codes: string[]): string {
+  const labels: Record<string, string> = {
+    already_current: 'План уже совпадает с шаблоном.',
+    duration_mismatch: 'Длительность шаблона не совпадает с программой.',
+    schedule_mismatch: 'Расписание программы требует ручной проверки.',
+    in_progress_workout: 'Есть тренировка в процессе.',
+    no_future_workouts: 'Нет будущих запланированных тренировок.',
+    exercise_unavailable: 'Упражнение нужно персонализировать для клиента.',
+    exercise_replacement: 'Замена упражнения требует ручной проверки.',
+    future_exercise_removal: 'Удаление будущего упражнения требует ручной проверки.',
+    new_exercises: 'Есть новые упражнения.',
+    prescription_changes: 'Есть изменения назначения.',
+    no_active_program: 'У клиента нет активной программы тренера.',
+  };
+  return codes.map((code) => labels[code] ?? code).join(' ');
+}
+
 export function CoachProgramBulkOperations({
   programs,
   selectedClients,
+  selectedTemplate,
 }: {
   programs: CoachAssignedProgram[];
   selectedClients: Client[];
+  selectedTemplate?: ProgramTemplate;
 }) {
   const { confirm, toast } = useFeedback();
   const queryClient = useQueryClient();
@@ -130,8 +179,19 @@ export function CoachProgramBulkOperations({
   const [durationMinutes, setDurationMinutes] = useState(20);
   const [restSeconds, setRestSeconds] = useState(90);
   const [reason, setReason] = useState('');
+  const [rolloutReason, setRolloutReason] = useState(
+    'Обновление будущего плана после проверки шаблона',
+  );
+  const [rolloutPreview, setRolloutPreview] = useState<RolloutPreview | null>(null);
+  const [rolloutPreviewKey, setRolloutPreviewKey] = useState('');
+  const [rolloutResults, setRolloutResults] = useState<RolloutResult[]>([]);
+  const [rolloutResultsKey, setRolloutResultsKey] = useState('');
   const [revisionOutcomes, setRevisionOutcomes] = useState<ActionOutcome[]>([]);
   const [proposalOutcomes, setProposalOutcomes] = useState<ActionOutcome[]>([]);
+  const selectedClientKey = selectedClients.map((client) => client.id ?? '').join(',');
+  const rolloutSelectionKey = `${selectedTemplate?.id ?? ''}:${selectedClientKey}`;
+  const currentRolloutPreview = rolloutPreviewKey === rolloutSelectionKey ? rolloutPreview : null;
+  const currentRolloutResults = rolloutResultsKey === rolloutSelectionKey ? rolloutResults : [];
 
   const targets: ProgramTarget[] = selectedClients.flatMap((client) => {
     const program = programs.find((item) => item.client_id === client.id && item.is_active);
@@ -334,6 +394,83 @@ export function CoachProgramBulkOperations({
     onError: () => toast('Не удалось подтвердить предложения.', 'error'),
   });
 
+  const rolloutPreviewMutation = useMutation({
+    mutationFn: async (): Promise<RolloutPreview> => {
+      if (!selectedTemplate || !selectedClients.length) {
+        throw new Error('Выберите шаблон и клиентов');
+      }
+      return api<RolloutPreview>('/api/v1/coach/program-rollouts/preview', {
+        method: 'POST',
+        body: {
+          template_id: selectedTemplate.id,
+          client_ids: selectedClients.flatMap((client) => (client.id == null ? [] : [client.id])),
+        },
+      });
+    },
+    onSuccess: (preview) => {
+      setRolloutPreview(preview);
+      setRolloutPreviewKey(rolloutSelectionKey);
+      setRolloutResults([]);
+      setRolloutResultsKey('');
+    },
+    onError: () =>
+      toast('Не удалось собрать предпросмотр rollout. Обновите данные и повторите.', 'error'),
+  });
+
+  const rolloutApplyMutation = useMutation({
+    mutationFn: async ({
+      preview,
+      idempotencyKey,
+    }: {
+      preview: RolloutPreview;
+      idempotencyKey: string;
+    }) => {
+      if (!selectedTemplate) throw new Error('Шаблон больше не выбран');
+      const targets = preview.targets.flatMap((target) =>
+        target.can_apply && target.program_id != null && target.current_revision_number != null
+          ? [
+              {
+                client_id: target.client_id,
+                program_id: target.program_id,
+                expected_revision_number: target.current_revision_number,
+              },
+            ]
+          : [],
+      );
+      return api<ApiSchemas['CoachProgramRolloutApplyResponse']>(
+        '/api/v1/coach/program-rollouts/apply',
+        {
+          method: 'POST',
+          headers: { 'Idempotency-Key': idempotencyKey },
+          body: {
+            template_id: selectedTemplate.id,
+            template_fingerprint: preview.template_fingerprint,
+            targets,
+            confirmed: true,
+            reason: rolloutReason.trim(),
+            idempotency_key: idempotencyKey,
+          },
+        },
+      );
+    },
+    onSuccess: async (result) => {
+      setRolloutResults(result.results);
+      setRolloutResultsKey(rolloutSelectionKey);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientSummaries }),
+      ]);
+      toast(
+        result.failed_count
+          ? `Rollout применён: ${result.applied_count}. Не выполнено: ${result.failed_count}.`
+          : `Rollout применён к ${result.applied_count} клиентам.`,
+        result.failed_count ? 'error' : 'success',
+      );
+    },
+    onError: () =>
+      toast('Не удалось применить rollout. Обновите предпросмотр и повторите.', 'error'),
+  });
+
   const scheduleCommonRevision = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (
@@ -402,6 +539,38 @@ export function CoachProgramBulkOperations({
     }
   };
 
+  const applyableRolloutTargets =
+    currentRolloutPreview?.targets.filter(
+      (target) =>
+        target.can_apply && target.program_id != null && target.current_revision_number != null,
+    ) ?? [];
+
+  const startRolloutPreview = () => {
+    setRolloutPreview(null);
+    setRolloutPreviewKey('');
+    setRolloutResults([]);
+    setRolloutResultsKey('');
+    rolloutPreviewMutation.mutate();
+  };
+
+  const confirmRollout = async () => {
+    if (!currentRolloutPreview || !applyableRolloutTargets.length || !rolloutReason.trim()) return;
+    const approved = await confirm({
+      title: 'Подтвердить rollout шаблона?',
+      message: [
+        `Шаблон «${currentRolloutPreview.template_title}» обновит только будущие запланированные тренировки у ${applyableRolloutTargets.length} клиентов.`,
+        'Завершённые тренировки не изменятся. Клиенты с персонализацией или ручной проверкой будут пропущены.',
+      ].join(' '),
+      confirmText: `Подтвердить · ${applyableRolloutTargets.length}`,
+    });
+    if (!approved) return;
+    const idempotencyKey =
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `rollout-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    rolloutApplyMutation.mutate({ preview: currentRolloutPreview, idempotencyKey });
+  };
+
   const canScheduleRevision =
     selectedClients.length > 0 &&
     targets.length === selectedClients.length &&
@@ -428,6 +597,111 @@ export function CoachProgramBulkOperations({
       className="coach-program-bulk-operations stack"
       aria-label="Общие действия с программами"
     >
+      {selectedTemplate && (
+        <details className="coach-program-rollout">
+          <summary>Проверить безопасный rollout выбранного шаблона</summary>
+          {!selectedClients.length ? (
+            <EmptyState title="Сначала выберите клиентов" text="Выбор клиентов находится выше." />
+          ) : (
+            <div className="stack">
+              <p className="coach-program-operations__note">
+                «{selectedTemplate.title}» сравнивается с будущими тренировками каждого клиента.
+                Завершённые тренировки не меняются; несовместимые случаи останутся для ручной
+                проверки.
+              </p>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={rolloutPreviewMutation.isPending || rolloutApplyMutation.isPending}
+                onClick={startRolloutPreview}
+              >
+                {rolloutPreviewMutation.isPending
+                  ? 'Собираем предпросмотр…'
+                  : 'Собрать предпросмотр'}
+              </Button>
+              {rolloutPreviewMutation.isError && (
+                <p role="alert">Не удалось собрать предпросмотр. Обновите данные и повторите.</p>
+              )}
+              {currentRolloutPreview && (
+                <div className="coach-program-rollout__preview" aria-live="polite">
+                  {currentRolloutPreview.targets.map((target) => (
+                    <fieldset className="coach-program-rollout__target" key={target.client_id}>
+                      <legend>
+                        {target.client_name}{' '}
+                        <Badge
+                          tone={
+                            target.classification === 'compatible'
+                              ? 'success'
+                              : target.classification === 'personalization_required'
+                                ? 'warning'
+                                : 'danger'
+                          }
+                        >
+                          {rolloutClassificationLabel(target.classification)}
+                        </Badge>
+                      </legend>
+                      <p className="muted">{rolloutReasonLabels(target.reason_codes ?? [])}</p>
+                      {(target.diff ?? []).length ? (
+                        <ul>
+                          {(target.diff ?? []).slice(0, 6).map((change, index) => (
+                            <li key={`${change.week_number}-${change.day_number}-${index}`}>
+                              {change.exercise_title}: {rolloutChangeLabel(change.change)} ·{' '}
+                              {change.current ?? 'нет'} → {change.proposed ?? 'нет'}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="muted">Изменений не найдено.</p>
+                      )}
+                    </fieldset>
+                  ))}
+                  {applyableRolloutTargets.length ? (
+                    <>
+                      <p className="coach-program-operations__note">
+                        К применению готово: {applyableRolloutTargets.length}. Остальные клиенты
+                        будут пропущены до отдельной ручной проверки.
+                      </p>
+                      <Field label="Причина rollout" labelFor="coach-rollout-reason">
+                        <Input
+                          id="coach-rollout-reason"
+                          required
+                          maxLength={500}
+                          value={rolloutReason}
+                          onChange={(event) => setRolloutReason(event.target.value)}
+                        />
+                      </Field>
+                      <Button
+                        type="button"
+                        disabled={rolloutApplyMutation.isPending || !rolloutReason.trim()}
+                        onClick={() => void confirmRollout()}
+                      >
+                        {rolloutApplyMutation.isPending
+                          ? 'Применяем…'
+                          : `Проверено и применить · ${applyableRolloutTargets.length}`}
+                      </Button>
+                    </>
+                  ) : (
+                    <p role="status">Нет клиентов, готовых к безопасному применению rollout.</p>
+                  )}
+                </div>
+              )}
+              {currentRolloutResults.length > 0 && (
+                <ul className="coach-program-operations__results" aria-live="polite">
+                  {currentRolloutResults.map((result) => (
+                    <li
+                      key={`${result.client_id}-${result.status}`}
+                      className={result.status === 'failed' ? 'is-failed' : undefined}
+                    >
+                      <strong>{result.client_name}:</strong> {result.detail}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </details>
+      )}
+
       <details
         open={revisionOpen}
         onToggle={(event) => {

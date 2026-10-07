@@ -2365,6 +2365,72 @@ def handle_demo_transport(
                 "tasks_reused": 0,
                 "generated_at": _iso(_now(session)),
             }
+        if path == "/api/v1/coach/program-rollouts/preview":
+            payload = _request_body(body)
+            template_id = payload.get("template_id")
+            if isinstance(template_id, bool) or not isinstance(template_id, int):
+                raise DemoActionForbiddenError
+            return {
+                "template_id": template_id,
+                "template_title": "Демо-шаблон",
+                "template_fingerprint": "0" * 64,
+                "targets": [
+                    {
+                        "client_id": DEMO_CLIENT_IDS["alexey"],
+                        "client_name": "Алексей",
+                        "program_id": 51001,
+                        "classification": "compatible",
+                        "can_apply": True,
+                        "current_revision_number": 3,
+                        "reason_codes": [],
+                        "diff": [
+                            {
+                                "week_number": 1,
+                                "day_number": 1,
+                                "exercise_title": "Приседания",
+                                "change": "updated",
+                                "current": "3×8",
+                                "proposed": "4×8",
+                            }
+                        ],
+                    }
+                ],
+                "generated_at": _iso(_now(session)),
+            }
+        if path == "/api/v1/coach/program-rollouts/apply":
+            payload = _request_body(body)
+            template_id = payload.get("template_id")
+            targets = payload.get("targets")
+            if (
+                isinstance(template_id, bool)
+                or not isinstance(template_id, int)
+                or not isinstance(targets, list)
+                or not targets
+            ):
+                raise DemoActionForbiddenError
+            results = [
+                {
+                    "client_id": int(target.get("client_id", 0)),
+                    "client_name": "Демо-клиент",
+                    "program_id": int(target.get("program_id", 0)),
+                    "status": "failed",
+                    "code": "demo_mode",
+                    "detail": "Rollout недоступен в демо-режиме.",
+                    "workouts_updated": 0,
+                    "current_revision_number": None,
+                }
+                for target in targets
+                if isinstance(target, dict)
+            ]
+            return {
+                "rollout_id": "0" * 64,
+                "template_id": template_id,
+                "results": results,
+                "applied_count": 0,
+                "already_applied_count": 0,
+                "failed_count": len(results),
+                "completed_at": _iso(_now(session)),
+            }
         if path == "/api/v1/coach/tasks":
             payload = _request_body(body)
             task_client_id = payload.get("client_id")
