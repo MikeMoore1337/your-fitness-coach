@@ -10872,8 +10872,21 @@ class TaskController:
             "base_sha": ready_base_sha,
             "head_sha": ready_head_sha,
         }
+        original_base_sha = str(lease.get("original_base_origin_master_sha", ""))
+        task_provenance = lease.get("task_provenance")
+        provenance_matches = (
+            task_provenance == anchor and original_base_sha == ready_base_sha
+        ) or (
+            task_provenance
+            == {
+                **anchor,
+                "original_base_sha": original_base_sha,
+            }
+            and re.fullmatch(r"[0-9a-f]{40}", original_base_sha) is not None
+            and self.repository.is_ancestor(original_base_sha, ready_base_sha)
+        )
         if (
-            lease.get("task_provenance") != anchor
+            not provenance_matches
             or pull_request_evidence.get("pr_number") != pr_number
             or pull_request_evidence.get("branch") != branch
             or any(
@@ -11240,26 +11253,62 @@ class TaskController:
             "base_sha": ready_base_sha,
             "head_sha": ready_head_sha,
         }
+        original_base_sha = str(lease.get("original_base_origin_master_sha", ""))
+        task_provenance = lease.get("task_provenance")
+        expanded_task_provenance = {
+            **preserved_anchor,
+            "original_base_sha": original_base_sha,
+        }
+        valid_task_provenance = (
+            task_provenance == preserved_anchor and original_base_sha == ready_base_sha
+        ) or (
+            task_provenance == expanded_task_provenance
+            and re.fullmatch(r"[0-9a-f]{40}", original_base_sha) is not None
+            and self.repository.is_ancestor(original_base_sha, ready_base_sha)
+        )
+        if not valid_task_provenance:
+            raise TaskSessionError(
+                "Historical deployed-task reconciliation requires one preserved ready provenance"
+            )
+        preserved_ready_provenance = dict(task_provenance)
+        preserved_delivery_snapshot: dict[str, Any] | None = None
+        delivery_snapshot_present = any(
+            lease.get(key) not in (None, "")
+            for key in (
+                "delivery_anchor",
+                "delivery_base_origin_master_sha",
+                "delivery_head_sha",
+                "delivery_released_at",
+            )
+        )
+        if delivery_snapshot_present:
+            if (
+                lease.get("delivery_anchor") != preserved_anchor
+                or lease.get("delivery_base_origin_master_sha") != ready_base_sha
+                or lease.get("delivery_head_sha") != ready_head_sha
+                or not isinstance(lease.get("delivery_released_at"), str)
+                or not lease.get("delivery_released_at")
+            ):
+                raise TaskSessionError(
+                    "Historical deployed-task reconciliation requires an unchanged delivery snapshot"
+                )
+            preserved_delivery_snapshot = {
+                "classification": "preserved_after_delivery_release",
+                "delivery_anchor": dict(lease["delivery_anchor"]),
+                "delivery_base_origin_master_sha": ready_base_sha,
+                "delivery_head_sha": ready_head_sha,
+                "delivery_released_at": lease["delivery_released_at"],
+            }
         if (
             task_id_from_branch(branch) != expected
             or lease.get("base_origin_master_sha") != ready_base_sha
-            or lease.get("original_base_origin_master_sha") != ready_base_sha
-            or lease.get("task_provenance") != preserved_anchor
             or any(
                 re.fullmatch(r"[0-9a-f]{40}", sha) is None
                 for sha in (ready_base_sha, ready_head_sha)
             )
-            or any(
-                lease.get(key) not in (None, "")
-                for key in (
-                    "delivery_anchor",
-                    "delivery_base_origin_master_sha",
-                    "delivery_head_sha",
-                )
-            )
         ):
             raise TaskSessionError(
-                "Historical deployed-task reconciliation requires one preserved ready anchor without a delivery rewrite"
+                "Historical deployed-task reconciliation requires one preserved ready anchor"
             )
 
         worktree_path = Path(str(lease.get("worktree", ""))).resolve()
@@ -11351,7 +11400,7 @@ class TaskController:
             "authorized_at": now,
             "reconciled_at": now,
             "original_state": HUMAN_REQUIRED_STATE,
-            "original_ready_anchor": preserved_anchor,
+            "original_ready_anchor": preserved_ready_provenance,
             "final_task_pr": pull_request_evidence,
             "task_head_history": head_history,
             "production": production,
@@ -11360,6 +11409,8 @@ class TaskController:
             "reconciled_against_master_sha": master_sha,
             "reconciled_task_head_sha": final_head_sha,
         }
+        if preserved_delivery_snapshot is not None:
+            reconciliation["preserved_delivery_snapshot"] = preserved_delivery_snapshot
         history_payload = {
             "version": TASK_STATE_VERSION,
             "task_id": expected,

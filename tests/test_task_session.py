@@ -3113,12 +3113,21 @@ def _prepare_historical_deployed_task_reconciliation(
     *,
     foreign_head_history: bool = False,
     revert_feature: bool = False,
+    released_delivery: bool = False,
 ) -> dict[str, Any]:
     root, git_repository, controller, worktree, branch, sha_pair = _prepare_started(
         repository, "746"
     )
     base_sha, ready_head_sha = sha_pair.split(":")
     controller.mark_ready("746", head_sha=ready_head_sha, quality_verdict="PASS", qa_verdict="PASS")
+    if released_delivery:
+        controller.acquire_delivery("746", offline=True)
+        controller.refresh_for_delivery("746", offline=True)
+        controller.release_delivery(
+            "746",
+            reason="Synthetic native delivery release before historical reconciliation",
+            offline=True,
+        )
     remediation_paths = [
         "frontend/tests/integration/task746-remediation.spec.ts",
         "backend/tests/test_task746_remediation.py",
@@ -3138,10 +3147,13 @@ def _prepare_historical_deployed_task_reconciliation(
         )
     final_head_sha = _git(worktree, "rev-parse", "HEAD")
     lease_path = controller.store.task_lease_path("746")
+    if not released_delivery:
+        lease = controller.store.read_json(lease_path)
+        assert isinstance(lease, dict)
+        lease["lifecycle_state"] = task_session.HUMAN_REQUIRED_STATE
+        task_session.StateStore.replace_json(lease_path, lease)
     lease = controller.store.read_json(lease_path)
     assert isinstance(lease, dict)
-    lease["lifecycle_state"] = task_session.HUMAN_REQUIRED_STATE
-    task_session.StateStore.replace_json(lease_path, lease)
 
     _git(
         root,
@@ -3372,6 +3384,49 @@ def test_reconcile_historical_deployed_task_after_master_drift_and_finish(
         history["historical_deployed_task_reconciliation"]["original_ready_anchor"]["head_sha"]
         == (fixture["ready_head_sha"])
     )
+
+
+def test_reconcile_historical_deployed_task_accepts_preserved_native_delivery_release(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository, released_delivery=True)
+    controller = fixture["controller"]
+
+    reconciliation = controller.reconcile_deployed_task_after_master_drift(
+        "746",
+        pr_number=764,
+        merge_sha=fixture["merge_sha"],
+        deployed_sha=fixture["merge_sha"],
+        production_run_id=9000,
+        owner_authorize=True,
+    )
+
+    snapshot = reconciliation["preserved_delivery_snapshot"]
+    assert snapshot["classification"] == "preserved_after_delivery_release"
+    assert snapshot["delivery_anchor"]["head_sha"] == fixture["ready_head_sha"]
+    assert controller.finish("746")["cleanup_performed"] is True
+
+
+def test_reconcile_historical_deployed_task_rejects_changed_delivery_snapshot(
+    repository: tuple[Path, Any],
+) -> None:
+    fixture = _prepare_historical_deployed_task_reconciliation(repository, released_delivery=True)
+    controller = fixture["controller"]
+    lease_path = controller.store.task_lease_path("746")
+    lease = controller.store.read_json(lease_path)
+    assert isinstance(lease, dict)
+    lease["delivery_head_sha"] = "f" * 40
+    task_session.StateStore.replace_json(lease_path, lease)
+
+    with pytest.raises(task_session.TaskSessionError, match="unchanged delivery snapshot"):
+        controller.reconcile_deployed_task_after_master_drift(
+            "746",
+            pr_number=764,
+            merge_sha=fixture["merge_sha"],
+            deployed_sha=fixture["merge_sha"],
+            production_run_id=9000,
+            owner_authorize=True,
+        )
 
 
 @pytest.mark.parametrize(
