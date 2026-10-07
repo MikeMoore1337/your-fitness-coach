@@ -15,10 +15,20 @@ from fitminiapp_api.schemas.check_in import (
     WeeklyPlanningReviewConfirmRequest,
     WeeklyPlanningReviewConfirmResponse,
 )
+from fitminiapp_api.schemas.check_in_templates import (
+    AssignedCheckInTemplateListResponse,
+    CheckInTemplateResponseItem,
+    CheckInTemplateResponseSubmit,
+)
 from fitminiapp_api.schemas.daily_wellbeing import (
     DailyWellbeingCheckInResponse,
     DailyWellbeingCheckInSaveRequest,
     DailyWellbeingCurrentResponse,
+)
+from fitminiapp_api.services.check_in_templates import (
+    CheckInTemplateError,
+    list_assigned_templates,
+    submit_response,
 )
 from fitminiapp_api.services.daily_wellbeing import (
     DailyWellbeingConflictError,
@@ -38,6 +48,10 @@ from fitminiapp_api.services.weekly_check_ins import (
 )
 
 router = APIRouter()
+
+
+def _check_in_template_error(exc: CheckInTemplateError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
 @router.get("/daily", response_model=DailyWellbeingCurrentResponse)
@@ -139,3 +153,38 @@ def create_weekly_check_in(
     except WeeklyCheckInConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return serialize_weekly_check_in(row)
+
+
+@router.get("/templates/assigned", response_model=AssignedCheckInTemplateListResponse)
+def assigned_check_in_templates(
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> AssignedCheckInTemplateListResponse:
+    return AssignedCheckInTemplateListResponse.model_validate(
+        list_assigned_templates(db, current_user)
+    )
+
+
+@router.post(
+    "/templates/assignments/{assignment_id}/responses",
+    response_model=CheckInTemplateResponseItem,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_assigned_check_in_template(
+    assignment_id: int,
+    payload: CheckInTemplateResponseSubmit,
+    idempotency_key: str | None = Header(
+        default=None,
+        alias="Idempotency-Key",
+        min_length=8,
+        max_length=128,
+    ),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+) -> CheckInTemplateResponseItem:
+    try:
+        return CheckInTemplateResponseItem.model_validate(
+            submit_response(db, current_user, assignment_id, payload, idempotency_key)
+        )
+    except CheckInTemplateError as exc:
+        raise _check_in_template_error(exc) from exc

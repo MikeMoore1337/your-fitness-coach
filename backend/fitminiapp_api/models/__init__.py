@@ -15,6 +15,12 @@ from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity, L
 from fitminiapp_api.models.billing import Payment, Plan, Subscription
 from fitminiapp_api.models.cardio import CardioSession
 from fitminiapp_api.models.check_in import WeeklyCheckIn
+from fitminiapp_api.models.check_in_templates import (
+    CoachCheckInAssignment,
+    CoachCheckInResponse,
+    CoachCheckInTemplate,
+    CoachCheckInTemplateVersion,
+)
 from fitminiapp_api.models.coach_crm import (
     CoachBusinessSession,
     CoachPackage,
@@ -145,7 +151,11 @@ __all__ = [
     "BotSupportCase",
     "CardioSession",
     "CoachBusinessSession",
+    "CoachCheckInAssignment",
+    "CoachCheckInResponse",
     "CoachCheckInReview",
+    "CoachCheckInTemplate",
+    "CoachCheckInTemplateVersion",
     "CoachClient",
     "CoachClientInvite",
     "CoachPackage",

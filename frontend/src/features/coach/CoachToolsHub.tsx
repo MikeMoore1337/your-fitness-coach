@@ -1,13 +1,25 @@
 import { Icon } from '../../shared/ui/Icon';
 
 export type CoachTool =
-  'schedule' | 'tasks' | 'finance' | 'invitations' | 'catalog' | 'reviews' | 'analytics';
+  | 'schedule'
+  | 'tasks'
+  | 'finance'
+  | 'invitations'
+  | 'catalog'
+  | 'reviews'
+  | 'analytics'
+  | 'templates';
 
 const tools: ReadonlyArray<{ key: CoachTool; title: string; description: string }> = [
   {
     key: 'reviews',
     title: 'Проверка итогов',
     description: 'Недельные итоги клиентов, ответ тренера и последующая задача',
+  },
+  {
+    key: 'templates',
+    title: 'Шаблоны проверок',
+    description: 'Повторяемые вопросы, версии и назначения клиентам',
   },
   {
     key: 'analytics',

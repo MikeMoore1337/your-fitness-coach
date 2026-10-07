@@ -707,6 +707,112 @@ async function mockCoachWorkspace(
         },
       });
     }
+    if (path.endsWith('/coach/check-in-templates')) {
+      return route.fulfill({
+        json: {
+          field_catalog: [
+            {
+              key: 'recovery',
+              label: 'Восстановление',
+              value_type: 'score',
+              min_value: 1,
+              max_value: 5,
+            },
+            {
+              key: 'hunger',
+              label: 'Голод',
+              value_type: 'score',
+              min_value: 1,
+              max_value: 5,
+            },
+            {
+              key: 'training_load',
+              label: 'Тренировочная нагрузка',
+              value_type: 'score',
+              min_value: 1,
+              max_value: 5,
+            },
+            {
+              key: 'adherence_difficulty',
+              label: 'Сложность следования плану',
+              value_type: 'score',
+              min_value: 1,
+              max_value: 5,
+            },
+          ],
+          items: [
+            {
+              id: 801,
+              name: 'Статус недели',
+              description: 'Короткая сверка самочувствия перед следующим планом.',
+              cadence: 'weekly',
+              is_active: true,
+              current_version: {
+                id: 802,
+                version: 1,
+                fields: [
+                  {
+                    key: 'recovery',
+                    label: 'Восстановление',
+                    value_type: 'score',
+                    min_value: 1,
+                    max_value: 5,
+                    required: true,
+                  },
+                  {
+                    key: 'hunger',
+                    label: 'Голод',
+                    value_type: 'score',
+                    min_value: 1,
+                    max_value: 5,
+                    required: false,
+                  },
+                ],
+                created_at: '2026-08-01T10:00:00Z',
+              },
+              assignments: [
+                {
+                  id: 803,
+                  client_id: 11,
+                  client_name: 'Анна Петрова',
+                  version: 1,
+                  status: 'active',
+                  next_due_on: operationDate,
+                  last_response_at: null,
+                },
+              ],
+              created_at: '2026-08-01T10:00:00Z',
+              updated_at: '2026-08-01T10:00:00Z',
+            },
+          ],
+        },
+      });
+    }
+    if (/\/coach\/check-in-templates\/\d+\/responses$/.test(path)) {
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: 804,
+              assignment_id: 803,
+              template_id: 801,
+              template_name: 'Статус недели',
+              version: 1,
+              due_on: operationDate,
+              values: { recovery: 4, hunger: 2 },
+              submitted_at: `${operationDate}T10:00:00Z`,
+              replayed: false,
+              client_id: 11,
+              client_name: 'Анна Петрова',
+            },
+          ],
+          total: 1,
+          limit: 50,
+        },
+      });
+    }
+    if (path.endsWith('/check-ins/templates/assigned'))
+      return route.fulfill({ json: { items: [] } });
     if (path.endsWith('/coach/operations/today')) return route.fulfill({ json: operations });
     if (path.endsWith('/coach/packages')) return route.fulfill({ json: operations.low_packages });
     if (path.endsWith('/coach/payments')) return route.fulfill({ json: operations.payment_facts });
@@ -2300,4 +2406,25 @@ test('task 525 visual package covers empty and permission-error states', async (
     path: `${task525VisualDir}/permission-error-review.png`,
     fullPage: true,
   });
+});
+
+test('Task 751 check-in templates stay usable on desktop and mobile', async ({ page }) => {
+  await mockCoachWorkspace(page, { operations: 'empty' });
+  await page.goto('/coach');
+  await page.getByRole('button', { name: 'Тренер' }).click();
+  await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+  await page.getByRole('button', { name: 'Шаблоны проверок' }).click();
+
+  await expect(page).toHaveURL('/coach?tab=tools&tool=templates');
+  await expect(page.getByTestId('coach-check-in-templates')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Статус недели', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Ответы клиентов', exact: true }).click();
+  await expect(page.getByText(/recovery: 4 · hunger: 2/)).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1440);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+  await expect(page.getByTestId('coach-check-in-templates')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect(page.getByRole('button', { name: 'Создать шаблон', exact: true })).toBeVisible();
 });
