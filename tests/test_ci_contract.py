@@ -686,8 +686,11 @@ def test_workflow_routes_scope_cancels_only_pull_request_runs() -> None:
     assert 'if [ "$EVENT_NAME" = schedule ]; then' in workflow
     assert '[ "$TARGET_REF" != refs/heads/master ]' in workflow
     assert 'elif [ "$EVENT_NAME" = workflow_dispatch ]; then' in workflow
-    assert "refs/heads/master|refs/heads/task/*" in workflow
-    assert "Manual CI is restricted to refs/heads/master and refs/heads/task/*" in workflow
+    assert "refs/heads/master|refs/heads/task/*|refs/heads/recovery/*" in workflow
+    assert (
+        "Manual CI is restricted to refs/heads/master, refs/heads/task/* and refs/heads/recovery/*"
+        in workflow
+    )
     assert "group: production" in deploy
     assert "cancel-in-progress: false" in deploy
 
