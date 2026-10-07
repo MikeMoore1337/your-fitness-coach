@@ -527,6 +527,17 @@ inaccurate.
 Do not duplicate trivial implementation details when code is the better source of truth.
 Use `technical-writer` for substantial documentation work.
 
+# Russian-first authenticated UI
+
+All user-facing labels and copy in authenticated product UI must be Russian. This includes
+headings, eyebrows, labels, buttons, hints, empty states, validation/error messages, status text,
+menu/navigation labels, placeholders and badges. New English user-facing literals are prohibited
+unless the task or canonical UI contract documents an intentional exception. Exceptions are the
+`Your Fitness Coach` brand, official external brand/service names, widely used technical or fitness
+abbreviations where a Russian form is impractical, user-entered data and non-visible technical
+identifiers. Internal identifiers, routes, API fields, analytics names and test/developer text are
+not UI copy and must not be translated merely to satisfy this rule.
+
 - Russian is the mandatory primary language for all human-readable documentation under
   `docs/`.
 - Do not create new English-language documentation under `docs/` unless the task explicitly

@@ -43,6 +43,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryDayStatus,
     FoodDiaryEntry,
 )
+from fitminiapp_api.models.grocery_list import GroceryList, GroceryListItem
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.notification import (
@@ -88,7 +89,7 @@ if TYPE_CHECKING:
     from fitminiapp_api.models.recipe import RecipeIngredient
 
 
-ACCOUNT_EXPORT_SCHEMA_VERSION = 23
+ACCOUNT_EXPORT_SCHEMA_VERSION = 24
 
 # Every ORM table whose rows can be reached from users through ownership or actor FKs must be
 # classified here. Tests compare this inventory with SQLAlchemy metadata so a new persistent user
@@ -120,6 +121,9 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "nutrition_meal_template_items": "nutrition_meal_templates",
     "nutrition_plans": "nutrition_plans",
     "nutrition_plan_items": "nutrition_plans",
+    "grocery_lists": "grocery_lists",
+    "grocery_list_items": "grocery_lists",
+    "grocery_list_item_sources": "grocery_lists",
     "food_search_aliases": "food_search_aliases",
     "food_diary_entries": "food_diary_entries",
     "food_diary_day_statuses": "food_diary_day_statuses",
@@ -529,6 +533,45 @@ def _serialize_nutrition_plan(plan: NutritionPlan) -> dict[str, object]:
     }
 
 
+def _serialize_grocery_list(grocery_list: GroceryList) -> dict[str, object]:
+    return {
+        "id": grocery_list.id,
+        "week_start": grocery_list.week_start,
+        "generated_at": grocery_list.generated_at,
+        "created_at": grocery_list.created_at,
+        "updated_at": grocery_list.updated_at,
+        "items": [
+            {
+                "id": item.id,
+                "source_kind": item.source_kind,
+                "food_id": item.food_id,
+                "aggregation_key": item.aggregation_key,
+                "name": item.name,
+                "brand": item.brand,
+                "amount": item.amount,
+                "amount_unit": item.amount_unit,
+                "checked": item.checked,
+                "owned": item.owned,
+                "position": item.position,
+                "created_at": item.created_at,
+                "updated_at": item.updated_at,
+                "sources": [
+                    {
+                        "id": source.id,
+                        "plan_item_id": source.plan_item_id,
+                        "recipe_id": source.recipe_id,
+                        "plan_date": source.plan_date,
+                        "meal_type": source.meal_type,
+                        "recipe_name": source.recipe_name,
+                    }
+                    for source in item.sources
+                ],
+            }
+            for item in grocery_list.items
+        ],
+    }
+
+
 def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
     return {
         "id": template.id,
@@ -895,6 +938,13 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .options(selectinload(NutritionPlan.items))
         .filter(NutritionPlan.user_id == user.id)
         .order_by(NutritionPlan.plan_date.asc(), NutritionPlan.id.asc())
+        .all()
+    )
+    grocery_lists = (
+        db.query(GroceryList)
+        .options(selectinload(GroceryList.items).selectinload(GroceryListItem.sources))
+        .filter(GroceryList.user_id == user.id)
+        .order_by(GroceryList.week_start.asc(), GroceryList.id.asc())
         .all()
     )
     food_search_aliases = (
@@ -1423,6 +1473,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         ],
         "nutrition_meal_templates": [_serialize_meal_template(row) for row in meal_templates],
         "nutrition_plans": [_serialize_nutrition_plan(row) for row in nutrition_plans],
+        "grocery_lists": [_serialize_grocery_list(row) for row in grocery_lists],
         "food_search_aliases": [
             _fields(
                 row,

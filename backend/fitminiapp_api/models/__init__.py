@@ -43,6 +43,7 @@ from fitminiapp_api.models.food_diary import (
     FoodDiaryDayStatus,
     FoodDiaryEntry,
 )
+from fitminiapp_api.models.grocery_list import GroceryList, GroceryListItem, GroceryListItemSource
 from fitminiapp_api.models.hydration import HydrationEntry, HydrationGoal, HydrationPreset
 from fitminiapp_api.models.lifecycle_milestone import LifecycleMilestone
 from fitminiapp_api.models.news import (
@@ -170,6 +171,9 @@ __all__ = [
     "FoodDiaryEntry",
     "FoodFavorite",
     "FoodSearchAlias",
+    "GroceryList",
+    "GroceryListItem",
+    "GroceryListItemSource",
     "HermesWebArticleSubmission",
     "HiddenProgramTemplate",
     "HydrationEntry",

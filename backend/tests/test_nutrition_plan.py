@@ -480,6 +480,7 @@ def test_nutrition_plan_migration_is_additive_and_reversible(tmp_path: Path) -> 
         migrations_dir / "0122_plan_fill_kind.py",
         migrations_dir / "0123_diary_planned_item_kind.py",
         migrations_dir / "0124_plan_item_lifecycle.py",
+        migrations_dir / "0125_grocery_lists.py",
     ]
     migrations = []
     for index, migration_path in enumerate(migration_paths):
@@ -521,6 +522,9 @@ def test_nutrition_plan_migration_is_additive_and_reversible(tmp_path: Path) -> 
             "nutrition_plans",
             "nutrition_plan_items",
             "nutrition_plan_operations",
+            "grocery_lists",
+            "grocery_list_items",
+            "grocery_list_item_sources",
         } <= set(schema.get_table_names())
         assert {
             "status",
@@ -536,5 +540,8 @@ def test_nutrition_plan_migration_is_additive_and_reversible(tmp_path: Path) -> 
             "nutrition_plans",
             "nutrition_plan_items",
             "nutrition_plan_operations",
+            "grocery_lists",
+            "grocery_list_items",
+            "grocery_list_item_sources",
         } & set(schema.get_table_names())
     engine.dispose()

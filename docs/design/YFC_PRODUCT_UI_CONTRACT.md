@@ -32,6 +32,20 @@ owner approval exploration и owner selection направления до rollou
 Bounded exception к contract записывается в task и получает explicit owner approval; молчание или
 ссылка на App Experience v3 исключением не являются.
 
+## Язык authenticated UI
+
+Authenticated product UI YFC является русскоязычным по умолчанию: весь user-facing текст должен
+быть на русском языке. Правило распространяется на headings, section eyebrows, labels, buttons,
+hints, empty states, validation/error messages, status text, menu/navigation labels, placeholders и
+user-visible badges. Новые английские literals в интерфейсе запрещены, если task или этот contract
+не фиксирует intentional documented exception.
+
+Допустимые исключения ограничены брендом `Your Fitness Coach`, официальными названиями внешних
+брендов/сервисов, общеупотребимыми техническими или фитнес-аббревиатурами, когда русская форма
+нецелесообразна, и данными, введёнными пользователем. Внутренние code identifiers, API fields,
+routes, analytics/event names, test names и developer documentation этим правилом не затрагиваются
+и не должны переводиться ради него.
+
 ## Source of truth и primitives
 
 - Текущая production implementation — source of truth для поведения, состояний и визуальных

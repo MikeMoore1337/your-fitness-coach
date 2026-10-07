@@ -44,6 +44,12 @@ from fitminiapp_api.schemas.food_diary import (
     FoodDiaryEntryUpdate,
     MealType,
 )
+from fitminiapp_api.schemas.grocery_list import (
+    GroceryListGenerateRequest,
+    GroceryListItemUpdate,
+    GroceryListManualItemCreate,
+    GroceryListResponse,
+)
 from fitminiapp_api.schemas.hydration import (
     HydrationDayResponse,
     HydrationEntryCreate,
@@ -150,6 +156,16 @@ from fitminiapp_api.services.foods import (
     list_recent_foods,
     set_food_favorite,
     update_user_food,
+)
+from fitminiapp_api.services.grocery_list import (
+    GroceryListConflictError,
+    GroceryListError,
+    GroceryListNotFoundError,
+    add_manual_item,
+    delete_grocery_item,
+    generate_grocery_list,
+    get_grocery_list,
+    update_grocery_item,
 )
 from fitminiapp_api.services.hydration import (
     HydrationConflictError,
@@ -273,6 +289,14 @@ def _raise_nutrition_plan_http_error(exc: NutritionPlanError) -> None:
                 status_code=409,
                 detail={"code": exc.code, "message": str(exc), **exc.details},
             ) from exc
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _raise_grocery_list_http_error(exc: GroceryListError) -> None:
+    if isinstance(exc, GroceryListNotFoundError):
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    if isinstance(exc, GroceryListConflictError):
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -988,6 +1012,68 @@ def nutrition_plan_day(
     db: Session = Depends(get_db),
 ):
     return get_plan_day(db, current_user, plan_date)
+
+
+@router.get("/grocery-list", response_model=GroceryListResponse)
+def nutrition_grocery_list(
+    week_start: date = Query(...),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    return get_grocery_list(db, current_user, week_start)
+
+
+@router.put("/grocery-list", response_model=GroceryListResponse)
+def generate_nutrition_grocery_list(
+    payload: GroceryListGenerateRequest,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return generate_grocery_list(db, current_user, payload.week_start)
+    except GroceryListError as exc:
+        _raise_grocery_list_http_error(exc)
+
+
+@router.post(
+    "/grocery-list/items",
+    response_model=GroceryListResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def add_nutrition_grocery_item(
+    payload: GroceryListManualItemCreate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return add_manual_item(db, current_user, payload)
+    except GroceryListError as exc:
+        _raise_grocery_list_http_error(exc)
+
+
+@router.patch("/grocery-list/items/{item_id}", response_model=GroceryListResponse)
+def patch_nutrition_grocery_item(
+    item_id: int,
+    payload: GroceryListItemUpdate,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return update_grocery_item(db, current_user, item_id, payload)
+    except GroceryListError as exc:
+        _raise_grocery_list_http_error(exc)
+
+
+@router.delete("/grocery-list/items/{item_id}", response_model=GroceryListResponse)
+def remove_nutrition_grocery_item(
+    item_id: int,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        return delete_grocery_item(db, current_user, item_id)
+    except GroceryListError as exc:
+        _raise_grocery_list_http_error(exc)
 
 
 @router.get("/plans/week", response_model=NutritionPlanWeekResponse)

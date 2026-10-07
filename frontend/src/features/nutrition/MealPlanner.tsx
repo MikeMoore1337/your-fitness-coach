@@ -725,7 +725,7 @@ export function MealPlanner({
     >
       <summary className="meal-planner__summary">
         <span>
-          <span className="eyebrow">Nutrition Planning</span>
+          <span className="eyebrow">Планирование питания</span>
           <strong>План питания</strong>
         </span>
         <span className="meal-planner__summary-note">День · неделя · шаблоны</span>
