@@ -1,3 +1,4 @@
+import re
 import tomllib
 from pathlib import Path
 
@@ -14,6 +15,9 @@ def _sources() -> dict[str, str]:
         ),
         "ci": (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8"),
         "deploy": (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8"),
+        "capacity_audit": (
+            root / ".github" / "workflows" / "production-capacity-audit.yml"
+        ).read_text(encoding="utf-8"),
         "controller": (root / "scripts" / "task_session.py").read_text(encoding="utf-8"),
         "launcher": (root / "scripts" / "run_task_delivery.py").read_text(encoding="utf-8"),
         "dependency_doc": (root / "docs" / "dependency-automation.md").read_text(encoding="utf-8"),
@@ -184,6 +188,124 @@ def test_deploy_bounds_transient_production_ssh_failures() -> None:
     assert "ConnectionAttempts=1" in deploy
     assert "Unable to read active production revision after 3 SSH attempts" in deploy
     assert 'sleep "$delay"' in deploy
+
+
+def test_capacity_audit_is_manual_owner_only_and_uses_strict_ssh() -> None:
+    workflow_text = _sources()["capacity_audit"]
+    workflow = yaml.safe_load(workflow_text)
+
+    assert re.search(r"(?m)^on:\s*$", workflow_text)
+    assert re.search(r"(?m)^\s+workflow_dispatch:\s*$", workflow_text)
+    assert not re.search(r"(?m)^\s+(push|pull_request|workflow_run|schedule):", workflow_text)
+    assert workflow["permissions"] == {"contents": "read"}
+    assert "owner-gate:" in workflow_text
+    assert "if: needs.owner-gate.result == 'success'" in workflow_text
+    assert "environment: production" in workflow_text
+    assert workflow["jobs"]["audit"]["timeout-minutes"] == 10
+    assert "uses:" not in workflow_text
+    owner_gate = workflow_text.split("  audit:", 1)[0]
+    assert "ssh" not in owner_gate.lower()
+    assert "PROD_SSH_KEY" not in owner_gate
+    assert "refs/heads/master" in owner_gate
+    assert "PROD_HOST: 77.91.90.171" in workflow_text
+    assert 'PROD_PORT: "1337"' in workflow_text
+    assert "PROD_USER: yfc-deploy" in workflow_text
+    assert "PROD_PATH: /srv/yfc/fit-mini-app" in workflow_text
+    for option in (
+        "BatchMode=yes",
+        "IdentitiesOnly=yes",
+        "StrictHostKeyChecking=yes",
+        "ConnectTimeout=10",
+        "ConnectionAttempts=1",
+        "UserKnownHostsFile=",
+        "IdentityFile=",
+    ):
+        assert option in workflow_text
+    assert "StrictHostKeyChecking=no" not in workflow_text
+    assert "ssh-keyscan" not in workflow_text
+
+
+def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path() -> None:
+    workflow_text = _sources()["capacity_audit"]
+
+    for output in (
+        "PRODUCTION_CAPACITY_PROBE=PASS",
+        "CPU_COUNT=",
+        "ARCH=",
+        "RAM_AVAILABLE_MIN=",
+        "RAM_AVAILABLE_AVG=",
+        "RAM_AVAILABLE_MAX=",
+        "DOCKER_TOTAL_MEMORY_USED_MIB=",
+        "DOCKER_MEMORY_MAX_MIB=",
+        "POSTGRES_MAX_CONNECTIONS=",
+        "POSTGRES_CURRENT_CONNECTIONS=",
+        "POSTGRES_CONNECTION_HEADROOM=",
+        "PORT_5678=",
+        "BACKEND_MODE=",
+        "WORKER_MODE=",
+        "BOT_MODE=",
+        "HISTORICAL_CAPACITY=",
+        "NO_PRODUCTION_MUTATIONS=true",
+    ):
+        assert output in workflow_text
+
+    for forbidden in (
+        "env\n",
+        "printenv",
+        "docker compose",
+        "docker pull",
+        "docker build",
+        "docker prune",
+        "docker kill",
+        "docker stop",
+        "docker rm",
+        "docker logs",
+        "hostname",
+        "ip addr",
+        "ifconfig",
+        ".NetworkSettings",
+        ".Mounts",
+        "CREATE DATABASE",
+        "CREATE ROLE",
+        "ALTER ROLE",
+        "GRANT ",
+        "REVOKE ",
+        "INSERT ",
+        "UPDATE ",
+        "DELETE ",
+        "DROP ",
+        "TRUNCATE ",
+    ):
+        assert forbidden not in workflow_text
+
+    assert '"inspect",' in workflow_text
+    assert '"--format",\n                          "{{.HostConfig.Memory}}",' in workflow_text
+    assert '"stats",' in workflow_text
+    assert '"--no-stream",' in workflow_text
+    assert "for sample_index in range(6)" in workflow_text
+    assert "time.sleep(10)" in workflow_text
+    assert "SELECT 'version_major='" in workflow_text
+    assert "SELECT 'current_connections='" in workflow_text
+    assert "POSTGRES_USER" not in workflow_text
+    assert "POSTGRES_DB" not in workflow_text
+    assert 'DEPLOYMENT_ROOT.glob("*/summary.json")' in workflow_text
+    assert ")[:5]" in workflow_text
+
+
+def test_capacity_audit_cleans_ephemeral_ssh_material_on_every_exit() -> None:
+    workflow_text = _sources()["capacity_audit"]
+
+    cleanup_start = workflow_text.index("- name: Remove ephemeral SSH material")
+    cleanup = workflow_text[cleanup_start:]
+    assert "if: always()" in cleanup
+    assert 'shred -u "$SSH_DIR/id_ed25519" "$SSH_DIR/known_hosts"' in cleanup
+    assert 'rm -rf -- "$SSH_DIR"' in cleanup
+    assert (
+        'rm -f -- "$RUNNER_TEMP/yfc-capacity-probe.sh" "$RUNNER_TEMP/yfc-capacity-ssh.err"'
+        in cleanup
+    )
+    assert 'printf \'%s\\n\' "$PROD_SSH_KEY" > "$ssh_dir/id_ed25519"' in workflow_text
+    assert 'printf \'%s\\n\' "$PROD_SSH_KNOWN_HOSTS" > "$ssh_dir/known_hosts"' in workflow_text
 
 
 def test_delivery_contract_is_master_only_and_github_gate_driven() -> None:
