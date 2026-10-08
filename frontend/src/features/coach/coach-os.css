@@ -2059,6 +2059,7 @@
 
 .coach-workflow-templates__forms {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  container-type: inline-size;
 }
 
 .coach-workflow-templates__forms > :last-child,
@@ -2070,6 +2071,7 @@
 .coach-workflow-templates__steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-column: 1 / -1;
   gap: var(--v2-space-2);
   min-width: 0;
   margin: 0;
@@ -2086,11 +2088,48 @@
 }
 
 .coach-workflow-templates__step {
+  display: flex;
+  min-height: 44px;
   min-width: 0;
+  align-items: center;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-2);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-compact-radius);
+  background: var(--v2-surface);
+  cursor: pointer;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.coach-workflow-templates__step.is-selected {
+  border-color: var(--v2-lime);
+  background: var(--coach-soft);
+  box-shadow: inset 0 0 0 1px var(--v2-lime);
+}
+
+.coach-workflow-templates__step.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.coach-workflow-templates__step:focus-within {
+  outline: 2px solid var(--v2-lime);
+  outline-offset: 2px;
 }
 
 .coach-workflow-templates__step input {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
   margin: 0;
+  accent-color: var(--v2-lime);
+}
+
+.coach-workflow-templates__step span {
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .coach-workflow-templates__references,
@@ -2164,6 +2203,18 @@
   scroll-margin-top: var(--v2-space-5);
 }
 
+@container (max-width: 720px) {
+  .coach-workflow-templates__steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 480px) {
+  .coach-workflow-templates__steps {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 640px) {
   .coach-workflow-templates__forms,
   .coach-workflow-templates__references,
@@ -2172,47 +2223,8 @@
   }
 
   .coach-workflow-templates__steps {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    grid-template-columns: 1fr;
     gap: var(--v2-space-3);
-  }
-
-  .coach-workflow-templates__step {
-    display: flex;
-    min-height: 44px;
-    min-width: 0;
-    align-items: center;
-    gap: var(--v2-space-2);
-    padding: var(--v2-space-2);
-    border: 1px solid var(--coach-line);
-    border-radius: var(--v2-compact-radius);
-    background: var(--v2-surface);
-    cursor: pointer;
-    overflow-wrap: normal;
-    word-break: normal;
-  }
-
-  .coach-workflow-templates__step.is-selected {
-    border-color: var(--v2-lime);
-    background: var(--coach-soft);
-    box-shadow: inset 0 0 0 1px var(--v2-lime);
-  }
-
-  .coach-workflow-templates__step:focus-within {
-    outline: 2px solid var(--v2-lime);
-    outline-offset: 2px;
-  }
-
-  .coach-workflow-templates__step input {
-    flex: 0 0 auto;
-    width: 20px;
-    height: 20px;
-    accent-color: var(--v2-lime);
-  }
-
-  .coach-workflow-templates__step span {
-    min-width: 0;
-    overflow-wrap: normal;
-    word-break: normal;
   }
 }
 

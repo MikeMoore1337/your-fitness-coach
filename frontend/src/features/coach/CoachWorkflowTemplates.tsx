@@ -65,7 +65,7 @@ function StepPicker({
         <label
           className={`coach-workflow-templates__step${
             steps.includes(choice.key) ? ' is-selected' : ''
-          }`}
+          }${disabled ? ' is-disabled' : ''}`}
           htmlFor={`${idPrefix}-${choice.key}`}
           key={choice.key}
         >
