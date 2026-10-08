@@ -31,10 +31,6 @@ const representativePages = [
     heading: /дневник тренировок: от программы до прогресса/i,
   },
   {
-    path: '/for-trainers',
-    heading: /рабочий кабинет тренера, который держит день в фокусе/i,
-  },
-  {
     path: '/exercises',
     heading: /техника упражнений из общего каталога/i,
   },
@@ -462,7 +458,7 @@ test('related materials use one editorial measure and compact inline CTAs', asyn
     { width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const route of ['/for-trainers', '/training', '/articles/strength-basics']) {
+    for (const route of ['/training', '/articles/strength-basics']) {
       await page.goto(route);
       await expect(page.locator('.public-related-card').first()).toBeVisible();
       const metrics = await page.evaluate(() => {

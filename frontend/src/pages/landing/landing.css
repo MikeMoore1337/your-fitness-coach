@@ -590,6 +590,16 @@
     grid-area: actions;
     justify-self: end;
   }
+
+  .landing-v10-page.public-shell .public-shell__header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'brand actions';
+    row-gap: 0;
+  }
+
+  .landing-v10-page.public-shell .public-shell__header-actions {
+    grid-area: actions;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .landing-chapter[data-motion-phase='enter'] {

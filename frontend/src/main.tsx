@@ -80,14 +80,19 @@ function isPublicContentRoute(path: string): boolean {
 }
 
 function isPublicLandingRoute(path: string): boolean {
-  return path === '/' || path === LANDING_AUDIENCE_ROUTES.athleteAlias;
+  return (
+    path === LANDING_AUDIENCE_ROUTES.athlete ||
+    path === LANDING_AUDIENCE_ROUTES.athleteAlias ||
+    path === LANDING_AUDIENCE_ROUTES.coach
+  );
 }
 
 const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
-const LandingPage = lazy(() => import('./pages/landing/LandingPage'));
+const LandingV10AthletePage = lazy(() => import('./pages/landing/LandingV10AthletePage'));
+const LandingV10CoachPage = lazy(() => import('./pages/landing/LandingV10CoachPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
 const PublicContentPage = lazy(() => import('./pages/public/PublicContentPage'));
 const PublicSharePage = lazy(() => import('./pages/public/PublicSharePage'));
@@ -159,16 +164,24 @@ function AppRoutes() {
   const { path } = useNavigation();
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
-    if (
-      !isPublicLandingRoute(path) &&
-      !isPublicContentRoute(path) &&
-      !isArticleRoute(path) &&
-      !isPublicShareRoute(path)
-    ) {
+    if (isPublicLandingRoute(path)) {
+      void import('./content/publicContent').then(({ getPublicContentPage }) => {
+        if (window.location.pathname !== path) return;
+        void import('./shared/seo/metadata').then(({ applyRouteMetadata }) => {
+          const metadataPage = path === LANDING_AUDIENCE_ROUTES.athleteAlias ? '/' : path;
+          applyRouteMetadata(path, getPublicContentPage(metadataPage));
+        });
+      });
+      return;
+    }
+    if (!isPublicContentRoute(path) && !isArticleRoute(path) && !isPublicShareRoute(path)) {
       applyPrivateRouteMetadata(path);
     }
   }, [path]);
-  if (isPublicLandingRoute(path)) return <LandingPage />;
+  if (isPublicLandingRoute(path)) {
+    if (path === LANDING_AUDIENCE_ROUTES.coach) return <LandingV10CoachPage />;
+    return <LandingV10AthletePage />;
+  }
   if (isArticleRoute(path)) return <ArticlesPage />;
   if (isPublicShareRoute(path))
     return (

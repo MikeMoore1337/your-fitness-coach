@@ -84,10 +84,17 @@ describe('LandingV10CoachPage', () => {
     for (const link of trainerDemoLinks) {
       expect(link).toHaveAttribute('href', '/demo?cabinet=1&scenario=trainer&section=trainer');
     }
-    expect(screen.getByRole('link', { name: /Как работает Коуч ОС/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Как работает Coach OS/ })).toHaveAttribute(
       'href',
       '#coach-work',
     );
+    expect(screen.getAllByText('Браузер и мини-приложение Telegram')).toHaveLength(2);
+    expect(screen.getByRole('link', { name: 'Демо' })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=trainer&section=trainer',
+    );
+    expect(screen.getByRole('link', { name: 'Вопросы' })).toHaveAttribute('href', '#faq');
+    expect(screen.getByRole('heading', { name: 'Перед тем как начать.' })).toBeInTheDocument();
   });
 
   it('does not call a product API while rendering the staged composition', () => {

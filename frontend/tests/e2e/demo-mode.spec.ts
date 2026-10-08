@@ -1161,7 +1161,7 @@ test('demo uses production today composition and persists one workout set throug
   await page.goto('/');
   await page
     .locator('.landing-hero__actions')
-    .getByRole('link', { name: 'Попробовать демо', exact: true })
+    .getByRole('link', { name: 'Попробовать демо тренировки', exact: true })
     .click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
@@ -1282,7 +1282,7 @@ test('the public trainer entry opens the existing isolated trainer cabinet', asy
     await page.emulateMedia({ colorScheme: state.theme, reducedMotion: 'reduce' });
     await page.goto('/for-trainers');
 
-    const entry = page.getByRole('link', { name: /Демо кабинета тренера/ });
+    const entry = page.getByRole('link', { name: 'Попробовать демо для тренера' }).first();
     await expect(entry).toHaveAttribute('href', '/demo?cabinet=1&scenario=trainer&section=trainer');
     await entry.click();
     await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
@@ -1292,7 +1292,7 @@ test('the public trainer entry opens the existing isolated trainer cabinet', asy
 
     await page.goBack();
     await expect(page).toHaveURL('/for-trainers');
-    await expect(page.getByRole('heading', { name: /Рабочий кабинет тренера/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'ВАШ МЕТОД В ДЕЙСТВИИ.' })).toBeVisible();
     await page.goForward();
     await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
     await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();

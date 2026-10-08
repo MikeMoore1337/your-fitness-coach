@@ -75,6 +75,6 @@ describe('Landing v10 audience foundation', () => {
       'data-landing-audience',
       'athlete',
     );
-    expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/app');
+    expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login');
   });
 });

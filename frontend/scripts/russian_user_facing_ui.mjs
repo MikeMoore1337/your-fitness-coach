@@ -34,7 +34,10 @@ const allowedLatinWords = new Map([
   ['Telegram', 'official external platform name'],
 ]);
 
-const allowedLatinPhrases = new Map([['Your Fitness Coach', 'official product brand']]);
+const allowedLatinPhrases = new Map([
+  ['Your Fitness Coach', 'official product brand'],
+  ['Coach OS', 'official product name'],
+]);
 
 const userFacingAttributes = new Set([
   'alt',

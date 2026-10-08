@@ -35,10 +35,26 @@ describe('LandingV10AthletePage', () => {
       screen.getByRole('heading', { name: /Смотрите на движение недели/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('heading', { name: 'Вы тренер? Знакомьтесь с Коуч ОС.' }),
+      screen.getAllByRole('heading', { name: 'Вы тренер? Знакомьтесь с Coach OS.' }),
     ).toHaveLength(1);
     expect(container.querySelectorAll('.landing-v10-coach-promo')).toHaveLength(1);
     expect(screen.queryByText(/Coach Today|Не потерять важное/)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Попробовать демо тренировки' })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=self_training&section=today',
+    );
+    expect(screen.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveAttribute(
+      'href',
+      '#training',
+    );
+    expect(screen.getAllByText('Браузер и мини-приложение Telegram')).toHaveLength(2);
+    expect(screen.getByRole('navigation', { name: 'Навигация по странице' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Демо' })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=self_training&section=today',
+    );
+    expect(screen.getByRole('link', { name: 'Вопросы' })).toHaveAttribute('href', '#faq');
+    expect(screen.getByRole('heading', { name: 'Перед тем как начать.' })).toBeInTheDocument();
   });
 
   it('switches the synthetic nutrition preview without implying consumed equals planned', () => {
