@@ -60,7 +60,9 @@ test('Product v10 public routes preserve responsive controls and keyboard access
     await page.setViewportSize({ width: state.width, height: 844 });
     await page.goto(state.path);
     await expect(page.locator(`[data-landing-audience="${state.audience}"]`)).toBeVisible();
-    await expect(page.locator('.landing-v10-audience-switch')).toBeVisible();
+    await expect(
+      page.locator('.landing-v10-hero-audience .landing-v10-audience-switch'),
+    ).toBeVisible();
     await expect(page.locator('.landing-button--compact')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(state.width);
 

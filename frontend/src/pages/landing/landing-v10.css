@@ -3,6 +3,11 @@
   --landing-header-muted: rgb(255 255 255 / 78%);
 }
 
+.landing-v10-page .landing-hero .landing-button--secondary {
+  -webkit-backdrop-filter: blur(3px) saturate(112%) brightness(103%);
+  backdrop-filter: blur(3px) saturate(112%) brightness(103%);
+}
+
 .landing-v10-page [id] {
   scroll-margin-top: 88px;
 }

@@ -5,6 +5,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from 'react';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { demoCabinetUrlForHostname, loginUrlForHostname } from '../../shared/navigation/appUrl';
 import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { Icon } from '../../shared/ui/Icon';
@@ -23,6 +24,16 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    trackProductEvent(
+      {
+        name: audience === 'coach' ? 'trainer_landing_viewed' : 'landing_viewed',
+        surface: productEventSurface(),
+      },
+      { dedupe: 'session' },
+    );
+  }, [audience]);
 
   useEffect(() => {
     const rawHash = window.location.hash.slice(1);
@@ -139,6 +150,12 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
           <a
             className="landing-button landing-button--compact"
             href={loginUrlForHostname(window.location.hostname)}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_login_selected',
+                surface: productEventSurface(),
+              })
+            }
           >
             Войти
           </a>

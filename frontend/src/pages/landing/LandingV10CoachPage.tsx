@@ -144,6 +144,14 @@ function CoachHero() {
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
             href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'hero',
+                scenario: 'trainer',
+              })
+            }
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>
@@ -611,6 +619,14 @@ export default function LandingV10CoachPage() {
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
             href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'section',
+                scenario: 'trainer',
+              })
+            }
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>

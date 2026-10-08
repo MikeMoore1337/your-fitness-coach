@@ -88,7 +88,7 @@ test.describe('motion demonstration', () => {
     await expect(scene).toHaveAttribute('data-phase', '0');
     await page.reload();
     await expect(scene).toHaveAttribute('data-phase', '0');
-    await page.locator('footer').scrollIntoViewIfNeeded();
+    await page.locator('.landing-v10-faq').scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute('data-phase', '2');
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute('data-phase', '2');

@@ -310,25 +310,27 @@ test('Telegram knowledge launch keeps the handoff when the SDK is unavailable', 
   await expect(page.getByRole('heading', { name: /База знаний/i })).not.toBeAttached();
 });
 
-test('Client navigation preserves metadata owned by a lazy public route', async ({ page }) => {
+test('Client navigation preserves metadata owned by a lazy public landing route', async ({
+  page,
+}) => {
   await page.route('**/api/v1/public/articles*', (request) => request.fulfill({ json: [] }));
   await page.goto('/');
 
   await page
-    .locator('.landing-footer')
-    .getByRole('link', { name: 'Тренировки', exact: true })
+    .locator('.landing-v10-header-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
     .click();
 
-  await expect(page).toHaveURL(/\/training$/);
+  await expect(page).toHaveURL(/\/for-trainers$/);
   await expect(
     page.getByRole('heading', {
       level: 1,
-      name: /дневник тренировок: от программы до прогресса/i,
+      name: 'ВАШ МЕТОД В ДЕЙСТВИИ.',
     }),
   ).toBeVisible();
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
     'href',
-    new URL('/training', page.url()).href,
+    new URL('/for-trainers', page.url()).href,
   );
 });

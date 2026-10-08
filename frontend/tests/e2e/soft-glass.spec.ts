@@ -43,7 +43,7 @@ for (const theme of ['light', 'dark'] as const) {
       expect(heroBox).not.toBeNull();
       expect(headerBox!.y).toBe(heroBox!.y);
       const heroAction = page.locator('.landing-hero .landing-button--secondary');
-      await expect(heroAction).toHaveCSS('background-color', 'rgba(20, 25, 25, 0.64)');
+      await expect(heroAction).toHaveCSS('background-color', 'rgb(32, 37, 37)');
       await expect(heroAction).toHaveCSS(
         'backdrop-filter',
         'blur(3px) saturate(1.12) brightness(1.03)',

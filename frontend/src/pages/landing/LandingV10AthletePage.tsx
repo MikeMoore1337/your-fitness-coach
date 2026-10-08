@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
@@ -154,12 +155,29 @@ function AthleteHero() {
         </h1>
         <p className="landing-hero__lead">Тренировки, питание и прогресс — в одном месте.</p>
         <div className="landing-hero__actions">
-          <a className="landing-button" href={appUrl}>
+          <a
+            className="landing-button"
+            href={appUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_app_selected',
+                surface: productEventSurface(),
+              })
+            }
+          >
             Начать со своими данными <Icon name="arrow-right" size={20} />
           </a>
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
             href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'hero',
+                scenario: 'self_training',
+              })
+            }
           >
             Попробовать демо тренировки <Icon name="arrow-right" size={20} />
           </a>

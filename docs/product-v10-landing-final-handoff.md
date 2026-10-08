@@ -791,3 +791,28 @@ PRODUCT_V10_PRODUCTION_RELEASE=AUTHORIZED
 CONTROLLER=ABSENT
 CONTROLLER_V2=ABSENT
 ```
+
+## 27. C7 exact-head smoke compatibility correction (#858)
+
+Required exact-head CI exposed five stale smoke assertions that still targeted the retired
+pre-V10 landing DOM: a single audience switch, the old landing title/contact/footer selectors and
+the former secondary CTA material. The assertions now target the approved V10 controls and routes,
+while keeping the same keyboard, metadata, overflow, asset, motion and privacy-event coverage.
+
+The shared V10 shell now preserves the existing `landing_viewed`/`trainer_landing_viewed` and login
+events, and approved athlete/trainer demo CTAs emit the existing privacy-safe demo event enum.
+Hero demo buttons use the existing compact Liquid Glass blur contract. No new analytics schema,
+router, backend, DemoCabinet or controller machinery was introduced.
+
+| Evidence | Result |
+|---|---|
+| Full frontend Vitest | 142 files, 784 tests passed |
+| Targeted smoke correction | 10/10 passed |
+| Full local Chromium E2E | 434 passed; 2 environment failures (`ERR_ADDRESS_IN_USE` / `ERR_NO_BUFFER_SPACE`), 6 existing skips |
+| TypeScript / ESLint / Russian UI guard | passed |
+| Changed-file Prettier / `git diff --check` | passed; handoff whole-file baseline warning retained |
+| Vite production build | passed (560 modules) |
+
+The two local E2E failures were infrastructure resource errors before page load and are not
+application assertions; required CI remains the merge gate. This correction is on the same PR and
+does not authorize a second visual redesign or a production cutover before exact-head CI passes.
