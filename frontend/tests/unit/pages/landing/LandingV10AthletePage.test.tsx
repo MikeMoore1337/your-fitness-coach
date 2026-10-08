@@ -63,6 +63,16 @@ describe('LandingV10AthletePage', () => {
     );
   });
 
+  it('preserves campaign and in-page context when the teaser switches audience', () => {
+    window.history.replaceState({}, '', '/for-athletes?utm_campaign=v10#coach-work');
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Возможности для тренера' })).toHaveAttribute(
+      'href',
+      '/for-trainers?utm_campaign=v10#coach-work',
+    );
+  });
+
   it('does not call a product API while rendering the staged composition', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     renderPage();

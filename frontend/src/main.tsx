@@ -25,6 +25,7 @@ import {
 import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
+import { LANDING_AUDIENCE_ROUTES } from './pages/landing/landingAudience';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
@@ -75,6 +76,10 @@ function isPublicContentRoute(path: string): boolean {
   return (
     publicContentRoots.has(path) || path.startsWith('/knowledge/') || path.startsWith('/exercises/')
   );
+}
+
+function isPublicLandingRoute(path: string): boolean {
+  return path === '/' || path === LANDING_AUDIENCE_ROUTES.athleteAlias;
 }
 
 const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
@@ -146,7 +151,7 @@ function AppRoutes() {
   const legacyKnowledgePath = publicKnowledgePathFromLegacyRoute(path);
   useEffect(() => {
     if (
-      path !== '/' &&
+      !isPublicLandingRoute(path) &&
       !isPublicContentRoute(path) &&
       !isArticleRoute(path) &&
       !isPublicShareRoute(path)
@@ -154,7 +159,7 @@ function AppRoutes() {
       applyPrivateRouteMetadata(path);
     }
   }, [path]);
-  if (path === '/') return <LandingPage />;
+  if (isPublicLandingRoute(path)) return <LandingPage />;
   if (isArticleRoute(path)) return <ArticlesPage />;
   if (isPublicShareRoute(path))
     return (
@@ -243,7 +248,10 @@ function AppRoutes() {
 function AnalyticsRuntime() {
   const { path } = useNavigation();
   const publicRoute =
-    path === '/' || isPublicContentRoute(path) || isArticleRoute(path) || isPublicShareRoute(path);
+    isPublicLandingRoute(path) ||
+    isPublicContentRoute(path) ||
+    isArticleRoute(path) ||
+    isPublicShareRoute(path);
 
   useLayoutEffect(() => {
     setYandexPrivateContentMask(!publicRoute);

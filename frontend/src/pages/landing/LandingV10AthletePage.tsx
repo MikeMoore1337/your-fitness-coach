@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { appUrlForHostname, demoUrlForHostname } from '../../shared/navigation/appUrl';
+import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
 import { LandingPractice } from './LandingPractice';
 import { LandingProgress } from './LandingProgress';
 import { LandingV10Shell } from './LandingV10Shell';
 import { StrengthScene } from './StrengthScene';
+import { landingAudienceHref } from './landingAudience';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
 
@@ -124,8 +125,9 @@ function WeeklyReview() {
 
 function AthleteHero() {
   const [heroUnavailable, setHeroUnavailable] = useState(false);
-  const appUrl = appUrlForHostname(window.location.hostname);
-  const demoUrl = demoUrlForHostname(window.location.hostname);
+  const hostname = window.location.hostname;
+  const appUrl = appUrlForHostname(hostname);
+  const demoUrl = demoCabinetUrlForHostname(hostname, 'self_training', 'today');
 
   return (
     <section className="landing-hero" aria-labelledby="landing-v10-athlete-title">
@@ -169,7 +171,7 @@ function AthleteHero() {
 
 export default function LandingV10AthletePage() {
   useLandingHeroMotion();
-  const demoUrl = demoUrlForHostname(window.location.hostname);
+  const demoUrl = demoCabinetUrlForHostname(window.location.hostname, 'self_training', 'progress');
 
   return (
     <LandingV10Shell audience="athlete">
@@ -253,7 +255,7 @@ export default function LandingV10AthletePage() {
           </p>
         </div>
         <div className="landing-v10-progress__grid">
-          <LandingProgress href={`${demoUrl}?cabinet=1&scenario=self_training&section=progress`} />
+          <LandingProgress href={demoUrl} />
           <WeeklyReview />
         </div>
       </LandingChapter>
@@ -272,7 +274,7 @@ export default function LandingV10AthletePage() {
             следующий шаг в одном рабочем цикле.
           </p>
         </div>
-        <a className="landing-button" href="/for-trainers">
+        <a className="landing-button" href={landingAudienceHref('coach')}>
           Возможности для тренера <Icon name="arrow-right" size={20} />
         </a>
       </LandingChapter>

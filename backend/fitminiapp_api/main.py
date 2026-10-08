@@ -24,6 +24,7 @@ from fitminiapp_api.middleware.request_body_limit import RequestBodyLimitMiddlew
 from fitminiapp_api.middleware.request_context import RequestContextMiddleware
 from fitminiapp_api.models.news import WebArticle
 from fitminiapp_api.seo import (
+    ATHLETE_LANDING_ALIAS_PATH,
     NOINDEX_ROBOTS,
     SeoMetadata,
     public_origin,
@@ -337,6 +338,11 @@ def demo_page() -> HTMLResponse:
 @app.get("/")
 def landing_page() -> HTMLResponse:
     return _frontend_index("/")
+
+
+@app.get(ATHLETE_LANDING_ALIAS_PATH)
+def athlete_landing_alias_page() -> HTMLResponse:
+    return _frontend_index(ATHLETE_LANDING_ALIAS_PATH)
 
 
 @app.get("/articles")

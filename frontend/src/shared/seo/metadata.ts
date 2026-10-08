@@ -2,12 +2,14 @@ import type { PublicContentPage } from '../../content/publicContent';
 
 export const INDEX_ROBOTS = 'index, follow';
 export const NOINDEX_ROBOTS = 'noindex, nofollow';
+export const NOINDEX_FOLLOW_ROBOTS = 'noindex, follow';
 export const SOCIAL_IMAGE_PATH = '/assets/brand/yfc-social-preview.png';
 export const SOCIAL_IMAGE_ALT =
   'Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram';
 export const ARTICLE_INDEX_TITLE = 'Статьи о тренировках, питании и прогрессе — Your Fitness Coach';
 export const ARTICLE_INDEX_DESCRIPTION =
   'Понятные статьи о тренировках, питании, спортивном питании и прогрессе: источники, ограничения и практический смысл без громких обещаний.';
+export const ATHLETE_LANDING_ALIAS_PATH = '/for-athletes';
 
 export interface PublicArticleSeoData {
   slug: string;
@@ -135,7 +137,12 @@ function replaceStructuredData(page: PublicContentPage | undefined): void {
 export function applyRouteMetadata(path: string, page?: PublicContentPage): void {
   const title = page?.title ?? 'Your Fitness Coach';
   const description = page?.description ?? 'Личный интерфейс Your Fitness Coach.';
-  const robots = page ? INDEX_ROBOTS : NOINDEX_ROBOTS;
+  const isAthleteLandingAlias = path === ATHLETE_LANDING_ALIAS_PATH;
+  const robots = isAthleteLandingAlias
+    ? NOINDEX_FOLLOW_ROBOTS
+    : page
+      ? INDEX_ROBOTS
+      : NOINDEX_ROBOTS;
 
   document.title = title;
   upsertMeta('meta[name="description"]', 'name', 'description', description);
@@ -149,7 +156,7 @@ export function applyRouteMetadata(path: string, page?: PublicContentPage): void
       canonical.rel = 'canonical';
       document.head.append(canonical);
     }
-    canonical.href = absoluteUrl(page.path);
+    canonical.href = absoluteUrl(isAthleteLandingAlias ? '/' : page.path);
     upsertMeta('meta[property="og:title"]', 'property', 'og:title', title);
     upsertMeta('meta[property="og:description"]', 'property', 'og:description', page.ogDescription);
     upsertMeta(
@@ -185,7 +192,7 @@ export function applyRouteMetadata(path: string, page?: PublicContentPage): void
     canonical?.remove();
     removeSocialMetadata();
   }
-  replaceStructuredData(page);
+  replaceStructuredData(isAthleteLandingAlias ? undefined : page);
 }
 
 export function applyArticleRouteMetadata(path: string, article?: PublicArticleSeoData): void {
