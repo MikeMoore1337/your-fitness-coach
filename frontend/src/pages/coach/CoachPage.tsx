@@ -16,6 +16,7 @@ import { CoachToolsHub, type CoachTool } from '../../features/coach/CoachToolsHu
 import { CoachCheckInReviews } from '../../features/coach/CoachCheckInReviews';
 import { CoachReviewWorkspace } from '../../features/coach/CoachReviewWorkspace';
 import { CoachCheckInTemplates } from '../../features/coach/CoachCheckInTemplates';
+import { CoachWorkflowTemplates } from '../../features/coach/CoachWorkflowTemplates';
 import { CoachRosterAnalytics } from '../../features/coach/CoachRosterAnalytics';
 import { CoachClientTimeline } from '../../features/coach/CoachClientTimeline';
 import { CoachReportHandoffEntry } from '../../features/coach/CoachReportHandoffEntry';
@@ -440,6 +441,7 @@ function operationalStatusLabel(status: Client['operational_status']): string {
 const coachToolValues: readonly CoachTool[] = [
   'reviews',
   'templates',
+  'workflows',
   'analytics',
   'schedule',
   'tasks',
@@ -447,6 +449,7 @@ const coachToolValues: readonly CoachTool[] = [
   'invitations',
   'catalog',
 ];
+const workflowsTool: CoachTool = 'workflows';
 
 function coachToolFromSearch(value: string | null): CoachTool | null {
   return value && coachToolValues.includes(value as CoachTool) ? (value as CoachTool) : null;
@@ -1795,6 +1798,11 @@ export default function CoachPage({
               <CoachCheckInReviews timezone={user.profile?.timezone} />
             ) : activeTool === 'templates' ? (
               <CoachCheckInTemplates
+                canManage={capabilities.canManageCoach}
+                clients={activeClients}
+              />
+            ) : activeTool === workflowsTool ? (
+              <CoachWorkflowTemplates
                 canManage={capabilities.canManageCoach}
                 clients={activeClients}
               />

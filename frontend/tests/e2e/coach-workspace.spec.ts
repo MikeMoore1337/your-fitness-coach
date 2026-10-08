@@ -276,6 +276,7 @@ async function mockCoachWorkspace(
     operations?: 'empty' | 'seeded';
     review?: 'empty' | 'pending';
     rollout?: boolean;
+    workflow?: boolean;
   } = {},
 ) {
   const feedbackComments: Array<{
@@ -1017,6 +1018,53 @@ async function mockCoachWorkspace(
         },
       });
     }
+    if (path.endsWith('/coach/workflow-templates/onboarding') && options.workflow)
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: 901,
+              name: 'Первые шаги клиента',
+              description: 'Повторяемый порядок подключения',
+              is_active: true,
+              current_version: {
+                id: 902,
+                version: 1,
+                steps: ['invite', 'goals', 'equipment', 'restrictions'],
+                program_template_id: null,
+                check_in_template_id: null,
+                created_at: '2026-08-01T10:00:00Z',
+              },
+              assignments: [],
+              created_at: '2026-08-01T10:00:00Z',
+              updated_at: '2026-08-01T10:00:00Z',
+            },
+          ],
+        },
+      });
+    if (path.endsWith('/coach/workflow-templates/communication') && options.workflow)
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: 903,
+              name: 'После первой встречи',
+              description: 'Сообщение для ручного подтверждения',
+              is_active: true,
+              current_version: {
+                id: 904,
+                version: 1,
+                subject: 'Первые шаги',
+                body: 'Проверьте план и напишите тренеру.',
+                created_at: '2026-08-01T10:00:00Z',
+              },
+              drafts: [],
+              created_at: '2026-08-01T10:00:00Z',
+              updated_at: '2026-08-01T10:00:00Z',
+            },
+          ],
+        },
+      });
     if (/\/coach\/check-in-templates\/\d+\/responses$/.test(path)) {
       return route.fulfill({
         json: {
@@ -1087,7 +1135,7 @@ async function mockCoachWorkspace(
           },
         ],
       });
-    if (path.endsWith('/programs/templates/mine') && options.rollout)
+    if (path.endsWith('/programs/templates/mine') && (options.rollout || options.workflow))
       return route.fulfill({
         json: [
           {
@@ -1684,6 +1732,172 @@ test('Task 755 keeps client groups organizational and explains meaningful change
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await expect.poll(actionSpacing, { timeout: 5000 }).toBeGreaterThanOrEqual(12);
+});
+
+test('Product V10 B7 keeps onboarding and communication workflows Russian and mobile-safe', async ({
+  browser,
+  page,
+}) => {
+  const assertStageLayout = async (targetPage: Page, workflow: Locator, columns: number) => {
+    const stageCards = workflow.locator('.coach-workflow-templates__step');
+    await expect(stageCards).toHaveCount(9);
+    const stageBoxes = await stageCards.evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { height: box.height, width: box.width, x: box.x, y: box.y };
+      }),
+    );
+    const viewportWidth = targetPage.viewportSize()?.width ?? 390;
+    const firstStage = stageBoxes[0];
+    const firstRow = stageBoxes.slice(0, columns);
+    if (!firstStage || firstRow.length !== columns) {
+      throw new Error('Этапы подключения не найдены');
+    }
+    expect(
+      stageBoxes.every((box) => box.width > 0 && (viewportWidth > 640 || box.height >= 44)),
+    ).toBe(true);
+    expect(
+      Math.max(...firstRow.map((box) => box.y)) - Math.min(...firstRow.map((box) => box.y)),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      firstRow.every((box, index) => index === 0 || box.x > (firstRow[index - 1]?.x ?? box.x)),
+    ).toBe(true);
+    if (columns === 1) {
+      expect(Math.abs(firstStage.x - (stageBoxes[1]?.x ?? firstStage.x))).toBeLessThanOrEqual(1);
+    }
+    if (stageBoxes[columns]) {
+      expect(stageBoxes[columns]?.y).toBeGreaterThan(firstStage.y);
+    }
+    const firstRowColumns = stageBoxes.findIndex(
+      (box, index) => index > 0 && box.y > firstStage.y + 1,
+    );
+    expect(firstRowColumns === -1 ? stageBoxes.length : firstRowColumns).toBe(columns);
+    expect(
+      await targetPage.evaluate(() => document.documentElement.scrollWidth),
+    ).toBeLessThanOrEqual(targetPage.viewportSize()?.width ?? 390);
+  };
+
+  const openWorkflow = async (targetPage: Page, telegram = false) => {
+    await targetPage.goto(telegram ? '/coach?tgWebAppPlatform=android' : '/coach');
+    if (!telegram) await targetPage.getByRole('button', { name: 'Тренер' }).click();
+    await expect(targetPage.getByRole('button', { name: 'Пригласить клиента' })).toBeVisible();
+    await trainerPrimaryNavigation(targetPage)
+      .getByRole('link', { name: 'Ещё', exact: true })
+      .click();
+    const hub = targetPage.getByTestId('coach-tools-hub');
+    await hub.getByRole('button', { name: /Подключение и сообщения/ }).click();
+    const workflow = targetPage.getByTestId('coach-workflow-templates');
+    await expect(
+      workflow.getByRole('heading', { name: 'Подключение клиентов и сообщения', exact: true }),
+    ).toBeVisible();
+    await expect(workflow.getByText('Первые шаги клиента', { exact: true })).toBeVisible();
+    await expect(workflow.getByText('После первой встречи', { exact: true })).toBeVisible();
+    expect(await workflow.textContent()).not.toMatch(
+      /follow-up|review|rollout|nutrition planning/i,
+    );
+    if ((targetPage.viewportSize()?.width ?? 0) <= 390) {
+      expect(
+        await targetPage.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(390);
+    }
+    return workflow;
+  };
+
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await mockCoachWorkspace(page, { workflow: true });
+  const desktopWorkflow = await openWorkflow(page);
+  await page.screenshot({
+    path: '../.artifacts/tasks/756/deliverables/visual/desktop-light.png',
+    fullPage: true,
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(desktopWorkflow).toBeVisible();
+  const questionnaire = desktopWorkflow.getByRole('checkbox', { name: 'Анкета' });
+  await expect(questionnaire).not.toBeChecked();
+  await desktopWorkflow.getByText('Анкета', { exact: true }).click();
+  await expect(questionnaire).toBeChecked();
+  await questionnaire.click();
+  await expect(questionnaire).not.toBeChecked();
+  await questionnaire.focus();
+  await page.keyboard.press('Space');
+  await expect(questionnaire).toBeChecked();
+  await assertStageLayout(page, desktopWorkflow, 1);
+  const createPlan = desktopWorkflow.getByRole('button', { name: 'Создать план подключения' });
+  await createPlan.scrollIntoViewIfNeeded();
+  await expect(createPlan).toBeVisible();
+  await assertAboveMobileDock(page, createPlan);
+  await desktopWorkflow.locator('.coach-workflow-templates__steps').evaluate((element) => {
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.scrollBehavior = 'auto';
+    window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY);
+  });
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await desktopWorkflow.locator('.coach-workflow-templates__steps').boundingBox())?.y ??
+          Number.POSITIVE_INFINITY,
+      ),
+    )
+    .toBeLessThanOrEqual(1);
+  await page.screenshot({
+    path: '../.artifacts/tasks/756/deliverables/visual/mobile-web-light.png',
+  });
+
+  for (const [width, columns] of [
+    [320, 1],
+    [360, 1],
+    [375, 1],
+    [390, 1],
+    [430, 1],
+    [768, 3],
+  ] as const) {
+    await page.setViewportSize({ width, height: 844 });
+    await assertStageLayout(page, desktopWorkflow, columns);
+  }
+
+  const tmaContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    hasTouch: true,
+    isMobile: true,
+    reducedMotion: 'reduce',
+  });
+  const tmaPage = await tmaContext.newPage();
+  await installTelegramHarness(tmaPage, {
+    colorScheme: 'dark',
+    safeAreaInset: { top: 16, right: 0, bottom: 20, left: 0 },
+  });
+  await mockCoachWorkspace(tmaPage, { workflow: true });
+  const tmaWorkflow = await openWorkflow(tmaPage, true);
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  const tmaAgenda = tmaWorkflow.getByRole('checkbox', { name: 'Внутренняя повестка' });
+  await expect(tmaAgenda).not.toBeChecked();
+  await tmaWorkflow.getByText('Внутренняя повестка', { exact: true }).click();
+  await expect(tmaAgenda).toBeChecked();
+  await assertStageLayout(tmaPage, tmaWorkflow, 1);
+  const tmaCreatePlan = tmaWorkflow.getByRole('button', { name: 'Создать план подключения' });
+  await tmaCreatePlan.scrollIntoViewIfNeeded();
+  await expect(tmaCreatePlan).toBeVisible();
+  await assertAboveMobileDock(tmaPage, tmaCreatePlan);
+  await tmaWorkflow.locator('.coach-workflow-templates__steps').evaluate((element) => {
+    document.documentElement.style.scrollBehavior = 'auto';
+    document.body.style.scrollBehavior = 'auto';
+    window.scrollTo(0, element.getBoundingClientRect().top + window.scrollY);
+  });
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await tmaWorkflow.locator('.coach-workflow-templates__steps').boundingBox())?.y ??
+          Number.POSITIVE_INFINITY,
+      ),
+    )
+    .toBeLessThanOrEqual(1);
+  await tmaPage.screenshot({
+    path: '../.artifacts/tasks/756/deliverables/visual/mocked-tma-dark.png',
+  });
+  await expect(tmaWorkflow).toBeVisible();
+  await tmaContext.close();
 });
 
 test('Task 291 показывает action-first Today и ленивый контекст клиента', async ({ page }) => {

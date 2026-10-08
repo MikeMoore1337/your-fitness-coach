@@ -26,6 +26,10 @@ export const queryKeys = {
     checkInTemplates: ['coach', 'check-in-templates'] as const,
     checkInTemplateHistory: (templateId: number) =>
       ['coach', 'check-in-template-history', templateId] as const,
+    onboardingWorkflowTemplates: ['coach', 'workflow-templates', 'onboarding'] as const,
+    communicationWorkflowTemplates: ['coach', 'workflow-templates', 'communication'] as const,
+    communicationWorkflowDraft: (draftId: number) =>
+      ['coach', 'workflow-templates', 'communication-draft', draftId] as const,
     operationsToday: ['coach', 'operations', 'today'] as const,
     agenda: (dateFrom: string, dateTo: string) => ['coach', 'agenda', dateFrom, dateTo] as const,
     clients: ['coach', 'clients'] as const,

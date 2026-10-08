@@ -67,6 +67,23 @@ from fitminiapp_api.schemas.coach_reviews import (
 from fitminiapp_api.schemas.coach_workflow_automation import (
     CoachWorkflowAutomationResponse,
 )
+from fitminiapp_api.schemas.coach_workflow_templates import (
+    CommunicationDraftCreate,
+    CommunicationDraftResponse,
+    CommunicationDraftUpdate,
+    CommunicationTemplateCreate,
+    CommunicationTemplateListResponse,
+    CommunicationTemplateResponse,
+    CommunicationTemplateVersionCreate,
+    CommunicationTemplateVersionResponse,
+    OnboardingTemplateAssignmentCreate,
+    OnboardingTemplateCreate,
+    OnboardingTemplateListResponse,
+    OnboardingTemplateResponse,
+    OnboardingTemplateVersionCreate,
+    OnboardingTemplateVersionResponse,
+    WorkflowAssignmentResponse,
+)
 from fitminiapp_api.schemas.feedback import (
     WorkoutCommentCreate,
     WorkoutCommentResponse,
@@ -157,6 +174,20 @@ from fitminiapp_api.services.coach_reviews import (
     review_coach_check_in,
 )
 from fitminiapp_api.services.coach_workflow_automation import evaluate_coach_workflow
+from fitminiapp_api.services.coach_workflow_templates import (
+    CoachWorkflowTemplateError,
+    assign_onboarding_template,
+    confirm_communication_draft,
+    create_communication_draft,
+    create_communication_template,
+    create_communication_template_version,
+    create_onboarding_template,
+    create_onboarding_template_version,
+    get_communication_draft,
+    list_communication_templates,
+    list_onboarding_templates,
+    update_communication_draft,
+)
 from fitminiapp_api.services.exercise_catalog import _effective_exercise_id, list_exercises
 from fitminiapp_api.services.measurements import (
     MeasurementError,
@@ -222,6 +253,10 @@ CoachProgramRolloutIdempotencyKey = Annotated[
     str | None,
     Header(alias="Idempotency-Key", min_length=8, max_length=128),
 ]
+CoachWorkflowIdempotencyKey = Annotated[
+    str | None,
+    Header(alias="Idempotency-Key", min_length=8, max_length=128),
+]
 
 
 def _crm_error(exc: CoachCrmError) -> HTTPException:
@@ -237,6 +272,10 @@ def _review_error(exc: CoachReviewError) -> HTTPException:
 
 
 def _check_in_template_error(exc: CheckInTemplateError) -> HTTPException:
+    return HTTPException(status_code=exc.status_code, detail=exc.detail)
+
+
+def _workflow_template_error(exc: CoachWorkflowTemplateError) -> HTTPException:
     return HTTPException(status_code=exc.status_code, detail=exc.detail)
 
 
@@ -589,6 +628,228 @@ def coach_check_in_template_responses(
         )
     except CheckInTemplateError as exc:
         raise _check_in_template_error(exc) from exc
+
+
+@router.get(
+    "/workflow-templates/onboarding",
+    response_model=OnboardingTemplateListResponse,
+)
+def coach_onboarding_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateListResponse:
+    return OnboardingTemplateListResponse.model_validate(
+        list_onboarding_templates(db, current_user)
+    )
+
+
+@router.post(
+    "/workflow-templates/onboarding",
+    response_model=OnboardingTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_onboarding_template(
+    payload: OnboardingTemplateCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateResponse:
+    try:
+        return OnboardingTemplateResponse.model_validate(
+            create_onboarding_template(db, current_user, payload, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/onboarding/{template_id}/versions",
+    response_model=OnboardingTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_onboarding_template_version(
+    template_id: int,
+    payload: OnboardingTemplateVersionCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> OnboardingTemplateVersionResponse:
+    try:
+        return OnboardingTemplateVersionResponse.model_validate(
+            create_onboarding_template_version(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/onboarding/{template_id}/assignments",
+    response_model=WorkflowAssignmentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def assign_coach_onboarding_template(
+    template_id: int,
+    payload: OnboardingTemplateAssignmentCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> WorkflowAssignmentResponse:
+    try:
+        return WorkflowAssignmentResponse.model_validate(
+            assign_onboarding_template(
+                db,
+                current_user,
+                template_id,
+                payload.client_id,
+                payload.version,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.get(
+    "/workflow-templates/communication",
+    response_model=CommunicationTemplateListResponse,
+)
+def coach_communication_templates(
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateListResponse:
+    return CommunicationTemplateListResponse.model_validate(
+        list_communication_templates(db, current_user)
+    )
+
+
+@router.post(
+    "/workflow-templates/communication",
+    response_model=CommunicationTemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_template(
+    payload: CommunicationTemplateCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateResponse:
+    try:
+        return CommunicationTemplateResponse.model_validate(
+            create_communication_template(db, current_user, payload, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/communication/{template_id}/versions",
+    response_model=CommunicationTemplateVersionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_template_version(
+    template_id: int,
+    payload: CommunicationTemplateVersionCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationTemplateVersionResponse:
+    try:
+        return CommunicationTemplateVersionResponse.model_validate(
+            create_communication_template_version(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/workflow-templates/communication/{template_id}/drafts",
+    response_model=CommunicationDraftResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_coach_communication_draft(
+    template_id: int,
+    payload: CommunicationDraftCreate,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            create_communication_draft(
+                db,
+                current_user,
+                template_id,
+                payload,
+                idempotency_key,
+            )
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.patch(
+    "/communication-drafts/{draft_id}",
+    response_model=CommunicationDraftResponse,
+)
+def update_coach_communication_draft(
+    draft_id: int,
+    payload: CommunicationDraftUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            update_communication_draft(db, current_user, draft_id, payload)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.get(
+    "/communication-drafts/{draft_id}",
+    response_model=CommunicationDraftResponse,
+)
+def get_coach_communication_draft(
+    draft_id: int,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            get_communication_draft(db, current_user, draft_id)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
+
+
+@router.post(
+    "/communication-drafts/{draft_id}/confirm",
+    response_model=CommunicationDraftResponse,
+)
+def confirm_coach_communication_draft(
+    draft_id: int,
+    idempotency_key: CoachWorkflowIdempotencyKey = None,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CommunicationDraftResponse:
+    try:
+        return CommunicationDraftResponse.model_validate(
+            confirm_communication_draft(db, current_user, draft_id, idempotency_key)
+        )
+    except CoachWorkflowTemplateError as exc:
+        raise _workflow_template_error(exc) from exc
 
 
 @router.get("/operations/today", response_model=CoachOperationsTodayResponse)

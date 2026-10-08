@@ -8,7 +8,8 @@ export type CoachTool =
   | 'catalog'
   | 'reviews'
   | 'analytics'
-  | 'templates';
+  | 'templates'
+  | 'workflows';
 
 const tools: ReadonlyArray<{ key: CoachTool; title: string; description: string }> = [
   {
@@ -20,6 +21,11 @@ const tools: ReadonlyArray<{ key: CoachTool; title: string; description: string 
     key: 'templates',
     title: 'Шаблоны проверок',
     description: 'Повторяемые вопросы, версии и назначения клиентам',
+  },
+  {
+    key: 'workflows',
+    title: 'Подключение и сообщения',
+    description: 'Планы подключения и черновики сообщений для клиентов',
   },
   {
     key: 'analytics',
