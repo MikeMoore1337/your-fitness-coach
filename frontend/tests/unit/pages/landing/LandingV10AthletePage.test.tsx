@@ -35,7 +35,7 @@ describe('LandingV10AthletePage', () => {
       screen.getByRole('heading', { name: /Смотрите на движение недели/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('heading', { name: 'Вы тренер? Знакомьтесь с Coach OS.' }),
+      screen.getAllByRole('heading', { name: 'Вы тренер? Знакомьтесь с Коуч ОС.' }),
     ).toHaveLength(1);
     expect(container.querySelectorAll('.landing-v10-coach-promo')).toHaveLength(1);
     expect(screen.queryByText(/Coach Today|Не потерять важное/)).not.toBeInTheDocument();

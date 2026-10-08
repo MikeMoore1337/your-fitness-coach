@@ -159,7 +159,7 @@ function AthleteHero() {
         </div>
         <div className="landing-hero__platform">
           <p className="landing-hero__platform-note">
-            <Icon name="web-app" size={16} /> Web и Telegram Mini App
+            <Icon name="web-app" size={16} /> Браузер и Telegram TMA
           </p>
         </div>
       </div>
@@ -265,7 +265,7 @@ export default function LandingV10AthletePage() {
         </div>
         <div>
           <h2 id="landing-v10-coach-title">
-            <span>Вы тренер?</span> <span>Знакомьтесь с Coach OS.</span>
+            <span>Вы тренер?</span> <span>Знакомьтесь с Коуч ОС.</span>
           </h2>
           <p>
             Подключайте клиентов, ведите версии программ, смотрите проверки и подтверждайте
@@ -282,22 +282,22 @@ export default function LandingV10AthletePage() {
         aria-labelledby="landing-v10-continuity-title"
       >
         <div>
-          <p className="landing-kicker">ВЕБ И TELEGRAM MINI APP</p>
+          <p className="landing-kicker">БРАУЗЕР И Telegram TMA</p>
           <h2 id="landing-v10-continuity-title">Один аккаунт. Общие данные.</h2>
           <p>
-            Полный контекст остаётся в Web, а быстрые действия доступны в Telegram Mini App — без
+            Полный контекст остаётся в браузере, а быстрые действия доступны в Telegram TMA — без
             отдельной версии продукта.
           </p>
         </div>
         <div className="landing-v10-continuity__rail" aria-label="Поверхности продукта">
           <span>
-            <Icon name="web-app" /> Web
+            <Icon name="web-app" /> Браузер
           </span>
           <Icon name="sync" size={24} />
           <strong>Общие данные</strong>
           <Icon name="sync" size={24} />
           <span>
-            <Icon name="mini-app" /> Telegram Mini App
+            <Icon name="mini-app" /> Telegram TMA
           </span>
         </div>
       </LandingChapter>
