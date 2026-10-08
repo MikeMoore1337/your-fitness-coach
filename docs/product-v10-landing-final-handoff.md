@@ -1,0 +1,309 @@
+# Product v10 — B × C × Current YFC — final implementation handoff
+
+Дата: 08.10.2026, Europe/Moscow. **Owner design approval: PASS.** Этот документ
+фиксирует approved design contract для последующей реализации; текущий PR меняет
+только документацию и versioned visual references.
+
+## Начать здесь
+
+1. Versioned visual references находятся в [`docs/design/references/product-v10-landing/`](design/references/product-v10-landing/): compact athlete teaser (desktop/mobile × dark/light), preserved Coach Today (desktop/mobile × dark/light) и glass-header close-ups.
+2. Интерактивная gallery, motion preview и full-page snapshots остаются локальным review evidence в ignored `.artifacts`; они не являются production runtime и не входят в docs-only PR.
+3. `HANDOFF.md` из sandbox был сверён с approved состоянием и перенесён сюда как durable section map, CTA/route matrix, component reuse map, ограничения claims и verification record.
+
+Исходники sandbox находятся уровнем выше: `design.tsx`, `refinement.css`, `build.cjs`, `audit-current.cjs`, `verify.cjs`, `motion.cjs`. Bundle и assets внутри deliverables можно просматривать без React dev-server и без API. Для пересборки используется уже установленный esbuild из `frontend/node_modules`. Новых зависимостей нет.
+
+Запуск из корня репозитория:
+
+```powershell
+node .artifacts/tasks/landing-v10-refinement/build.cjs
+node .artifacts/tasks/landing-v10-refinement/verify.cjs
+```
+
+Сервер запускается **из deliverables**, а не из корня репозитория:
+
+```powershell
+D:/Pet-projects/your-fitness-coach/.venv/Scripts/python.exe -m http.server 8789 --bind 127.0.0.1
+```
+
+## 1. Что утверждено и что ещё нет
+
+Owner выбрал сочетание B (кинематографичная спортивная подача), C (продуктовый цикл и полноценный Coach OS) и Current YFC (существующая идентичность). Финальная визуальная итерация утверждена; отдельная owner authorization на implementation дана после завершения design gate.
+
+Это один финальный вариант. Дополнительные hero-концепции не создавались: сохранение узнаваемого «Сила в действии» оказалось сильнее новой словесной идентичности. Для тренера предложено «Ваш метод в действии» в той же композиционной грамматике.
+
+В этом docs-only PR ни один production route, компонент, stylesheet, API, модель, Demo service или SEO-файл не изменён. Sandbox импортирует некоторые production компоненты read-only. Данные новых сцен локальные. CSP `connect-src 'none'` исключает запросы прототипа к API; в browser verification дополнительно проверено отсутствие fetch/XHR и внешних запросов.
+
+### Durable handoff contract
+
+- `LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS` зафиксирован в Issue #852.
+- `LANDING_HANDOFF_PERSISTED=PASS` означает этот versioned документ и выбранные visual references; ignored gallery не является единственным источником.
+- `LANDING_IMPLEMENTATION=AUTHORIZED_NOT_STARTED` на момент docs-only PR: production implementation начинается отдельными bounded PR для #853 и следующих зависимых issues.
+- `CONTROLLER=ABSENT`: не добавлять controller, leases, lifecycle state machine, delivery owner, очередь или recovery orchestration.
+
+## 2. Источники и визуальный аудит production
+
+Основной контракт возможностей: `docs/product-v10-landing-read-only-proposal.md`, прочитанный на предыдущем этапе, и текущий source. Проверенный локальный HEAD: `bd8f2bdd33341f1a8e7cd8e6b2384c38d67d307f`. Production осмотрен отдельно по публичному URL `https://your-fitness-coach.ru/`, без входа и без запуска изменяющих demo-действий.
+
+Источник live-снимков: `current/`. `current/audit.json` содержит URL, заголовок, текущие demo href, порядок секций, computed button values, размеры и page errors. Chromium desktop 1440×1000 и mobile 390×844; обе темы. В этих четырёх состояниях horizontal overflow и JS page errors не обнаружены. Это не полный аудит accessibility, не provenance соответствия runtime конкретному SHA и не field performance.
+
+Визуально подтверждены:
+
+- наклонный Oswald и лаймовая вторая строка «Сила в действии»;
+- существующая силовая фотография и явная спортивная энергия;
+- кнопка: `rgb(178,245,32)` = `#b2f520`, radius `14px`, border `1px`, min-height `48px`, Inter;
+- стеклянная вторичная кнопка с фирменной обводкой;
+- StrengthScene с двумя положениями гантели и явным пояснением ручной записи;
+- подготовленная демонстрация прогресса с 6 220 кг, 11 тренировками и индексом 100 → 104,2%; это синтетические данные, не efficacy claim;
+- полноценная работа темы, desktop navigation и mobile menu;
+- trainer block находится после workout/nutrition/progress, поэтому тренерский рассказ начинается поздно.
+
+**Что уже хорошо:** выразительная идентичность, реальные продуктовые объяснения, demo boundary, Web/TMA и честные ограничения графика. Это сохранено.
+
+**Что улучшаем:** общий hero-copy слишком широк для ответа «почему YFC»; доказательство тренерской ценности ограничивается фотографией и текстом; связка питания, плана и покупок не показана; программа сначала скрыта за входной фотографией демо. Выводы качественные, не основаны на измеренной конверсии.
+
+## 3. Полная карта решений по текущему Landing
+
+| Текущее решение | Решение | Сохраняется | Изменение и польза |
+|---|---|---|---|
+| Hero спортсмена | EVOLVE | Фото, «Сила в действии», наклон, лайм, общий характер | Выбор аудитории, ясный цикл и подзаголовок; посетитель понимает следующий шаг |
+| Фотографические сцены | KEEP_AS_IS / REPOSITION | Только существующие marketing assets | Trainer photo становится hero тренера; nutrition photo сохраняет эмоциональную главу |
+| StrengthScene | KEEP_AS_IS | Исходный компонент, CSS, пары фото, easing, 2→3, disclosure | Только на странице спортсмена; у тренера не дублируется |
+| Scroll-bound механика | KEEP_AS_IS | Исходные passive listeners, rAF, interpolation, reduced motion | Не заменена новым видео/параллаксом; нет нового scroll-jacking |
+| Входная фотография LandingPractice | REPLACE_WITH_JUSTIFICATION (только entry presentation) | Сам интерактивный тренировочный сценарий | В sandbox программа видна сразу. Преимущество: понятен предмет действия до клика; runtime lazy/demo boundaries в будущем сохранить |
+| Интерактивная тренировка | EVOLVE | Реальный TrainingScenario и его UI | В sandbox получает local fixture; будущий production должен переиспользовать существующий Demo API, не этот локальный reducer |
+| Питание | EVOLVE | Фото, тема, шрифты, controls | Три понятных состояния: план, покупки, дневник; факт не возникает сам |
+| Прогресс | KEEP_AS_IS / EVOLVE | Реальный LandingProgressContent, TimeSeriesChart, числа, индекс, disclosure | Рядом вопрос недельной проверки; отдельная synthetic иллюстрация, не приватная authenticated view |
+| Тренерский блок | EVOLVE + REPOSITION | Coach OS facts и фирменная фотография | В режиме тренера — отдельные шесть глав, без повторения athlete narrative |
+| Athlete Coach OS teaser | REPLACE_WITH_COMPACT_PROMO | Связь со страницей тренера и реальные Coach OS возможности | После athlete-прогресса, перед объяснением различий и Demo; без фотографии, без auth/DemoCabinet; CTA переключает audience на coach |
+| Шаблоны подключения | EVOLVE | Версия плана и отдельные действия invite/программа/check-in | Назначение шаблона подключения не назначает программу автоматически |
+| Web/TMA continuity | KEEP_AS_IS / REPOSITION | Один аккаунт, общие основные данные | После демо-сценариев; краткое упоминание также в hero |
+| Переходы к демо | EVOLVE (presentation only) | Существующие scenario entry points | Selected audience задаёт первый сценарий; backend и Demo engine не изменять |
+| Athlete Coach OS teaser | REPLACE_WITH_COMPACT_PROMO | Existing coach capabilities: clients, program versions, reviews, confirmed next step | Один компактный promotional block после athlete proof; повтор в coach path отсутствует |
+| Навигация | EVOLVE | PublicShell, Продукт/Демо/Вопросы, theme, login/menu | Добавлен audience choice в hero. Menu Escape/focus, anchors остаются |
+| CTA | EVOLVE | Геометрия, токены, hover/pressed/focus, Glass | Owner mandate: primary свои данные; secondary настоящий demo; отдельный anchor локального примера |
+| Theme toggle | KEEP_AS_IS | Реальный AppThemeToggle/useWebTheme | В галерее есть принудительные темы для проверки; production default не меняется |
+| FAQ / прозрачность | EVOLVE | Данные, demo isolation, человеческое решение | Добавлены явные границы ручных сообщений и роли независимого тренера |
+| Footer | EVOLVE | BrandLockup, продуктовые/служебные ссылки | Явная роль YFC; реальные legal URL необходимо согласовать |
+| Избранные статьи | REPOSITION | Существующая публичная content surface | Не включены в основной proof-path макета. В реализации сохранить вторичный вход к знаниям/статьям в footer, не удалять routes или SEO |
+| Прозрачная полоса всей шапки | KEEP_AS_IS | Исходные PublicShell + landing.css, blur, границы, тема, mobile и scroll | Непрозрачный sandbox override удалён. Desktop: фон 28%, blur 12px; mobile: 22%, blur 8px. Glass не распространяется на обычные секции |
+
+## 4. Финальное повествование
+
+### Для себя
+
+Hero с текущей силовой сценой → четыре шага цикла → оригинальная StrengthScene → интерактивная тренировка → питание (план/покупки/дневник) → прогресс и проверка недели → компактный Coach OS teaser → локальный интерактивный Coach OS пример → отличие связанного контекста → три demo-сценария → Web/TMA → FAQ → CTA → footer.
+
+В hero: «Сила в действии». Подзаголовок: «Тренируйтесь по плану. Сопоставляйте питание, результаты и самочувствие — чтобы выбрать следующий шаг». Primary: «Начать со своими данными». Secondary: «Попробовать демо тренировки». Компактная tertiary-кнопка: «Посмотреть пример тренировки». После прогресса один promotional teaser: «Вы тренер? Знакомьтесь с Coach OS.» с CTA «Возможности для тренера», который меняет audience на тренерскую версию лендинга.
+
+### Для тренера
+
+Hero с текущим trainer photo → цикл → сохранённый Coach Today / «Не потерять важное» (#coach-work) → подключение клиента (#coach-connect) → назначение программы (#coach-program) → Client 360 / факты (#coach-facts) → Check-in / Review Workspace (#coach-review) → preview/confirm применения версии к нескольким клиентам (#coach-decision) → черновик/подтверждение сообщения (#coach-followup) → адаптированное отличие → только trainer Demo CTA → Web/TMA → тренерские FAQ → CTA → footer. Athlete-only секций в этом DOM нет.
+
+В hero: «Ваш метод в действии». Подзаголовок: «Программы, проверки и история клиента — в одном рабочем пространстве. Видеть важное. Выбирать следующий шаг». Primary: «Начать как тренер». Secondary: «Попробовать демо для тренера». Компактная tertiary-кнопка: «Как работает Coach OS».
+
+Переключение меняет не роль аккаунта, а публичный рассказ: hero/photo, список выгод, порядок секций, primary CTA, первый демо-сценарий. В sandbox параметр `audience` сохраняет выбор, Back восстанавливает его, `theme` сохраняет тему. Production route/canonical decision здесь не реализован.
+
+Coach OS — не отдельная корпоративная CRM. Те же шрифты, кнопки и спортивная фотография; без KPI-плиток бизнеса, командных ролей, биллинга и обещаний auto-send. Тренер — независимый пользователь, YFC не сторона договора тренер–клиент.
+
+## 5. Что реально переиспользовано в sandbox
+
+| Компонент/ресурс | Как использован | Boundary для будущей реализации |
+|---|---|---|
+| `shared/ui/PublicShell.tsx` | Прямой import | Сохранить текущий shell, не делать второе Landing SPA |
+| `BrandLogo.tsx` / BrandLockup | Прямой import, theme-aware assets | Не перерисовывать знак/wordmark |
+| `Icon.tsx` / iconGlyphs | Прямой import | Существующий каталог уже содержит glyphs с upstream provenance (включая Lucide); это не новая замена иконографии. Новые icon packs не добавлены |
+| `Glass.tsx`, `GlassInteractions.tsx`, `liquid-glass.css` | Прямые imports | `glassProps` только у ссылок/кнопок переключения и secondary actions. Обычные product panels непрозрачные |
+| `AppThemeToggle`, `useWebTheme` | Через PublicShell; прямой theme hook | Текущий механизм тем; локальный storage только origin sandbox |
+| `StrengthScene.tsx` / CSS | Прямой import без правок | Весь current mechanism оставить; изменение длительности не принято |
+| `LandingChapter` | Прямой import | Сохранять semantic reveal/reduced-motion behavior |
+| `TrainingScenario` | Прямой import + local fixture | Это synthetic preview; не переносить sandbox reducer вместо Demo API |
+| `LandingProgressContent` / `TimeSeriesChart` | Прямой import | Две сводные точки и индекс должны остаться честно подписанными |
+| `LandingPractice` | Изучен; прямой import не использован из-за API action | В implementation предпочтительно адаптировать existing entry, сохранив lazy-load и query boundary |
+| CoachToday / CoachReviewWorkspace / rollout / workflow templates | Изучены, сцена воспроизведена на synthetic данных | Не монтировать авторизованный компонент с настоящим clientId на публичной странице |
+| `WeeklyCheckInCard` | Изучены facts/questions/adjustment, recovery question и шкала 1–5 | Публичный образец не пишет check-in и не раскрывает данные аккаунта |
+| `fonts.css`, `design-system.css`, `landing.css`, `public-shell.css` | Прямые imports | Новые sandbox rules описывают композицию, а не замену токенов |
+| `marketing/*.webp`, `brand/*`, fonts | Копия текущих repo assets в изолированный output | Новых внешних фото/генераций/шрифтов нет |
+
+### Токены и визуальные инварианты
+
+- Lime: `--v2-lime` / `--landing-green`, текущий `#b2f520`.
+- Dark paper: `#090b0b`; light paper: текущие `#fff`/shell theme values. Новая палитра не введена.
+- Type: `--font-display` Oswald, `--font-sans` Inter. Hero сохраняет italic; размеры и переносы адаптированы к новому switch и subhead.
+- Controls: `--radius-control` 14 px, min-height 48 px у Landing action и 44 px у компактных controls, 1 px border. Основная кнопка остаётся лаймовой, secondary — текущий glass.
+- Panels: `--radius-panel` 24 px, `--landing-line`, непрозрачный paper.
+- Motion: текущие `--motion-state` 180 ms и `--motion-ease`; pressed без transform согласно override Design V2. Focus остаётся явным.
+
+## 6. Motion specification и доказательства
+
+`motion-preview.webm` — запись настоящего local Chromium render 1280×800, normal motion. `motion-manifest.json` содержит последовательность.
+
+1. Athlete hero: краткое вступление текста. Доступ к CTA не ждёт завершения.
+2. Audience switch: текст 260 ms (opacity .6→1, translateY 8→0); фотография 420 ms (.4→.7). Повторный выбор доступен немедленно; effect cleanup отменяет предыдущую animation.
+3. StrengthScene: исходная scroll-driven интерполяция и фазы 0/1/2; сохранено пояснение, что запись выполняет человек. Никакого распознавания движения.
+4. Product state: 180 ms короткое появление панели. Значение/состояние меняется по действию сразу, а не после таймера.
+5. Chapter reveal и Glass pointer response — существующие компоненты, без новых motion dependencies.
+
+Reduced motion: выключены hero/panel movement, плавная прокрутка; original StrengthScene показывает завершённое состояние без длинного sticky. Все controls и текст сохраняются. Визуальная смена audience/photo без motion остаётся мгновенной.
+
+**Не реализовано заранее:** autoplay video hero, full-page parallax, новый timeline/scroll owner, бесконечные фоновые эффекты. Они не нужны для утверждённого направления.
+
+## 7. Mobile и состояния
+
+- 320/360/390/430: switch в отдельной строке hero, CTA вертикально, ясный следующий шаг до глубоких разделов; фотографии имеют отдельный crop.
+- 768: промежуточная композиция проверена, таблицы/controls не вылезают за viewport.
+- 1280/1440: двухколоночные proof-сцены и крупные фотоглавы; Coach OS не превращается в корпоративную панель.
+- Cycle — 2×2 на mobile; смысловые продуктовые панели — одна колонка; без горизонтальных каруселей.
+- Mobile navigation: открыть/закрыть, Escape возвращает focus кнопке; theme/switch доступны клавиатуре.
+- CTA: default, hover, pressed, focus; «свои данные» открывает существующий /app в новой вкладке. Legal boundary-dialog остаётся локальным. Диалог закрывается Escape.
+- Workout: today → active → completed sets → summary; реальный TrainingScenario, local-only state.
+- Nutrition: план не создаёт факт; дневник меняется только после явного действия.
+- Weekly review: раскрытие вопроса и выбор восстановления 1–5; ответ остаётся в memory sandbox.
+- Coach: факты → изменения → предварительный просмотр → подтверждение; отдельно draft edit → confirmation. Реальной отправки нет.
+
+## 8. Проверенные возможности и запреты claims
+
+Опоры текущего source: `CoachToday.tsx`, `CoachReviewWorkspace.tsx`, `CoachWorkflowTemplates.tsx`, `services/coach_program_rollout.py` (preview/confirmed), `services/coach_workflow_templates.py` (confirm draft), `services/nutrition_plan.py` (planned/consumed), `GroceryList.tsx`, `WeeklyCheckInCard.tsx`, existing Landing/demo source.
+
+Для посетителя показаны программа/подходы, питание, планирование/покупки, динамика и проверка недели. Для тренера — клиент, назначение, review, безопасное подтверждение, onboarding templates и сообщение с подтверждением. Изоляция private notes сохранена: в публичной сцене их нет.
+
+AI Coach, часы, видеоанализ, Multi-Coach runtime, marketplace, team roles, payment processing не заявлены. Ни отзывов, ни счётчиков клиентов, ни гарантии результата/абсолютной безопасности. Сравнение «запись/контекст» не утверждает отсутствие аналогичных функций у всех конкурентов.
+
+## 9. Проверки и ограничения
+
+`verification.json`: 28 сочетаний (2 аудитории × 2 темы × 7 ширин). Проверены горизонтальный overflow, clipping видимого текста, состояния темы, локальные interactions, меню, FAQ, dialog, audience keyboard navigation и Back. Намеренно визуально скрытое `.sr-only` описание графика исключено из detector clipping, но не удалено из DOM.
+
+Full-page snapshots: 8. Предметные proposed comparison crops: 5. Current evidence: 4 hero theme/device состояния + training/progress/trainer/CTA + StrengthScene. Дополнительно: `coach-promo-dark-1440.png`, `coach-promo-dark-390.png`, `coach-promo-light-1440.png`, `coach-promo-light-390.png`. Это целевые материалы, а не десятки почти одинаковых hero.
+
+Нет API/external requests из prototype при проверенных действиях. CSP — дополнительная техническая граница. Production baseline собран анонимно, без credentials. Конверсия и field CWV не измерялись; physical-device, Safari, real Telegram, screen-reader полноценный аудит не выполнены. Browser viewport evidence не равно physical-device proof.
+
+Sandbox bundle включает текущие styles/component dependencies ради точного reuse и не является оптимизированным production payload. Не копировать весь bundle/legacy CSS в новый production entry. Будущая задача должна сохранить существующие lazy boundaries и измерить runtime bundle/LCP/CLS на актуальном build.
+
+## 10. Минимальный будущий implementation scope — только после отдельного owner prompt
+
+1. Сверить current protected master, Issue/spec и окончательное визуальное решение. Не использовать этот HEAD как freeze/redeploy target.
+2. В существующем LandingPage ввести публичный audience context, hero copy/photo, порядок уже существующих sections и demo entry. Не менять auth role.
+3. Переиспользовать PublicShell, текущие buttons/icons/glass/theme, StrengthScene и existing demos. Не переносить sandbox app как второй production SPA.
+4. Адаптировать LandingPractice entry; сохранить query error/retry, isolation, lazy loading и analytics distinction synthetic/real.
+5. Добавить минимальные synthetic proof-scenes для планирования/покупок и Coach OS только в согласованном объёме. Не импортировать authenticated queries/private notes в public surface.
+6. Связать weekly review proof с фактическим контрактом. Не вводить автоматические медицинские/тренировочные рекомендации.
+7. Проверить публичную навигацию `/` и `/for-trainers`, Back/forward, UTM, canonical/fallback. Не вводить `/coach-demo` или `/for-athletes` без отдельного решения. Существующие demo href из live audit сохранить совместимыми.
+8. Обновить allowlisted audience/CTA measurement на существующих событиях, без персональных/health данных и без нового провайдера.
+9. Проверить доступность, обе темы, reduced-motion, failure/no-JS/fallback, реальный demo contract, SEO regression и performance. Подготовить bounded visual evidence, затем применимые Checks и GitHub Flow — только в рамках будущей авторизации.
+
+Вероятные production files для будущего diff: `pages/landing/LandingPage.tsx`, `landing.css`, при необходимости `LandingPractice.tsx`; минимальный новый public proof component. Shared tokens/Icon/BrandLogo/Glass/StrengthScene менять не требуется. Routes/metadata/demo runtime — только если конкретное утверждённое решение действительно этого требует.
+
+## 11. Оставшиеся owner design decisions
+
+1. Утвердить единую композицию: athlete «Сила в действии», coach «Ваш метод в действии», общий переключатель и разный порядок сцен.
+2. Проверить финальную композицию обязательной owner CTA-иерархии: свои данные → настоящий demo → локальный пример. Сам приоритет уже зафиксирован владельцем, не является открытым вариантом.
+3. Утвердить финальную подачу сохранённых встроенных synthetic planning/coach states рядом с отдельным existing demo entry. Текущий trainer demo подтверждает client/workout/comment; нельзя объявлять всю предложенную v10 sequence уже доступной в текущем demo.
+4. Утвердить default audience «Для себя» и использование существующей системной темы. Gallery defaults — инструмент review, не новое продуктовое правило.
+5. Утвердить обращение на «вы» в новом copy; исходный StrengthScene содержит «ты» и намеренно не переписан. Если нужна полная унификация, это небольшой отдельный copy diff будущей задачи.
+6. Согласовать actual legal URLs и вторичный вход к статьям/базе знаний в footer. Ни legal content, ни public SEO routes не удалять ради макета.
+
+После выбора нужен **отдельный явный prompt на implementation**. Одобрение направления не является разрешением продолжить автоматически.
+
+## 12. Исправления #852 и точные переходы
+
+| Элемент | Текст кнопки | Ожидаемое действие | Destination | Реальный продуктовый маршрут |
+|---|---|---|---|---|
+| Hero + финал / спортсмен | Начать со своими данными | Открыть существующий вход/старт | app | /app |
+| Hero + финал / тренер | Начать как тренер | Сейчас общий вход. Цель #875: авторизация → явное согласие → Coach Today без Профиля; не реализовано | app | /app |
+| Hero + финал / спортсмен | Попробовать демо тренировки | Настоящий изолированный демо-кабинет | demo/self_training | /demo?cabinet=1&scenario=self_training&section=today |
+| Hero + финал / тренер | Попробовать демо для тренера | Настоящий тренерский демо-кабинет | demo/trainer | /demo?cabinet=1&scenario=trainer&section=trainer |
+| Hero / спортсмен | Посмотреть пример тренировки | Прокрутить локальный пример | landing/#training | /#training |
+| Hero / тренер | Как работает Coach OS | Прокрутить локальный пример | landing/#coach-work | /#coach-work |
+| Меню / спортсмен | Демо | Настоящий демо-кабинет спортсмена | demo/self_training | /demo?cabinet=1&scenario=self_training&section=today |
+| Меню / тренер | Демо | Настоящий демо-кабинет тренера | demo/trainer | /demo?cabinet=1&scenario=trainer&section=trainer |
+| Меню | Войти | Существующая авторизация | login | /login |
+| Сценарии демо | Попробовать демо тренировки | Настоящий демо-кабинет | demo/self_training | /demo?cabinet=1&scenario=self_training&section=today |
+| Сценарии демо | Попробовать демо питания | Настоящий демо-кабинет питания | demo/nutrition | /demo?cabinet=1&scenario=nutrition&section=nutrition |
+| Сценарии демо | Попробовать демо для тренера | Настоящий демо-кабинет тренера | demo/trainer | /demo?cabinet=1&scenario=trainer&section=trainer |
+| Прогресс | Попробовать демо прогресса / Открыть прогресс | Открыть раздел прогресса существующего демо | demo/progress | /demo?cabinet=1&scenario=self_training&section=progress |
+
+Маршруты /app, /login и /demo разрешаются через `appUrlForHostname`, `loginUrlForHostname`, `demoUrlForHostname`. Для public hostname это `https://app.your-fitness-coach.ru`. Anchor-пути остаются на Landing. В sandbox используются production-host links; при реализации не переносить фиксированный hostname, использовать текущий hostname.
+
+`cabinetScenarioUrl` в `frontend/src/pages/landing/LandingPage.tsx` (локальная функция) задаёт today/nutrition/trainer. Sandbox только повторяет href-контракт; не создаёт сессию. Будущая реализация переиспользует эту функцию, `frontend/src/pages/demo/DemoCabinet.tsx`, `frontend/src/features/demo/demoRoute.ts` и действующий session loader. Запрещён второй demo engine.
+
+`PublicContentPage.tsx` уже направляет основной CTA /for-trainers в общий /app с destination onboarding. В sandbox «Начать как тренер» сохраняет этот существующий href. Это временный фактический destination, НЕ выполненное требование #875. Целевой путь: после авторизации существующий тренер попадает в Coach Today; новый тренер видит согласие с условиями и явное подтверждение, затем существующую server-authoritative активацию и Coach Today / первое приглашение без поиска в Профиле. Отказ сохраняет личный аккаунт. Один маркетинговый клик или query-параметр не активирует capability. Сохранение intent, auth callbacks, согласие и активация отложены в #875; никакие новые URL/query/endpoint в макете не вводились.
+
+Проверка маршрутов — инспекция href и исходников, без входа в аккаунт или создания production demo-сессий. `route-matrix.json` содержит машинно-читаемую таблицу; `cta-verification.json` — проверенные href и клики по локальным anchors. `header-verification.json` — текущий production и prototype, desktop/mobile, темы, аудитории, scroll и отключённый backdrop-filter. Versioned close-ups шапки: [`header-comparison-1440.png`](design/references/product-v10-landing/header-comparison-1440.png), [`header-comparison-390.png`](design/references/product-v10-landing/header-comparison-390.png).
+
+StrengthScene импортируется без изменений только для спортсмена; тёмные контекстные секции переходят в исходную белую сцену. Normal-motion sticky-дистанция остаётся исходной; reduced-motion не добавляет пустой экран.
+
+#852 закрывается после merge этого docs-only PR. #853–#858 и #875 остаются отдельными bounded implementation tasks с указанными зависимостями. Рабочая галерея и её zip-пакет находятся в ignored/local evidence; GitHub остаётся источником versioned contract.
+
+## 13. Финальная доработка: tertiary и отдельный тренерский рассказ
+
+| Решение | KEEP / REPLACE / SHARED | Итог |
+|---|---|---|
+| Athlete cinematic path | KEEP | StrengthScene, TrainingScenario, питание/покупки, прогресс/неделя сохранены |
+| Принятые glass header и demo semantics | KEEP | Те же PublicShell, tokens и маршруты |
+| Маленькие текстовые preview links | REPLACE | Tertiary outline 14px radius, 44px min-height, 12px Inter 600, компактная ширина по тексту; контекст «Интерактивный пример» |
+| Дублирование athlete-секций у тренера | REPLACE | Шесть самостоятельных глав о работе тренера |
+| Brand, SectionTitle, LandingChapter, buttons, theme, motion | SHARED | Одни primitives, не две независимые реализации |
+| Отличие, Web/TMA, Demo, FAQ, footer | SHARED | Общая композиция; trainer copy, anchors, FAQ и trainer-only demo entry |
+
+Tertiary остаётся семантической ссылкой для якоря. Оба варианта используют один класс. Hover меняет подложку/обводку; focus-visible лаймовый, pressed усиливает тёмную подложку и лаймовую границу. Текущий Design V2 shell отменяет transform hover/active; этот инвариант сохранён. Enter переносит фокус на целевую секцию и прокручивает к ней с 24px отступом. Исходная glass-шапка не sticky и уходит при прокрутке; она не закрывает заголовок. Reduced motion выключает smooth-scroll. Компоненты доступны без мыши. Это всё sandbox, production не затронут.
+
+### Источники тренерских сцен и ограничения
+
+- Подключение и план: `frontend/src/features/coach/CoachWorkflowTemplates.tsx`. Версия плана подключения не выполняет автоматически отдельные шаги назначения программы и проверки.
+- Назначения / версии / несколько клиентов: `CoachProgramOperations.tsx`, `CoachProgramBulkOperations.tsx`, `backend/fitminiapp_api/services/coach_program_rollout.py`. Выбор → preview по клиентам → явное подтверждение. В сцене смена выбора сбрасывает preview, пустой выбор блокирует действие. Применение показано к будущим тренировкам; история выполненного не переписывается. Backend errors/conflicts не симулируются как полноценный runtime.
+- Coach Today / Inbox / Client 360: текущие CoachToday и обзор связанного клиента. Показаны только синтетические факты плана, выполнения и проверки, никаких приватных заметок.
+- Проверки: `CoachReviewWorkspace.tsx`; выполненные/плановые тренировки, самооценка, честное отсутствие сопоставимых изменений, ручная отметка проверки. Никакого readiness-score или медицинской интерпретации.
+- Сопровождение: `CoachWorkflowTemplates.tsx`; создание → редактирование → подтверждение черновика. В настоящем продукте создаётся внутреннее уведомление; локальная сцена ничего не отправляет.
+
+Сцены независимые иллюстрации этапов, а не второй сквозной demo runtime. Принятие приглашения помечено как «показать»; тренер не принимает согласие от имени клиента. Все Alexey/Marina и числовые значения синтетические. Существующий DemoCabinet не объявляется полным отражением новых публичных сцен.
+
+### Evidence
+
+`proposed/hero-self-tertiary.png`, `proposed/hero-coach-tertiary.png`; `trainer-section-flow.png`; существующие восемь full-page снимков обновлены, включая coach mobile dark/light. `tertiary-states.png` показывает default/hover/focus/pressed; `tertiary-verification.json` проверяет pressed и keyboard desktop/mobile. `trainer-verification.json` фиксирует клавиатурный якорь, отсутствие athlete-секций, шесть interactions, invalidated preview, запрет пустого выбора и explicit message confirmation. Общая responsive matrix — 28 состояний. `motion-preview.webm` обновлён.
+
+Финальное visual approval дано владельцем 08.10.2026. #875 — самостоятельная implementation-задача, не часть этого design handoff.
+
+## 14. Финальная minor-доработка athlete Coach OS teaser
+
+Публичная athlete-страница теперь содержит ровно один компактный teaser после `#progress` и перед `#difference`/`#demo`:
+
+`Вы тренер? Знакомьтесь с Coach OS.`
+
+Описание сообщает только существующие Coach OS возможности: подключение клиентов, версии программ, проверки и подтверждение следующего шага. Фотография убрана из этого перехода; ordinary panels не получили glass. `Возможности для тренера` использует текущую lime-кнопку и `?audience=coach`, поэтому не открывает `/login` и не создаёт DemoCabinet. В athlete-ветке полноценный Coach Today и остальные trainer-only scenes не монтируются. В coach-ветке teaser отсутствует, сохранён полноценный Coach Today / «Не потерять важное», а шесть утверждённых тренерских глав не изменены.
+
+Карта секций после корректировки:
+
+| Аудитория | Порядок |
+|---|---|
+| Для себя | Hero → цикл → StrengthScene → тренировка → питание → прогресс/недельный обзор → Coach OS teaser → локальный Coach OS пример → различие YFC → Demo → Web + TMA → FAQ → CTA → footer |
+| Для тренера | Hero → цикл → Coach Today / «Не потерять важное» → подключение клиента → программа/версия → Client 360 / факты → Check-in / Review Workspace → preview/confirm применения → черновик/подтверждение сообщения → различие YFC → Demo → Web + TMA → FAQ → CTA → footer |
+
+Versioned evidence: [`coach-promo-dark-1440.png`](design/references/product-v10-landing/coach-promo-dark-1440.png), [`coach-promo-dark-390.png`](design/references/product-v10-landing/coach-promo-dark-390.png), [`coach-promo-light-1440.png`](design/references/product-v10-landing/coach-promo-light-1440.png), [`coach-promo-light-390.png`](design/references/product-v10-landing/coach-promo-light-390.png), [`coach-today-dark-1440.png`](design/references/product-v10-landing/coach-today-dark-1440.png), [`coach-today-dark-390.png`](design/references/product-v10-landing/coach-today-dark-390.png), [`coach-today-light-1440.png`](design/references/product-v10-landing/coach-today-light-1440.png), [`coach-today-light-390.png`](design/references/product-v10-landing/coach-today-light-390.png). Ignored verification artifacts дополнительно фиксируют уникальный Coach Today в coach-ветке, отсутствие Coach Today и trainer-only scenes в athlete-ветке, URL hash-нормализацию и отсутствие overflow во всех четырёх состояниях.
+
+Тренерская ветка после этого изменения не затронута. Production files, PR, merge, deploy, auth/API и новые routes не создавались.
+
+## 15. Терминальное состояние
+
+```text
+LANDING_DESIGN_DIRECTION=B+C+CURRENT_YFC
+CURRENT_YFC_VISUAL_IDENTITY=PRESERVED
+LANDING_TOP_GLASS_HEADER=PRESERVED
+LANDING_COACH_PROMO_ON_ATHLETE=COMPACT
+LANDING_ATHLETE_TRAINER_ONLY_SECTIONS=HIDDEN
+LANDING_DEMO_CTA_SEMANTICS=CORRECTED
+LANDING_TERTIARY_CTA=REFINED
+LANDING_TRAINER_FULL_JOURNEY=APPROVED
+LANDING_TRAINER_COACH_TODAY=PRESERVED
+LANDING_TRAINER_AUDIENCE_DIFFERENTIATION=PASS
+LANDING_TRAINER_POST_AUTH_ACTIVATION=DEFERRED_TO_ISSUE_875
+LANDING_INTERACTIVE_PREVIEWS=PRESERVED
+LANDING_DESIGN_HANDOFF=UPDATED
+LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS
+LANDING_HANDOFF_PERSISTED=PASS
+LANDING_IMPLEMENTATION=AUTHORIZED_NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C2
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+Этот документ и visual references предназначены для versioned docs-only PR #852. Production Landing, PR implementation, merge/deploy runtime, production configuration и новые delivery processes этим handoff не меняются. Git/GitHub остаётся operational source of truth. Сервер localhost нужен только для просмотра локальной галереи.
