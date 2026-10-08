@@ -1261,6 +1261,46 @@ test('demo uses production today composition and persists one workout set throug
   expect(directProductionRequests).toEqual([]);
 });
 
+test('the public trainer entry opens the existing isolated trainer cabinet', async ({ page }) => {
+  const directMutationRequests: string[] = [];
+  page.on('request', (request) => {
+    const url = new URL(request.url());
+    if (
+      !url.pathname.startsWith('/api/v1/demo/') &&
+      ['POST', 'PUT', 'PATCH', 'DELETE'].includes(request.method())
+    ) {
+      directMutationRequests.push(`${request.method()} ${url.pathname}`);
+    }
+  });
+  await installDemoTransport(page);
+
+  for (const state of [
+    { width: 390, height: 844, theme: 'light' as const },
+    { width: 1440, height: 900, theme: 'dark' as const },
+  ]) {
+    await page.setViewportSize({ width: state.width, height: state.height });
+    await page.emulateMedia({ colorScheme: state.theme, reducedMotion: 'reduce' });
+    await page.goto('/for-trainers');
+
+    const entry = page.getByRole('link', { name: /Демо кабинета тренера/ });
+    await expect(entry).toHaveAttribute('href', '/demo?cabinet=1&scenario=trainer&section=trainer');
+    await entry.click();
+    await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
+    await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+    await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Пригласить клиента' }).first()).toBeDisabled();
+
+    await page.goBack();
+    await expect(page).toHaveURL('/for-trainers');
+    await expect(page.getByRole('heading', { name: /Рабочий кабинет тренера/ })).toBeVisible();
+    await page.goForward();
+    await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
+    await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  }
+
+  expect(directMutationRequests).toEqual([]);
+});
+
 test('nutrition and coach scenarios render shared production surfaces with local mutations', async ({
   browser,
 }) => {

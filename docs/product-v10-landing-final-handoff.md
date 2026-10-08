@@ -425,3 +425,57 @@ env change required: no
   mobile composition were inspected; existing `/` and `/for-trainers` were not rewired.
 - Production implementation, demo session creation, authentication, private data access and
   deploy were not performed. The next bounded stage is #856 for the existing trainer demo path.
+
+## 19. C5 trainer demo entry and evidence map (#856)
+
+Trainer demo CTAs point to the existing isolated `DemoCabinet` route. The staged coach page and
+the current public `/for-trainers` page use the same hostname-aware URL builder; no new public
+route, session runtime, fixture engine or product screen is introduced.
+
+| Boundary | Source | Contract |
+|---|---|---|
+| Trainer demo destination | `frontend/src/shared/navigation/appUrl.ts` | `demoCabinetUrlForHostname(hostname, 'trainer', 'trainer')` resolves to `/demo?cabinet=1&scenario=trainer&section=trainer` locally and the existing app subdomain on the public hostname |
+| Staged coach CTA | `frontend/src/pages/landing/LandingV10CoachPage.tsx` | hero and final «Попробовать демо для тренера» links enter the real trainer demo contour, while the nearby «Как работает Коуч ОС» link remains an in-page preview anchor |
+| Existing public entry | `frontend/src/content/publicContent.json`, `frontend/src/pages/public/PublicContentPage.tsx` | `/for-trainers` keeps one related card «Демо кабинета тренера» with the same trainer destination and demo click event |
+| Demo runtime | `frontend/src/pages/demo/DemoCabinet.tsx`, `frontend/src/features/demo/demoApi.ts`, `frontend/src/features/demo/demoRoute.ts` | one existing synthetic trainer session, Coach Today → attention/client/workout/progress/operations/task/return route, current reset/exit/focus/history behavior |
+| Boundary | `DemoCabinet` demo boundary and existing demo transport | «Демо-режим · данные не сохраняются» remains visible; invitations and real account writes are not available in the public session |
+| Proof | `frontend/tests/unit/pages/landing/LandingV10CoachPage.test.tsx`, `frontend/tests/e2e/demo-mode.spec.ts` | both staged trainer CTAs and the public `/for-trainers` click-through are checked against the actual rendered demo cabinet, with mobile/desktop themes, back/forward and mutation boundary assertions |
+
+Exact CTA → destination → browser state contract:
+
+```text
+/for-trainers → «Демо кабинета тренера»
+  → /demo?cabinet=1&scenario=trainer&section=trainer
+  → heading «Что требует действия?» + «Демо-режим · данные не сохраняются»
+  → synthetic Coach Today; no direct real mutation request
+
+staged coach hero/final CTA → /demo?cabinet=1&scenario=trainer&section=trainer
+  → the same existing DemoCabinet state; «Как работает Коуч ОС» remains an in-page preview
+```
+
+```text
+LANDING_TRAINER_DEMO_ENGINE=REUSED_EXISTING
+LANDING_TRAINER_DEMO_ENTRY=PUBLIC_FOR_TRAINERS_AND_STAGED_COACH_CTA
+LANDING_TRAINER_DEMO_BOUNDARY=NO_REAL_WRITES_OR_PRIVATE_DATA
+LANDING_TRAINER_DEMO_RESPONSIVE=CHECKED
+LANDING_TRAINER_DEMO_HISTORY=CHECKED
+LANDING_IMPLEMENTATION=ATHLETE_COACH_DEMO_STAGED
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C6
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+### C5 verification record
+
+- Full frontend Vitest passed: 141 files, 777 tests. The unit contract covers both staged coach
+  demo CTAs and retains the in-page Coach OS preview anchor separately from the real demo
+  destination.
+- TypeScript, Vite production build, ESLint, Russian UI guard and targeted Prettier passed.
+- The Playwright contract starts from `/for-trainers`, clicks the public trainer demo entry,
+  asserts the rendered `DemoCabinet` screen and explicit no-save boundary, checks the disabled
+  invite action, runs mobile/light and desktop/dark states, and returns through browser back and
+  forward without leaving the isolated demo route.
+- The existing trainer route remains the only demo runtime; no production route, backend API,
+  account, private note, real invitation, notification or deploy is added by C5.

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { appUrlForHostname, demoUrlForHostname } from '../../shared/navigation/appUrl';
+import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
 import { LandingV10Shell } from './LandingV10Shell';
@@ -93,7 +93,7 @@ function CoachTodayPreview() {
 function CoachHero() {
   const [heroUnavailable, setHeroUnavailable] = useState(false);
   const appUrl = appUrlForHostname(window.location.hostname);
-  const demoUrl = demoUrlForHostname(window.location.hostname);
+  const demoUrl = demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer');
 
   return (
     <section
@@ -126,7 +126,7 @@ function CoachHero() {
           </a>
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
-            href={`${demoUrl}?cabinet=1&scenario=trainer&section=trainer`}
+            href={demoUrl}
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>
@@ -321,7 +321,7 @@ function FollowUpPreview() {
 
 export default function LandingV10CoachPage() {
   useLandingHeroMotion();
-  const demoUrl = demoUrlForHostname(window.location.hostname);
+  const demoUrl = demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer');
 
   return (
     <LandingV10Shell audience="coach">
@@ -578,7 +578,7 @@ export default function LandingV10CoachPage() {
           </a>
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
-            href={`${demoUrl}?cabinet=1&scenario=trainer&section=trainer`}
+            href={demoUrl}
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>

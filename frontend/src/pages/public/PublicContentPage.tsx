@@ -15,7 +15,7 @@ import type {
   PublicExerciseSummary,
   PublicProgram,
 } from '../../shared/api/types';
-import { appUrlForHostname } from '../../shared/navigation/appUrl';
+import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { AppLink, Redirect, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
@@ -557,27 +557,39 @@ function RelatedContent({ page }: { page: PublicContentPageData }) {
         <h2 id="public-related-title">Связанные материалы и возможности</h2>
       </div>
       <div className="public-related-grid">
-        {page.related.map((item) => (
-          <AppLink
-            className="public-related-card"
-            to={item.path}
-            key={item.path}
-            onClick={
-              page.path === '/for-trainers' && item.path.startsWith('/demo?')
-                ? () =>
-                    trackProductEvent({
-                      name: 'trainer_landing_cta_clicked',
-                      surface: productEventSurface(),
-                      destination: 'demo',
-                    })
-                : undefined
-            }
-          >
-            <strong>{item.label}</strong>
-            {item.description && <span>{item.description}</span>}
-            <small>Открыть →</small>
-          </AppLink>
-        ))}
+        {page.related.map((item) => {
+          const isTrainerDemo = page.path === '/for-trainers' && item.path.startsWith('/demo?');
+          const href = isTrainerDemo
+            ? demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer')
+            : item.path;
+          const onClick = isTrainerDemo
+            ? () =>
+                trackProductEvent({
+                  name: 'trainer_landing_cta_clicked',
+                  surface: productEventSurface(),
+                  destination: 'demo',
+                })
+            : undefined;
+          const content = (
+            <>
+              <strong>{item.label}</strong>
+              {item.description && <span>{item.description}</span>}
+              <small>Открыть →</small>
+            </>
+          );
+          if (href.startsWith('http')) {
+            return (
+              <a className="public-related-card" href={href} key={item.path} onClick={onClick}>
+                {content}
+              </a>
+            );
+          }
+          return (
+            <AppLink className="public-related-card" to={href} key={item.path} onClick={onClick}>
+              {content}
+            </AppLink>
+          );
+        })}
       </div>
     </section>
   );

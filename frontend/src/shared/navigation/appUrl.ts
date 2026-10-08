@@ -16,6 +16,15 @@ export function demoUrlForHostname(hostname: string): string {
     : '/demo';
 }
 
+export function demoCabinetUrlForHostname(
+  hostname: string,
+  scenario: string,
+  section: string,
+): string {
+  const params = new URLSearchParams({ cabinet: '1', scenario, section });
+  return `${demoUrlForHostname(hostname)}?${params.toString()}`;
+}
+
 export function publicUrlForHostname(hostname: string, path: string): string {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return ['app.your-fitness-coach.ru', 'www.app.your-fitness-coach.ru'].includes(hostname)
