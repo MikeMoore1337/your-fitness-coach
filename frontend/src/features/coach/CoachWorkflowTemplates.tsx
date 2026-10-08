@@ -156,6 +156,10 @@ function formatDate(value: string): string {
   return new Date(value).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
 }
 
+function isConfirmedDraft(status: 'draft' | 'confirmed'): boolean {
+  return status === 'confirmed';
+}
+
 export function CoachWorkflowTemplates({
   clients,
   canManage = true,
@@ -802,8 +806,8 @@ export function CoachWorkflowTemplates({
                               {item.client_name} · версия {item.version} ·{' '}
                               {formatDate(item.updated_at)}
                             </span>{' '}
-                            <Badge tone={item.status === 'confirmed' ? 'success' : 'warning'}>
-                              {item.status === 'confirmed' ? 'Подтверждено' : 'Черновик'}
+                            <Badge tone={isConfirmedDraft(item.status) ? 'success' : 'warning'}>
+                              {isConfirmedDraft(item.status) ? 'Подтверждено' : 'Черновик'}
                             </Badge>{' '}
                             <Button
                               onClick={() => setSelectedDraftId(item.id)}
@@ -832,8 +836,8 @@ export function CoachWorkflowTemplates({
           description="Изменения сохраняются отдельно. Подтверждение добавляет одно уведомление в существующий внутренний поток клиента."
           actions={
             selectedDraft && (
-              <Badge tone={selectedDraft.status === 'confirmed' ? 'success' : 'warning'}>
-                {selectedDraft.status === 'confirmed' ? 'Подтверждено' : 'Черновик'}
+              <Badge tone={isConfirmedDraft(selectedDraft.status) ? 'success' : 'warning'}>
+                {isConfirmedDraft(selectedDraft.status) ? 'Подтверждено' : 'Черновик'}
               </Badge>
             )
           }
@@ -851,7 +855,7 @@ export function CoachWorkflowTemplates({
                 <span>Тема</span>
                 <input
                   className="ui-input"
-                  disabled={!canManage || selectedDraft.status === 'confirmed'}
+                  disabled={!canManage || isConfirmedDraft(selectedDraft.status)}
                   onChange={(event) =>
                     setDraftEdits((values) => ({
                       ...values,
@@ -868,7 +872,7 @@ export function CoachWorkflowTemplates({
                 <span>Текст</span>
                 <textarea
                   className="ui-input"
-                  disabled={!canManage || selectedDraft.status === 'confirmed'}
+                  disabled={!canManage || isConfirmedDraft(selectedDraft.status)}
                   onChange={(event) =>
                     setDraftEdits((values) => ({
                       ...values,
@@ -886,7 +890,7 @@ export function CoachWorkflowTemplates({
                 <Button
                   disabled={
                     !canManage ||
-                    selectedDraft.status === 'confirmed' ||
+                    isConfirmedDraft(selectedDraft.status) ||
                     !currentDraftSubject.trim() ||
                     !currentDraftBody.trim() ||
                     updateDraft.isPending
@@ -899,12 +903,12 @@ export function CoachWorkflowTemplates({
                 </Button>
                 <Button
                   disabled={
-                    !canManage || selectedDraft.status === 'confirmed' || confirmDraft.isPending
+                    !canManage || isConfirmedDraft(selectedDraft.status) || confirmDraft.isPending
                   }
                   onClick={() => confirmDraft.mutate()}
                   type="button"
                 >
-                  {selectedDraft.status === 'confirmed'
+                  {isConfirmedDraft(selectedDraft.status)
                     ? 'Сообщение подтверждено'
                     : 'Подтвердить сообщение'}
                 </Button>
