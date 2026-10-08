@@ -213,6 +213,16 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "coach_check_in_template_versions": "private trainer-owned check-in field definitions",
     "coach_check_in_assignments": "coach-client check-in assignment metadata",
     "coach_check_in_responses": "health-adjacent check-in responses kept out of generic archives",
+    "coach_workflow_templates": "private trainer-owned onboarding and communication templates",
+    "coach_workflow_template_versions": (
+        "private trainer-owned workflow versions and message content"
+    ),
+    "coach_workflow_assignments": (
+        "trainer-owned client assignment metadata kept out of generic archives"
+    ),
+    "coach_communication_drafts": (
+        "trainer-owned client message drafts and confirmation metadata kept out of generic archives"
+    ),
 }
 
 
