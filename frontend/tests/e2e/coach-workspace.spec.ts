@@ -1747,14 +1747,25 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
         return { height: box.height, width: box.width, x: box.x, y: box.y };
       }),
     );
-    const viewportWidth = targetPage.viewportSize()?.width ?? 390;
     const firstStage = stageBoxes[0];
     const firstRow = stageBoxes.slice(0, columns);
     if (!firstStage || firstRow.length !== columns) {
       throw new Error('Этапы подключения не найдены');
     }
+    expect(stageBoxes.every((box) => box.width > 0 && box.height >= 44)).toBe(true);
     expect(
-      stageBoxes.every((box) => box.width > 0 && (viewportWidth > 640 || box.height >= 44)),
+      await stageCards.evaluateAll((elements) =>
+        elements.every((element) => {
+          const input = element.querySelector('input');
+          const label = element.querySelector('span');
+          if (!input || !label) return false;
+          const inputBox = input.getBoundingClientRect();
+          const labelBox = label.getBoundingClientRect();
+          const inputCenter = inputBox.top + inputBox.height / 2;
+          const labelCenter = labelBox.top + labelBox.height / 2;
+          return inputBox.left < labelBox.left && Math.abs(inputCenter - labelCenter) <= 1;
+        }),
+      ),
     ).toBe(true);
     expect(
       Math.max(...firstRow.map((box) => box.y)) - Math.min(...firstRow.map((box) => box.y)),
@@ -1804,13 +1815,30 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
   };
 
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
-  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.setViewportSize({ width: 1280, height: 900 });
   await mockCoachWorkspace(page, { workflow: true });
   const desktopWorkflow = await openWorkflow(page);
+  await assertStageLayout(page, desktopWorkflow, 3);
+  await desktopWorkflow.locator('.coach-workflow-templates__steps').scrollIntoViewIfNeeded();
   await page.screenshot({
-    path: '../.artifacts/tasks/756/deliverables/visual/desktop-light.png',
-    fullPage: true,
+    path: '../.artifacts/tasks/846/deliverables/visual/desktop-light.png',
   });
+
+  const desktopDarkContext = await browser.newContext({
+    colorScheme: 'dark',
+    viewport: { width: 1280, height: 900 },
+  });
+  const desktopDarkPage = await desktopDarkContext.newPage();
+  await desktopDarkPage.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
+  await mockCoachWorkspace(desktopDarkPage, { workflow: true });
+  const desktopDarkWorkflow = await openWorkflow(desktopDarkPage);
+  await expect(desktopDarkPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await assertStageLayout(desktopDarkPage, desktopDarkWorkflow, 3);
+  await desktopDarkWorkflow.locator('.coach-workflow-templates__steps').scrollIntoViewIfNeeded();
+  await desktopDarkPage.screenshot({
+    path: '../.artifacts/tasks/846/deliverables/visual/desktop-dark.png',
+  });
+  await desktopDarkContext.close();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(desktopWorkflow).toBeVisible();
@@ -1842,7 +1870,7 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
     )
     .toBeLessThanOrEqual(1);
   await page.screenshot({
-    path: '../.artifacts/tasks/756/deliverables/visual/mobile-web-light.png',
+    path: '../.artifacts/tasks/846/deliverables/visual/mobile-web-light.png',
   });
 
   for (const [width, columns] of [
@@ -1851,7 +1879,8 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
     [375, 1],
     [390, 1],
     [430, 1],
-    [768, 3],
+    [768, 2],
+    [1024, 2],
   ] as const) {
     await page.setViewportSize({ width, height: 844 });
     await assertStageLayout(page, desktopWorkflow, columns);
@@ -1894,7 +1923,7 @@ test('Product V10 B7 keeps onboarding and communication workflows Russian and mo
     )
     .toBeLessThanOrEqual(1);
   await tmaPage.screenshot({
-    path: '../.artifacts/tasks/756/deliverables/visual/mocked-tma-dark.png',
+    path: '../.artifacts/tasks/846/deliverables/visual/mocked-tma-dark.png',
   });
   await expect(tmaWorkflow).toBeVisible();
   await tmaContext.close();
