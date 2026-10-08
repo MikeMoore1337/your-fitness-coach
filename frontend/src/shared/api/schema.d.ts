@@ -1948,6 +1948,145 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/coach/workflow-templates/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Onboarding Templates */
+        get: operations["coach_onboarding_templates_api_v1_coach_workflow_templates_onboarding_get"];
+        put?: never;
+        /** Create Coach Onboarding Template */
+        post: operations["create_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/onboarding/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Onboarding Template Version */
+        post: operations["create_coach_onboarding_template_version_api_v1_coach_workflow_templates_onboarding__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/onboarding/{template_id}/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Assign Coach Onboarding Template */
+        post: operations["assign_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding__template_id__assignments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Coach Communication Templates */
+        get: operations["coach_communication_templates_api_v1_coach_workflow_templates_communication_get"];
+        put?: never;
+        /** Create Coach Communication Template */
+        post: operations["create_coach_communication_template_api_v1_coach_workflow_templates_communication_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication/{template_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Communication Template Version */
+        post: operations["create_coach_communication_template_version_api_v1_coach_workflow_templates_communication__template_id__versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/workflow-templates/communication/{template_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Coach Communication Draft */
+        post: operations["create_coach_communication_draft_api_v1_coach_workflow_templates_communication__template_id__drafts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/coach/communication-drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Coach Communication Draft */
+        get: operations["get_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Communication Draft */
+        patch: operations["update_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/coach/communication-drafts/{draft_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Coach Communication Draft */
+        post: operations["confirm_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/coach/operations/today": {
         parameters: {
             query?: never;
@@ -9089,6 +9228,146 @@ export interface components {
             /** Task State */
             task_state?: ("open" | "completed") | null;
         };
+        /** CommunicationDraftCreate */
+        CommunicationDraftCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+        };
+        /** CommunicationDraftResponse */
+        CommunicationDraftResponse: {
+            /** Id */
+            id: number;
+            /** Template Id */
+            template_id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /** Notification Id */
+            notification_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+        };
+        /** CommunicationDraftSummary */
+        CommunicationDraftSummary: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "confirmed";
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Confirmed At */
+            confirmed_at?: string | null;
+        };
+        /** CommunicationDraftUpdate */
+        CommunicationDraftUpdate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+        };
+        /** CommunicationTemplateCreate */
+        CommunicationTemplateCreate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** CommunicationTemplateListResponse */
+        CommunicationTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["CommunicationTemplateResponse"][];
+        };
+        /** CommunicationTemplateResponse */
+        CommunicationTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["CommunicationTemplateVersionResponse"] | null;
+            /** Drafts */
+            drafts?: components["schemas"]["CommunicationDraftSummary"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** CommunicationTemplateVersionCreate */
+        CommunicationTemplateVersionCreate: {
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+        };
+        /** CommunicationTemplateVersionResponse */
+        CommunicationTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** DailyValuePercent */
         DailyValuePercent: {
             /** Energy Kcal */
@@ -12965,6 +13244,82 @@ export interface components {
             /** Missing Fields */
             missing_fields: "goal"[];
         };
+        /** OnboardingTemplateAssignmentCreate */
+        OnboardingTemplateAssignmentCreate: {
+            /** Client Id */
+            client_id: number;
+            /** Version */
+            version?: number | null;
+        };
+        /** OnboardingTemplateCreate */
+        OnboardingTemplateCreate: {
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+        };
+        /** OnboardingTemplateListResponse */
+        OnboardingTemplateListResponse: {
+            /** Items */
+            items?: components["schemas"]["OnboardingTemplateResponse"][];
+        };
+        /** OnboardingTemplateResponse */
+        OnboardingTemplateResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            /** Is Active */
+            is_active: boolean;
+            current_version?: components["schemas"]["OnboardingTemplateVersionResponse"] | null;
+            /** Assignments */
+            assignments?: components["schemas"]["WorkflowAssignmentResponse"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** OnboardingTemplateVersionCreate */
+        OnboardingTemplateVersionCreate: {
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+        };
+        /** OnboardingTemplateVersionResponse */
+        OnboardingTemplateVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version */
+            version: number;
+            /** Steps */
+            steps: ("invite" | "questionnaire" | "goals" | "equipment" | "restrictions" | "measurements" | "program" | "first_check_in" | "agenda")[];
+            /** Program Template Id */
+            program_template_id?: number | null;
+            /** Check In Template Id */
+            check_in_template_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** PackageAmount */
         "PackageAmount-Input": {
             /** Amount */
@@ -16789,6 +17144,27 @@ export interface components {
             target_total?: components["schemas"]["FoodDiaryTargets"] | null;
             /** Proposals */
             proposals?: components["schemas"]["WeeklyPlanningProposal"][];
+        };
+        /** WorkflowAssignmentResponse */
+        WorkflowAssignmentResponse: {
+            /** Id */
+            id: number;
+            /** Client Id */
+            client_id: number;
+            /** Client Name */
+            client_name: string;
+            /** Version */
+            version: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "assigned" | "completed" | "revoked";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** WorkoutAdaptationApplyRequest */
         WorkoutAdaptationApplyRequest: {
@@ -21585,6 +21961,363 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckInTemplateResponseHistory"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_onboarding_templates_api_v1_coach_workflow_templates_onboarding_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_onboarding_template_version_api_v1_coach_workflow_templates_onboarding__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    assign_coach_onboarding_template_api_v1_coach_workflow_templates_onboarding__template_id__assignments_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingTemplateAssignmentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowAssignmentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    coach_communication_templates_api_v1_coach_workflow_templates_communication_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateListResponse"];
+                };
+            };
+        };
+    };
+    create_coach_communication_template_api_v1_coach_workflow_templates_communication_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationTemplateCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_communication_template_version_api_v1_coach_workflow_templates_communication__template_id__versions_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationTemplateVersionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationTemplateVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_coach_communication_draft_api_v1_coach_workflow_templates_communication__template_id__drafts_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                template_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationDraftCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommunicationDraftUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_coach_communication_draft_api_v1_coach_communication_drafts__draft_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "Idempotency-Key"?: string | null;
+            };
+            path: {
+                draft_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommunicationDraftResponse"];
                 };
             };
             /** @description Validation Error */

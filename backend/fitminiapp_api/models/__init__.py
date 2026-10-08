@@ -30,6 +30,12 @@ from fitminiapp_api.models.coach_crm import (
     CoachTask,
 )
 from fitminiapp_api.models.coach_reviews import CoachCheckInReview
+from fitminiapp_api.models.coach_workflow_templates import (
+    CoachCommunicationDraft,
+    CoachWorkflowAssignment,
+    CoachWorkflowTemplate,
+    CoachWorkflowTemplateVersion,
+)
 from fitminiapp_api.models.daily_wellbeing import DailyWellbeingCheckIn
 from fitminiapp_api.models.exercise import (
     Equipment,
@@ -158,12 +164,16 @@ __all__ = [
     "CoachCheckInTemplateVersion",
     "CoachClient",
     "CoachClientInvite",
+    "CoachCommunicationDraft",
     "CoachPackage",
     "CoachPackageLedgerEntry",
     "CoachPayment",
     "CoachRoleApplication",
     "CoachSessionSeries",
     "CoachTask",
+    "CoachWorkflowAssignment",
+    "CoachWorkflowTemplate",
+    "CoachWorkflowTemplateVersion",
     "DailyWellbeingCheckIn",
     "EnergyCalibration",
     "Equipment",

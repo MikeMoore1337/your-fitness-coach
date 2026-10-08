@@ -2045,6 +2045,177 @@
   margin-bottom: var(--v2-space-3);
 }
 
+.coach-workflow-templates {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.coach-workflow-templates__forms,
+.coach-workflow-templates__draft-form,
+.coach-workflow-template__editor {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.coach-workflow-templates__forms {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.coach-workflow-templates__forms > :last-child,
+.coach-workflow-templates__wide-field,
+.coach-workflow-templates__references {
+  grid-column: 1 / -1;
+}
+
+.coach-workflow-templates__steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-compact-radius);
+}
+
+.coach-workflow-templates__steps legend {
+  padding-inline: var(--v2-space-1);
+  color: var(--v2-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.coach-workflow-templates__step {
+  min-width: 0;
+}
+
+.coach-workflow-templates__step input {
+  margin: 0;
+}
+
+.coach-workflow-templates__references,
+.coach-workflow-template__assign {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+}
+
+.coach-workflow-templates__list {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+
+.coach-workflow-template {
+  display: grid;
+  gap: var(--v2-space-3);
+  min-width: 0;
+  padding: var(--v2-space-3);
+  border: 1px solid var(--coach-line);
+  border-radius: var(--v2-panel-radius);
+  background: var(--v2-surface);
+}
+
+.coach-workflow-template__header,
+.coach-workflow-template__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.coach-workflow-template__header {
+  justify-content: space-between;
+}
+
+.coach-workflow-template__header h3 {
+  margin: 0;
+}
+
+.coach-workflow-template__header p,
+.coach-workflow-template__body,
+.coach-workflow-template__meta {
+  margin: 0;
+}
+
+.coach-workflow-template__meta,
+.coach-workflow-template__body {
+  color: var(--v2-text-secondary);
+}
+
+.coach-workflow-template__history {
+  display: grid;
+  gap: var(--v2-space-2);
+  padding-top: var(--v2-space-3);
+  border-top: 1px solid var(--coach-line);
+}
+
+.coach-workflow-template__history ul {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.coach-workflow-template__history li {
+  padding-block: var(--v2-space-1);
+}
+
+.coach-workflow-templates__draft {
+  scroll-margin-top: var(--v2-space-5);
+}
+
+@media (max-width: 640px) {
+  .coach-workflow-templates__forms,
+  .coach-workflow-templates__references,
+  .coach-workflow-template__assign {
+    grid-template-columns: 1fr;
+  }
+
+  .coach-workflow-templates__steps {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+    gap: var(--v2-space-3);
+  }
+
+  .coach-workflow-templates__step {
+    display: flex;
+    min-height: 44px;
+    min-width: 0;
+    align-items: center;
+    gap: var(--v2-space-2);
+    padding: var(--v2-space-2);
+    border: 1px solid var(--coach-line);
+    border-radius: var(--v2-compact-radius);
+    background: var(--v2-surface);
+    cursor: pointer;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+
+  .coach-workflow-templates__step.is-selected {
+    border-color: var(--v2-lime);
+    background: var(--coach-soft);
+    box-shadow: inset 0 0 0 1px var(--v2-lime);
+  }
+
+  .coach-workflow-templates__step:focus-within {
+    outline: 2px solid var(--v2-lime);
+    outline-offset: 2px;
+  }
+
+  .coach-workflow-templates__step input {
+    flex: 0 0 auto;
+    width: 20px;
+    height: 20px;
+    accent-color: var(--v2-lime);
+  }
+
+  .coach-workflow-templates__step span {
+    min-width: 0;
+    overflow-wrap: normal;
+    word-break: normal;
+  }
+}
+
 @media (max-width: 640px) {
   .coach-check-in-templates__form,
   .coach-check-in-template__assign,
