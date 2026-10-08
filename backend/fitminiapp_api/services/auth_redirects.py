@@ -4,6 +4,7 @@ import re
 from urllib.parse import urlencode
 
 SAFE_AUTH_PATHS = frozenset({"/app", "/coach", "/admin"})
+TRAINER_INTENT_PATH = "/app?trainer_intent=1"
 SAFE_JOIN_PATH = re.compile(r"/join/[A-Za-z0-9_-]{20,128}\Z")
 AUTH_ERROR_CODES = frozenset(
     {
@@ -22,7 +23,11 @@ def safe_auth_next_path(value: str | None) -> str | None:
     if value is None:
         return None
     normalized = value.strip()
-    if normalized in SAFE_AUTH_PATHS or SAFE_JOIN_PATH.fullmatch(normalized):
+    if (
+        normalized in SAFE_AUTH_PATHS
+        or normalized == TRAINER_INTENT_PATH
+        or SAFE_JOIN_PATH.fullmatch(normalized)
+    ):
         return normalized
     return None
 

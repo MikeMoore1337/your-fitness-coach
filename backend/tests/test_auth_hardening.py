@@ -332,6 +332,7 @@ def test_private_responses_and_auth_cookies_have_safe_policy(client, monkeypatch
     ("value", "expected"),
     [
         ("/app", "/app"),
+        ("/app?trainer_intent=1", "/app?trainer_intent=1"),
         ("/coach", "/coach"),
         ("/admin", "/admin"),
         ("/join/Abc_12345678901234567890", "/join/Abc_12345678901234567890"),
@@ -340,6 +341,7 @@ def test_private_responses_and_auth_cookies_have_safe_policy(client, monkeypatch
         ("/%2F%2Fevil.example", None),
         ("%2F%2Fevil.example", None),
         ("/app%3Fnext=https://evil.example", None),
+        ("/app?trainer_intent=1&next=https://evil.example", None),
         ("/unknown", None),
     ],
 )
@@ -350,6 +352,9 @@ def test_safe_auth_next_allowlist(value, expected):
 def test_auth_error_redirect_keeps_only_a_safe_continuation():
     assert auth_error_redirect("denied", next_path="/coach") == (
         "/login?next=%2Fcoach&auth_error=denied"
+    )
+    assert auth_error_redirect("denied", next_path="/app?trainer_intent=1") == (
+        "/login?next=%2Fapp%3Ftrainer_intent%3D1&auth_error=denied"
     )
     assert auth_error_redirect("provider-secret", next_path="https://evil.example") == (
         "/login?next=%2Fapp&auth_error=provider_failure"

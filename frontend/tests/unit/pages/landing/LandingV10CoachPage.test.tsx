@@ -70,12 +70,12 @@ describe('LandingV10CoachPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('keeps trainer CTA destinations on the existing app and demo contours', () => {
+  it('keeps trainer CTA destinations on the bounded auth intent and demo contours', () => {
     renderPage();
 
     expect(screen.getAllByRole('link', { name: 'Начать как тренер' })[0]).toHaveAttribute(
       'href',
-      '/app',
+      '/login?next=%2Fapp%3Ftrainer_intent%3D1',
     );
     const trainerDemoLinks = screen.getAllByRole('link', {
       name: 'Попробовать демо для тренера',

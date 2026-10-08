@@ -1,4 +1,6 @@
-const SAFE_AUTH_PATHS = new Set(['/app', '/coach', '/admin']);
+import { TRAINER_INTENT_PATH } from './trainerIntent';
+
+const SAFE_AUTH_PATHS = new Set(['/app', '/coach', '/admin', TRAINER_INTENT_PATH]);
 const SAFE_INVITE_PATH = /^\/join\/[A-Za-z0-9_-]{20,128}$/;
 const OAUTH_PROVIDERS = new Set(['telegram', 'google', 'yandex', 'vk', 'apple']);
 
