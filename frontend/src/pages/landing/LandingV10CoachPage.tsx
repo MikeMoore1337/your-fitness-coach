@@ -6,11 +6,11 @@ import { LandingV10Shell } from './LandingV10Shell';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
 
-type CoachTodayTab = 'facts' | 'changes' | 'message';
+type CoachTodayTab = 'facts' | 'изменения' | 'message';
 
 const COACH_TODAY_TABS: ReadonlyArray<{ id: CoachTodayTab; label: string }> = [
   { id: 'facts', label: 'Факты' },
-  { id: 'changes', label: 'Изменения' },
+  { id: 'изменения', label: 'Изменения' },
   { id: 'message', label: 'Сообщение' },
 ] as const;
 
@@ -24,7 +24,7 @@ const COACH_TODAY_CONTENT: Record<
     body: '2 тренировки выполнены · проверка недели готова к просмотру.',
     note: 'Публичный пример использует только синтетические записи.',
   },
-  changes: {
+  изменения: {
     eyebrow: 'ПРОГРАММА / ВЕРСИЯ 2',
     title: 'Изменение подтверждено',
     body: 'Тяга гантели: 3 → 2 подхода. Один демо-клиент.',
@@ -39,7 +39,7 @@ const COACH_TODAY_CONTENT: Record<
 };
 
 function CoachTodayPreview() {
-  const [tab, setTab] = useState<CoachTodayTab>('changes');
+  const [tab, setTab] = useState<CoachTodayTab>('изменения');
   const active = COACH_TODAY_CONTENT[tab];
 
   return (
@@ -83,7 +83,7 @@ function CoachTodayPreview() {
         <p>{active.body}</p>
         <span>{active.note}</span>
         <strong className="landing-v10-coach-today__confirmation">
-          {tab === 'changes' ? 'Подтверждено в примере' : 'Доступно для решения'}
+          {tab === 'изменения' ? 'Подтверждено в примере' : 'Доступно для решения'}
         </strong>
       </div>
     </div>
