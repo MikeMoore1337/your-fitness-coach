@@ -5439,6 +5439,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/for-athletes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Athlete Landing Alias Page */
+        get: operations["athlete_landing_alias_page_for_athletes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/articles": {
         parameters: {
             query?: never;
@@ -29533,6 +29550,26 @@ export interface operations {
         };
     };
     landing_page__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    athlete_landing_alias_page_for_athletes_get: {
         parameters: {
             query?: never;
             header?: never;
