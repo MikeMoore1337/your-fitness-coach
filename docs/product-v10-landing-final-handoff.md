@@ -32,7 +32,7 @@ Owner выбрал сочетание B (кинематографичная сп
 Это один финальный вариант. Дополнительные hero-концепции не создавались: сохранение узнаваемого «Сила в действии» оказалось сильнее новой словесной идентичности. Для тренера предложено «Ваш метод в действии» в той же композиционной грамматике.
 
 В staged implementation PR production routes, API, модели, Demo service и SEO-файлы не
-изменяются. Новая athlete-композиция использует существующие production components и
+изменяются. Новые athlete и trainer композиции используют существующие production components и
 локальные synthetic preview states; browser verification проверяет отсутствие API-вызовов при
 рендере.
 
@@ -40,7 +40,7 @@ Owner выбрал сочетание B (кинематографичная сп
 
 - `LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS` зафиксирован в Issue #852.
 - `LANDING_HANDOFF_PERSISTED=PASS` означает этот versioned документ и выбранные visual references; ignored gallery не является единственным источником.
-- `LANDING_IMPLEMENTATION=ATHLETE_STAGED` после C3: production public cutover остаётся отдельным gate #858.
+- `LANDING_IMPLEMENTATION=ATHLETE_COACH_STAGED` после C4: production public cutover остаётся отдельным gate #858.
 - `CONTROLLER=ABSENT`: не добавлять controller, leases, lifecycle state machine, delivery owner, очередь или recovery orchestration.
 
 ## 2. Источники и визуальный аудит production
@@ -304,9 +304,9 @@ LANDING_INTERACTIVE_PREVIEWS=PRESERVED
 LANDING_DESIGN_HANDOFF=UPDATED
 LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS
 LANDING_HANDOFF_PERSISTED=PASS
-LANDING_IMPLEMENTATION=ATHLETE_STAGED
+LANDING_IMPLEMENTATION=ATHLETE_COACH_STAGED
 LANDING_PUBLIC_CUTOVER=NOT_STARTED
-PRODUCT_V10_CONVEYOR=READY_FOR_C4
+PRODUCT_V10_CONVEYOR=READY_FOR_C5
 CONTROLLER=ABSENT
 GITHUB_FLOW=AUTHORITATIVE
 env change required: no
@@ -350,8 +350,8 @@ cutover #858. Все previews синтетические и локальные; 
 | Responsive/theme layer | `frontend/src/pages/landing/landing-v10.css` | desktop/mobile grids, compact teaser, focus states and dark/light-safe surfaces; shared tokens, buttons, icons and glass shell stay in use |
 | Proof | `frontend/tests/unit/pages/landing/LandingV10AthletePage.test.tsx` | story landmarks, one teaser/no trainer scene, nutrition state, local weekly review, trainer href and no API call on render |
 
-`AppRoutes` и текущие `/` и `/for-trainers` остаются без изменений. Это staged athlete
-implementation для следующего bounded trainer task #855; production replacement и SEO
+`AppRoutes` и текущие `/` и `/for-trainers` остаются без изменений. Это staged athlete и
+trainer implementation для следующего bounded demo task #856; production replacement и SEO
 indexation остаются deferred to #858.
 
 ```text
@@ -379,3 +379,49 @@ env change required: no
   the trainer CTA pointing to `/for-trainers`.
 - The local visual screenshots remain ignored review evidence under `.artifacts`; no production
   route or deployment was changed by #854.
+
+## 18. C4 trainer staged implementation map (#855)
+
+Тренерская композиция собрана в том же staged shell и не подключена к текущему
+`/for-trainers` до финального cutover #858. В DOM тренерской ветки нет athlete-only
+`StrengthScene`, интерактивной тренировки, питания или athlete-прогресса; все product scenes
+ниже синтетические и локальные.
+
+| Boundary | Staged source | Contract |
+|---|---|---|
+| Trainer composition | `frontend/src/pages/landing/LandingV10CoachPage.tsx` | hero «Ваш метод в действии» → рабочий цикл → Coach Today/«Не потерять важное» → подключение клиента → версия программы → Client 360 факты → обратная связь/проверка → решение, safe rollout и черновик сообщения → Web/TMA → coach CTA |
+| Coach Today proof | `LandingV10CoachPage.tsx` | одна локальная сцена с вкладками «Факты / Изменения / Сообщение»; подтверждение и сообщение явно помечены как пример; API, реальные клиенты и private notes не читаются |
+| Coach-native scenes | `LandingV10CoachPage.tsx` | onboarding клиента, версии программы, factual review, check-in and explicit trainer decision use synthetic Alexey/Marina data; no auto-send, payment gateway, multi-coach or AI decision claim |
+| Safe rollout boundary | `LandingV10CoachPage.tsx` | выбор клиентов → локальный preview → explicit «Подтвердить в примере»; выполненная история не переписывается; draft confirmation is separate |
+| Shared visual layer | `LandingV10Shell.tsx`, `LandingAudienceSwitch.tsx`, `landing-v10.css` | existing PublicShell, brand lockup, buttons, icons, tokens, glass header, theme and reduced-motion contracts are reused; no second landing shell or demo engine |
+| Proof | `frontend/tests/unit/pages/landing/LandingV10CoachPage.test.tsx` | six chapter order, absence of athlete sections, local Coach Today/program/review/follow-up interactions, existing `/app` and trainer demo hrefs, no fetch on render |
+
+Порядок шести coach-native глав: `coach-today → connect → program → facts → review →
+decision`. `coach-decision` содержит два независимых локальных preview: safe rollout с явным
+подтверждением и черновик сообщения с отдельным подтверждением. Это не сквозной demo runtime.
+
+```text
+LANDING_TRAINER_NARRATIVE=STAGED
+LANDING_TRAINER_CHAPTERS=6
+LANDING_TRAINER_ATHLETE_SECTIONS=ABSENT
+LANDING_TRAINER_COACH_TODAY=LOCAL_PREVIEW
+LANDING_TRAINER_SAFE_ROLLOUT=LOCAL_EXPLICIT_CONFIRM
+LANDING_TRAINER_DEMO_ENGINE=DEFERRED_TO_C5
+LANDING_TRAINER_RESPONSIVE=PASS
+LANDING_IMPLEMENTATION=ATHLETE_COACH_STAGED
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C5
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+### C4 verification record
+
+- `frontend/tests/unit/pages/landing/LandingV10CoachPage.test.tsx`: 4/4 passed; targeted
+  TypeScript, Russian UI guard and Prettier passed.
+- Local Chromium staged preview checked 390×844 and 1440×900 in Light/Dark. Hero, audience
+  switch, six chapter order, coach-only scenes, light/dark panels, CTA contours and no-overflow
+  mobile composition were inspected; existing `/` and `/for-trainers` were not rewired.
+- Production implementation, demo session creation, authentication, private data access and
+  deploy were not performed. The next bounded stage is #856 for the existing trainer demo path.
