@@ -1403,7 +1403,12 @@ def list_clients(
     include_preferences_context: bool = False,
 ) -> list[dict]:
     clients = (
-        db.query(User, CoachClient.private_name, CoachClient.operational_status)
+        db.query(
+            User,
+            CoachClient.private_name,
+            CoachClient.operational_status,
+            CoachClient.labels,
+        )
         .join(CoachClient, CoachClient.client_user_id == User.id)
         .options(joinedload(User.profile))
         .filter(
@@ -1428,7 +1433,7 @@ def list_clients(
         .all()
     )
 
-    client_users = [user for user, _private_name, _operational_status in clients]
+    client_users = [user for user, _private_name, _operational_status, _labels in clients]
     users_by_id = {user.id: user for user in client_users}
     assigner_user = aliased(User)
     assigner_profile = aliased(UserProfile)
@@ -1466,8 +1471,9 @@ def list_clients(
             nutrition_by_user_id.get(user.id),
             include_preferences_context=include_preferences_context,
             operational_status=operational_status,
+            labels=labels,
         )
-        for user, private_name, operational_status in clients
+        for user, private_name, operational_status, labels in clients
     ] + [_client_entry_from_invite(invite) for invite in invites]
 
 

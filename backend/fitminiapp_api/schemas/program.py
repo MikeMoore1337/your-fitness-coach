@@ -1088,5 +1088,6 @@ class ClientResponse(BaseModel):
     training_preferences: TrainingPreferencesResponse | None = None
     timezone: str | None = None
     kbju: NutritionTargetResponse | None = None
+    labels: list[str] = Field(default_factory=list, max_length=20)
     status: Literal["active", "pending"]
     operational_status: Literal["active", "paused", "archived"] = "active"

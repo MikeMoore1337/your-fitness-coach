@@ -46,7 +46,6 @@ const task525VisualDir =
       process?: { env?: Record<string, string | undefined> };
     }
   ).process?.env?.TASK_525_VISUAL_DIR ?? '../.artifacts/tasks/525/deliverables/visual';
-
 const clients = [
   {
     id: 11,
@@ -62,6 +61,7 @@ const clients = [
     cardio_trainings_per_week: 1,
     timezone: 'Europe/Moscow',
     kbju: null,
+    labels: ['Онлайн'],
     status: 'active',
   },
   {
@@ -78,6 +78,7 @@ const clients = [
     cardio_trainings_per_week: 0,
     timezone: 'Europe/Moscow',
     kbju: null,
+    labels: ['Утро'],
     status: 'active',
   },
   {
@@ -94,6 +95,7 @@ const clients = [
     cardio_trainings_per_week: 2,
     timezone: 'Europe/Moscow',
     kbju: null,
+    labels: [],
     status: 'active',
   },
   {
@@ -102,6 +104,7 @@ const clients = [
     telegram_user_id: null,
     username: null,
     full_name: 'Елена — приглашение ожидает подтверждения',
+    labels: [],
     status: 'pending',
   },
 ];
@@ -528,6 +531,10 @@ async function mockCoachWorkspace(
         label: 'Завершённые тренировки',
         previous: 2,
         current: 3,
+        source: 'weekly_check_in',
+        source_id: 901,
+        reason: 'Завершённые тренировки: 2 → 3',
+        occurred_at: '2026-08-17',
       },
       {
         domain: 'progression',
@@ -535,6 +542,10 @@ async function mockCoachWorkspace(
         label: 'Объём тренинга',
         previous: 980,
         current: 1200,
+        source: 'weekly_check_in',
+        source_id: 901,
+        reason: 'Объём тренинга: 980 → 1200',
+        occurred_at: '2026-08-17',
       },
       {
         domain: 'nutrition',
@@ -542,6 +553,10 @@ async function mockCoachWorkspace(
         label: 'Дни с дневником питания',
         previous: 4,
         current: 6,
+        source: 'weekly_check_in',
+        source_id: 901,
+        reason: 'Дни с дневником питания: 4 → 6',
+        occurred_at: '2026-08-17',
       },
       {
         domain: 'measurements',
@@ -549,6 +564,10 @@ async function mockCoachWorkspace(
         label: 'Последний вес',
         previous: 69,
         current: 68.5,
+        source: 'weekly_check_in',
+        source_id: 901,
+        reason: 'Последний вес: 69 → 68.5',
+        occurred_at: '2026-08-17',
       },
     ],
     actions: {
@@ -1155,6 +1174,11 @@ async function mockCoachWorkspace(
       });
     if (path.endsWith('/coach/clients/11/review-workspace'))
       return route.fulfill({ json: reviewWorkspace });
+    if (path.endsWith('/coach/clients/11/labels') && request.method() === 'PATCH') {
+      const payload = request.postDataJSON() as { labels: string[] };
+      clients[0]!.labels = payload.labels;
+      return route.fulfill({ json: { client_id: 11, labels: payload.labels } });
+    }
     if (path.endsWith('/coach/clients')) return route.fulfill({ json: clients });
     if (/\/coach\/clients\/\d+\/operations$/.test(path))
       return route.fulfill({ json: { sessions: [], packages: [], payments: [], tasks: [] } });
@@ -1603,6 +1627,63 @@ test('Task 752 review workspace composes facts and keeps actions explicit on des
   await expect(
     workspace.getByRole('heading', { name: 'Ответ и следующий шаг', exact: true }),
   ).toBeVisible();
+});
+
+test('Task 755 keeps client groups organizational and explains meaningful changes', async ({
+  page,
+}) => {
+  await openCoach(page);
+  await page.getByLabel('Группа').selectOption('Онлайн');
+  const filteredRoster = page.locator('.coach-client-roster .coach-client-row');
+  await expect(filteredRoster).toHaveCount(1);
+  await expect(filteredRoster.getByText('Анна Петрова', { exact: true })).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /Анна Петрова/ })
+    .first()
+    .click();
+  await expect(page.getByRole('heading', { name: 'Группы клиента', exact: true })).toBeVisible();
+  await page.getByLabel('Метки через запятую').fill('Утро, онлайн');
+  await page.getByRole('button', { name: 'Сохранить группы', exact: true }).click();
+  await expect(page.getByText('Организационные группы сохранены', { exact: true })).toBeVisible();
+
+  await page
+    .getByRole('navigation', { name: 'Данные клиента' })
+    .getByRole('link', { name: 'Проверка', exact: true })
+    .click();
+  const workspace = page.getByTestId('coach-review-workspace');
+  await expect(workspace.getByText('Завершённые тренировки', { exact: true })).toBeVisible();
+  await expect(workspace.getByText('2 → 3', { exact: true })).toBeVisible();
+  await expect(workspace.getByText(/недельный итог/).first()).toBeVisible();
+  await expect(
+    workspace.getByText('Что проверить позже (необязательно)', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    workspace.getByRole('heading', { name: 'Следующая проверка', exact: true }),
+  ).toBeVisible();
+  await expect(workspace.getByText('Дата следующей проверки', { exact: true })).toBeVisible();
+  await expect(
+    workspace.getByRole('button', { name: 'Запланировать проверку', exact: true }),
+  ).toBeVisible();
+  await expect(workspace).not.toContainText(/follow-up|review|rollout/i);
+  const reviewButton = workspace.getByRole('button', {
+    name: 'Отметить итог проверенным',
+    exact: true,
+  });
+  const taskActions = workspace.locator('.coach-review-workspace__task-actions');
+  const actionSpacing = async () => {
+    const [reviewButtonBox, taskActionsBox] = await Promise.all([
+      reviewButton.boundingBox(),
+      taskActions.boundingBox(),
+    ]);
+    if (!reviewButtonBox || !taskActionsBox) return -1;
+    return taskActionsBox.y - (reviewButtonBox.y + reviewButtonBox.height);
+  };
+  await page.evaluate(() => document.fonts.ready);
+  await expect.poll(actionSpacing, { timeout: 5000 }).toBeGreaterThanOrEqual(12);
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expect.poll(actionSpacing, { timeout: 5000 }).toBeGreaterThanOrEqual(12);
 });
 
 test('Task 291 показывает action-first Today и ленивый контекст клиента', async ({ page }) => {

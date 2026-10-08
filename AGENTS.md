@@ -56,6 +56,18 @@ visual redesigns.
   changing authenticated UI. RETHINK requires an explicit owner-approved exploration task.
 - Use the shared `WeekStrip` for ordinary seven-day week contexts.
 
+## RUSSIAN_USER_FACING_UI (mandatory)
+
+- All new authenticated Web, Telegram Mini App, athlete-cabinet and trainer-cabinet UI copy is
+  Russian by default. This includes headings, labels, buttons, placeholders, hints, dialogs,
+  notifications, errors, statuses, chart/card labels and accessibility copy such as `aria-label`.
+- Allowed exceptions are `Your Fitness Coach`, official external brand names, necessary technical
+  or common fitness abbreviations without a practical Russian equivalent, and user-generated text.
+  `follow-up`, `review`, `rollout` and `Nutrition Planning` are not exceptions.
+- New or changed user-facing literals are checked by the AST-based `frontend` guard through
+  `npm run lint`; the guard is part of the required `frontend-checks` CI group. Do not add inline
+  bypasses. Legacy English UI is tracked separately and must not be expanded by new changes.
+
 ## Verification and security
 
 Run risk-based targeted checks, then the applicable repository checks. Meaningful checks include

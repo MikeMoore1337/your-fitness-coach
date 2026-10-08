@@ -94,6 +94,10 @@ class CoachReviewChange(BaseModel):
     label: str = Field(min_length=1, max_length=128)
     previous: float | int | None = None
     current: float | int | None = None
+    source: Literal["weekly_check_in"]
+    source_id: int = Field(gt=0)
+    reason: str = Field(min_length=1, max_length=240)
+    occurred_at: date
 
 
 class CoachReviewActionState(BaseModel):

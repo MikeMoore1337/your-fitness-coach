@@ -59,12 +59,14 @@ export function needsCoachAttention(summary?: TrainerClientProgressSummary): boo
 export function filterCoachClients({
   clients,
   filter,
+  labelFilter = '',
   programs,
   search,
   summaries,
 }: {
   clients: Client[];
   filter: CoachClientFilter;
+  labelFilter?: string;
   programs: CoachAssignedProgram[];
   search: string;
   summaries: Map<number, TrainerClientProgressSummary>;
@@ -84,6 +86,15 @@ export function filterCoachClients({
       .filter(Boolean)
       .join(' ')
       .toLocaleLowerCase('ru-RU');
+    const normalizedLabelFilter = labelFilter.toLocaleLowerCase('ru-RU');
+    if (
+      normalizedLabelFilter &&
+      !(client.labels ?? []).some(
+        (label) => label.toLocaleLowerCase('ru-RU') === normalizedLabelFilter,
+      )
+    ) {
+      return false;
+    }
     if (normalizedSearch && !searchable.includes(normalizedSearch)) return false;
 
     if (filter === 'pending') return client.status === 'pending';

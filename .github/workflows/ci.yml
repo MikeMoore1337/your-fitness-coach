@@ -68,8 +68,6 @@ jobs:
       run_scheduled_report: ${{ steps.route.outputs.run_scheduled_report }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -186,6 +184,8 @@ jobs:
       ALLURE_VITEST_REPORTER_PATH: ${{ github.workspace }}/frontend/scheduled-report/node_modules/allure-vitest/dist/reporter.js
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         id: npm-setup
         with:

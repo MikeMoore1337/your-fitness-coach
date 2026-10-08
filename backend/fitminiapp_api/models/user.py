@@ -339,6 +339,9 @@ class CoachClient(Base):
     coach_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     client_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     private_name: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    labels: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, default=list, server_default="[]"
+    )
     status: Mapped[str] = mapped_column(
         String(16), nullable=False, default="active", server_default="active"
     )

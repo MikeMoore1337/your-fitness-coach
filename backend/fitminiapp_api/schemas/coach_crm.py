@@ -111,6 +111,34 @@ class CoachClientOperationalStatusUpdate(BaseModel):
     operational_status: Literal["active", "paused", "archived"]
 
 
+class CoachClientLabelsUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    labels: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("labels")
+    @classmethod
+    def normalize_labels(cls, value: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for label in value:
+            item = " ".join(label.split())
+            if not item or len(item) > 64:
+                raise ValueError("Метка должна содержать от 1 до 64 символов")
+            key = item.casefold()
+            if key not in seen:
+                normalized.append(item)
+                seen.add(key)
+        return normalized
+
+
+class CoachClientLabelsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    client_id: int = Field(gt=0)
+    labels: list[str] = Field(default_factory=list, max_length=20)
+
+
 class CoachPackageCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -279,6 +307,8 @@ class CoachOperationsTodayResponse(BaseModel):
 
 __all__ = [
     "CoachAgendaResponse",
+    "CoachClientLabelsResponse",
+    "CoachClientLabelsUpdate",
     "CoachClientOperationalStatusUpdate",
     "CoachClientOperationsResponse",
     "CoachOperationsTodayResponse",

@@ -261,6 +261,15 @@ def test_review_workspace_composes_bounded_facts_and_trainer_private_notes(clien
         "nutrition.logged_days",
         "measurements.weight_kg",
     }
+    change = next(
+        item
+        for item in payload["meaningful_changes"]
+        if item["key"] == "training.completed_workouts"
+    )
+    assert change["source"] == "weekly_check_in"
+    assert change["source_id"] == payload["current_check_in"]["id"]
+    assert change["occurred_at"] == payload["current_check_in"]["submitted_on"]
+    assert "Завершённые тренировки" in change["reason"]
     assert payload["private_notes"][0]["text"] == "Только для тренера: обсудить технику приседа."
 
     assert (

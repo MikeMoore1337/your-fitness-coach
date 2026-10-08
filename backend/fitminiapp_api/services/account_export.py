@@ -220,7 +220,7 @@ def _fields(row: object, names: tuple[str, ...]) -> dict[str, object]:
     return {name: getattr(row, name) for name in names}
 
 
-def _crm_business_session_fields(row: CoachBusinessSession, user_id: int) -> dict[str, object]:
+def _crm_business_session_fields(row: CoachBusinessSession) -> dict[str, object]:
     names: tuple[str, ...] = (
         "id",
         "client_user_id",
@@ -237,8 +237,6 @@ def _crm_business_session_fields(row: CoachBusinessSession, user_id: int) -> dic
         "created_at",
         "updated_at",
     )
-    if row.coach_user_id == user_id:
-        names = (*names[:-2], "private_note", *names[-2:])
     return _fields(row, names)
 
 
@@ -1661,7 +1659,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             for series in session_series
         ],
         "coach_business_sessions": [
-            _crm_business_session_fields(session, user.id) for session in business_sessions
+            _crm_business_session_fields(session) for session in business_sessions
         ],
         "coach_packages": [_crm_package_fields(package, user.id) for package in packages],
         "coach_package_ledger": [

@@ -668,7 +668,18 @@ def update_session(
         if payload.location is not None:
             target.location = payload.location.strip() or None
         if payload.private_note is not None:
+            previous_private_note = target.private_note
             target.private_note = payload.private_note.strip() or None
+            if target.private_note != previous_private_note:
+                record_audit_event(
+                    db,
+                    actor_user_id=coach.id,
+                    target_user_id=client.id,
+                    action="coach.private_note_updated",
+                    resource_type="coach_business_session",
+                    resource_id=target.id,
+                    details={"source": "business_session"},
+                )
         status_changed = payload.status is not None and payload.status != previous_status
         if payload.status is not None and (status_changed or payload.charge_package is not None):
             target.status = payload.status

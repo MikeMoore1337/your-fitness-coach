@@ -705,6 +705,73 @@ function ClientSummaryFacts({ summary }: { summary?: TrainerClientProgressSummar
   );
 }
 
+function ClientLabelsEditor({ client }: { client: Client }) {
+  const queryClient = useQueryClient();
+  const { toast } = useFeedback();
+  const [draft, setDraft] = useState((client.labels ?? []).join(', '));
+  const mutation = useMutation({
+    mutationFn: () => {
+      const labels = Array.from(
+        new Map(
+          draft
+            .split(/[;,\n]/)
+            .map((label) => label.trim())
+            .filter(Boolean)
+            .map((label) => [label.toLocaleLowerCase('ru-RU'), label] as const),
+        ).values(),
+      );
+      return api<{ client_id: number; labels: string[] }>(
+        `/api/v1/coach/clients/${client.id}/labels`,
+        { method: 'PATCH', body: { labels } },
+      );
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clients });
+      toast('Организационные группы сохранены');
+    },
+    onError: (error) =>
+      toast(error instanceof Error ? error.message : 'Не удалось сохранить группы', 'error'),
+  });
+  return (
+    <section className="coach-client-labels" aria-labelledby="coach-client-labels-title">
+      <div>
+        <span className="eyebrow">Организация списка</span>
+        <h3 id="coach-client-labels-title">Группы клиента</h3>
+        <p className="muted">
+          Только для рабочего порядка и фильтрации, не медицинская классификация.
+        </p>
+      </div>
+      {(client.labels ?? []).length > 0 && (
+        <div className="coach-client-labels__list" aria-label="Назначенные группы">
+          {(client.labels ?? []).map((label) => (
+            <Badge key={label} tone="neutral">
+              {label}
+            </Badge>
+          ))}
+        </div>
+      )}
+      <label className="field">
+        <span>Метки через запятую</span>
+        <input
+          aria-label="Метки через запятую"
+          maxLength={500}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="Например: утро, онлайн"
+          value={draft}
+        />
+      </label>
+      <Button
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+        type="button"
+        variant="secondary"
+      >
+        {mutation.isPending ? 'Сохраняем…' : 'Сохранить группы'}
+      </Button>
+    </section>
+  );
+}
+
 function ProgramAssignmentDisclosure({ client }: { client: Client }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -849,6 +916,8 @@ function CoachClientDetail({
       </header>
 
       <ClientSummaryFacts summary={summary} />
+
+      <ClientLabelsEditor client={client} key={client.id} />
 
       <section className="coach-client-overview" aria-label="Контекст клиента">
         <div>
@@ -1143,6 +1212,7 @@ export default function CoachPage({
   }, [user?.is_coach]);
   const [clientSearch, setClientSearch] = useState('');
   const [clientFilter, setClientFilter] = useState<CoachClientFilter>('all');
+  const [clientLabelFilter, setClientLabelFilter] = useState('');
   const [programSearch, setProgramSearch] = useState('');
   const [focusedProgramId, setFocusedProgramId] = useState<number | null>(null);
   const [focusedWorkoutId, setFocusedWorkoutId] = useState<number | null>(initialWorkoutId);
@@ -1226,6 +1296,13 @@ export default function CoachPage({
     () => (clients.data ?? []).filter((client) => client.status === 'active'),
     [clients.data],
   );
+  const clientLabels = useMemo(
+    () =>
+      Array.from(new Set((clients.data ?? []).flatMap((client) => client.labels ?? []))).sort(
+        (left, right) => left.localeCompare(right, 'ru'),
+      ),
+    [clients.data],
+  );
   useEffect(() => {
     if (runtime.kind === 'demo' || !user?.is_coach || activeClients.length === 0) return;
     trackProductEvent(
@@ -1239,11 +1316,12 @@ export default function CoachPage({
       filterCoachClients({
         clients: clients.data ?? [],
         filter: clientFilter,
+        labelFilter: clientLabelFilter,
         programs: programs.data ?? [],
         search: clientSearch,
         summaries: summaryMap,
       }),
-    [clientFilter, clientSearch, clients.data, programs.data, summaryMap],
+    [clientLabelFilter, clientFilter, clientSearch, clients.data, programs.data, summaryMap],
   );
   const selectedSummary = selected?.id ? summaryMap.get(selected.id) : undefined;
   if (!user?.is_coach) return <Redirect to="/app" />;
@@ -1463,6 +1541,21 @@ export default function CoachPage({
                       <option value="pending">Ожидают подключения</option>
                     </select>
                   </label>
+                  <label className="field">
+                    <span>Группа</span>
+                    <select
+                      aria-label="Группа"
+                      value={clientLabelFilter}
+                      onChange={(event) => setClientLabelFilter(event.target.value)}
+                    >
+                      <option value="">Все группы</option>
+                      {clientLabels.map((label) => (
+                        <option key={label} value={label}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
                 {clients.isLoading ? (
                   <LoadingState />
@@ -1505,6 +1598,15 @@ export default function CoachPage({
                                   ? 'Ожидает подтверждения'
                                   : activeProgram?.title || 'Нет активной программы'}
                               </small>
+                              {(client.labels ?? []).length > 0 && (
+                                <span className="coach-client-row__labels">
+                                  {(client.labels ?? []).map((label) => (
+                                    <Badge key={label} tone="neutral">
+                                      {label}
+                                    </Badge>
+                                  ))}
+                                </span>
+                              )}
                             </span>
                             {client.status === 'active' ? (
                               <span className="coach-client-row__signals">

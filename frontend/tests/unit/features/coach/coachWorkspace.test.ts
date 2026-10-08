@@ -14,9 +14,15 @@ import {
 } from '../../../../src/features/coach/coachWorkspace';
 
 const clients = [
-  { id: 1, full_name: 'Анна Петрова', username: 'anna', status: 'active' },
-  { id: 2, full_name: 'Борис С очень длинной фамилией', username: 'boris', status: 'active' },
-  { id: null, invite_id: 41, full_name: 'Ожидающий клиент', status: 'pending' },
+  { id: 1, full_name: 'Анна Петрова', username: 'anna', status: 'active', labels: ['Утро'] },
+  {
+    id: 2,
+    full_name: 'Борис С очень длинной фамилией',
+    username: 'boris',
+    status: 'active',
+    labels: ['Онлайн'],
+  },
+  { id: null, invite_id: 41, full_name: 'Ожидающий клиент', status: 'pending', labels: [] },
 ] as Client[];
 
 function summary(
@@ -153,6 +159,11 @@ describe('coach workspace summaries', () => {
         (client) => client.invite_id,
       ),
     ).toEqual([41]);
+    expect(
+      filterCoachClients({ ...base, filter: 'all', labelFilter: 'онлайн', search: '' }).map(
+        (client) => client.id,
+      ),
+    ).toEqual([2]);
   });
 
   it('does not promote a raw Telegram id to the primary client identity', () => {

@@ -40,6 +40,7 @@ def _link(coach_telegram_id: int, client_telegram_id: int) -> tuple[int, int]:
 
 def test_crm_sessions_are_separate_from_workouts_and_package_ledger_is_traceable(client) -> None:
     coach_headers = _auth(client, 29_201, is_coach=True)
+    other_coach_headers = _auth(client, 29_203, is_coach=True)
     client_headers = _auth(client, 29_202)
     _coach_id, client_id = _link(29_201, 29_202)
     with get_session_context() as db:
@@ -53,6 +54,27 @@ def test_crm_sessions_are_separate_from_workouts_and_package_ledger_is_traceable
     assert (
         next(row for row in roster.json() if row["id"] == client_id)["operational_status"]
         == "active"
+    )
+
+    labels = client.patch(
+        f"/api/v1/coach/clients/{client_id}/labels",
+        headers=coach_headers,
+        json={"labels": ["Утро", "Онлайн", "утро"]},
+    )
+    assert labels.status_code == 200, labels.text
+    assert labels.json() == {"client_id": client_id, "labels": ["Утро", "Онлайн"]}
+    roster_with_labels = client.get("/api/v1/coach/clients", headers=coach_headers)
+    assert next(row for row in roster_with_labels.json() if row["id"] == client_id)["labels"] == [
+        "Утро",
+        "Онлайн",
+    ]
+    assert (
+        client.patch(
+            f"/api/v1/coach/clients/{client_id}/labels",
+            headers=other_coach_headers,
+            json={"labels": ["Чужой доступ"]},
+        ).status_code
+        == 404
     )
 
     package = client.post(
@@ -271,6 +293,7 @@ def test_crm_sessions_are_separate_from_workouts_and_package_ledger_is_traceable
     assert export.status_code == 200, export.text
     assert export.json()["coaching_relationships"][0]["operational_status"] == "active"
     assert export.json()["coach_business_sessions"]
+    assert all("private_note" not in item for item in export.json()["coach_business_sessions"])
     assert export.json()["coach_package_ledger"]
     assert export.json()["coach_payments"]
     assert export.json()["coach_tasks"]
