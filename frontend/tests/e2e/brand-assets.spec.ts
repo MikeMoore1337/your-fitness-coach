@@ -392,9 +392,18 @@ test('canonical brand assets render on light and dark public surfaces', async ({
       await page.screenshot({ path: '../.artifacts/brand/landing-light-desktop.png' });
     }
 
+    if (viewport.name === 'mobile') {
+      await page.getByRole('button', { name: 'Открыть меню', exact: true }).click();
+    }
     await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
+    if (viewport.name === 'mobile') {
+      await page.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
+    }
     await assertHeaderMark(page, 'dark', 44);
-    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(page.locator('#landing-v10-athlete-title')).toHaveCSS(
+      'color',
+      'rgb(255, 255, 255)',
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {

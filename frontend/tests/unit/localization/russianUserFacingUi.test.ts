@@ -30,6 +30,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     'const reviewMutation = createMutation();',
     "const path = 'rollout_preview';",
     '<span>Your Fitness Coach</span>',
+    '<span>Как работает Coach OS</span>',
     '<input aria-label="Дата проверки" />',
   ])('allows Russian copy, identifiers, and documented exceptions: %s', (source) => {
     const result = runGuard(source);

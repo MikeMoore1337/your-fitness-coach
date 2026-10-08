@@ -1,11 +1,14 @@
 import { useState } from 'react';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
 import { LandingPractice } from './LandingPractice';
 import { LandingProgress } from './LandingProgress';
 import { LandingV10Shell } from './LandingV10Shell';
+import { LandingV10Faq } from './LandingV10Faq';
 import { StrengthScene } from './StrengthScene';
+import { LandingAudienceSwitch } from './LandingAudienceSwitch';
 import { landingAudienceHref } from './landingAudience';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
@@ -131,6 +134,9 @@ function AthleteHero() {
 
   return (
     <section className="landing-hero" aria-labelledby="landing-v10-athlete-title">
+      <div className="landing-v10-hero-audience">
+        <LandingAudienceSwitch audience="athlete" showLabel={false} />
+      </div>
       <img
         className="landing-hero__image"
         src="/assets/marketing/strength-hero.webp"
@@ -149,19 +155,39 @@ function AthleteHero() {
         </h1>
         <p className="landing-hero__lead">Тренировки, питание и прогресс — в одном месте.</p>
         <div className="landing-hero__actions">
-          <a className="landing-button" href={appUrl}>
+          <a
+            className="landing-button"
+            href={appUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_app_selected',
+                surface: productEventSurface(),
+              })
+            }
+          >
             Начать со своими данными <Icon name="arrow-right" size={20} />
           </a>
           <a
-            className="landing-button landing-button--secondary"
-            href={`${demoUrl}?cabinet=1&scenario=self_training&section=today`}
+            className="landing-button landing-button--secondary landing-button--secondary-on-dark"
+            href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'hero',
+                scenario: 'self_training',
+              })
+            }
           >
-            Попробовать демо <Icon name="arrow-right" size={20} />
+            Попробовать демо тренировки <Icon name="arrow-right" size={20} />
           </a>
         </div>
+        <a className="landing-v10-hero-tertiary" href="#training">
+          Посмотреть пример тренировки <Icon name="chevron-down" size={16} />
+        </a>
         <div className="landing-hero__platform">
           <p className="landing-hero__platform-note">
-            <Icon name="web-app" size={16} /> Браузер и Telegram TMA
+            <Icon name="web-app" size={16} /> Браузер и мини-приложение Telegram
           </p>
         </div>
       </div>
@@ -177,7 +203,11 @@ export default function LandingV10AthletePage() {
     <LandingV10Shell audience="athlete">
       <AthleteHero />
 
-      <LandingChapter className="landing-v10-cycle" aria-labelledby="landing-v10-cycle-title">
+      <LandingChapter
+        id="product"
+        className="landing-v10-cycle"
+        aria-labelledby="landing-v10-cycle-title"
+      >
         <div className="landing-v10-cycle__intro">
           <p className="landing-kicker">01 / СВЯЗАННЫЙ РИТМ</p>
           <h2 id="landing-v10-cycle-title">
@@ -211,7 +241,11 @@ export default function LandingV10AthletePage() {
 
       <StrengthScene />
 
-      <LandingChapter className="landing-practice" aria-labelledby="landing-v10-practice-title">
+      <LandingChapter
+        id="training"
+        className="landing-practice"
+        aria-labelledby="landing-v10-practice-title"
+      >
         <div>
           <p className="landing-kicker">03 / В ДЕЛЕ</p>
           <h2 id="landing-v10-practice-title">
@@ -267,7 +301,7 @@ export default function LandingV10AthletePage() {
         </div>
         <div>
           <h2 id="landing-v10-coach-title">
-            <span>Вы тренер?</span> <span>Знакомьтесь с Коуч ОС.</span>
+            <span>Вы тренер?</span> <span>Знакомьтесь с Coach OS.</span>
           </h2>
           <p>
             Подключайте клиентов, ведите версии программ, смотрите проверки и подтверждайте
@@ -284,11 +318,11 @@ export default function LandingV10AthletePage() {
         aria-labelledby="landing-v10-continuity-title"
       >
         <div>
-          <p className="landing-kicker">БРАУЗЕР И Telegram TMA</p>
+          <p className="landing-kicker">Браузер и мини-приложение Telegram</p>
           <h2 id="landing-v10-continuity-title">Один аккаунт. Общие данные.</h2>
           <p>
-            Полный контекст остаётся в браузере, а быстрые действия доступны в Telegram TMA — без
-            отдельной версии продукта.
+            Полный контекст остаётся в браузере, а быстрые действия доступны в мини-приложении
+            Telegram — без отдельной версии продукта.
           </p>
         </div>
         <div className="landing-v10-continuity__rail" aria-label="Поверхности продукта">
@@ -299,10 +333,12 @@ export default function LandingV10AthletePage() {
           <strong>Общие данные</strong>
           <Icon name="sync" size={24} />
           <span>
-            <Icon name="mini-app" /> Telegram TMA
+            <Icon name="mini-app" /> Мини-приложение Telegram
           </span>
         </div>
       </LandingChapter>
+
+      <LandingV10Faq />
     </LandingV10Shell>
   );
 }

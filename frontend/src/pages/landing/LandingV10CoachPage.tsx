@@ -4,7 +4,9 @@ import { trainerIntentLoginUrl } from '../../shared/auth/trainerIntent';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
+import { LandingV10Faq } from './LandingV10Faq';
 import { LandingV10Shell } from './LandingV10Shell';
+import { LandingAudienceSwitch } from './LandingAudienceSwitch';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
 
@@ -47,7 +49,7 @@ function CoachTodayPreview() {
   return (
     <div className="landing-v10-coach-today" data-testid="coach-today-preview">
       <div className="landing-v10-coach-today__topline">
-        <strong>Коуч ОС</strong>
+        <strong>Coach OS</strong>
         <small>Дизайн-сцена · пример</small>
       </div>
       <div className="landing-v10-coach-today__client">
@@ -102,6 +104,9 @@ function CoachHero() {
       className="landing-hero landing-v10-coach-hero"
       aria-labelledby="landing-v10-coach-title"
     >
+      <div className="landing-v10-hero-audience">
+        <LandingAudienceSwitch audience="coach" showLabel={false} />
+      </div>
       <img
         className="landing-hero__image"
         src="/assets/marketing/trainer-photo.webp"
@@ -139,16 +144,24 @@ function CoachHero() {
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
             href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'hero',
+                scenario: 'trainer',
+              })
+            }
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>
         </div>
-        <a className="landing-v10-coach-tertiary" href="#coach-work">
-          Как работает Коуч ОС <Icon name="chevron-down" size={16} />
+        <a className="landing-v10-hero-tertiary" href="#coach-work">
+          Как работает Coach OS <Icon name="chevron-down" size={16} />
         </a>
         <div className="landing-hero__platform">
           <p className="landing-hero__platform-note">
-            <Icon name="web-app" size={16} /> Браузер и Telegram TMA
+            <Icon name="web-app" size={16} /> Браузер и мини-приложение Telegram
           </p>
         </div>
       </div>
@@ -341,6 +354,7 @@ export default function LandingV10CoachPage() {
       <CoachHero />
 
       <LandingChapter
+        id="product"
         className="landing-v10-coach-cycle"
         aria-labelledby="landing-v10-coach-cycle-title"
       >
@@ -350,7 +364,7 @@ export default function LandingV10CoachPage() {
             От внимания
             <br /> <em>к следующему шагу.</em>
           </h2>
-          <p>Коуч ОС связывает сигнал, контекст клиента и ручное решение в одном рабочем цикле.</p>
+          <p>Coach OS связывает сигнал, контекст клиента и ручное решение в одном рабочем цикле.</p>
         </div>
         <ol className="landing-v10-coach-cycle__list">
           {[
@@ -561,10 +575,11 @@ export default function LandingV10CoachPage() {
         aria-labelledby="landing-v10-coach-continuity-title"
       >
         <div>
-          <p className="landing-kicker">БРАУЗЕР И Telegram TMA</p>
+          <p className="landing-kicker">Браузер и мини-приложение Telegram</p>
           <h2 id="landing-v10-coach-continuity-title">Один аккаунт. Общий контекст.</h2>
           <p>
-            Полный рабочий обзор остаётся в браузере, а быстрые действия доступны в Telegram TMA.
+            Полный рабочий обзор остаётся в браузере, а быстрые действия доступны в мини-приложении
+            Telegram.
           </p>
         </div>
         <div className="landing-v10-coach-continuity__rail" aria-label="Поверхности продукта">
@@ -575,10 +590,12 @@ export default function LandingV10CoachPage() {
           <strong>Общий контекст</strong>
           <Icon name="sync" size={24} />
           <span>
-            <Icon name="mini-app" /> Telegram TMA
+            <Icon name="mini-app" /> Мини-приложение Telegram
           </span>
         </div>
       </LandingChapter>
+
+      <LandingV10Faq />
 
       <section className="landing-v10-coach-cta" aria-labelledby="landing-v10-coach-cta-title">
         <div>
@@ -602,6 +619,14 @@ export default function LandingV10CoachPage() {
           <a
             className="landing-button landing-button--secondary landing-button--secondary-on-dark"
             href={demoUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'landing_demo_selected',
+                surface: productEventSurface(),
+                placement: 'section',
+                scenario: 'trainer',
+              })
+            }
           >
             Попробовать демо для тренера <Icon name="arrow-right" size={20} />
           </a>

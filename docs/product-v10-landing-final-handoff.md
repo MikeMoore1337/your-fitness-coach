@@ -441,7 +441,7 @@ route, session runtime, fixture engine or product screen is introduced.
 | Boundary | Source | Contract |
 |---|---|---|
 | Trainer demo destination | `frontend/src/shared/navigation/appUrl.ts` | `demoCabinetUrlForHostname(hostname, 'trainer', 'trainer')` resolves to `/demo?cabinet=1&scenario=trainer&section=trainer` locally and the existing app subdomain on the public hostname |
-| Staged coach CTA | `frontend/src/pages/landing/LandingV10CoachPage.tsx` | hero and final «Попробовать демо для тренера» links enter the real trainer demo contour, while the nearby «Как работает Коуч ОС» link remains an in-page preview anchor |
+| Staged coach CTA | `frontend/src/pages/landing/LandingV10CoachPage.tsx` | hero and final «Попробовать демо для тренера» links enter the real trainer demo contour, while the nearby «Как работает Coach OS» link remains an in-page preview anchor |
 | Existing public entry | `frontend/src/content/publicContent.json`, `frontend/src/pages/public/PublicContentPage.tsx` | `/for-trainers` keeps one related card «Демо кабинета тренера» with the same trainer destination and demo click event |
 | Demo runtime | `frontend/src/pages/demo/DemoCabinet.tsx`, `frontend/src/features/demo/demoApi.ts`, `frontend/src/features/demo/demoRoute.ts` | one existing synthetic trainer session, Coach Today → attention/client/workout/progress/operations/task/return route, current reset/exit/focus/history behavior |
 | Boundary | `DemoCabinet` demo boundary and existing demo transport | «Демо-режим · данные не сохраняются» remains visible; invitations and real account writes are not available in the public session |
@@ -456,7 +456,7 @@ Exact CTA → destination → browser state contract:
   → synthetic Coach Today; no direct real mutation request
 
 staged coach hero/final CTA → /demo?cabinet=1&scenario=trainer&section=trainer
-  → the same existing DemoCabinet state; «Как работает Коуч ОС» remains an in-page preview
+  → the same existing DemoCabinet state; «Как работает Coach OS» remains an in-page preview
 ```
 
 ```text
@@ -577,7 +577,7 @@ env change required: no
 
 ### C8 verification record
 
-- Targeted trainer/profile Vitest and auth redirect unit tests passed: 4 test files, 11 tests;
+- Targeted trainer/profile Vitest and auth redirect unit tests passed: 4 test files, 12 tests;
   existing Profile activation/idempotency tests remain green.
 - Frontend typecheck, Vite production build, ESLint/Russian UI guard and changed-file Prettier
   passed. Backend redirect allowlist tests passed (13 selected tests) with Ruff check/format.
@@ -585,3 +585,234 @@ env change required: no
   activation, and a signed Telegram launch with `tgWebAppPlatform` transport query (3/3).
 - No production Landing route was switched, no production API/configuration was changed, and no
   deploy, merge or external analytics delivery was performed by the local C8 implementation.
+
+## 22. C7 final integration candidate and owner visual gate (#858)
+
+C7 wires the approved V10 compositions into the public browser routes on the isolated release
+candidate branch. The candidate is reviewable locally, but it is not merged, deployed or exposed
+by the production master revision until the separate owner visual approval is recorded.
+
+| Public route | Rendered composition | Indexation contract | Candidate proof |
+|---|---|---|---|
+| `/` | `LandingV10AthletePage` / `data-landing-audience="athlete"` | canonical, `index, follow` | compact Coach OS teaser once; Coach Today and trainer-only scenes absent |
+| `/for-athletes` | the same athlete composition | `noindex, follow`, canonical `/` | campaign/hash context is preserved; hidden trainer hashes do not create an athlete scroll target |
+| `/for-trainers` | `LandingV10CoachPage` / `data-landing-audience="coach"` | canonical, `index, follow` | one Coach Today scene; athlete Strength, practice, nutrition and progress scenes absent |
+
+The shared `LandingV10Shell` keeps the existing YFC glass header, brand lockup, theme control,
+login destination, audience switch, buttons, icons and reduced-motion behavior. Public route
+metadata is applied through the existing manifest/SEO helper; no second router, analytics store,
+demo runtime or service was introduced. Hash navigation waits for the mounted target and applies
+the existing header offset, while a hash for an athlete-hidden trainer section leaves the athlete
+composition at its safe top position.
+
+| Evidence | Result |
+|---|---|
+| Candidate screenshots | `athlete-desktop-dark.png`, `athlete-mobile-light.png`, `trainer-desktop-light.png`, `trainer-mobile-dark.png` |
+| C7 Chromium browser contract | 4/4 passed |
+| C7 WebKit browser contract | Not available: current Playwright configuration exposes Chromium only |
+| Existing full frontend Vitest | 142 files, 783 tests passed |
+| TMA smoke | 33/33 passed |
+| Backend public SEO/landing tests | 26 passed, 171 deselected |
+| Candidate branch | `codex/v10-c7-final-integration` (unmerged) |
+
+Visual evidence is stored under `.artifacts/tasks/858/evidence/visual/` and shows the approved
+athlete and trainer compositions in desktop/mobile and dark/light combinations. Production
+cutover, PR/merge, deployment, production smoke/provenance and terminal closeout remain blocked
+on the separate owner visual approval required by #858. C6 retains the prior 27/27 Chromium,
+Firefox and WebKit cross-browser result; a new C7 WebKit run requires a configured Playwright
+project before it can be claimed.
+
+```text
+PRODUCT_V10_C7=READY_FOR_OWNER_VISUAL_APPROVAL
+LANDING_PUBLIC_ROUTE_CANDIDATE=ATHLETE_ROOT_AND_ALIAS_PLUS_TRAINER
+LANDING_ATHLETE_COACH_PROMO=COMPACT_SINGLE
+LANDING_ATHLETE_TRAINER_ONLY_SECTIONS=HIDDEN
+LANDING_TRAINER_COACH_TODAY=PRESERVED_SINGLE
+LANDING_METADATA=EXISTING_MANIFEST_HELPER_REUSED
+LANDING_HASH_SCROLL=TARGET_WAIT_AND_HEADER_OFFSET
+LANDING_TMA_SMOKE=PASSED_33_OF_33
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_TERMINAL_CLOSEOUT=PENDING_OWNER_VISUAL_APPROVAL
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+## 23. C7 visual corrections ready for owner re-review (#858)
+
+После owner gate `CHANGES_REQUIRED` исправлены только найденные публичные визуальные и
+навигационные дефекты. Audience switch теперь использует явные selected/inactive/hover/focus
+tokens во всех темах и размерах; mobile menu возвращает Product/Demo/FAQ без потери стеклянной
+шапки. Athlete secondary demo CTA получил контрастную фирменную поверхность, а проверка
+контраста в browser contract требует минимум 4.5:1. Официальные публичные формулировки теперь
+`Как работает Coach OS`, `Попробовать демо тренировки` и `Браузер и мини-приложение Telegram`.
+
+| Аудитория | Актуальная карта секций и переходов |
+|---|---|
+| Для себя | Hero → `#product` → Strength / тренировка / питание / прогресс → compact Coach OS teaser → локальный пример → difference → Demo → Web + мини-приложение Telegram → `#faq` → CTA → footer |
+| Для тренера | Hero → `#product` → Coach Today / «Не потерять важное» → остальные пять тренерских глав → difference → Demo → Web + мини-приложение Telegram → `#faq` → CTA → footer |
+
+Athlete `Посмотреть пример тренировки` ведёт к `#training`; hero demo ведёт в существующий
+`self_training` DemoCabinet, trainer demo и header Demo остаются на существующем trainer
+DemoCabinet. Coach Today и trainer-only scenes по-прежнему монтируются только в coach flow.
+FAQ переиспользует один общий компонент и один `#faq` anchor; backend, C6/C8 business logic и
+DemoCabinet runtime не менялись.
+
+| Evidence | Result |
+|---|---|
+| Full screenshots | `athlete-desktop-light.png`, `athlete-desktop-dark.png`, `athlete-mobile-light.png`, `athlete-mobile-dark.png`, `trainer-desktop-light.png`, `trainer-desktop-dark.png`, `trainer-mobile-light.png`, `trainer-mobile-dark.png` |
+| Focused header evidence | `athlete-mobile-dark-header.png`, `trainer-desktop-light-header.png` |
+| Unit/Vitest | 142 files, 784 tests passed |
+| TypeScript / ESLint / Russian UI guard | passed |
+| Frontend changed-file Prettier / `git diff --check` | passed; handoff whole-file Prettier retains the pre-existing baseline warning |
+| Vite production build | passed (560 modules) |
+| C7 Chromium browser contract | 4/4 passed: routes, audience switch, themes, mobile menu, CTA destinations, WCAG contrast, tertiary anchor, hash/history |
+| Demo route regression | 2/2 passed: self-training and trainer DemoCabinet |
+| Existing mocked TMA smoke | 33/33 passed |
+| WebKit | not available in current Playwright configuration; C6 prior result remains historical |
+
+Visual files are under `.artifacts/tasks/858/evidence/visual/` on the unmerged branch
+`codex/v10-c7-final-integration`. This is a review candidate only; no PR, merge, deploy or
+production cutover was performed.
+
+```text
+PRODUCT_V10_C7=AWAITING_VISUAL_REAPPROVAL
+TASK_858_VISUAL_OWNER_GATE=CHANGES_READY_FOR_REVIEW
+LANDING_PUBLIC_CUTOVER=NOT_AUTHORIZED
+LANDING_ATHLETE_TRAINER_ONLY_SECTIONS=HIDDEN
+LANDING_TRAINER_COACH_TODAY=PRESERVED
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+## 24. C7 third visual iteration: glass CTA and responsive header (#858)
+
+После повторного `CHANGES_REQUIRED` изменены только CTA-материал и responsive header. Tertiary
+links `Посмотреть пример тренировки` и `Как работает Coach OS` теперь используют компактный
+тёмный Liquid Glass: тонированная прозрачная поверхность, blur, edge/highlight, контрастный
+текст и отдельные hover/pressed/focus states; их hash/demo destinations не менялись.
+
+Desktop header получил одну нейтральную glass-панель для Product/Demo/FAQ и audience switch с
+лаймовым selected state. На mobile header теперь одна строка BrandLockup + `Войти` + menu во всех
+темах и на 320 px. Audience switch выведен в начало hero без подписи `Сценарий`; открытое меню
+содержит Product/Demo/FAQ, синхронный audience switch и `Тема`. Menu поддерживает initial focus,
+Tab wrap, Escape, outside touch и возврат focus на trigger. При открытом меню hero switch скрыт
+визуально, чтобы не дублировать control под glass-панелью.
+
+| Surface | Contract |
+|---|---|
+| Desktop 768/1280/1440 | header glass panel, readable inactive audience, lime active audience, unchanged hero/layout |
+| Mobile 320/360/375/390/430 | one-row header, no horizontal overflow, 44 px controls, hero audience control separated from copy/CTA |
+| Menu | Product / Demo / FAQ / audience / Theme, shared route/theme state, keyboard/touch semantics |
+| Themes | identical mobile geometry in light/dark; only visual tokens change |
+
+Evidence is stored in `.artifacts/tasks/858/evidence/visual/`:
+
+- full desktop/mobile light/dark matrix plus `athlete-mobile-320-*` and `trainer-mobile-320-*`;
+- `*-menu-open.png` for mobile menu states;
+- `athlete-mobile-dark-header.png`, `athlete-mobile-320-light-header.png`,
+  `trainer-desktop-light-header.png`, `trainer-mobile-320-dark-header.png`;
+- unchanged approved sections, photos, StrengthScene, Coach OS scenes, backend, auth and demo
+  routing remain outside this iteration.
+
+| Evidence | Result |
+|---|---|
+| C7 Chromium landing contract | 5/5 passed: CTA Glass, header states, 320 layout, responsive width smoke (20 states), menu focus/theme/audience, hash/history, overflow |
+| Full frontend Vitest | 142 files, 784 tests passed |
+| TypeScript / ESLint / Russian UI guard | passed |
+| Changed-file Prettier / `git diff --check` | passed |
+| Vite production build | passed (560 modules) |
+| Demo route regression | 2/2 passed: self-training and trainer DemoCabinet |
+| Mocked TMA smoke | 33/33 passed against current build |
+| WebKit | unavailable in current Playwright configuration |
+
+The release candidate remains local and unmerged. No PR, merge, deploy, production cutover or
+controller/controller v2 machinery was added.
+
+```text
+TASK_858_VISUAL_OWNER_GATE=WAITING_FOR_REAPPROVAL
+LANDING_GLASS_CTA=PASS
+LANDING_DESKTOP_LIGHT_HEADER=PASS
+LANDING_MOBILE_HEADER_SIMPLIFIED=PASS
+LANDING_MOBILE_320PX=PASS
+LANDING_PRODUCTION_CUTOVER=NOT_STARTED
+CONTROLLER=ABSENT
+env change required: no
+```
+
+## 25. C7 final header polish: desktop navigation frame (#858)
+
+В этой точечной итерации убрана только общая glass-рамка вокруг desktop Product/Demo/FAQ и
+audience switch. Навигация снова располагается свободно на существующей верхней стеклянной
+линии; собственный компактный Glass-контейнер audience switch сохранён. Подпись `Сценарий`
+получила единый семантический `--landing-header-muted` поверх тёмной панели, поэтому её цвет
+одинаков в light/dark и accessible name `Выбор аудитории` не изменился.
+
+Мобильная шапка, меню, hero audience switch, CTA, маршруты, backend, auth, SEO и analytics не
+менялись. Chromium проверил desktop 768/1280/1440 и mobile 320/390 smoke без горизонтального
+переполнения.
+
+| Evidence | Result |
+|---|---|
+| Desktop visual matrix | `athlete-desktop-light.png`, `athlete-desktop-dark.png`, `trainer-desktop-light.png`, `trainer-desktop-dark.png` |
+| Desktop header crops | `athlete-desktop-light-header.png`, `athlete-desktop-dark-header.png`, `trainer-desktop-light-header.png`, `trainer-desktop-dark-header.png` |
+| C7 Chromium landing contract | 5/5 passed; desktop outer frame removed, label token/accessible name, CTA destinations, 20 responsive width states |
+| Build / TypeScript / ESLint / Russian UI guard | passed; Vite 560 modules |
+| Frontend changed-file Prettier / `git diff --check` | passed; handoff whole-file Prettier retains the pre-existing baseline warning |
+| Mobile regression | 320/390 light/dark smoke passed; mobile implementation unchanged |
+
+The candidate remains local and unmerged. No PR, merge, deploy or production cutover was
+performed.
+
+```text
+TASK_858_VISUAL_OWNER_GATE=WAITING_FOR_REAPPROVAL
+LANDING_DESKTOP_HEADER_OUTER_FRAME=REMOVED
+LANDING_SCENARIO_LABEL_COLOR=CONSISTENT
+LANDING_MOBILE_HEADER=UNCHANGED
+LANDING_PRODUCTION_CUTOVER=NOT_STARTED
+CONTROLLER=ABSENT
+env change required: no
+```
+
+## 26. Final owner production authorization (#858)
+
+Владелец утвердил последний desktop header polish и весь ранее согласованный C7 candidate:
+desktop navigation без внешней общей рамки, единый цвет `СЦЕНАРИЙ`, независимый Glass audience
+switch, упрощённый mobile header/menu, Liquid Glass CTA, athlete/trainer routes и настоящие
+DemoCabinet destinations. Разрешены commit, PR, exact-head CI, merge, штатный production deploy,
+production smoke/provenance и terminal closeout без дополнительного routine visual gate при
+сохранении этого утверждённого scope.
+
+```text
+TASK_858_VISUAL_OWNER_GATE=PASS
+LANDING_FINAL_OWNER_APPROVAL=PASS
+PRODUCT_V10_PRODUCTION_RELEASE=AUTHORIZED
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+```
+
+## 27. C7 exact-head smoke compatibility correction (#858)
+
+Required exact-head CI exposed five stale smoke assertions that still targeted the retired
+pre-V10 landing DOM: a single audience switch, the old landing title/contact/footer selectors and
+the former secondary CTA material. The assertions now target the approved V10 controls and routes,
+while keeping the same keyboard, metadata, overflow, asset, motion and privacy-event coverage.
+
+The shared V10 shell now preserves the existing `landing_viewed`/`trainer_landing_viewed` and login
+events, and approved athlete/trainer demo CTAs emit the existing privacy-safe demo event enum.
+Hero demo buttons use the existing compact Liquid Glass blur contract. No new analytics schema,
+router, backend, DemoCabinet or controller machinery was introduced.
+
+| Evidence | Result |
+|---|---|
+| Full frontend Vitest | 142 files, 784 tests passed |
+| Targeted smoke correction | 10/10 passed |
+| Full local Chromium E2E | 434 passed; 2 environment failures (`ERR_ADDRESS_IN_USE` / `ERR_NO_BUFFER_SPACE`), 6 existing skips |
+| TypeScript / ESLint / Russian UI guard | passed |
+| Changed-file Prettier / `git diff --check` | passed; handoff whole-file baseline warning retained |
+| Vite production build | passed (560 modules) |
+
+The two local E2E failures were infrastructure resource errors before page load and are not
+application assertions; required CI remains the merge gate. This correction is on the same PR and
+does not authorize a second visual redesign or a production cutover before exact-head CI passes.

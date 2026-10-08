@@ -4,6 +4,8 @@ import './landing-v10.css';
 type LandingAudienceSwitchProps = {
   audience: LandingAudience;
   location?: LandingLocation;
+  onNavigate?: () => void;
+  showLabel?: boolean;
 };
 
 const AUDIENCES: ReadonlyArray<{ id: LandingAudience; label: string }> = [
@@ -11,10 +13,15 @@ const AUDIENCES: ReadonlyArray<{ id: LandingAudience; label: string }> = [
   { id: 'coach', label: 'Для тренера' },
 ];
 
-export function LandingAudienceSwitch({ audience, location }: LandingAudienceSwitchProps) {
+export function LandingAudienceSwitch({
+  audience,
+  location,
+  onNavigate,
+  showLabel = true,
+}: LandingAudienceSwitchProps) {
   return (
     <nav className="landing-v10-audience-switch" aria-label="Выбор аудитории">
-      <span className="landing-v10-audience-switch__label">Сценарий</span>
+      {showLabel && <span className="landing-v10-audience-switch__label">Сценарий</span>}
       <div className="landing-v10-audience-switch__links">
         {AUDIENCES.map((item) => (
           <a
@@ -23,6 +30,7 @@ export function LandingAudienceSwitch({ audience, location }: LandingAudienceSwi
             href={landingAudienceHref(item.id, location)}
             aria-current={item.id === audience ? 'page' : undefined}
             data-audience={item.id}
+            onClick={onNavigate}
           >
             {item.label}
           </a>
