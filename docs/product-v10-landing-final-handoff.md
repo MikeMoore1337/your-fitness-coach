@@ -211,7 +211,7 @@ Sandbox bundle включает текущие styles/component dependencies р�
 | Элемент | Текст кнопки | Ожидаемое действие | Destination | Реальный продуктовый маршрут |
 |---|---|---|---|---|
 | Hero + финал / спортсмен | Начать со своими данными | Открыть существующий вход/старт | app | /app |
-| Hero + финал / тренер | Начать как тренер | Сейчас общий вход. Цель #875: авторизация → явное согласие → Coach Today без Профиля; не реализовано | app | /app |
+| Hero + финал / тренер | Начать как тренер | Авторизация → server capability check → явное согласие при необходимости → Coach Today без Профиля | trainer intent | /app?trainer_intent=1 |
 | Hero + финал / спортсмен | Попробовать демо тренировки | Настоящий изолированный демо-кабинет | demo/self_training | /demo?cabinet=1&scenario=self_training&section=today |
 | Hero + финал / тренер | Попробовать демо для тренера | Настоящий тренерский демо-кабинет | demo/trainer | /demo?cabinet=1&scenario=trainer&section=trainer |
 | Hero / спортсмен | Посмотреть пример тренировки | Прокрутить локальный пример | landing/#training | /#training |
@@ -228,7 +228,13 @@ Sandbox bundle включает текущие styles/component dependencies р�
 
 `cabinetScenarioUrl` в `frontend/src/pages/landing/LandingPage.tsx` (локальная функция) задаёт today/nutrition/trainer. Sandbox только повторяет href-контракт; не создаёт сессию. Будущая реализация переиспользует эту функцию, `frontend/src/pages/demo/DemoCabinet.tsx`, `frontend/src/features/demo/demoRoute.ts` и действующий session loader. Запрещён второй demo engine.
 
-`PublicContentPage.tsx` уже направляет основной CTA /for-trainers в общий /app с destination onboarding. В sandbox «Начать как тренер» сохраняет этот существующий href. Это временный фактический destination, НЕ выполненное требование #875. Целевой путь: после авторизации существующий тренер попадает в Coach Today; новый тренер видит согласие с условиями и явное подтверждение, затем существующую server-authoritative активацию и Coach Today / первое приглашение без поиска в Профиле. Отказ сохраняет личный аккаунт. Один маркетинговый клик или query-параметр не активирует capability. Сохранение intent, auth callbacks, согласие и активация отложены в #875; никакие новые URL/query/endpoint в макете не вводились.
+`PublicContentPage.tsx` и staged trainer CTA используют bounded `/app?trainer_intent=1`. После
+авторизации существующий тренер попадает в Coach Today; новый тренер видит существующее
+согласие с условиями и явное подтверждение, затем существующую server-authoritative активацию
+и Coach Today / первое приглашение без поиска в Профиле. Отказ сохраняет личный аккаунт. Один
+маркетинговый клик, hash или произвольный query-параметр не активирует capability; Telegram
+transport-параметры разрешены только в signed launch. Сохранение intent, auth callbacks,
+согласие и активация реализованы в #875 без нового endpoint или второго Coach OS компонента.
 
 Проверка маршрутов — инспекция href и исходников, без входа в аккаунт или создания production demo-сессий. `route-matrix.json` содержит машинно-читаемую таблицу; `cta-verification.json` — проверенные href и клики по локальным anchors. `header-verification.json` — текущий production и prototype, desktop/mobile, темы, аудитории, scroll и отключённый backdrop-filter. Versioned close-ups шапки: [`header-comparison-1440.png`](design/references/product-v10-landing/header-comparison-1440.png), [`header-comparison-390.png`](design/references/product-v10-landing/header-comparison-390.png).
 
@@ -491,7 +497,7 @@ C6 подготовил публичный контур без подключе�
 | Athlete alias SEO | `frontend/src/shared/seo/metadata.ts`, `backend/fitminiapp_api/seo.py` | alias отдаёт `noindex, follow`, canonical `https://your-fitness-coach.ru/`, root public fallback и не создаёт structured-data duplicate |
 | Host boundary | `backend/fitminiapp_api/middleware/canonical_host.py` | application host redirects `/for-athletes` на public host, query сохраняется; `/app`, `/login`, `/coach`, `/admin`, API и demo boundaries не ослаблены |
 | Demo CTA semantics | `frontend/src/pages/landing/LandingPage.tsx`, `frontend/src/shared/navigation/appUrl.ts` | real `DemoCabinet` links use the shared hostname-aware `demoCabinetUrlForHostname`; in-page navigation is explicitly labelled `Сценарии демо` and does not emit demo success |
-| Own-data and trainer CTA | current `LandingPage`, staged `LandingV10AthletePage`, `PublicContentPage` | own-data links remain `/app`; the compact trainer teaser switches to `/for-trainers` while preserving campaign/hash context; current trainer entry remains the existing app handoff and `trainer_landing_cta_clicked` intent event; capability activation and Coach Today redirect stay owned by #875 |
+| Own-data and trainer CTA | current `LandingPage`, staged `LandingV10AthletePage`, `PublicContentPage` | own-data links remain `/app`; the compact trainer teaser switches to `/for-trainers` while preserving campaign/hash context; trainer entry keeps `trainer_landing_cta_clicked` and now uses the bounded `/app?trainer_intent=1` continuation; capability activation and Coach Today redirect stay owned by #875 |
 | Attribution and analytics | existing `captureFirstTouchAttribution`, `productEvents`, Yandex boundary | UTM/first-touch stays allowlisted and immutable; CTA/demo events carry only existing enums and surface; no raw URL, account/health data, private notes or phantom success event is introduced |
 | No-JS and index map | backend SEO renderer and sitemap | `/for-athletes` has meaningful root fallback, `/for-trainers` remains the existing canonical trainer page, and only manifest/article canonical URLs enter sitemap |
 
@@ -529,3 +535,53 @@ CONTROLLER=ABSENT
 GITHUB_FLOW=AUTHORITATIVE
 env change required: no
 ```
+
+## 21. C8 authenticated trainer intent and Coach Today handoff (#875)
+
+C8 adds the bounded post-auth continuation without changing the public Landing cutover. Every
+trainer CTA enters the existing auth surface with the exact destination `/app?trainer_intent=1`.
+After authentication the application performs a server capability check. An already active
+trainer is sent directly to `/coach` (Coach Today); a personal account sees the existing trainer
+capability facts, limits and terms confirmation, then the existing idempotent capability API is
+called only after an explicit checkbox and button action. The decline path replaces the intent
+with `/app?section=today` and never routes through Profile.
+
+| Boundary | Source | Contract |
+|---|---|---|
+| Bounded auth intent | `frontend/src/shared/auth/trainerIntent.ts`, `frontend/src/shared/auth/oauthRecovery.ts`, `backend/fitminiapp_api/services/auth_redirects.py` | exact trainer destination only; Telegram transport parameters may accompany it; hashes, duplicate intent and arbitrary query values do not activate the flow; external/open redirects remain rejected |
+| Public CTA handoff | `frontend/src/pages/public/PublicContentPage.tsx`, `frontend/src/pages/landing/LandingV10CoachPage.tsx` | trainer hero/final CTAs retain `trainer_landing_cta_clicked` and lead to the auth continuation; generic athlete Login and DemoCabinet links are unchanged |
+| Authenticated continuation | `frontend/src/main.tsx`, `frontend/src/features/trainer/TrainerIntentFlow.tsx` | capability GET decides active → `/coach` or inactive → existing consent; cancel uses the personal Today route; no URL-driven or silent role activation |
+| Consent/API boundary | `frontend/src/features/trainer/TrainerCapabilityConsent.tsx`, `frontend/src/features/profile/TrainerCapabilityCard.tsx`, `/api/v1/me/trainer-capability` | existing Russian terms UI/styles are shared between Profile and post-auth flow; existing lock/idempotency/audit API and `accepted_terms: true` request are reused; no second Coach OS implementation |
+| Analytics | existing `productEvents` and AuthProvider login markers | generic login started/completed, trainer landing CTA, application started/completed, activation and workspace events remain truthful; activation success is emitted only when the API returns `activated_now` |
+| TMA/history | `isTrainerIntentLocation`, `NavigationProvider`, existing AuthGate | signed Telegram launch can retain allowlisted transport query; explicit consent remains required; cancel/activation replace the intent entry and avoid a stale scroll position |
+
+The terms confirmation is not a new material UI surface: the existing Profile consent markup and
+`trainer-capability.css` were extracted once and rendered in both contexts. No owner visual gate
+was introduced by C8. The existing Coach Today page and its authorization checks remain the only
+authenticated trainer workspace.
+
+```text
+PRODUCT_V10_C8=COMPLETE
+LANDING_TRAINER_INTENT_DESTINATION=/app?trainer_intent=1
+LANDING_TRAINER_CAPABILITY=EXISTING_API_REUSED
+LANDING_TRAINER_TERMS_UI=EXISTING_CONSENT_REUSED
+LANDING_TRAINER_POST_AUTH=/coach
+LANDING_TRAINER_SILENT_ACTIVATION=DISABLED
+LANDING_TRAINER_TMA_INTENT=ALLOWLISTED_TRANSPORT_ONLY
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C7
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+### C8 verification record
+
+- Targeted trainer/profile Vitest and auth redirect unit tests passed: 4 test files, 11 tests;
+  existing Profile activation/idempotency tests remain green.
+- Frontend typecheck, Vite production build, ESLint/Russian UI guard and changed-file Prettier
+  passed. Backend redirect allowlist tests passed (13 selected tests) with Ruff check/format.
+- Chromium Playwright auth smoke passed the current `/for-trainers` CTA, explicit consent and
+  activation, and a signed Telegram launch with `tgWebAppPlatform` transport query (3/3).
+- No production Landing route was switched, no production API/configuration was changed, and no
+  deploy, merge or external analytics delivery was performed by the local C8 implementation.

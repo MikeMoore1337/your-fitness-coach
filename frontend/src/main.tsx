@@ -26,6 +26,7 @@ import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import { LANDING_AUDIENCE_ROUTES } from './pages/landing/landingAudience';
+import { isTrainerIntentLocation } from './shared/auth/trainerIntent';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
@@ -97,6 +98,11 @@ const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const JoinCoachPage = lazy(() => import('./pages/join/JoinCoachPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
+const TrainerIntentFlow = lazy(() =>
+  import('./features/trainer/TrainerIntentFlow').then((module) => ({
+    default: module.TrainerIntentFlow,
+  })),
+);
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 function loadTelegramSdk(): Promise<void> {
   if (!isTelegramLaunch(window.location) || window.Telegram?.WebApp) {
@@ -129,7 +135,10 @@ function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
 
 function AuthenticatedAppRoute() {
   const { user } = useAuth();
-  const { search } = useNavigation();
+  const { search, path } = useNavigation();
+  if (isTrainerIntentLocation(path, search, window.location.hash)) {
+    return <TrainerIntentFlow />;
+  }
   const isIntentionalPersonalReturn =
     window.history.state?.[PERSONAL_WORKSPACE_RETURN_STATE] === true;
   if (

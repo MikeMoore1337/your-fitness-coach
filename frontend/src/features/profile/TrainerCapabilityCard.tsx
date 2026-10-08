@@ -11,13 +11,13 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, ErrorState, LoadingState } from '../../shared/ui/common';
 import { AppLink } from '../../shared/navigation/router';
+import { TrainerCapabilityConsent } from '../trainer/TrainerCapabilityConsent';
 import { TrainerModeSwitch } from '../trainer/TrainerModeSwitch';
 
 export function TrainerCapabilityCard() {
   const { user, reloadUser } = useAuth();
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const capability = useQuery({
     queryKey: ['me', 'trainer-capability'],
@@ -55,7 +55,6 @@ export function TrainerCapabilityCard() {
     mutationFn: () => api<TrainerCapability>('/api/v1/me/trainer-capability', { method: 'DELETE' }),
     onSuccess: async () => {
       await refresh();
-      setAcceptedTerms(false);
       setShowOnboarding(false);
       toast('Режим тренера выключен');
     },
@@ -183,43 +182,13 @@ export function TrainerCapabilityCard() {
           </div>
         </div>
       ) : (
-        <div className="trainer-capability top-gap">
-          <ul className="trainer-capability__facts" aria-label="Возможности режима тренера">
-            <li>Приглашать клиентов по персональной ссылке после их согласия.</li>
-            <li>Создавать или переиспользовать программы и назначать их клиенту.</li>
-            <li>Смотреть разрешённый прогресс и оставлять контекстные комментарии.</li>
-          </ul>
-          <ul className="trainer-capability__limits" aria-label="Ограничения режима тренера">
-            <li>Режим не создаёт публичный профиль, платежи или маркетплейс.</li>
-            <li>Сервис не проверяет образование, сертификацию или квалификацию тренера.</li>
-            <li>Доступ к данным появляется только после подтверждения связи клиентом.</li>
-          </ul>
-          <label className="trainer-capability__terms">
-            <input
-              type="checkbox"
-              checked={acceptedTerms}
-              onChange={(event) => setAcceptedTerms(event.target.checked)}
-            />
-            <span>
-              <strong>Принимаю условия использования режима тренера</strong>
-              <small>
-                Буду использовать доступ только для работы с подключёнными клиентами и не выдавать
-                включение режима за проверку квалификации.
-              </small>
-            </span>
-          </label>
-          <button
-            type="button"
-            className="trainer-capability__activate"
-            disabled={!acceptedTerms || activate.isPending}
-            onClick={() => {
-              trackGrowthEvent('trainer_application_started');
-              activate.mutate();
-            }}
-          >
-            {activate.isPending ? 'Включаем…' : 'Включить режим тренера'}
-          </button>
-        </div>
+        <TrainerCapabilityConsent
+          pending={activate.isPending}
+          onConfirm={() => {
+            trackGrowthEvent('trainer_application_started');
+            activate.mutate();
+          }}
+        />
       )}
     </Card>
   );

@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
+import { demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
+import { trainerIntentLoginUrl } from '../../shared/auth/trainerIntent';
+import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
 import { LandingV10Shell } from './LandingV10Shell';
@@ -92,7 +94,7 @@ function CoachTodayPreview() {
 
 function CoachHero() {
   const [heroUnavailable, setHeroUnavailable] = useState(false);
-  const appUrl = appUrlForHostname(window.location.hostname);
+  const appUrl = trainerIntentLoginUrl(window.location.hostname);
   const demoUrl = demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer');
 
   return (
@@ -121,7 +123,17 @@ function CoachHero() {
           Выбирать следующий шаг.
         </p>
         <div className="landing-hero__actions">
-          <a className="landing-button" href={appUrl}>
+          <a
+            className="landing-button"
+            href={appUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'trainer_landing_cta_clicked',
+                surface: productEventSurface(),
+                destination: 'onboarding',
+              })
+            }
+          >
             Начать как тренер <Icon name="arrow-right" size={20} />
           </a>
           <a
@@ -321,6 +333,7 @@ function FollowUpPreview() {
 
 export default function LandingV10CoachPage() {
   useLandingHeroMotion();
+  const trainerLoginUrl = trainerIntentLoginUrl(window.location.hostname);
   const demoUrl = demoCabinetUrlForHostname(window.location.hostname, 'trainer', 'trainer');
 
   return (
@@ -573,7 +586,17 @@ export default function LandingV10CoachPage() {
           <h2 id="landing-v10-coach-cta-title">Начните с рабочего контекста.</h2>
         </div>
         <div className="landing-v10-coach-cta__actions">
-          <a className="landing-button" href={appUrlForHostname(window.location.hostname)}>
+          <a
+            className="landing-button"
+            href={trainerLoginUrl}
+            onClick={() =>
+              trackProductEvent({
+                name: 'trainer_landing_cta_clicked',
+                surface: productEventSurface(),
+                destination: 'onboarding',
+              })
+            }
+          >
             Начать как тренер <Icon name="arrow-right" size={20} />
           </a>
           <a

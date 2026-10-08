@@ -188,6 +188,113 @@ test('Landing ведёт на canonical Login, а protected route сохраня
   );
 });
 
+test('Trainer CTA сохраняет bounded intent до авторизации', async ({ page }) => {
+  await mockAuthApi(page);
+  await page.goto('/for-trainers');
+
+  const cta = page.locator('a[href*="trainer_intent"]').first();
+  await expect(cta).toBeVisible();
+  await expect(cta).toHaveAttribute('href', '/login?next=%2Fapp%3Ftrainer_intent%3D1');
+  await cta.click();
+  await expect(page).toHaveURL(/\/login\?next=%2Fapp%3Ftrainer_intent%3D1$/);
+});
+
+test('Trainer intent требует явного согласия и после capability activation открывает Coach Today', async ({
+  page,
+}) => {
+  const initialUser = userPayload();
+  await mockAuthApi(page, { authenticated: true, initialUser });
+  let capabilityActive = false;
+  await page.route('**/api/v1/me/trainer-capability', async (route) => {
+    if (route.request().method() === 'POST') {
+      capabilityActive = true;
+      initialUser.is_coach = true;
+      return route.fulfill({
+        json: {
+          is_active: true,
+          activated_now: true,
+          active_client_count: 0,
+          pending_invite_count: 0,
+          can_disable: true,
+          terms_version: 'trainer-capability-v1',
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        is_active: capabilityActive,
+        activated_now: false,
+        active_client_count: 0,
+        pending_invite_count: 0,
+        can_disable: capabilityActive,
+        terms_version: 'trainer-capability-v1',
+      },
+    });
+  });
+
+  await page.goto('/app?trainer_intent=1');
+  const activate = page.getByRole('button', { name: 'Включить режим тренера' });
+  await expect(activate).toBeDisabled();
+  await page.getByRole('checkbox', { name: /принимаю условия/i }).check();
+  await expect(activate).toBeEnabled();
+  await activate.click();
+  await expect(page).toHaveURL(/\/coach$/);
+});
+
+test('Trainer intent в TMA сохраняет явное согласие и не смешивает Telegram transport query', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.Telegram = {
+      WebApp: {
+        initData: 'signed-trainer-intent-data',
+        initDataUnsafe: {},
+        colorScheme: 'dark',
+        ready() {},
+        expand() {},
+        BackButton: {
+          show() {},
+          hide() {},
+          onClick() {},
+          offClick() {},
+        },
+      },
+    };
+  });
+  const telegramUser = userPayload();
+  await mockAuthApi(page, { telegramUser });
+  await page.route('**/api/v1/me/trainer-capability', async (route) => {
+    if (route.request().method() === 'POST') {
+      telegramUser.is_coach = true;
+      return route.fulfill({
+        json: {
+          is_active: true,
+          activated_now: true,
+          active_client_count: 0,
+          pending_invite_count: 0,
+          can_disable: true,
+          terms_version: 'trainer-capability-v1',
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        is_active: false,
+        activated_now: false,
+        active_client_count: 0,
+        pending_invite_count: 0,
+        can_disable: false,
+        terms_version: 'trainer-capability-v1',
+      },
+    });
+  });
+
+  await page.goto('/app?trainer_intent=1&tgWebAppPlatform=android');
+  await page.getByRole('checkbox', { name: /принимаю условия/i }).check();
+  await page.getByRole('button', { name: 'Включить режим тренера' }).click();
+  await expect(page).toHaveURL(/\/coach$/);
+});
+
 test('Login использует surface-aware logo и не дублирует Войти в mobile header', async ({
   page,
 }) => {

@@ -18,6 +18,9 @@ describe('oauthRecovery', () => {
     expect(oauthStartHref('google', 'https://evil.example')).toBe(
       '/api/v1/auth/oauth/google/start',
     );
+    expect(oauthStartHref('google', '/app?trainer_intent=1')).toBe(
+      '/api/v1/auth/oauth/google/start?next=%2Fapp%3Ftrainer_intent%3D1',
+    );
     expect(oauthStartHref('unknown', '/app')).toBeNull();
   });
 

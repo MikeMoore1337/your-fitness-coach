@@ -16,6 +16,7 @@ import type {
   PublicProgram,
 } from '../../shared/api/types';
 import { appUrlForHostname, demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
+import { trainerIntentLoginUrl } from '../../shared/auth/trainerIntent';
 import { AppLink, Redirect, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
@@ -648,6 +649,8 @@ export default function PublicContentPage() {
 
   const appUrlBase = appUrlForHostname(window.location.hostname);
   const appUrl = page.kind === 'program' ? `${appUrlBase}?section=programs` : appUrlBase;
+  const trainerAppUrl = trainerIntentLoginUrl(window.location.hostname);
+  const primaryCtaUrl = page.path === '/for-trainers' ? trainerAppUrl : appUrl;
   const articleClassName = `public-article public-article--${page.kind}${
     page.path === '/training' ? ' public-article--training' : ''
   }`;
@@ -676,7 +679,7 @@ export default function PublicContentPage() {
                 <div className="public-hero__action">
                   <a
                     className="landing-button landing-action"
-                    href={appUrl}
+                    href={primaryCtaUrl}
                     onClick={
                       page.path === '/for-trainers'
                         ? () =>
@@ -778,7 +781,7 @@ export default function PublicContentPage() {
               </div>
               <a
                 className="landing-button landing-action"
-                href={appUrl}
+                href={primaryCtaUrl}
                 onClick={
                   page.path === '/for-trainers'
                     ? () =>
