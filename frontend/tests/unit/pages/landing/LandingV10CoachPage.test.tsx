@@ -77,9 +77,13 @@ describe('LandingV10CoachPage', () => {
       'href',
       '/app',
     );
-    expect(
-      screen.getAllByRole('link', { name: 'Попробовать демо для тренера' })[0],
-    ).toHaveAttribute('href', '/demo?cabinet=1&scenario=trainer&section=trainer');
+    const trainerDemoLinks = screen.getAllByRole('link', {
+      name: 'Попробовать демо для тренера',
+    });
+    expect(trainerDemoLinks).toHaveLength(2);
+    for (const link of trainerDemoLinks) {
+      expect(link).toHaveAttribute('href', '/demo?cabinet=1&scenario=trainer&section=trainer');
+    }
     expect(screen.getByRole('link', { name: /Как работает Коуч ОС/ })).toHaveAttribute(
       'href',
       '#coach-work',

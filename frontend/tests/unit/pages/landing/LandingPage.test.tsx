@@ -10,6 +10,7 @@ import {
   PRODUCT_EVENT_NAME,
   type ProductEventEnvelope,
 } from '../../../../src/shared/analytics/productEvents';
+import { demoCabinetUrlForHostname } from '../../../../src/shared/navigation/appUrl';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
 
 function renderLanding() {
@@ -155,6 +156,9 @@ describe('LandingPage', () => {
     );
     expect(demoUrlForHostname('your-fitness-coach.ru')).toBe(
       'https://app.your-fitness-coach.ru/demo',
+    );
+    expect(demoCabinetUrlForHostname('your-fitness-coach.ru', 'trainer', 'trainer')).toBe(
+      'https://app.your-fitness-coach.ru/demo?cabinet=1&scenario=trainer&section=trainer',
     );
     expect(screen.getByRole('link', { name: 'Приватность и данные' })).toHaveAttribute(
       'href',

@@ -249,6 +249,15 @@ describe('PublicContentPage', () => {
     }
   });
 
+  it('keeps the trainer demo card on the isolated trainer cabinet contract', () => {
+    renderPath('/for-trainers');
+
+    expect(screen.getByRole('link', { name: /Демо кабинета тренера/ })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=trainer&section=trainer',
+    );
+  });
+
   it.each([
     ['/training', /дневник тренировок: от программы до прогресса/i],
     ['/programs/full-body-3-days', /программа тренировок 3 раза в неделю: всё тело \(full body\)/i],
