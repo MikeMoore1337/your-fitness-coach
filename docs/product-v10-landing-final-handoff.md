@@ -816,3 +816,35 @@ router, backend, DemoCabinet or controller machinery was introduced.
 The two local E2E failures were infrastructure resource errors before page load and are not
 application assertions; required CI remains the merge gate. This correction is on the same PR and
 does not authorize a second visual redesign or a production cutover before exact-head CI passes.
+
+## 28. Production delivery and terminal verification (#858 / #744)
+
+Финальный owner approval из раздела 26 выполнен через штатный GitHub Flow. PR [#892](https://github.com/MikeMoore1337/your-fitness-coach/pull/892) прошёл exact-head required CI и смёржен merge-коммитом `b7484880f830b1ad772466f3cc75ff79de451a34`. Post-merge master CI [run 37835089810](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37835089810) завершён успешно на том же SHA. Автоматический [Release production run 37835440693](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37835440693) завершён успешно; immutable bundle и production provenance указывают на `b7484880f830b1ad772466f3cc75ff79de451a34`.
+
+Deployment evidence подтвердил:
+
+- `Production deployment completed: b7484880f830b1ad772466f3cc75ff79de451a34`;
+- active revision и single-slot deployment совпадают с merge SHA;
+- backend readiness и worker readiness прошли, миграций: `0 added migration(s)`;
+- `https://app.your-fitness-coach.ru` отвечает в production environment;
+- SEO surface `https://your-fitness-coach.ru` healthy, проверены 29 canonical sitemap URLs;
+- публичный Telegram bot profile verified/matched; Controller и controller v2 отсутствуют.
+
+Read-only production HTTP и Chromium smoke подтвердили 200 для `/`, `/for-athletes`, `/for-trainers`, `/robots.txt`, `/sitemap.xml`, а также для app shell. В production browser matrix прошли athlete/trainer desktop и mobile light/dark, 320 px, mobile menu open/close, desktop unframed header, единый `Сценарий` token, Glass CTA, athlete-only compact Coach OS teaser, trainer-only Coach Today, hash `#training`, audience transition `/for-athletes` → `/for-trainers`, настоящий `self_training` DemoCabinet, настоящий trainer DemoCabinet и trainer auth entry с `trainer_intent` redirect. Production screenshots сохранены в `.artifacts/tasks/858/evidence/production/` без личных данных.
+
+Тестовое покрытие перед доставкой и в required CI: frontend build 560 modules, TypeScript, ESLint/Russian UI guard, changed-file Prettier, Vitest 142 files/784 tests, Playwright smoke shards 5/5, Frontend checks/unit, Chromium+WebKit mobile regression, CodeQL Python/JavaScript, critical application smoke, container build/scan и branch-checks — passed. Existing mocked TMA smoke: 33/33 passed. Full local Prettier baseline по всему репозиторию по-прежнему содержит исторические предупреждения; массовое форматирование не выполнялось. Weekly/extended cross-browser jobs были scope-skipped, при этом required mobile Chromium+WebKit job прошёл.
+
+```text
+TASK_858=TERMINAL_CLOSED
+PRODUCT_V10_NON_LANDING_SCOPE=COMPLETE
+PRODUCT_V10_LANDING=DEPLOYED
+LANDING_FINAL_OWNER_APPROVAL=PASS
+LANDING_PRODUCTION_SMOKE=PASS
+PRODUCTION_PROVENANCE=PASS
+ISSUE_858=CLOSED
+ISSUE_744=CLOSED
+PRODUCT_V10_TERMINAL_CLOSEOUT=PASS
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
