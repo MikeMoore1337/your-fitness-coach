@@ -1,13 +1,13 @@
 # Product v10 — B × C × Current YFC — final implementation handoff
 
 Дата: 08.10.2026, Europe/Moscow. **Owner design approval: PASS.** Этот документ
-фиксирует approved design contract для последующей реализации; текущий PR меняет
-только документацию и versioned visual references.
+фиксирует approved design contract и staged implementation map; public cutover остаётся
+отдельным gate #858.
 
 ## Начать здесь
 
 1. Versioned visual references находятся в [`docs/design/references/product-v10-landing/`](design/references/product-v10-landing/): compact athlete teaser (desktop/mobile × dark/light), preserved Coach Today (desktop/mobile × dark/light) и glass-header close-ups.
-2. Интерактивная gallery, motion preview и full-page snapshots остаются локальным review evidence в ignored `.artifacts`; они не являются production runtime и не входят в docs-only PR.
+2. Интерактивная gallery, motion preview и full-page snapshots остаются локальным review evidence в ignored `.artifacts`; они не являются production runtime и не входят в versioned PRs.
 3. `HANDOFF.md` из sandbox был сверён с approved состоянием и перенесён сюда как durable section map, CTA/route matrix, component reuse map, ограничения claims и verification record.
 
 Исходники sandbox находятся уровнем выше: `design.tsx`, `refinement.css`, `build.cjs`, `audit-current.cjs`, `verify.cjs`, `motion.cjs`. Bundle и assets внутри deliverables можно просматривать без React dev-server и без API. Для пересборки используется уже установленный esbuild из `frontend/node_modules`. Новых зависимостей нет.
@@ -31,13 +31,16 @@ Owner выбрал сочетание B (кинематографичная сп
 
 Это один финальный вариант. Дополнительные hero-концепции не создавались: сохранение узнаваемого «Сила в действии» оказалось сильнее новой словесной идентичности. Для тренера предложено «Ваш метод в действии» в той же композиционной грамматике.
 
-В этом docs-only PR ни один production route, компонент, stylesheet, API, модель, Demo service или SEO-файл не изменён. Sandbox импортирует некоторые production компоненты read-only. Данные новых сцен локальные. CSP `connect-src 'none'` исключает запросы прототипа к API; в browser verification дополнительно проверено отсутствие fetch/XHR и внешних запросов.
+В staged implementation PR production routes, API, модели, Demo service и SEO-файлы не
+изменяются. Новая athlete-композиция использует существующие production components и
+локальные synthetic preview states; browser verification проверяет отсутствие API-вызовов при
+рендере.
 
 ### Durable handoff contract
 
 - `LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS` зафиксирован в Issue #852.
 - `LANDING_HANDOFF_PERSISTED=PASS` означает этот versioned документ и выбранные visual references; ignored gallery не является единственным источником.
-- `LANDING_IMPLEMENTATION=STAGED_FOUNDATION_ONLY` после C2: production public cutover остаётся отдельным gate #858.
+- `LANDING_IMPLEMENTATION=ATHLETE_STAGED` после C3: production public cutover остаётся отдельным gate #858.
 - `CONTROLLER=ABSENT`: не добавлять controller, leases, lifecycle state machine, delivery owner, очередь или recovery orchestration.
 
 ## 2. Источники и визуальный аудит production
@@ -231,7 +234,9 @@ Sandbox bundle включает текущие styles/component dependencies р�
 
 StrengthScene импортируется без изменений только для спортсмена; тёмные контекстные секции переходят в исходную белую сцену. Normal-motion sticky-дистанция остаётся исходной; reduced-motion не добавляет пустой экран.
 
-#852 закрывается после merge этого docs-only PR. #853–#858 и #875 остаются отдельными bounded implementation tasks с указанными зависимостями. Рабочая галерея и её zip-пакет находятся в ignored/local evidence; GitHub остаётся источником versioned contract.
+#852 закрыт после merge docs-only PR. #853–#858 и #875 остаются отдельными bounded
+implementation tasks с указанными зависимостями. Рабочая галерея и её zip-пакет находятся в
+ignored/local evidence; GitHub остаётся источником versioned contract.
 
 ## 13. Финальная доработка: tertiary и отдельный тренерский рассказ
 
@@ -299,15 +304,17 @@ LANDING_INTERACTIVE_PREVIEWS=PRESERVED
 LANDING_DESIGN_HANDOFF=UPDATED
 LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS
 LANDING_HANDOFF_PERSISTED=PASS
-LANDING_IMPLEMENTATION=STAGED_FOUNDATION_ONLY
+LANDING_IMPLEMENTATION=ATHLETE_STAGED
 LANDING_PUBLIC_CUTOVER=NOT_STARTED
-PRODUCT_V10_CONVEYOR=READY_FOR_C3
+PRODUCT_V10_CONVEYOR=READY_FOR_C4
 CONTROLLER=ABSENT
 GITHUB_FLOW=AUTHORITATIVE
 env change required: no
 ```
 
-Этот документ и visual references предназначены для versioned docs-only PR #852. Production Landing, PR implementation, merge/deploy runtime, production configuration и новые delivery processes этим handoff не меняются. Git/GitHub остаётся operational source of truth. Сервер localhost нужен только для просмотра локальной галереи.
+Этот документ и visual references остаются versioned source of truth для bounded implementation
+PRs. Production public cutover, merge/deploy runtime, production configuration и новые delivery
+processes этим staged PR не меняются. Git/GitHub остаётся operational source of truth.
 
 ## 16. C2 staged implementation map (#853)
 
@@ -319,7 +326,7 @@ env change required: no
 | Audience route context | `frontend/src/pages/landing/landingAudience.ts` | `athlete` = `/` (canonical) и `/for-athletes` (context alias); `coach` = `/for-trainers`; search/hash сохраняются при переключении |
 | Accessible switch | `frontend/src/pages/landing/LandingAudienceSwitch.tsx` | обычные ссылки с `aria-current`, native browser history, русский label «Для себя / Для тренера» |
 | Shared composition shell | `frontend/src/pages/landing/LandingV10Shell.tsx` | существующий `PublicShell`, `BrandLockup`, `AppThemeToggle`, existing login destination; audience content injected as children |
-| Staged shell styles | `frontend/src/pages/landing/landing-v10.css` | только geometry/focus/responsive rules для switch; glass material остаётся у shared `PublicShell`/`Glass` |
+| Staged shell styles | `frontend/src/pages/landing/landing-v10.css` | geometry/focus/responsive rules for audience switch and staged composition; glass material остаётся у shared `PublicShell`/`Glass` |
 | Proof | `frontend/tests/unit/pages/landing/LandingAudienceSwitch.test.tsx` | route mapping, canonical contract, UTM/hash preservation, ARIA state and shared-shell composition |
 
 `/` и текущий `/for-trainers` намеренно продолжают рендерить существующие production pages;
@@ -327,3 +334,48 @@ env change required: no
 незаполненную страницу. #854 добавляет athlete scenes в этот composition, #855 — trainer
 scenes, а #858 остаётся единственным public cutover/release gate. Никакой второй shell,
 router, analytics store или controller не создаётся.
+
+## 17. C3 athlete staged implementation map (#854)
+
+Athlete composition собрана в staged shell и не подключена к текущему `/` до финального
+cutover #858. Все previews синтетические и локальные; реальные пользовательские данные не
+читаются и не записываются.
+
+| Boundary | Staged source | Contract |
+|---|---|---|
+| Athlete composition | `frontend/src/pages/landing/LandingV10AthletePage.tsx` | hero → plan/action/facts/decision cycle → existing `StrengthScene` → existing `LandingPractice` → nutrition preview → progress/weekly review → one compact Coach OS teaser → Web/TMA continuity |
+| Existing product proof | `StrengthScene.tsx`, `LandingPractice.tsx`, `LandingProgress.tsx` | current scroll-bound movement, isolated demo API boundary and prepared progress preview are reused without a second demo engine |
+| Nutrition truth | `LandingV10AthletePage.tsx` | local tabs distinguish plan, purchases and diary; planned ≠ consumed; missing entry ≠ zero |
+| Compact Coach OS teaser | `LandingV10AthletePage.tsx` | appears exactly once on athlete composition; CTA is `/for-trainers`, not auth or DemoCabinet; no Coach Today/trainer-only scene is rendered |
+| Responsive/theme layer | `frontend/src/pages/landing/landing-v10.css` | desktop/mobile grids, compact teaser, focus states and dark/light-safe surfaces; shared tokens, buttons, icons and glass shell stay in use |
+| Proof | `frontend/tests/unit/pages/landing/LandingV10AthletePage.test.tsx` | story landmarks, one teaser/no trainer scene, nutrition state, local weekly review, trainer href and no API call on render |
+
+`AppRoutes` и текущие `/` и `/for-trainers` остаются без изменений. Это staged athlete
+implementation для следующего bounded trainer task #855; production replacement и SEO
+indexation остаются deferred to #858.
+
+```text
+LANDING_DESIGN_DIRECTION=B+C+CURRENT_YFC
+LANDING_ATHLETE_NARRATIVE=STAGED
+LANDING_ATHLETE_COACH_PROMO=COMPACT_SINGLE
+LANDING_ATHLETE_TRAINER_ONLY_SECTIONS=HIDDEN
+LANDING_ATHLETE_DEMO_ENGINE=REUSED
+LANDING_ATHLETE_RESPONSIVE=PASS
+LANDING_IMPLEMENTATION=ATHLETE_STAGED
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C4
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```
+
+### C3 verification record
+
+- `frontend/tests/unit/pages/landing/LandingV10AthletePage.test.tsx`: 4/4 passed; full frontend
+  Vitest: 140 files, 772 tests passed.
+- TypeScript build, ESLint and Russian UI guard, targeted Prettier and Vite production build passed.
+- Local Chromium preview of the staged-only route passed four states: 390×844 and 1440×900,
+  light and dark, with the Coach OS teaser present once, no Coach Today/trainer-only copy, and
+  the trainer CTA pointing to `/for-trainers`.
+- The local visual screenshots remain ignored review evidence under `.artifacts`; no production
+  route or deployment was changed by #854.
