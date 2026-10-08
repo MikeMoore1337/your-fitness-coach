@@ -479,3 +479,53 @@ env change required: no
   forward without leaving the isolated demo route.
 - The existing trainer route remains the only demo runtime; no production route, backend API,
   account, private note, real invitation, notification or deploy is added by C5.
+
+## 20. C6 public CTA, route and SEO preparation (#857)
+
+C6 подготовил публичный контур без подключения staged V10 compositions к production Landing.
+Текущие `/` и `/for-trainers` сохраняют действующие страницы до финального cutover #858.
+
+| Boundary | Source | Contract |
+|---|---|---|
+| Athlete route | `frontend/src/main.tsx`, `backend/fitminiapp_api/main.py` | `/` остаётся canonical indexable athlete route; `/for-athletes` обслуживается как context alias с сохранением query/hash в браузере и без отдельной sitemap entry |
+| Athlete alias SEO | `frontend/src/shared/seo/metadata.ts`, `backend/fitminiapp_api/seo.py` | alias отдаёт `noindex, follow`, canonical `https://your-fitness-coach.ru/`, root public fallback и не создаёт structured-data duplicate |
+| Host boundary | `backend/fitminiapp_api/middleware/canonical_host.py` | application host redirects `/for-athletes` на public host, query сохраняется; `/app`, `/login`, `/coach`, `/admin`, API и demo boundaries не ослаблены |
+| Demo CTA semantics | `frontend/src/pages/landing/LandingPage.tsx`, `frontend/src/shared/navigation/appUrl.ts` | real `DemoCabinet` links use the shared hostname-aware `demoCabinetUrlForHostname`; in-page navigation is explicitly labelled `Сценарии демо` and does not emit demo success |
+| Own-data and trainer CTA | current `LandingPage`, staged `LandingV10AthletePage`, `PublicContentPage` | own-data links remain `/app`; the compact trainer teaser switches to `/for-trainers` while preserving campaign/hash context; current trainer entry remains the existing app handoff and `trainer_landing_cta_clicked` intent event; capability activation and Coach Today redirect stay owned by #875 |
+| Attribution and analytics | existing `captureFirstTouchAttribution`, `productEvents`, Yandex boundary | UTM/first-touch stays allowlisted and immutable; CTA/demo events carry only existing enums and surface; no raw URL, account/health data, private notes or phantom success event is introduced |
+| No-JS and index map | backend SEO renderer and sitemap | `/for-athletes` has meaningful root fallback, `/for-trainers` remains the existing canonical trainer page, and only manifest/article canonical URLs enter sitemap |
+
+The chosen header decision from the #857 clarification is the in-page label `Сценарии демо`:
+it points to the existing scenario showcase, where each visible scenario link enters the real
+isolated demo route. The public copy therefore does not claim a preview anchor is a completed demo.
+
+### C6 verification record
+
+- Added route/metadata regression coverage for direct `/for-athletes`, root canonicalization,
+  `noindex, follow`, no-JS fallback, sitemap exclusion and application-host redirect behavior.
+- Landing unit coverage now checks alias metadata and shared real-demo URL construction; the
+  production landing browser contract uses the explicit `Сценарии демо` label.
+- Targeted frontend Vitest, TypeScript, ESLint/Russian UI guard and Prettier passed; targeted
+  backend SEO/host tests and Ruff passed. The full repository frontend format baseline remains
+  the previously recorded pre-existing failure on 448 files and was not mass-formatted.
+- Cross-browser landing coverage passed 27/27 on Chromium, Firefox and WebKit with desktop,
+  mobile, light/dark, keyboard and direct-alias cases; the existing mocked TMA smoke suite passed
+  33/33. TMA-specific public cutover behavior remains deferred until the final #858 integration.
+- Production Landing cutover, authentication, trainer capability activation, external analytics
+  delivery, PR merge, deployment and production smoke remain deferred to #875/#858.
+
+```text
+PRODUCT_V10_C6=COMPLETE
+LANDING_ATHLETE_ROUTE=/
+LANDING_ATHLETE_CONTEXT_ALIAS=/for-athletes
+LANDING_ATHLETE_ALIAS_INDEXATION=NOINDEX_FOLLOW_CANONICAL_ROOT
+LANDING_TRAINER_ROUTE=/for-trainers
+LANDING_DEMO_CTA_SEMANTICS=SCENARIO_SHOWCASE_WITH_REAL_LINKS
+LANDING_FIRST_TOUCH_ATTRIBUTION=EXISTING_ALLOWLIST_REUSED
+LANDING_ANALYTICS=EXISTING_PRIVACY_SAFE_BOUNDARY_REUSED
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C8
+CONTROLLER=ABSENT
+GITHUB_FLOW=AUTHORITATIVE
+env change required: no
+```

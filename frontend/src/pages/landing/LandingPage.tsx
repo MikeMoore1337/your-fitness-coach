@@ -12,10 +12,10 @@ import type { DemoScenario } from '../../features/demo/demoApi';
 import { DEMO_SCENARIOS } from '../../features/demo/demoContent';
 import {
   appUrlForHostname,
-  demoUrlForHostname,
+  demoCabinetUrlForHostname,
   loginUrlForHostname,
 } from '../../shared/navigation/appUrl';
-import { AppLink } from '../../shared/navigation/router';
+import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { applyRouteMetadata } from '../../shared/seo/metadata';
 import { PUBLIC_TELEGRAM_LINKS } from '../../shared/telegram/publicLinks';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
@@ -127,17 +127,18 @@ const faqs = [
   },
 ] as const;
 
-function cabinetScenarioUrl(baseUrl: string, scenario: DemoScenario): string {
+function cabinetScenarioUrl(hostname: string, scenario: DemoScenario): string {
   const section =
     scenario === 'nutrition' ? 'nutrition' : scenario === 'trainer' ? 'trainer' : 'today';
-  return `${baseUrl}?cabinet=1&scenario=${scenario}&section=${section}`;
+  return demoCabinetUrlForHostname(hostname, scenario, section);
 }
 
 export default function LandingPage() {
   useLandingHeroMotion();
-  const appUrl = appUrlForHostname(window.location.hostname);
-  const loginUrl = loginUrlForHostname(window.location.hostname);
-  const demoUrl = demoUrlForHostname(window.location.hostname);
+  const { path } = useNavigation();
+  const hostname = window.location.hostname;
+  const appUrl = appUrlForHostname(hostname);
+  const loginUrl = loginUrlForHostname(hostname);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [heroUnavailable, setHeroUnavailable] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
@@ -150,7 +151,9 @@ export default function LandingPage() {
   useEffect(() => {
     let mounted = true;
     void import('../../content/publicContent').then(({ getPublicContentPage }) => {
-      if (mounted) applyRouteMetadata('/', getPublicContentPage('/'));
+      if (mounted && (path === '/' || path === '/for-athletes')) {
+        applyRouteMetadata(path, getPublicContentPage('/'));
+      }
     });
     trackProductEvent(
       { name: 'landing_viewed', surface: productEventSurface() },
@@ -159,7 +162,7 @@ export default function LandingPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [path]);
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -222,7 +225,7 @@ export default function LandingPage() {
             Продукт
           </a>
           <a href="#demo" onClick={() => setMobileMenuOpen(false)}>
-            Демо
+            Сценарии демо
           </a>
           <a href="#faq" onClick={() => setMobileMenuOpen(false)}>
             Вопросы
@@ -281,7 +284,7 @@ export default function LandingPage() {
                 className="landing-button landing-button--secondary"
                 {...glassProps('clear', true)}
                 data-glass-tone="on-image"
-                href={cabinetScenarioUrl(demoUrl, 'self_training')}
+                href={cabinetScenarioUrl(hostname, 'self_training')}
                 onClick={() => trackDemoSelection('hero', 'self_training')}
               >
                 Попробовать демо <Icon name="arrow-right" size={20} />
@@ -355,7 +358,7 @@ export default function LandingPage() {
               />
             ) : (
               <LandingProgress
-                href={`${demoUrl}?cabinet=1&scenario=self_training&section=progress`}
+                href={demoCabinetUrlForHostname(hostname, 'self_training', 'progress')}
               />
             )}
           </LandingChapter>
@@ -407,7 +410,7 @@ export default function LandingPage() {
               </AppLink>
               <a
                 className="landing-button landing-button--secondary landing-button--secondary-on-light"
-                href={cabinetScenarioUrl(demoUrl, 'trainer')}
+                href={cabinetScenarioUrl(hostname, 'trainer')}
                 onClick={() => {
                   trackTrainerCta('demo');
                   trackDemoSelection('section', 'trainer');
@@ -454,7 +457,7 @@ export default function LandingPage() {
               </p>
               <a
                 className="landing-button landing-button--secondary landing-start__demo-cta"
-                href={cabinetScenarioUrl(demoUrl, 'self_training')}
+                href={cabinetScenarioUrl(hostname, 'self_training')}
                 onClick={() => trackDemoSelection('section', 'self_training')}
               >
                 Попробовать демо <Icon name="arrow-right" size={20} />
@@ -469,7 +472,7 @@ export default function LandingPage() {
               {DEMO_SCENARIOS.map((scenario, index) => (
                 <a
                   key={scenario.value}
-                  href={cabinetScenarioUrl(demoUrl, scenario.value)}
+                  href={cabinetScenarioUrl(hostname, scenario.value)}
                   onClick={() => trackDemoSelection('section', scenario.value)}
                 >
                   <span>{String(index + 1).padStart(2, '0')}</span>
@@ -605,7 +608,7 @@ export default function LandingPage() {
             </a>
             <a
               className="landing-button landing-button--secondary landing-button--secondary-on-dark"
-              href={cabinetScenarioUrl(demoUrl, 'self_training')}
+              href={cabinetScenarioUrl(hostname, 'self_training')}
               onClick={() => trackDemoSelection('section', 'self_training')}
             >
               Попробовать демо <Icon name="arrow-right" size={20} />

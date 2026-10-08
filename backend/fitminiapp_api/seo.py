@@ -24,6 +24,7 @@ from fitminiapp_api.services.public_programs import (
 
 INDEX_ROBOTS = "index, follow"
 NOINDEX_ROBOTS = "noindex, nofollow"
+NOINDEX_FOLLOW_ROBOTS = "noindex, follow"
 SOCIAL_IMAGE_PATH = "/assets/brand/yfc-social-preview.png"
 SOCIAL_IMAGE_ALT = "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram"
 ARTICLE_INDEX_TITLE = "Статьи о тренировках, питании и прогрессе — Your Fitness Coach"
@@ -31,6 +32,7 @@ ARTICLE_INDEX_DESCRIPTION = (
     "Понятные статьи о тренировках, питании, спортивном питании и прогрессе: "
     "источники, ограничения и практический смысл без громких обещаний."
 )
+ATHLETE_LANDING_ALIAS_PATH = "/for-athletes"
 _PUBLIC_FALLBACK_PATTERN = re.compile(
     r"<!-- public-fallback-start -->.*?<!-- public-fallback-end -->",
     re.DOTALL,
@@ -537,6 +539,16 @@ def metadata_for_path(path: str) -> SeoMetadata:
     """Keep indexability decisions in one place for browser and crawler responses."""
 
     page = public_page_for_path(path)
+    if path == ATHLETE_LANDING_ALIAS_PATH:
+        landing = public_page_for_path("/")
+        if landing:
+            return SeoMetadata(
+                title=_required_string(landing["title"], field="title"),
+                description=_required_string(landing["description"], field="description"),
+                robots=NOINDEX_FOLLOW_ROBOTS,
+                canonical_url=_absolute_public_url("/"),
+                og_description=_required_string(landing["ogDescription"], field="ogDescription"),
+            )
     if page:
         if page.get("kind") == "exercise":
             # An allowlisted manifest entry is indexable only when its canonical domain
@@ -791,6 +803,8 @@ def render_articles_index_fallback(articles: tuple[WebArticle, ...]) -> str:
 def render_public_fallback(path: str) -> str:
     """Render the public page's meaningful text and links without requiring JavaScript."""
 
+    if path == ATHLETE_LANDING_ALIAS_PATH:
+        path = "/"
     page = public_page_for_path(path)
     if not page:
         return ""

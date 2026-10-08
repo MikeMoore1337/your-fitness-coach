@@ -3693,6 +3693,35 @@ def test_landing_host_keeps_public_home_on_landing_domain(client, monkeypatch):
     assert '<main class="seo-fallback">' in response.text
 
 
+def test_athlete_landing_alias_keeps_root_canonical_without_indexable_duplicate(
+    client, monkeypatch
+):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get(
+        "/for-athletes?utm_source=owner#demo",
+        headers={"Host": "your-fitness-coach.ru"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["x-robots-tag"] == "noindex, follow"
+    assert '<meta name="robots" content="noindex, follow" />' in response.text
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in response.text
+    assert '<main class="seo-fallback">' in response.text
+    assert "for-athletes" not in response.text
+
+
+def test_athlete_landing_alias_is_not_published_in_sitemap(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    response = client.get("/sitemap.xml", headers={"Host": "your-fitness-coach.ru"})
+
+    assert response.status_code == 200
+    assert "https://your-fitness-coach.ru/for-athletes" not in response.text
+
+
 def test_public_seo_response_uses_canonical_metadata_and_truthful_structured_data(
     client, monkeypatch
 ):
@@ -4247,6 +4276,11 @@ def test_canonical_hosts_and_missing_routes_do_not_create_duplicate_or_soft_404_
     app_host_public_page = client.get(
         "/training", headers={"Host": "app.your-fitness-coach.ru"}, follow_redirects=False
     )
+    app_host_athlete_alias = client.get(
+        "/for-athletes?utm_source=owner",
+        headers={"Host": "app.your-fitness-coach.ru"},
+        follow_redirects=False,
+    )
     trailing_public_page = client.get(
         "/training/", headers={"Host": "your-fitness-coach.ru"}, follow_redirects=False
     )
@@ -4260,6 +4294,11 @@ def test_canonical_hosts_and_missing_routes_do_not_create_duplicate_or_soft_404_
     assert landing_app_slash.headers["location"] == "https://app.your-fitness-coach.ru/app"
     assert app_host_public_page.status_code == 308
     assert app_host_public_page.headers["location"] == "https://your-fitness-coach.ru/training"
+    assert app_host_athlete_alias.status_code == 308
+    assert (
+        app_host_athlete_alias.headers["location"]
+        == "https://your-fitness-coach.ru/for-athletes?utm_source=owner"
+    )
     assert trailing_public_page.status_code == 308
     assert trailing_public_page.headers["location"] == "https://your-fitness-coach.ru/training"
     assert missing.status_code == 404

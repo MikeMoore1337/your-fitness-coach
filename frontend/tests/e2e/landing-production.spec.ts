@@ -198,7 +198,9 @@ test('landing hero fills the desktop first viewport without horizontal overflow'
       expect(headerStyle.borderWidth).toBe('1px');
       const navigation = page.getByRole('navigation', { name: 'Навигация по странице' });
       await expect(navigation.getByRole('link', { name: 'Продукт', exact: true })).toBeVisible();
-      await expect(navigation.getByRole('link', { name: 'Демо', exact: true })).toBeVisible();
+      await expect(
+        navigation.getByRole('link', { name: 'Сценарии демо', exact: true }),
+      ).toBeVisible();
       await expect(navigation.getByRole('link', { name: 'Вопросы', exact: true })).toBeVisible();
     }
     await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
@@ -263,7 +265,10 @@ test('landing secondary actions keep contrast tied to their section surface', as
 
   const surfaceCases = [
     { selector: '.landing-feature--0 .landing-button', className: 'on-light' },
-    { selector: '.landing-feature--1 .landing-button', className: 'on-dark' },
+    {
+      selector: '.landing-feature--1 > div:first-child .landing-button',
+      className: 'on-dark',
+    },
     {
       selector: '.landing-trainer__actions .landing-button--secondary',
       className: 'on-light',
@@ -560,6 +565,19 @@ test('keyboard, menu, FAQ and canonical public actions stay operable', async ({ 
   await page.getByRole('link', { name: 'Приватность и данные' }).click();
   await expect(page).toHaveURL(/#privacy$/);
   await expect(page.locator('#privacy')).toBeInViewport();
+});
+
+test('athlete audience alias keeps campaign context without an indexable duplicate', async ({
+  page,
+}) => {
+  await page.goto('/for-athletes?utm_source=owner#demo');
+
+  await expect(page.getByRole('heading', { level: 1, name: 'СИЛА В ДЕЙСТВИИ.' })).toBeVisible();
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow');
+  const canonicalUrl = new URL('/', page.url()).toString();
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', canonicalUrl);
+  await expect(page).toHaveURL('/for-athletes?utm_source=owner#demo');
+  await expect(page.locator('script[type="application/ld+json"]')).toHaveCount(0);
 });
 
 test('captures Task 401 landing readability and spacing evidence when requested', async ({

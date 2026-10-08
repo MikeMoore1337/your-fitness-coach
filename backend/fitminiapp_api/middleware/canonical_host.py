@@ -7,6 +7,7 @@ from starlette.responses import RedirectResponse, Response
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.seo import (
+    ATHLETE_LANDING_ALIAS_PATH,
     canonical_landing_domain,
     frontend_host,
     public_origin,
@@ -26,7 +27,7 @@ APPLICATION_PATHS = frozenset(
 # Public pages use relative API URLs, so redirecting /api/* to the app origin
 # would turn a same-origin browser request into a cross-origin response.
 APPLICATION_PATH_PREFIXES = ("/join/",)
-PUBLIC_PATHS = frozenset(public_page_paths())
+PUBLIC_PATHS = frozenset((*public_page_paths(), ATHLETE_LANDING_ALIAS_PATH))
 
 
 def _is_application_path(path: str) -> bool:

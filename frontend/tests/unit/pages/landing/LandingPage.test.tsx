@@ -294,4 +294,20 @@ describe('LandingPage', () => {
 
     unmount();
   });
+
+  it('keeps the athlete audience alias non-indexable with the root canonical', async () => {
+    window.history.replaceState({}, '', '/for-athletes?utm_source=owner#demo');
+    renderLanding();
+
+    await waitFor(() => expect(document.title).toMatch(/тренировки, питание и прогресс/i));
+    expect(document.querySelector('meta[name="robots"]')).toHaveAttribute(
+      'content',
+      'noindex, follow',
+    );
+    expect(document.querySelector('link[rel="canonical"]')).toHaveAttribute(
+      'href',
+      `${window.location.origin}/`,
+    );
+    expect(document.querySelector('script[type="application/ld+json"]')).toBeNull();
+  });
 });
