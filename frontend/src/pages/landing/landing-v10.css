@@ -1,0 +1,95 @@
+.landing-v10-page {
+  overflow: clip;
+}
+
+.landing-v10-page .public-shell__header {
+  width: 100%;
+  padding-inline: max(5vw, calc((100vw - 1180px) / 2));
+}
+
+.landing-v10-audience-switch {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.landing-v10-audience-switch__label {
+  color: var(--landing-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.landing-v10-audience-switch__links {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--landing-border);
+  border-radius: var(--radius-control);
+  background: var(--landing-card);
+}
+
+.landing-v10-audience-switch__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 8px 12px;
+  border-radius: calc(var(--radius-control) - 3px);
+  color: var(--landing-ink);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.landing-v10-audience-switch__link:hover {
+  background: var(--landing-secondary);
+  text-decoration: none;
+}
+
+.landing-v10-audience-switch__link[aria-current='page'] {
+  background: var(--brand-lime);
+  color: var(--brand-ink);
+}
+
+.landing-v10-audience-switch__link:focus-visible {
+  outline: 3px solid var(--v2-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 680px) {
+  .landing-v10-page .public-shell__header {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'brand actions'
+      'audience audience';
+    row-gap: 10px;
+    padding-block: 10px;
+  }
+
+  .landing-v10-page .public-shell__brand {
+    grid-area: brand;
+  }
+
+  .landing-v10-page .public-shell__header-actions {
+    grid-area: actions;
+  }
+
+  .landing-v10-audience-switch {
+    grid-area: audience;
+    justify-content: center;
+    width: 100%;
+    padding-bottom: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-v10-audience-switch__link {
+    transition: none;
+  }
+}

@@ -37,7 +37,7 @@ Owner выбрал сочетание B (кинематографичная сп
 
 - `LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS` зафиксирован в Issue #852.
 - `LANDING_HANDOFF_PERSISTED=PASS` означает этот versioned документ и выбранные visual references; ignored gallery не является единственным источником.
-- `LANDING_IMPLEMENTATION=AUTHORIZED_NOT_STARTED` на момент docs-only PR: production implementation начинается отдельными bounded PR для #853 и следующих зависимых issues.
+- `LANDING_IMPLEMENTATION=STAGED_FOUNDATION_ONLY` после C2: production public cutover остаётся отдельным gate #858.
 - `CONTROLLER=ABSENT`: не добавлять controller, leases, lifecycle state machine, delivery owner, очередь или recovery orchestration.
 
 ## 2. Источники и визуальный аудит production
@@ -299,11 +299,31 @@ LANDING_INTERACTIVE_PREVIEWS=PRESERVED
 LANDING_DESIGN_HANDOFF=UPDATED
 LANDING_FINAL_DESIGN_OWNER_APPROVAL=PASS
 LANDING_HANDOFF_PERSISTED=PASS
-LANDING_IMPLEMENTATION=AUTHORIZED_NOT_STARTED
-PRODUCT_V10_CONVEYOR=READY_FOR_C2
+LANDING_IMPLEMENTATION=STAGED_FOUNDATION_ONLY
+LANDING_PUBLIC_CUTOVER=NOT_STARTED
+PRODUCT_V10_CONVEYOR=READY_FOR_C3
 CONTROLLER=ABSENT
 GITHUB_FLOW=AUTHORITATIVE
 env change required: no
 ```
 
 Этот документ и visual references предназначены для versioned docs-only PR #852. Production Landing, PR implementation, merge/deploy runtime, production configuration и новые delivery processes этим handoff не меняются. Git/GitHub остаётся operational source of truth. Сервер localhost нужен только для просмотра локальной галереи.
+
+## 16. C2 staged implementation map (#853)
+
+Подготовительная архитектура переиспользует существующие primitives и не меняет текущие
+публичные рендеры до финального cutover:
+
+| Boundary | Staged source | Contract |
+|---|---|---|
+| Audience route context | `frontend/src/pages/landing/landingAudience.ts` | `athlete` = `/` (canonical) и `/for-athletes` (context alias); `coach` = `/for-trainers`; search/hash сохраняются при переключении |
+| Accessible switch | `frontend/src/pages/landing/LandingAudienceSwitch.tsx` | обычные ссылки с `aria-current`, native browser history, русский label «Для себя / Для тренера» |
+| Shared composition shell | `frontend/src/pages/landing/LandingV10Shell.tsx` | существующий `PublicShell`, `BrandLockup`, `AppThemeToggle`, existing login destination; audience content injected as children |
+| Staged shell styles | `frontend/src/pages/landing/landing-v10.css` | только geometry/focus/responsive rules для switch; glass material остаётся у shared `PublicShell`/`Glass` |
+| Proof | `frontend/tests/unit/pages/landing/LandingAudienceSwitch.test.tsx` | route mapping, canonical contract, UTM/hash preservation, ARIA state and shared-shell composition |
+
+`/` и текущий `/for-trainers` намеренно продолжают рендерить существующие production pages;
+новый shell не подключён в `AppRoutes`, не добавляет indexable route и не публикует
+незаполненную страницу. #854 добавляет athlete scenes в этот composition, #855 — trainer
+scenes, а #858 остаётся единственным public cutover/release gate. Никакой второй shell,
+router, analytics store или controller не создаётся.
