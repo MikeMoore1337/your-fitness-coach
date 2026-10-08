@@ -21,7 +21,7 @@ online_rollout_notes = (
 def upgrade() -> None:
     op.add_column(
         "coach_clients",
-        sa.Column("labels", sa.JSON(), server_default=sa.text("'[]'"), nullable=False),
+        sa.Column("labels", sa.JSON(), nullable=True),
     )
 
 
