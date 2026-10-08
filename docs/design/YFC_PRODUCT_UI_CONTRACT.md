@@ -46,6 +46,14 @@ user-visible badges. Новые английские literals в интерфе�
 routes, analytics/event names, test names и developer documentation этим правилом не затрагиваются
 и не должны переводиться ради него.
 
+Для enforcement в новых изменениях frontend используется `frontend/scripts/russian_user_facing_ui.mjs`.
+Он разбирает TypeScript/TSX через установленный TypeScript AST, проверяет только новые или
+изменённые исходные строки пользовательского текста и запускается через `npm run lint`, поэтому
+входит в обязательную группу `frontend-checks` CI. Существующий legacy English UI не становится
+массовым migration scope: он не расширяется новыми нарушениями и исправляется отдельными задачами.
+Allowlist guard ограничен документированными брендами и техническими обозначениями; произвольные
+inline-исключения запрещены.
+
 ## Source of truth и primitives
 
 - Текущая production implementation — source of truth для поведения, состояний и визуальных

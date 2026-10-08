@@ -2050,6 +2050,23 @@ export interface paths {
         patch: operations["update_coach_client_operational_status_api_v1_coach_clients__client_id__operational_status_patch"];
         trace?: never;
     };
+    "/api/v1/coach/clients/{client_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Coach Client Labels */
+        patch: operations["update_coach_client_labels_api_v1_coach_clients__client_id__labels_patch"];
+        trace?: never;
+    };
     "/api/v1/coach/packages": {
         parameters: {
             query?: never;
@@ -7771,6 +7788,8 @@ export interface components {
             /** Timezone */
             timezone?: string | null;
             kbju?: components["schemas"]["NutritionTargetResponse"] | null;
+            /** Labels */
+            labels?: string[];
             /**
              * Status
              * @enum {string}
@@ -8071,6 +8090,18 @@ export interface components {
              * @default 0
              */
             fold: number;
+        };
+        /** CoachClientLabelsResponse */
+        CoachClientLabelsResponse: {
+            /** Client Id */
+            client_id: number;
+            /** Labels */
+            labels?: string[];
+        };
+        /** CoachClientLabelsUpdate */
+        CoachClientLabelsUpdate: {
+            /** Labels */
+            labels?: string[];
         };
         /** CoachClientOperationalStatusUpdate */
         CoachClientOperationalStatusUpdate: {
@@ -8601,6 +8632,20 @@ export interface components {
             previous?: number | null;
             /** Current */
             current?: number | null;
+            /**
+             * Source
+             * @constant
+             */
+            source: "weekly_check_in";
+            /** Source Id */
+            source_id: number;
+            /** Reason */
+            reason: string;
+            /**
+             * Occurred At
+             * Format: date
+             */
+            occurred_at: string;
         };
         /** CoachReviewCheckInSnapshot */
         CoachReviewCheckInSnapshot: {
@@ -21730,6 +21775,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_coach_client_labels_api_v1_coach_clients__client_id__labels_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                client_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoachClientLabelsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachClientLabelsResponse"];
                 };
             };
             /** @description Validation Error */

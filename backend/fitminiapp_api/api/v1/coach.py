@@ -33,6 +33,8 @@ from fitminiapp_api.schemas.coach_attention import CoachAttentionResponse
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityResponse
 from fitminiapp_api.schemas.coach_crm import (
     CoachAgendaResponse,
+    CoachClientLabelsResponse,
+    CoachClientLabelsUpdate,
     CoachClientOperationalStatusUpdate,
     CoachClientOperationsResponse,
     CoachOperationsTodayResponse,
@@ -122,6 +124,7 @@ from fitminiapp_api.services.coach_clients import (
     get_client_managed_by_coach,
     remove_client_for_coach,
     revoke_coach_invite,
+    update_client_labels,
 )
 from fitminiapp_api.services.coach_crm import (
     CoachCrmError,
@@ -671,6 +674,23 @@ def update_coach_client_operational_status(
     except CoachCrmError as exc:
         raise _crm_error(exc) from exc
     return {"operational_status": payload.operational_status}
+
+
+@router.patch(
+    "/clients/{client_id}/labels",
+    response_model=CoachClientLabelsResponse,
+)
+def update_coach_client_labels(
+    client_id: int,
+    payload: CoachClientLabelsUpdate,
+    current_user: User = Depends(require_coach),
+    db: Session = Depends(get_db),
+) -> CoachClientLabelsResponse:
+    try:
+        labels = update_client_labels(db, current_user, client_id, payload.labels)
+    except ProgramError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return CoachClientLabelsResponse(client_id=client_id, labels=labels)
 
 
 @router.get("/packages", response_model=list[CoachPackageResponse])

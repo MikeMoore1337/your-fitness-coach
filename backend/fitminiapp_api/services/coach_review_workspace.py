@@ -254,6 +254,10 @@ def _changes(
                 label=label,
                 previous=old,
                 current=new,
+                source="weekly_check_in",
+                source_id=current.id,
+                reason=f"{label}: {old} → {new}",
+                occurred_at=current.submitted_on,
             )
         )
     return changes

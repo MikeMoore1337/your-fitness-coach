@@ -311,6 +311,9 @@ export function CoachReviewWorkspace({
                   <strong>
                     {valueLabel(change.previous)} → {valueLabel(change.current)}
                   </strong>
+                  <small>
+                    {change.reason} · недельный итог · {dateLabel(change.occurred_at)}
+                  </small>
                 </div>
               ))}
             </div>
@@ -376,7 +379,7 @@ export function CoachReviewWorkspace({
               </label>
               <div className="coach-review-card__follow-up">
                 <label className="field">
-                  <span>Follow-up, если нужен</span>
+                  <span>Что проверить позже (необязательно)</span>
                   <input
                     className="ui-input"
                     maxLength={240}
@@ -452,9 +455,9 @@ export function CoachReviewWorkspace({
               </Button>
             </div>
             <div className="coach-review-workspace__task-card">
-              <h4>Следующий review</h4>
+              <h4>Следующая проверка</h4>
               <label className="field">
-                <span>Срок следующего review</span>
+                <span>Дата следующей проверки</span>
                 <input
                   className="ui-input"
                   onChange={(event) => setNextReviewDueAt(event.target.value)}
@@ -467,9 +470,9 @@ export function CoachReviewWorkspace({
                 onClick={() =>
                   taskMutation.mutate({
                     kind: 'schedule_follow_up',
-                    title: 'Провести следующий review клиента',
+                    title: 'Провести следующую проверку клиента',
                     dueAt: nextReviewDueAt,
-                    reason: 'Следующий review запланирован тренером из рабочего места проверки.',
+                    reason: 'Следующая проверка запланирована тренером из рабочего места проверки.',
                     sourceKind: 'client',
                     sourceId: clientId,
                   })
@@ -477,7 +480,7 @@ export function CoachReviewWorkspace({
                 type="button"
                 variant="secondary"
               >
-                Запланировать review
+                Запланировать проверку
               </Button>
             </div>
           </div>

@@ -1162,6 +1162,7 @@ def _client(session: _DemoSession, slug: str) -> dict[str, Any]:
         "training_preferences": None,
         "timezone": "Europe/Moscow",
         "kbju": _nutrition_target(DEMO_CLIENT_IDS[slug], _today(session), session),
+        "labels": session.state.setdefault("crm_labels", {}).get(slug, []),
         "status": "active",
         "operational_status": session.state.setdefault("crm_operational_status", {}).get(
             slug, "active"
@@ -1188,6 +1189,7 @@ def _pending_client() -> dict[str, Any]:
         "training_preferences": None,
         "timezone": None,
         "kbju": None,
+        "labels": [],
         "status": "pending",
         "operational_status": "active",
     }
@@ -2629,6 +2631,27 @@ def handle_demo_transport(
         session.state.setdefault("crm_operational_status", {})[slug] = payload["operational_status"]
         session.revision += 1
         return {"operational_status": payload["operational_status"]}
+
+    if (
+        method == "PATCH"
+        and len(parts) == 4
+        and parts[:2] == ["coach", "clients"]
+        and parts[2].isdigit()
+        and parts[3] == "labels"
+    ):
+        client_id = int(parts[2])
+        slug = _client_slug(client_id)
+        labels = _request_body(body).get("labels")
+        if not isinstance(labels, list) or any(
+            not isinstance(label, str) or not label.strip() for label in labels
+        ):
+            raise DemoActionForbiddenError
+        normalized = list(dict.fromkeys(" ".join(label.split()) for label in labels))
+        if len(normalized) > 20 or any(len(label) > 64 for label in normalized):
+            raise DemoActionForbiddenError
+        session.state.setdefault("crm_labels", {})[slug] = normalized
+        session.revision += 1
+        return {"client_id": client_id, "labels": normalized}
 
     if (
         method in {"PATCH", "DELETE"}

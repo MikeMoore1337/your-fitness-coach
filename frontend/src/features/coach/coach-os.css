@@ -898,6 +898,12 @@
   gap: 2px;
 }
 
+.coach-review-workspace__change-list small {
+  color: var(--v2-text-secondary);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
 .coach-review-workspace__change-list span {
   color: var(--v2-text-secondary);
   font-size: 0.8rem;
@@ -951,6 +957,11 @@
 .coach-review-card__follow-up {
   grid-template-columns: minmax(0, 1.5fr) minmax(180px, 1fr);
   align-items: end;
+}
+
+.coach-review-workspace__actions {
+  display: grid;
+  gap: var(--v2-space-3);
 }
 
 .coach-roster-analytics__summary {

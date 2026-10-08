@@ -124,6 +124,7 @@ def _client_entry_from_user(
     *,
     include_preferences_context: bool,
     operational_status: str | None = "active",
+    labels: list[str] | None = None,
 ) -> dict:
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
@@ -155,6 +156,7 @@ def _client_entry_from_user(
         ),
         "timezone": get_user_timezone_name(user),
         "kbju": nutrition_target,
+        "labels": list(labels or []),
         "status": "active",
         "operational_status": operational_status or "active",
     }
@@ -182,6 +184,7 @@ def _client_entry_from_invite(invite: CoachClientInvite) -> dict:
         "training_preferences": None,
         "timezone": None,
         "kbju": None,
+        "labels": [],
         "status": "pending",
         "operational_status": "active",
     }
@@ -246,6 +249,38 @@ def remove_client_for_coach(db: Session, coach: User, client_id: int) -> None:
         details={"status": "ended", "reason": "removed_by_trainer"},
     )
     db.commit()
+
+
+def update_client_labels(
+    db: Session,
+    coach: User,
+    client_id: int,
+    labels: list[str],
+) -> list[str]:
+    client = get_client_managed_by_coach(db, coach, client_id)
+    link = (
+        db.query(CoachClient)
+        .filter(
+            CoachClient.coach_user_id == coach.id,
+            CoachClient.client_user_id == client.id,
+            CoachClient.status == "active",
+        )
+        .with_for_update()
+        .one()
+    )
+    previous = list(link.labels or [])
+    link.labels = list(labels)
+    record_audit_event(
+        db,
+        actor_user_id=coach.id,
+        target_user_id=client.id,
+        action="coach.client_labels_changed",
+        resource_type="coach_client",
+        resource_id=link.id,
+        details={"from_count": len(previous), "to_count": len(labels)},
+    )
+    db.commit()
+    return list(labels)
 
 
 def revoke_coach_invite(db: Session, coach: User, invite_id: int) -> None:
