@@ -1,12 +1,11 @@
 # Landing v10 — final pre-delivery gate (#895–#900 / PR #902)
 
-Audit date: 2026-10-09. Runtime audited at `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`; base `origin/master` was
-`64e90857157a013ce1f28c655eeefaf765cb779b`. PR #902 was OPEN, CLEAN and MERGEABLE;
-the base is an ancestor of the head. The worktree was clean and no foreign changes
-were found. Subsequent changes for this gate are documentation/traceability only.
-The frozen frontend tree is `d9bcfd9eb12d13b1d6d434cadf7dce791b32375e`.
-Required Checks for any documentation commit must finish on that new exact head;
-the final head/check snapshot is recorded on PR #902 and in the local gate evidence.
+Audit date: 2026-10-09. Controlled parity recovery is based on the existing PR #902
+worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7`; `origin/master` remains
+`64e90857157a013ce1f28c655eeefaf765cb779b`. The recovery diff is limited to the
+dedicated visual spec and its disposition fixture; runtime/frontend/backend code is
+unchanged. PR #902 remains OPEN, CLEAN and MERGEABLE at the last GitHub snapshot;
+the exact post-recovery head and its Checks must be read after push.
 
 ```text
 OWNER_VISUAL_APPROVAL=APPROVED
@@ -15,9 +14,14 @@ VISUAL_BASELINE=FROZEN
 ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
 ARCHIVE_VISUAL_PARITY=FAIL
 ARCHIVE_PRODUCT_SCENES_ATTEMPTED=25
-ARCHIVE_PRODUCT_SCENES_PIXEL_COMPARED=15
+ARCHIVE_PRODUCT_SCENES_PIXEL_COMPARED=13
 ARCHIVE_PRODUCT_SCENES_PASS=0
-ARCHIVE_PRODUCT_SCENES_TIMEOUT=10
+ARCHIVE_PRODUCT_SCENES_PIXEL_FAIL=13
+ARCHIVE_PRODUCT_SCENES_TIMEOUT=0
+ARCHIVE_SUPERSEDED_SCENES=12
+SUPERSEDED_REFERENCE_COVERAGE=PASS
+TRAINER_SIX_CHAPTER_ACCEPTANCE=OWNER_DECISION_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
 READY_FOR_MERGE_APPROVAL=NO
 MERGE=FORBIDDEN
 DEPLOY=FORBIDDEN
@@ -28,9 +32,31 @@ CONTROLLER_V2=ABSENT
 env change required: no
 ```
 
-The latest owner approval remains valid for the frozen design. Earlier REJECTED
-and WAITING records describe earlier candidates. Approval does not turn failed
-archive comparisons into PASS, authorize release, or close acceptance criteria.
+The latest owner approval remains valid for the frozen design. Earlier REJECTED and
+WAITING records describe earlier candidates. Approval does not turn failed archive
+comparisons into PASS, authorize release, or close acceptance criteria.
+
+## Current controlled recovery result
+
+- The dedicated configuration `frontend/playwright.landing-visual.config.ts` ran
+  against a local Vite preview with `updateSnapshots: 'none'`; originals and the
+  `0.01` threshold were not changed.
+- All 28 original PNG hashes pass. The final three are comparison/gallery material;
+  25 product scenes are in the disposition matrix.
+- Twelve archive cases are OWNER_SUPERSEDED by later owner decisions. Their current
+  approved page structure passed the separate assertions; the old archive pixels are
+  recorded as `NOT_COMPARABLE`, never as PASS.
+- Thirteen ACTIVE_COMPARABLE cases reached a deterministic state and have no selector
+  timeout, but all thirteen remain `PIXEL_FAIL` at the unchanged threshold. The
+  recovery fixed three capture defects in the harness: the lowered StrengthScene
+  effort phase and lazy progress readiness for two progress cases.
+- The loaded progress cases (`14-07_1`, `14-07_2`) retain a concrete nested-frame/
+  geometry mismatch. Other active failures remain unresolved crop/geometry differences;
+  no visual CSS change is authorized by this gate.
+
+Evidence: [controlled recovery gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/index.html),
+[scene matrix](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-report.md),
+and [summary JSON](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-summary.json).
 
 ## Checks and reproducibility
 
@@ -73,13 +99,13 @@ $env:LANDING_VISUAL_EVIDENCE_DIR='D:/Pet-projects/your-fitness-coach/.artifacts/
 npx playwright test --config=playwright.landing-visual.config.ts --reporter=list,json
 ```
 
-The actual run returned exit 1: **1 hash test PASS, 25 scene tests FAIL**, no skips,
-no retries. `playwright.config.ts` explicitly ignores this spec; dedicated config
-has `updateSnapshots: 'none'`. The comparator always runs its comparison (setting
-`LANDING_VISUAL_COMPARE=1` does not bypass or replace the pixel assertions).
-No test, fixture, threshold, golden or runtime was changed during this gate.
+The historical run above returned exit 1: **1 hash test PASS, 25 scene tests FAIL**,
+with ten stale-selector timeouts. It predates the controlled recovery. The current
+recovery result is recorded above and in the linked gallery; `playwright.config.ts`
+still explicitly ignores this spec, while the dedicated config keeps
+`updateSnapshots: 'none'`.
 
-## Archive hashes and scene results
+## Historical pre-recovery archive hashes and scene results
 
 [Canonical manifest](design/references/landing-archive-owner-canonical/MANIFEST.json):
 all 28 PNGs matched their SHA-256 values. The actual local `Landing.zip` also matched
@@ -173,7 +199,21 @@ no self proof chapters on trainer. They are recorded in the owner follow-ups and
 the latest approval, not inferred from CI. No new waiver of unrelated pixel or
 six-interactive-chapter criteria is inferred.
 
-## Acceptance reconciliation
+## Current recovery reconciliation for Issues #895–#900
+
+| Issue | Current evidence | Status |
+|---|---|---|
+| #895 | Owner visual approval and frozen final-correction evidence; recovery is test/fixture/docs only | APPROVED / OPEN; delivery gate remains blocked |
+| #896 | `landing-production.spec.ts`: 50/50 Chromium pass across 320–1920, themes and audiences; archive active scenes remain 13/13 pixel FAIL | Functional checks verified; visual parity unresolved |
+| #897 | Athlete route contains the approved compact Coach OS teaser and existing interactive athlete scenes; 13 active archive scenes fail unchanged 0.01 threshold | Implemented and functionally checked; exact archive parity unresolved |
+| #898 | Trainer route retains Coach Today and process; no separate six interactive chapters for invite, program, Client 360, weekly review, selected-client preview/confirm and draft/confirm | `OWNER_DECISION_REQUIRED`; no UI added |
+| #899 | Responsive Chromium matrix 50/50, keyboard/menu/hash and mocked TMA safe-area checks pass; native Telegram and exact archive crops are not proven | Functional checks verified; visual/native coverage partial |
+| #900 | Canonical MANIFEST hash check 28/28; 25 product scenes dispositioned; dedicated comparator excluded by ordinary `testIgnore` and reports 13 active pixel FAIL | Evidence complete; visual gate FAIL |
+
+The historical table below is retained for audit chronology. Its older timeout counts
+and pre-recovery candidate links are not the current result.
+
+## Historical acceptance reconciliation (pre-recovery snapshot)
 
 Implementation, verification and issue closure are separate. Every issue below is
 OPEN; no unchecked original acceptance item was changed to checked. Source/test

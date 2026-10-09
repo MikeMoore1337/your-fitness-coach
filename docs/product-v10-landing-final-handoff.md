@@ -1,6 +1,6 @@
 # Product v10 — B × C × Current YFC — final implementation handoff
 
-## Current #895 pre-delivery gate — 2026-10-09
+## Current #895 controlled parity recovery — 2026-10-09
 
 `OWNER_VISUAL_APPROVAL=APPROVED`, `APPROVAL_SCOPE=FINAL_CORRECTION_VISUAL_DESIGN`,
 `VISUAL_BASELINE=FROZEN`. The owner's latest approval applies to the current design;
@@ -8,16 +8,17 @@ older REJECTED/WAITING/NOT_CREATED values below are historical snapshots, not cu
 status. The frozen visual evidence remains `.artifacts/tasks/895/evidence/final-correction/`.
 
 [PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) explicitly covers Issues #895, #896, #897, #898, #899 and #900.
-Runtime head audited: `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`. Its [required CI](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37922378285)
-is green, including shared mobile Chromium/WebKit (10/10). Firefox is scope-SKIPPED.
-Any documentation-only head added by this reconciliation requires its own Checks;
-the current exact head/check result is recorded on PR #902, not inferred from the old run.
+Controlled recovery is based on the existing WIP head `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and changes only the dedicated visual spec plus its disposition fixture. Runtime/frontend/backend code is unchanged. The exact post-recovery head and Checks must be read from PR #902 after push; the older CI run below is historical for `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`.
 
-The separate archive suite is **FAIL**: 28/28 original PNG hashes PASS; 25 product
-scenes attempted, 15 pixel mismatches, 10 missing-selector timeouts, 0 scene PASS.
-Three comparison-gallery images are hashed and excluded from product-scene counts.
-The ordinary Playwright config excludes this spec, so required CI GREEN is not
-archive acceptance. No baseline or threshold was changed and no new visual fix made.
+The separate archive suite remains **FAIL**: 28/28 original PNG hashes PASS; 25 product
+scenes are dispositioned, with 12 owner-superseded structural checks PASS and 13 active
+pixel comparisons FAIL at the unchanged 0.01 threshold. The recovery removed three
+test-harness capture defects and leaves no selector timeouts. Three comparison-gallery
+images are hashed and excluded from product-scene counts. The ordinary Playwright config
+excludes this spec, so required CI GREEN is not archive acceptance. No baseline, threshold,
+or runtime visual was changed.
+
+[Controlled recovery gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/index.html) · [scene matrix](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-report.md)
 
 [Detailed criterion reconciliation and all scene results](product-v10-landing-pre-delivery-gate.md)
 records owner-approved composition overrides, capture readiness/normalization defects,
@@ -39,6 +40,10 @@ TASK_895_VISUAL_BASELINE=FROZEN
 TASK_895_PR=OPEN
 ARCHIVE_ORIGINALS_HASHES=PASS
 ARCHIVE_VISUAL_PARITY=FAIL
+ACTIVE_REFERENCE_PARITY=FAIL
+SUPERSEDED_REFERENCE_COVERAGE=PASS
+TRAINER_SIX_CHAPTER_ACCEPTANCE=OWNER_DECISION_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
 TASK_895_READY_FOR_DELIVERY_APPROVAL=NO
 READY_FOR_MERGE_APPROVAL=NO
 TASK_895_MERGE=NOT_STARTED
