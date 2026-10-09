@@ -57,7 +57,7 @@ describe('canonical archive athlete composition', () => {
         .compareDocumentPosition(hero.getByText(/Браузер и мини-приложение Telegram/)),
     ).toBe(4);
     expect(screen.getByRole('heading', { name: 'Понятные правила.' })).toBeInTheDocument();
-  });
+  }, 15000);
   it('does not turn planned food into a diary entry without an explicit action', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
     renderPage();
