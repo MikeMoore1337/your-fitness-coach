@@ -1,12 +1,12 @@
 # Landing v10 — final pre-delivery gate (#895–#900 / PR #902)
 
 Audit date: 2026-10-09. Controlled parity recovery started from the existing PR #902
-worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is now verified at exact
-head `f7ec1acd3bd31bb4ed9c709ce9ea13b28d894d48`; `origin/master` remains
+worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is now verified at the
+current PR #902 exact head; `origin/master` remains
 `64e90857157a013ce1f28c655eeefaf765cb779b`. The recovery diff is limited to the
 dedicated visual spec, its disposition fixture and these traceability documents;
 runtime/frontend/backend code is unchanged. PR #902 is OPEN, CLEAN and MERGEABLE;
-required CI run `37937220046` is GREEN at the exact head.
+the required exact-head Checks are GREEN (the current run is linked from PR #902).
 
 ```text
 OWNER_VISUAL_APPROVAL=APPROVED
@@ -61,10 +61,10 @@ and [summary JSON](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evide
 
 ## Checks and reproducibility
 
-- [Required CI run 37937220046](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37937220046): SUCCESS on exact head `f7ec1acd3bd31bb4ed9c709ce9ea13b28d894d48`,
+- [Required exact-head Checks on PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902/checks): GREEN on the current exact head,
   aggregate `checks` green; frontend/unit/smoke, Python, security/CodeQL/audits,
   migrated stack, containers and workflow/deployment policy jobs succeeded.
-- [Required mobile job](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37937220046/job/113849129157):
+- [Required mobile checks on PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902/checks):
   Chromium + WebKit, 10/10 PASS. The checked-in mobile config selects both projects;
   this is the shared application mobile regression group, not archive Landing
   pixel parity in WebKit.

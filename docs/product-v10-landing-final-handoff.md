@@ -8,7 +8,7 @@ older REJECTED/WAITING/NOT_CREATED values below are historical snapshots, not cu
 status. The frozen visual evidence remains `.artifacts/tasks/895/evidence/final-correction/`.
 
 [PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) explicitly covers Issues #895, #896, #897, #898, #899 and #900.
-Controlled recovery started from the existing WIP head `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is verified at exact head `f7ec1acd3bd31bb4ed9c709ce9ea13b28d894d48`. The recovery commit changes only the dedicated visual spec, its disposition fixture and these traceability documents. Runtime/frontend/backend code is unchanged. Required CI run `37937220046` is GREEN at the exact head; the older CI run below is historical for `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`.
+Controlled recovery started from the existing WIP head `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is verified at the current PR #902 exact head. The recovery commit changes only the dedicated visual spec, its disposition fixture and these traceability documents. Runtime/frontend/backend code is unchanged. Required exact-head Checks are GREEN on PR #902; the older CI run below is historical for `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`.
 
 The separate archive suite remains **FAIL**: 28/28 original PNG hashes PASS; 25 product
 scenes are dispositioned, with 12 owner-superseded structural checks PASS and 13 active
