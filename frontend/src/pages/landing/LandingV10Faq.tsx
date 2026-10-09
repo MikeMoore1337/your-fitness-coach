@@ -1,5 +1,6 @@
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
+import type { LandingAudience } from './landingAudience';
 
 const FAQ_ITEMS = [
   {
@@ -29,7 +30,8 @@ const FAQ_ITEMS = [
   },
 ] as const;
 
-export function LandingV10Faq() {
+export function LandingV10Faq({ audience }: { audience: LandingAudience }) {
+  const coach = audience === 'coach';
   return (
     <LandingChapter
       id="faq"
@@ -38,7 +40,7 @@ export function LandingV10Faq() {
     >
       <header>
         <p className="landing-kicker">ПЕРЕД ТЕМ КАК НАЧАТЬ</p>
-        <h2 id="landing-v10-faq-title">Понятные правила.</h2>
+        <h2 id="landing-v10-faq-title">{coach ? 'Понятные правила.' : 'Понятные границы.'}</h2>
       </header>
       <div className="landing-faq-list">
         {FAQ_ITEMS.map((item) => (

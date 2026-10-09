@@ -23,15 +23,25 @@ describe('canonical archive trainer composition', () => {
     expect(
       [...container.querySelectorAll('main > section[id]')]
         .map((e) => e.id)
-        .filter((id) =>
-          ['coach-work', 'coach-process', 'training', 'nutrition', 'progress'].includes(id),
+        .filter(
+          (id) => id.startsWith('coach-') || ['training', 'nutrition', 'progress'].includes(id),
         ),
-    ).toEqual(['coach-work', 'coach-process']);
+    ).toEqual([
+      'coach-work',
+      'coach-process',
+      'coach-connect',
+      'coach-program',
+      'coach-facts',
+      'coach-review',
+      'coach-decision',
+      'coach-followup',
+    ]);
     expect(container.querySelectorAll('.strength-scene')).toHaveLength(0);
     expect(container.querySelector('#training')).toBeNull();
     expect(container.querySelector('#nutrition')).toBeNull();
     expect(container.querySelector('#progress')).toBeNull();
     expect(container.querySelector('#faq')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Понятные правила.' })).toBeInTheDocument();
     expect(container.querySelector('#coach-promo')).toBeNull();
   });
   it('requires separate preview and confirmation; messages remain local', () => {

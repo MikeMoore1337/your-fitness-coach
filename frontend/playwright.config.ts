@@ -7,6 +7,7 @@ export default defineConfig({
     '**/mobile-ui-regression.spec.ts',
     '**/ui-quality-sweep.spec.ts',
     '**/landing-approved-visual.spec.ts',
+    '**/landing-frozen-visual.spec.ts',
   ],
   outputDir: '../.artifacts/runtime/tests/playwright',
   fullyParallel: true,

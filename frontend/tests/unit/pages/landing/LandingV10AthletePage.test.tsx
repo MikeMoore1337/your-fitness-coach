@@ -21,6 +21,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe('canonical archive athlete composition', () => {
+  it('returns legal-dialog focus to its actual trigger when clicks do not focus buttons', () => {
+    renderPage();
+    const dialog = document.querySelector('dialog')!;
+    const show = vi.fn();
+    Object.defineProperty(dialog, 'showModal', { value: show });
+    for (const name of ['Условия использования', 'Политика конфиденциальности']) {
+      const trigger = screen.getByRole('button', { name });
+      fireEvent.click(trigger);
+      expect(show).toHaveBeenCalled();
+      fireEvent(dialog, new Event('close'));
+      expect(trigger).toHaveFocus();
+      trigger.blur();
+    }
+  });
   it('keeps the archive section order, Coach Today and real destinations', () => {
     const { container } = renderPage();
     const hero = within(container.querySelector('.ref-hero')! as HTMLElement);
@@ -56,7 +70,7 @@ describe('canonical archive athlete composition', () => {
         .getByRole('link', { name: 'Посмотреть пример тренировки' })
         .compareDocumentPosition(hero.getByText(/Браузер и мини-приложение Telegram/)),
     ).toBe(4);
-    expect(screen.getByRole('heading', { name: 'Понятные правила.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Понятные границы.' })).toBeInTheDocument();
   }, 15000);
   it('does not turn planned food into a diary entry without an explicit action', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');

@@ -1,54 +1,204 @@
 # Product v10 — B × C × Current YFC — final implementation handoff
 
-## Current #895 controlled parity recovery — 2026-10-09
+## Current delivery authority — complete recovery approved
 
-`OWNER_VISUAL_APPROVAL=APPROVED`, `APPROVAL_SCOPE=FINAL_CORRECTION_VISUAL_DESIGN`,
-`VISUAL_BASELINE=FROZEN`. The owner's latest approval applies to the current design;
-older REJECTED/WAITING/NOT_CREATED values below are historical snapshots, not current
-status. The frozen visual evidence remains `.artifacts/tasks/895/evidence/final-correction/`.
+OWNER_VISUAL_APPROVAL=APPROVED · VISUAL_BASELINE=FROZEN.
+Latest complete recovery WIP is approved for both audiences/themes,
+desktop/mobile and all six Coach OS chapters. Historical archive pixel
+differences are accepted **for PR #902 only**; ARCHIVE_VISUAL_PARITY stays **FAIL**.
+Protected merge/deploy are authorized after mandatory technical checks pass.
+No runtime or visual change is made after approval.
 
-[PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) explicitly covers Issues #895, #896, #897, #898, #899 and #900.
-Controlled recovery started from the existing WIP head `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is verified at the current PR #902 exact head. The recovery commit changes only the dedicated visual spec, its disposition fixture and these traceability documents. Runtime/frontend/backend code is unchanged. Required exact-head Checks are GREEN on PR #902; the older CI run below is historical for `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`.
+[Current scope, acceptance and owner exception](product-v10-landing-release-895.md).
+PR #902 / Issues #895–#900 and Actions record current delivery results.
+Earlier rejections and pending states below are preserved as history.
 
-The separate archive suite remains **FAIL**: 28/28 original PNG hashes PASS; 25 product
-scenes are dispositioned, with 12 owner-superseded structural checks PASS and 13 active
-pixel comparisons FAIL at the unchanged 0.01 threshold. The recovery removed three
-test-harness capture defects and leaves no selector timeouts. Three comparison-gallery
-images are hashed and excluded from product-scene counts. The ordinary Playwright config
-excludes this spec, so required CI GREEN is not archive acceptance. No baseline, threshold,
-or runtime visual was changed.
+<details>
+<summary>Historical visual gates before final owner delivery approval — superseded statuses, preserved evidence</summary>
 
-[Controlled recovery gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/index.html) · [scene matrix](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-pre-delivery-gate/archive-suite-recovery/archive-recovery-report.md)
+## Current #895 visual acceptance reconciliation — 2026-10-09
 
-[Detailed criterion reconciliation and all scene results](product-v10-landing-pre-delivery-gate.md)
-records owner-approved composition overrides, capture readiness/normalization defects,
-remaining geometry differences and the incomplete six-interactive-chapter criterion.
-Current athlete flow uses one compact shared Coach OS teaser with preview; trainer
-has Coach Today + repeatable process, then demos/continuity/FAQ/closing, with no self
-proof sections. The latest owner follow-up, not the older archival section map, defines
-these explicit differences. Other archive differences are not silently waived.
+The complete current WIP remains **NEEDS_OWNER_REVIEW**. Earlier final-correction
+approval is **APPROVED / FROZEN**, limited to its recorded scope. Existing recovery,
+all six trainer chapters, mobile heading spaces and stable progress readiness are
+preserved. Only the athlete FAQ heading was restored to the binding archive text
+**«Понятные границы.»**; the trainer heading remains **«Понятные правила.»** under
+the explicit trainer-specific owner directive. FAQ answers are unchanged.
 
-Fresh scoped checks: Landing 50/50, unit 73/73, auth/privacy/Demo 8/8, SEO correct-origin
-retry 1/1, nutrition quick-add regression 1/1. The previous nutrition failure is retained
-as history and is not currently reproduced. Windows sandbox EPERM was reproduced for
-Vite; identical outside-sandbox build and unit tests passed. Both are documented with
-their evidentiary limits in the gate report.
+[Current acceptance report and owner chronology](product-v10-landing-visual-acceptance.md) ·
+[One compact review gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/acceptance-reconciliation/index.html) ·
+[All 48 regions, exact PNG paths, dimensions and evidence](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/acceptance-reconciliation/classification.json) ·
+[Versioned mandatory state contract](design/references/product-v10-landing-acceptance.json).
+
+Exclusive historical whole-region classification: **2 CONFIRMED_REGRESSION**
+(one athlete FAQ copy defect, now fixed), **0 SUPERSEDED_WITH_OWNER_EVIDENCE**,
+**0 CAPTURE_OR_STATE_MISMATCH**, **46 UNRESOLVED**. Scoped trainer copy approval
+and measured displacements do not waive unexplained pixels in an entire crop.
+All 48 current region comparisons still FAIL; the two other regions PASS.
+Archive originals, frozen screenshots, SHA256, thresholds and normalization,
+disposition and region fixtures were not changed in this reconciliation.
+
+Functional checks: Chromium **66/66**, WebKit **66/66**, Vitest **88/88**,
+auth/DemoCabinet/privacy **9/9**, SEO **1/1**, TypeScript, changed-file ESLint,
+Russian UI guard and build PASS. Dedicated visual configuration: **7 PASS / 40 FAIL**,
+zero skips/retries. Its extra approval-completeness guard blocks all 176 unapproved
+current candidate states; this is not a pixel-parity substitute. The two hero
+reference-coverage tests are explicitly named as coverage, not pixel comparisons.
+
+Four complete desktop frozen frames match at ratio 0.000000. All 20 upper 700px
+areas also match exactly. Sixteen complete mobile frozen frames FAIL in the lower
+hero strip y729/741–827 after the existing 44px link fix; they are not waived.
+The current complete desktop/mobile, light/dark state matrix has **176 candidate-only
+captures** at 1440/320/390/430, with no approved modern complete reference set.
+No new header/hero/CTA design approval is requested for unchanged approved material.
+Current lower composition, six restored chapter states and bounded pixel exceptions
+still need explicit decisions before any new baseline can be approved.
+
+PR #902 remains at `a4df49e80e1e15f1ab125ff7047d75f03f3890f2`, OPEN / MERGEABLE /
+CLEAN, aggregate CI SUCCESS for that remote HEAD only. The local WIP was not committed
+or pushed; Issues #895–#900 remain OPEN. Known nutrition quick-add did not recur in
+the isolated regression; no fix is claimed. Permitted outside-sandbox checks passed
+despite Windows sandbox EPERM. Firefox/native Telegram were not run; TMA is mocked.
 
 ```text
-TASK_895_OWNER_VISUAL_APPROVAL=APPROVED
-TASK_895_VISUAL_BASELINE=FROZEN
-TASK_895_PR=OPEN
-ARCHIVE_ORIGINALS_HASHES=PASS
+OWNER_VISUAL_APPROVAL=PENDING_CURRENT_COMPLETE_WIP
+PREVIOUS_FINAL_CORRECTION_VISUAL_APPROVAL=APPROVED_FROZEN
+ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
 ARCHIVE_VISUAL_PARITY=FAIL
-ACTIVE_REFERENCE_PARITY=FAIL
-SUPERSEDED_REFERENCE_COVERAGE=PASS
-TRAINER_SIX_CHAPTER_ACCEPTANCE=OWNER_DECISION_REQUIRED
-VISUAL_REGRESSION_GATE=FAIL
-TASK_895_READY_FOR_DELIVERY_APPROVAL=NO
+CURRENT_FROZEN_BASELINE_PARITY=FAIL (4/20 full frames PASS)
+CURRENT_COMPLETE_APPROVED_BASELINE_PARITY=BLOCKED
+UNRESOLVED_VISUAL_ACCEPTANCE=NEEDS_OWNER_REVIEW
 READY_FOR_MERGE_APPROVAL=NO
-TASK_895_MERGE=NOT_STARTED
-TASK_895_PRODUCTION_DEPLOY=NOT_STARTED
-PRODUCTION_CUTOVER=FORBIDDEN
+NO_COMMIT / NO_PUSH / NO_PR_UPDATE / NO_MERGE / NO_DEPLOY / NO_CUTOVER
+ISSUES_895_TO_900=OPEN
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
+
+## Prior targeted polish record — historical, superseded by reconciliation above
+
+The following records preserve the previous measurements and then-pending questions.
+The athlete FAQ question below is now resolved by the archive; the current visual
+suite has one additional mandatory approval-completeness failure. Earlier numeric
+results and status blocks are not the current acceptance state.
+
+The existing region-recovery WIP is preserved. The owner finds its appearance
+preliminarily satisfactory; final acceptance of the current WIP is still pending.
+The earlier final-correction approval remains **APPROVED / FROZEN** for its scope.
+No header/hero/CTA, photograph, font, size, color or CSS composition was changed.
+
+Fixed the two mobile cycle headings by preserving a real JSX space when CSS hides
+the BR. Fixed progress busy semantics: the actual lazy fallback stays busy until
+the chart is ready. Captures now await the real heading/chart, not a timer or only
+viewport intersection. Both callers and the existing six trainer chapters remain.
+
+[Current report, classification and owner decisions](product-v10-landing-targeted-polish.md) ·
+[Compact current gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-polish/index.html) ·
+[13 active scenes / 50 region results](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/final-polish/classification.json).
+
+Current local checks: Chromium **66/66**, WebKit **66/66**, Vitest **88/88**,
+auth/DemoCabinet/privacy **9/9**, SEO **1/1**; TypeScript, changed-file ESLint,
+Russian UI guard, changed-file Prettier, build and diff check PASS. Six-chapter
+actions and evidence cover 1440/320/390/430 × both themes. All 16 capture combinations
+have no overflow, page errors, API writes or progress-loading fallback in final PNGs.
+The gallery contains 16 initial full pages, eight interacted trainer full pages and
+all initial/intermediate/final chapter states, without duplicating gallery panels.
+
+Archive status remains **FAIL**: 13 active scenes, 48/50 regions FAIL; the two PASS
+are partial regions. Dedicated suite **7 PASS / 39 FAIL**, exit 1, comprising 13
+active, 16 old mobile frozen comparisons and ten lower VISUAL_NOT_PROVEN scenes.
+All 28 archive and 20 frozen hashes PASS. Fixtures and thresholds were not changed.
+Measured 1–3px/23px displacement components do not explain or waive all residual
+pixels. The active Coach Today overline and progress overline have identical wording
+in original/candidate; previous contradictory diagnoses are corrected in the report.
+
+Owner decisions: final recovery acceptance; athlete FAQ «Понятные правила.» versus
+archive «Понятные границы.»; reference/provenance contract for the documented residual
+pixels and missing/older frozen proof. No baseline is automatically regenerated.
+PR #902 was read only and remains at `a4df49e80e1e15f1ab125ff7047d75f03f3890f2`,
+OPEN / MERGEABLE / CLEAN, aggregate checks SUCCESS; that CI is not proof of this WIP.
+Historical nutrition quick-add did not recur in the isolated test; no fix is claimed.
+Firefox/native Telegram were not run; TMA evidence is synthetic.
+
+```text
+OWNER_VISUAL_APPROVAL=PENDING_FINAL_REVIEW_CURRENT_WIP
+PREVIOUS_FINAL_CORRECTION_VISUAL_APPROVAL=APPROVED
+VISUAL_BASELINE=FROZEN
+ARCHIVE_VISUAL_PARITY=FAIL
+READY_FOR_MERGE_APPROVAL=NO
+COMMIT_PUSH_PR_UPDATE_MERGE_DEPLOY_CUTOVER=NOT_PERFORMED
+ISSUES_895_TO_900=NOT_CLOSED
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
+
+## Prior regional recovery record — superseded by targeted polish above
+
+The final-correction owner approval remains **APPROVED** and its baseline **FROZEN**.
+The newly restored lower trainer journey and progress frame are **local WIP awaiting
+new owner review**. They are not covered by first-screen screenshots or by the green
+CI of the unchanged PR head. Older REJECTED/WAITING/NOT_CREATED and STRUCTURE_PASS
+records below are historical, not current visual acceptance.
+
+[PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) remains OPEN,
+MERGEABLE and CLEAN at `a4df49e80e1e15f1ab125ff7047d75f03f3890f2`, covering
+#895, #896, #897, #898, #899 and #900. Required CI run
+[37941546491](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37941546491)
+is GREEN for that exact head only. `origin/master` is
+`64e90857157a013ce1f28c655eeefaf765cb779b`, an ancestor. No commit or push was made
+for this recovery; no remote CI result validates the uncommitted changes.
+
+[Current report and criterion reconciliation](product-v10-landing-region-recovery.md) ·
+[Unified archive/source/candidate/heatmap gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/index.html) ·
+[All regional metrics and immutable hashes](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/recovery-summary.json).
+
+All 28 original PNG hashes PASS; 25 are product scenes and three are gallery-only.
+Thirteen active scenes now have 50 separate unchanged-region comparisons at 0.01:
+2 partial-region PASS / 48 FAIL, no complete active-scene PASS. Header and adjacent
+teaser overrides are explicitly scoped. Ten lower owner-superseded scenes are
+VISUAL_NOT_PROVEN; DOM structure is not visual approval. Four immutable #895 desktop
+first-screen comparisons PASS; sixteen mobile first-screen/menu comparisons FAIL
+because their captures predate the existing 44px hero-footer-link fix. No golden or
+tolerance was changed. The full dedicated suite exits 1 (7 tests PASS / 39 FAIL).
+
+Trainer flow: hero → cycle → one existing Coach Today → existing process summary →
+six independent synthetic chapters (connect, program/version, Client 360, weekly
+review, selected-client preview/confirm, editable draft/confirm) → demos → continuity
+→ FAQ → closing/footer. The six chapters reuse #852 source because the archive does
+not depict them. Athlete product sections are not duplicated into trainer.
+Four initial and four interacted full-page trainer images and all intermediate
+states are in the gallery for new owner review.
+
+Current functional checks: Chromium 56/56, WebKit 56/56, targeted Vitest 88/88,
+auth/privacy/DemoCabinet 9/9, correct-origin SEO 1/1 PASS. TypeScript, scoped ESLint,
+Russian UI guard, changed-file formatting and build PASS. Earlier WebKit failures
+are retained with their readiness/focus-return corrections. No backend, auth, demo
+route, SEO or analytics implementation changed. Native TMA/Firefox were not run.
+The historical nutrition quick-add failure did not recur; Windows sandbox EPERM
+required permitted outside-sandbox test/build runs. Neither excuses visual FAIL.
+
+A dedicated manual GitHub workflow and managed-preview visual config are prepared;
+they are not pushed, not run remotely and not added as a knowingly-red required job.
+See the current report for remaining visual/provenance/requirements blockers.
+
+```text
+TASK_895_OWNER_VISUAL_APPROVAL=APPROVED (final-correction scope only)
+TASK_895_VISUAL_BASELINE=FROZEN
+LOCAL_RECOVERY_OWNER_VISUAL_APPROVAL=PENDING
+TASK_895_PR=OPEN
+PR_HEAD_CI=GREEN
+LOCAL_WIP_REMOTE_CI=NOT_RUN
+ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
+ARCHIVE_VISUAL_PARITY=FAIL
+ACTIVE_ARCHIVE_REGIONS=50 (2 PASS / 48 FAIL)
+LOWER_SUPERSEDED_VISUAL_NOT_PROVEN=10
+TRAINER_SIX_CHAPTERS=LOCAL_WIP_REVIEW_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
+READY_FOR_MERGE_APPROVAL=NO
+COMMIT_PUSH=NOT_PERFORMED
+MERGE_DEPLOY_PRODUCTION_CUTOVER=FORBIDDEN
 ISSUES_895_TO_900=OPEN
 CONTROLLER=ABSENT
 CONTROLLER_V2=ABSENT
@@ -1188,5 +1338,7 @@ ISSUES_895_TO_900=OPEN
 CONTROLLER=ABSENT
 CONTROLLER_V2=ABSENT
 ```
+
+</details>
 
 </details>

@@ -183,13 +183,11 @@ export function LandingV10Cycle({ audience }: { audience: LandingAudience }) {
         <h2>
           {coach ? (
             <>
-              Сопровождение.
-              <br />С продолжением.
+              Сопровождение. <br />С продолжением.
             </>
           ) : (
             <>
-              Продолжение
-              <br />
+              Продолжение <br />
               имеет значение.
             </>
           )}

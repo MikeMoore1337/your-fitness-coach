@@ -18,7 +18,10 @@ function mount() {
 describe('landing progress prepared preview', () => {
   it('renders a static preview without starting a demo session', async () => {
     mount();
-    expect(await screen.findByText('6 220', { exact: false })).toBeInTheDocument();
+    const value = await screen.findByText('6 220', { exact: false });
+    expect(value).toBeInTheDocument();
+    expect(value.closest('[aria-busy]')).toHaveAttribute('aria-busy', 'false');
+    expect(screen.queryByText('Загружаем пример прогресса…')).not.toBeInTheDocument();
     expect(screen.getByText(/Показаны две сводные точки/)).toBeInTheDocument();
     expect(screen.getByRole('table')).toHaveTextContent('104,2');
     expect(screen.getByRole('link', { name: 'Открыть прогресс' })).toHaveAttribute(

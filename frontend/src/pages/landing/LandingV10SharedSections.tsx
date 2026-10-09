@@ -51,8 +51,10 @@ export function LandingV10SharedSections({
 }) {
   const coach = audience === 'coach';
   const legalDialog = useRef<HTMLDialogElement>(null);
+  const legalTrigger = useRef<HTMLButtonElement>(null);
   const [legalTitle, setLegalTitle] = useState('');
-  const showLegalPlaceholder = (title: string) => {
+  const showLegalPlaceholder = (title: string, trigger: HTMLButtonElement) => {
+    legalTrigger.current = trigger;
     setLegalTitle(title);
     legalDialog.current?.showModal();
   };
@@ -178,7 +180,7 @@ export function LandingV10SharedSections({
           <Icon name="mini-app" size={80} />
         </a>
       </LandingChapter>
-      <LandingV10Faq />
+      <LandingV10Faq audience={audience} />
       <section className="ref-closing" id="contact">
         <p className="landing-kicker">ПЛАН. ДЕЙСТВИЕ. ПРОДОЛЖЕНИЕ.</p>
         <h2>
@@ -214,10 +216,16 @@ export function LandingV10SharedSections({
           <AppLink to="/nutrition">Питание</AppLink>
           <AppLink to="/progress">Прогресс</AppLink>
           <a href="#faq">Приватность и вопросы</a>
-          <button onClick={() => showLegalPlaceholder('Условия использования')}>
+          <button
+            onClick={(event) => showLegalPlaceholder('Условия использования', event.currentTarget)}
+          >
             Условия использования
           </button>
-          <button onClick={() => showLegalPlaceholder('Политика конфиденциальности')}>
+          <button
+            onClick={(event) =>
+              showLegalPlaceholder('Политика конфиденциальности', event.currentTarget)
+            }
+          >
             Политика конфиденциальности
           </button>
         </nav>
@@ -228,10 +236,18 @@ export function LandingV10SharedSections({
           <br />© {new Date().getFullYear()} Your Fitness Coach
         </p>
       </footer>
-      <dialog ref={legalDialog} className="ref-dialog" aria-labelledby="landing-legal-title">
+      <dialog
+        ref={legalDialog}
+        className="ref-dialog"
+        aria-labelledby="landing-legal-title"
+        onClose={() => legalTrigger.current?.focus()}
+      >
         <h2 id="landing-legal-title">{legalTitle}</h2>
         <p>Это предварительная версия лендинга. Юридический документ ещё не подключён.</p>
-        <p>Вопросы о данных и работе сервиса доступны в разделе «Понятные правила».</p>
+        <p>
+          Вопросы о данных и работе сервиса доступны в разделе «Понятные{' '}
+          {coach ? 'правила' : 'границы'}».
+        </p>
         <form method="dialog">
           <button className="landing-button">Закрыть</button>
         </form>

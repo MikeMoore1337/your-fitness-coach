@@ -1,5 +1,142 @@
 # Landing v10 — final pre-delivery gate (#895–#900 / PR #902)
 
+## Current delivery authority — complete recovery approved
+
+OWNER_VISUAL_APPROVAL=APPROVED · VISUAL_BASELINE=FROZEN.
+Latest complete recovery WIP is approved for both audiences/themes,
+desktop/mobile and all six Coach OS chapters. Historical archive pixel
+differences are accepted **for PR #902 only**; ARCHIVE_VISUAL_PARITY stays **FAIL**.
+Protected merge/deploy are authorized after mandatory technical checks pass.
+No runtime or visual change is made after approval.
+
+[Current scope, acceptance and owner exception](product-v10-landing-release-895.md).
+PR #902 / Issues #895–#900 and Actions record current delivery results.
+Earlier rejections and pending states below are preserved as history.
+
+<details>
+<summary>Historical visual gates before final owner delivery approval — superseded statuses, preserved evidence</summary>
+
+## Current visual acceptance reconciliation — 2026-10-09
+
+The authoritative local report is [visual acceptance reconciliation](product-v10-landing-visual-acceptance.md).
+Current complete WIP owner approval is **PENDING**; prior final-correction design
+approval remains **APPROVED / FROZEN** for its unchanged recorded scope.
+
+All 48 historical failed regions now have exact evidence and exclusive disposition:
+2 confirmed regions (one athlete FAQ wording defect, fixed), 0 whole-region owner
+supersessions, 0 proven whole-region capture mismatches, 46 unresolved. Trainer FAQ
+wording has explicit owner evidence, but that does not approve all other crop pixels.
+Athlete FAQ is restored to «Понятные границы.» without changing answers.
+
+Functional Chromium/WebKit **66/66 each**, Vitest **88/88**, auth/demo/privacy **9/9**,
+SEO **1/1** and scoped frontend quality checks PASS. Dedicated visual suite exits 1:
+**7 PASS / 40 FAIL**, zero skips/retries. Archive **0/13 complete scenes PASS**,
+48/50 regions FAIL; current frozen **4/20 PASS**, sixteen mobile FAIL. All 20 upper
+700px areas are identical; the remaining mobile difference is a bounded lower hero
+strip after the existing 44px link fix. This diagnosis is not a whole-frame waiver.
+
+The separate versioned 176-state candidate set covers both audiences/themes,
+desktop 1440 and mobile 320/390/430, all six chapter initial/changed states. It is
+**NOT_APPROVED**. The completeness gate deliberately fails until every required
+state has authoritative approval and an approved pixel reference; fresh matched
+comparisons will still be required. No golden, fixture or threshold was changed.
+
+READY_FOR_MERGE_APPROVAL=NO: current lower/restored implementation needs approval,
+unexplained mandatory pixel differences need evidence or explicit bounded decisions,
+and the local WIP has no exact-head remote CI. PR #902 and Issues #895–#900 were read
+only, not updated/closed. No commit/push/merge/deploy/cutover occurred.
+
+## Prior targeted polish record — historical, superseded by reconciliation above
+
+The current report is [final targeted polish](product-v10-landing-targeted-polish.md).
+Both mobile cycle headings and actual lazy progress readiness are fixed locally.
+Chromium/WebKit 66/66 each, Vitest 88/88 and scoped quality checks PASS.
+Archive parity remains FAIL: 13 active scenes / 48 failed regions; dedicated suite
+7 PASS / 39 FAIL. Original/frozen hashes, fixtures and thresholds are unchanged.
+Final recovery approval and reference/copy decisions remain pending.
+READY_FOR_MERGE_APPROVAL=NO. No commit/push/PR update/merge/deploy/cutover or Issue closure.
+
+## Prior regional recovery record — superseded by current report above
+
+The final-correction owner approval remains **APPROVED** and its baseline **FROZEN**.
+The newly restored lower trainer journey and progress frame are **local WIP awaiting
+new owner review**. They are not covered by first-screen screenshots or by the green
+CI of the unchanged PR head. Older REJECTED/WAITING/NOT_CREATED and STRUCTURE_PASS
+records below are historical, not current visual acceptance.
+
+[PR #902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902) remains OPEN,
+MERGEABLE and CLEAN at `a4df49e80e1e15f1ab125ff7047d75f03f3890f2`, covering
+#895, #896, #897, #898, #899 and #900. Required CI run
+[37941546491](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37941546491)
+is GREEN for that exact head only. `origin/master` is
+`64e90857157a013ce1f28c655eeefaf765cb779b`, an ancestor. No commit or push was made
+for this recovery; no remote CI result validates the uncommitted changes.
+
+[Current report and criterion reconciliation](product-v10-landing-region-recovery.md) ·
+[Unified archive/source/candidate/heatmap gallery](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/index.html) ·
+[All regional metrics and immutable hashes](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evidence/region-recovery/recovery-summary.json).
+
+All 28 original PNG hashes PASS; 25 are product scenes and three are gallery-only.
+Thirteen active scenes now have 50 separate unchanged-region comparisons at 0.01:
+2 partial-region PASS / 48 FAIL, no complete active-scene PASS. Header and adjacent
+teaser overrides are explicitly scoped. Ten lower owner-superseded scenes are
+VISUAL_NOT_PROVEN; DOM structure is not visual approval. Four immutable #895 desktop
+first-screen comparisons PASS; sixteen mobile first-screen/menu comparisons FAIL
+because their captures predate the existing 44px hero-footer-link fix. No golden or
+tolerance was changed. The full dedicated suite exits 1 (7 tests PASS / 39 FAIL).
+
+Trainer flow: hero → cycle → one existing Coach Today → existing process summary →
+six independent synthetic chapters (connect, program/version, Client 360, weekly
+review, selected-client preview/confirm, editable draft/confirm) → demos → continuity
+→ FAQ → closing/footer. The six chapters reuse #852 source because the archive does
+not depict them. Athlete product sections are not duplicated into trainer.
+Four initial and four interacted full-page trainer images and all intermediate
+states are in the gallery for new owner review.
+
+Current functional checks: Chromium 56/56, WebKit 56/56, targeted Vitest 88/88,
+auth/privacy/DemoCabinet 9/9, correct-origin SEO 1/1 PASS. TypeScript, scoped ESLint,
+Russian UI guard, changed-file formatting and build PASS. Earlier WebKit failures
+are retained with their readiness/focus-return corrections. No backend, auth, demo
+route, SEO or analytics implementation changed. Native TMA/Firefox were not run.
+The historical nutrition quick-add failure did not recur; Windows sandbox EPERM
+required permitted outside-sandbox test/build runs. Neither excuses visual FAIL.
+
+A dedicated manual GitHub workflow and managed-preview visual config are prepared;
+they are not pushed, not run remotely and not added as a knowingly-red required job.
+See the current report for remaining visual/provenance/requirements blockers.
+
+```text
+TASK_895_OWNER_VISUAL_APPROVAL=APPROVED (final-correction scope only)
+TASK_895_VISUAL_BASELINE=FROZEN
+LOCAL_RECOVERY_OWNER_VISUAL_APPROVAL=PENDING
+TASK_895_PR=OPEN
+PR_HEAD_CI=GREEN
+LOCAL_WIP_REMOTE_CI=NOT_RUN
+ARCHIVE_ORIGINALS_HASHES=PASS (28/28)
+ARCHIVE_VISUAL_PARITY=FAIL
+ACTIVE_ARCHIVE_REGIONS=50 (2 PASS / 48 FAIL)
+LOWER_SUPERSEDED_VISUAL_NOT_PROVEN=10
+TRAINER_SIX_CHAPTERS=LOCAL_WIP_REVIEW_REQUIRED
+VISUAL_REGRESSION_GATE=FAIL
+READY_FOR_MERGE_APPROVAL=NO
+COMMIT_PUSH=NOT_PERFORMED
+MERGE_DEPLOY_PRODUCTION_CUTOVER=FORBIDDEN
+ISSUES_895_TO_900=OPEN
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+env change required: no
+```
+
+## Historical pre-delivery records
+
+The records below describe the remote a4df49e8 and earlier candidates, before this
+uncommitted regional recovery. Their STRUCTURE_PASS, incomplete six-chapter and
+runtime-unchanged statements must not be read as the current WIP status. Issues
+remain OPEN; GitHub still describes the unchanged remote head.
+
+<details>
+<summary>Historical gate evidence — current state is above</summary>
+
 Audit date: 2026-10-09. Controlled parity recovery started from the existing PR #902
 worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is now verified at the
 current PR #902 exact head; `origin/master` remains
@@ -204,14 +341,14 @@ six-interactive-chapter criteria is inferred.
 
 ## Current recovery reconciliation for Issues #895–#900
 
-| Issue | Current evidence | Status |
-|---|---|---|
-| #895 | Owner visual approval and frozen final-correction evidence; recovery is test/fixture/docs only | APPROVED / OPEN; delivery gate remains blocked |
-| #896 | `landing-production.spec.ts`: 50/50 Chromium pass across 320–1920, themes and audiences; archive active scenes remain 13/13 pixel FAIL | Functional checks verified; visual parity unresolved |
-| #897 | Athlete route contains the approved compact Coach OS teaser and existing interactive athlete scenes; 13 active archive scenes fail unchanged 0.01 threshold | Implemented and functionally checked; exact archive parity unresolved |
-| #898 | Trainer route retains Coach Today and process; no separate six interactive chapters for invite, program, Client 360, weekly review, selected-client preview/confirm and draft/confirm | `OWNER_DECISION_REQUIRED`; no UI added |
-| #899 | Responsive Chromium matrix 50/50, keyboard/menu/hash and mocked TMA safe-area checks pass; native Telegram and exact archive crops are not proven | Functional checks verified; visual/native coverage partial |
-| #900 | Canonical MANIFEST hash check 28/28; 25 product scenes dispositioned; dedicated comparator excluded by ordinary `testIgnore` and reports 13 active pixel FAIL | Evidence complete; visual gate FAIL |
+| Issue | Current evidence                                                                                                                                                                      | Status                                                                |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| #895  | Owner visual approval and frozen final-correction evidence; recovery is test/fixture/docs only                                                                                        | APPROVED / OPEN; delivery gate remains blocked                        |
+| #896  | `landing-production.spec.ts`: 50/50 Chromium pass across 320–1920, themes and audiences; archive active scenes remain 13/13 pixel FAIL                                                | Functional checks verified; visual parity unresolved                  |
+| #897  | Athlete route contains the approved compact Coach OS teaser and existing interactive athlete scenes; 13 active archive scenes fail unchanged 0.01 threshold                           | Implemented and functionally checked; exact archive parity unresolved |
+| #898  | Trainer route retains Coach Today and process; no separate six interactive chapters for invite, program, Client 360, weekly review, selected-client preview/confirm and draft/confirm | `OWNER_DECISION_REQUIRED`; no UI added                                |
+| #899  | Responsive Chromium matrix 50/50, keyboard/menu/hash and mocked TMA safe-area checks pass; native Telegram and exact archive crops are not proven                                     | Functional checks verified; visual/native coverage partial            |
+| #900  | Canonical MANIFEST hash check 28/28; 25 product scenes dispositioned; dedicated comparator excluded by ordinary `testIgnore` and reports 13 active pixel FAIL                         | Evidence complete; visual gate FAIL                                   |
 
 The historical table below is retained for audit chronology. Its older timeout counts
 and pre-recovery candidate links are not the current result.
@@ -281,3 +418,7 @@ No backend, auth, analytics, SEO runtime, dependencies, env keys, app layout, br
 service, golden or threshold was changed by this gate. No merge/deploy/cutover or
 issue closure was performed. Standard Git/GitHub remains the operational source of
 truth; the artifact directory contains evidence only.
+
+</details>
+
+</details>

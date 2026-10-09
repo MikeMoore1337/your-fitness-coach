@@ -3,6 +3,7 @@ import { LandingV10Hero, LandingV10Cycle } from './LandingV10Hero';
 import { ArchiveCoachWork } from './LandingV10Scenes';
 import { LandingV10SharedSections } from './LandingV10SharedSections';
 import { LandingChapter } from './LandingChapter';
+import { LandingV10CoachJourney } from './LandingV10CoachJourney';
 import { useLandingHeroMotion } from './useLandingHeroMotion';
 import './landing.css';
 export default function LandingV10CoachPage() {
@@ -42,6 +43,7 @@ export default function LandingV10CoachPage() {
           ))}
         </ol>
       </LandingChapter>
+      <LandingV10CoachJourney />
       <LandingV10SharedSections audience="coach" includeDifference={false} />
     </LandingV10Shell>
   );

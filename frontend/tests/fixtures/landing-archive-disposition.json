@@ -4,7 +4,8 @@
     "ownerDecision": "Последняя owner-approved композиция закрепила текущий athlete hero, матовый Glass header и hero CTA; старый архивный crop не является текущим пиксельным эталоном.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-desktop-first-screen.png",
     "ownerSourceScope": "full current approved desktop first screen",
-    "baselineAssertions": [".ref-hero", "#training", "#coach-promo"]
+    "baselineAssertions": [".ref-hero", "#training", "#coach-promo"],
+    "visualProof": "FROZEN_FIRST_SCREEN"
   },
   "2026-10-08_14-05.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",
@@ -35,37 +36,40 @@
   },
   "2026-10-08_14-07_1.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",
-    "auditStatus": "GENUINE_VISUAL_DEFECT",
+    "auditStatus": "REGIONAL_REVIEW_REQUIRED",
     "captureAdjustment": "wait-for-loaded-progress"
   },
   "2026-10-08_14-07_2.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",
-    "auditStatus": "GENUINE_VISUAL_DEFECT",
+    "auditStatus": "REGIONAL_REVIEW_REQUIRED",
     "captureAdjustment": "wait-for-loaded-progress"
   },
   "2026-10-08_14-08.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "В athlete flow фотографическая Coach OS секция заменена компактным Coach OS teaser с preview и CTA «Возможности для тренера».",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; replacement section requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-promo", ".ref-coach-panel--compact"],
-    "baselineAbsent": ["#coach-work"]
+    "baselineAbsent": ["#coach-work"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-08_1.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "В athlete flow сохранён только компактный Coach OS teaser; старое интерактивное change state удалено из athlete section-flow.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; replacement section requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-promo", ".ref-coach-panel--compact"],
-    "baselineAbsent": ["#coach-work"]
+    "baselineAbsent": ["#coach-work"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-08_2.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "В athlete flow сохранён только компактный Coach OS teaser; старое message state удалено из athlete section-flow.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/athlete-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; replacement section requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-promo", ".ref-coach-panel--compact"],
-    "baselineAbsent": ["#coach-work"]
+    "baselineAbsent": ["#coach-work"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-08_3.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",
@@ -84,7 +88,8 @@
     "ownerDecision": "Последняя owner-approved композиция закрепила текущий trainer hero, матовый Glass header и hero CTA; старый архивный crop не является текущим пиксельным эталоном.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
     "ownerSourceScope": "full current approved desktop first screen",
-    "baselineAssertions": [".ref-hero", "#coach-work", "#coach-process"]
+    "baselineAssertions": [".ref-hero", "#coach-work", "#coach-process"],
+    "visualProof": "FROZEN_FIRST_SCREEN"
   },
   "2026-10-08_14-10_1.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",
@@ -94,57 +99,64 @@
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало дублирующиеся athlete-like photo-led scenes из trainer flow и оставило Coach Today как рабочую секцию.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process", "#demo", "#faq"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-10_3.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало дублирующую athlete StrengthScene из trainer flow; Coach Today и trainer process сохранены.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-10_4.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало дублирующую athlete StrengthScene из trainer flow; Coach Today и trainer process сохранены.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-11.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало повтор athlete training scene из trainer flow; рабочая тренерская последовательность начинается с Coach Today и process.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process", "#demo"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene", "#training"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene", "#training"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-11_1.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало повтор athlete training scene из trainer flow; рабочая тренерская последовательность начинается с Coach Today и process.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process", "#demo"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene", "#training"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene", "#training"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-11_2.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало повтор athlete progress scene из trainer flow; trainer continuity/demo/FAQ остаются в общем trainer journey.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process", "#continuity", "#faq"],
-    "baselineAbsent": [".ref-bridge", ".strength-scene", "#progress"]
+    "baselineAbsent": [".ref-bridge", ".strength-scene", "#progress"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-12.png": {
     "comparisonStatus": "OWNER_SUPERSEDED",
     "ownerDecision": "Позднее owner-approved решение убрало повтор athlete difference scene из trainer flow; trainer Coach Today/process/demo flow остаётся единственным источником.",
     "ownerSource": ".artifacts/tasks/895/evidence/final-correction/coach-dark-desktop-first-screen.png",
-    "ownerSourceScope": "page-level approved source; current lower-flow structure requires structural check",
+    "ownerSourceScope": "First-screen approval does not cover this lower section; no current approved replacement screenshot.",
     "baselineAssertions": ["#coach-work", "#coach-process", "#demo", "#faq"],
-    "baselineAbsent": [".ref-difference"]
+    "baselineAbsent": [".ref-difference"],
+    "visualProof": "VISUAL_NOT_PROVEN"
   },
   "2026-10-08_14-12_1.png": {
     "comparisonStatus": "ACTIVE_COMPARABLE",

@@ -32,15 +32,21 @@ export function LandingProgress({
     return () => observer.disconnect();
   }, []);
 
-  const content = (
-    <div className={className} ref={root} aria-busy={!isNearViewport}>
-      {isNearViewport ? (
-        <Suspense fallback={<p role="status">Загружаем пример прогресса…</p>}>
-          <LandingProgressContent href={href} />
-        </Suspense>
-      ) : (
-        <p>Подготовленный демо-сценарий</p>
-      )}
+  const content = isNearViewport ? (
+    <Suspense
+      fallback={
+        <div className={className} aria-busy="true">
+          <p role="status">Загружаем пример прогресса…</p>
+        </div>
+      }
+    >
+      <div className={className} aria-busy="false">
+        <LandingProgressContent href={href} />
+      </div>
+    </Suspense>
+  ) : (
+    <div className={className} ref={root} aria-busy="true">
+      <p>Подготовленный демо-сценарий</p>
     </div>
   );
   return wrapperClassName ? <div className={wrapperClassName}>{content}</div> : content;

@@ -1728,3 +1728,86 @@
 .landing-v10-page .ref-hero .landing-hero__platform-note {
   margin: 0;
 }
+
+/* Six trainer chapters: original #852 composition, scoped to restored scenes. */
+.ref-coach-facts {
+  padding: 0;
+  gap: 0;
+  align-items: stretch;
+}
+.ref-coach-facts .ref-photo-copy {
+  min-height: 650px;
+}
+.ref-coach-facts .ref-photo-copy p {
+  max-width: 410px;
+  color: white;
+}
+.ref-coach-facts-body {
+  padding: 65px 5vw;
+  display: flex;
+  align-items: center;
+}
+.ref-coach-facts-body > .ref-product {
+  width: 100%;
+}
+.ref-coach-facts .ref-text-control {
+  min-height: 44px;
+}
+.ref-coach-program .ref-product > p,
+.ref-coach-review .ref-product > p,
+.ref-coach-decision .ref-product > p,
+.ref-coach-followup .ref-product > p {
+  font-size: 13px;
+}
+.ref-coach-targets {
+  border: 0;
+  padding: 16px 0;
+  margin: 0;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.ref-coach-targets legend {
+  font-size: 11px;
+  color: var(--landing-muted);
+}
+.ref-coach-targets label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 14px;
+}
+.ref-coach-targets input {
+  accent-color: var(--v2-lime);
+  width: 18px;
+  height: 18px;
+}
+.ref-coach-decision .ref-list small {
+  display: block;
+  font-size: 10px;
+  color: var(--landing-muted);
+  margin-top: 5px;
+}
+.ref-coach-connect .landing-button {
+  margin-top: 22px;
+}
+.ref-coach-decision .ref-list li {
+  align-items: center;
+}
+@media (max-width: 767px) {
+  .ref-coach-facts .ref-photo-copy {
+    min-height: 420px;
+  }
+  .ref-coach-facts-body {
+    padding: 35px 20px;
+  }
+  .ref-coach-decision .ref-product > .landing-button,
+  .ref-coach-connect .ref-product > .landing-button {
+    font-size: 12px;
+    padding-inline: 12px;
+  }
+  .ref-coach-decision .ref-list li {
+    font-size: 11px;
+  }
+}

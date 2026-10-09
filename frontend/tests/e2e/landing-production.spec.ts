@@ -3,7 +3,7 @@ async function open(page: Page, route: string, theme: 'light' | 'dark', width: n
   await page.setViewportSize({ width, height: width < 700 ? 844 : 1100 });
   await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
   await page.addInitScript((v) => localStorage.setItem('app-theme', v), theme);
-  await page.goto(route);
+  await page.goto(route, { waitUntil: 'networkidle' });
   await expect(page.locator('.ref-hero h1')).toBeVisible();
   await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
@@ -13,6 +13,9 @@ for (const width of [320, 360, 390, 430, 768, 1280, 1366, 1440, 1498, 1600, 1920
     for (const audience of ['athlete', 'coach'] as const) {
       test(`${audience} ${theme} ${width}: geometry, labels and destinations`, async ({ page }) => {
         await open(page, audience === 'coach' ? '/for-trainers' : '/', theme, width);
+        await expect(page.locator('#faq h2')).toHaveText(
+          audience === 'coach' ? 'Понятные правила.' : 'Понятные границы.',
+        );
         const hero = page.locator('.ref-hero');
         for (const label of ['Для себя', 'Для тренера'])
           await expect(hero.getByRole('link', { name: label, exact: true })).toBeVisible();
@@ -149,14 +152,66 @@ for (const width of [320, 360, 390, 430, 768, 1280, 1366, 1440, 1498, 1600, 1920
         await expect(page.locator('#training')).toHaveCount(audience === 'athlete' ? 1 : 0);
         await expect(page.locator('#nutrition')).toHaveCount(audience === 'athlete' ? 1 : 0);
         await expect(page.locator('#progress')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        const cycleHeading = page.locator('#product h2');
+        await expect(cycleHeading).toHaveText(
+          audience === 'coach' ? 'Сопровождение. С продолжением.' : 'Продолжение имеет значение.',
+        );
+        expect(
+          await cycleHeading.evaluate((element) => (element as HTMLElement).innerText),
+        ).not.toMatch(/Продолжениеимеет|Сопровождение\.С/);
         for (const section of await page.locator('main > section').all()) {
           await section.scrollIntoViewIfNeeded();
+          if ((await section.getAttribute('id')) === 'progress') {
+            await expect(section.getByRole('heading', { name: 'Объём тренировок' })).toBeVisible();
+            await expect(section.locator('.data-viz-chart')).toBeVisible();
+            await expect(section.getByText('Загружаем пример прогресса…')).toHaveCount(0);
+            await expect(section.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false');
+          }
           expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(
             0,
           );
         }
       });
     }
+test.describe('cold progress loading', () => {
+  // The PWA can serve its cached chunk without hitting the test's network gate.
+  test.use({ serviceWorkers: 'block' });
+  for (const theme of ['light', 'dark'] as const)
+    for (const width of [320, 390, 430, 1440])
+      test(`progress waits for its real lazy chunk ${theme} ${width}`, async ({ page }) => {
+        let release!: () => void;
+        const responseGate = new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        let requested = false;
+        await page.route('**/assets/LandingProgressContent-*.js', async (route) => {
+          requested = true;
+          await responseGate;
+          await route.continue();
+        });
+        try {
+          await open(page, '/', theme, width);
+          const progress = page.locator('#progress');
+          await progress.scrollIntoViewIfNeeded();
+          await expect(progress.getByText('Загружаем пример прогресса…')).toBeVisible();
+          await expect.poll(() => requested).toBe(true);
+          await expect(progress.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'true');
+          await expect(progress.getByRole('heading', { name: 'Объём тренировок' })).toHaveCount(0);
+          release();
+          await expect(progress.getByRole('heading', { name: 'Объём тренировок' })).toBeVisible();
+          await expect(progress.locator('.data-viz-chart')).toBeVisible();
+          await expect(progress.getByText('Загружаем пример прогресса…')).toHaveCount(0);
+          await expect(progress.locator('[aria-busy]')).toHaveAttribute('aria-busy', 'false');
+          await expect(progress.getByRole('link', { name: 'Открыть прогресс' })).toHaveAttribute(
+            'href',
+            '/demo?cabinet=1&scenario=self_training&section=progress',
+          );
+        } finally {
+          release();
+        }
+      });
+});
+
 test('mobile menu focus, theme, audience, Escape and resize', async ({ page }) => {
   await open(page, '/', 'light', 320);
   const trigger = page.getByRole('button', { name: 'Открыть меню' });
@@ -232,6 +287,9 @@ test('all archive interactive states remain explicit and local', async ({ page }
   await expect(page.getByText('Записи пока нет')).toBeVisible();
   await page.getByRole('button', { name: 'Отметить съеденное в примере' }).click();
   await expect(page.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
+  await page.locator('#progress').scrollIntoViewIfNeeded();
+  await expect(page.locator('#progress [aria-busy="false"]')).toHaveCount(1);
+  await page.evaluate(() => document.fonts.ready);
   await page.getByRole('button', { name: 'Открыть изменения' }).click();
   await page.getByRole('button', { name: 'Посмотреть перед применением' }).click();
   await page.getByRole('button', { name: 'Подтвердить в примере', exact: true }).click();

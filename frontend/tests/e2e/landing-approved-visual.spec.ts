@@ -1,16 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { createRequire } from 'node:module';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import cases from '../fixtures/landing-archive-normalization.json' with { type: 'json' };
 import dispositions from '../fixtures/landing-archive-disposition.json' with { type: 'json' };
-
-const require = createRequire(import.meta.url);
-// Decode and crop original pixels with Playwright's bundled PNG reader; never rewrite goldens.
-const { PNG } = require(
-  path.join(path.dirname(require.resolve('playwright-core/package.json')), 'lib/utilsBundle.js'),
-) as { PNG: { sync: { read: (data: Buffer) => { width: number; height: number; data: Buffer } } } };
+import regionCases from '../fixtures/landing-archive-regions.json' with { type: 'json' };
+import acceptance from '../../../docs/design/references/product-v10-landing-acceptance.json' with { type: 'json' };
+import { PNG, compareLandingPixels } from './fixtures/landing-pixels';
 const root = path.resolve(
   process.env.LANDING_ARCHIVE_ROOT ?? '../docs/design/references/landing-archive-owner-canonical',
 );
@@ -18,7 +14,8 @@ const evidence = path.resolve(
   process.env.LANDING_VISUAL_EVIDENCE_DIR ?? '../.artifacts/tasks/895/evidence/archive-restoration',
 );
 const ownerEvidence = path.resolve(
-  process.env.LANDING_OWNER_EVIDENCE_DIR ?? '../.artifacts/tasks/895/evidence/final-correction',
+  process.env.LANDING_OWNER_EVIDENCE_DIR ??
+    '../docs/design/references/product-v10-landing-approved/final-895',
 );
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'MANIFEST.json'), 'utf8')) as {
   source_zip_sha256: string;
@@ -40,6 +37,7 @@ type Disposition = {
   baselineAssertions?: string[];
   baselineAbsent?: string[];
   captureAdjustment?: string;
+  visualProof?: string;
 };
 const dispositionByFile = dispositions as Record<string, Disposition>;
 const approvedSourceHashes: Record<string, string> = {
@@ -49,7 +47,8 @@ const approvedSourceHashes: Record<string, string> = {
     '252031c6d9b60a7c019f8734211cecdc39a25408da7dd56362ba4381a001b865',
 };
 
-fs.mkdirSync(path.join(evidence, 'candidate'), { recursive: true });
+for (const folder of ['candidate', 'regions', 'normalized-originals', 'diff'])
+  fs.mkdirSync(path.join(evidence, folder), { recursive: true });
 
 test('all 28 immutable owner originals retain their hashes', () => {
   expect(manifest.source_zip_sha256).toBe(
@@ -63,6 +62,71 @@ test('all 28 immutable owner originals retain their hashes', () => {
         .update(fs.readFileSync(path.join(root, 'screenshots', item.filename)))
         .digest('hex'),
     ).toBe(item.sha256);
+});
+
+test('current acceptance coverage requires every state and an approved pixel reference', () => {
+  // This is an approval-completeness gate, never a pixel-parity substitute.
+  const states = acceptance.mandatoryCandidateStates;
+  const chapterStates = {
+    connect: ['initial', 'accepted'],
+    program: ['initial', 'version-2', 'assigned'],
+    facts: ['initial', 'client-360'],
+    review: ['initial', 'changes', 'checked'],
+    decision: ['initial', 'preview-one', 'confirmed'],
+    followup: ['initial', 'edited-draft', 'confirmed'],
+  };
+  expect(states).toHaveLength(176);
+  expect(
+    new Set(states.map((item) => `${item.audience}/${item.theme}/${item.width}/${item.state}`))
+      .size,
+  ).toBe(states.length);
+  for (const theme of ['light', 'dark'])
+    for (const width of [1440, 320, 390, 430]) {
+      for (const audience of ['athlete', 'coach'])
+        for (const state of ['full-initial', 'cycle'])
+          expect(
+            states.filter(
+              (item) =>
+                item.audience === audience &&
+                item.theme === theme &&
+                item.width === width &&
+                item.state === state,
+            ),
+          ).toHaveLength(1);
+      expect(
+        states.filter(
+          (item) =>
+            item.audience === 'athlete' &&
+            item.theme === theme &&
+            item.width === width &&
+            item.state === 'progress-ready',
+        ),
+      ).toHaveLength(1);
+      expect(
+        states.filter(
+          (item) =>
+            item.audience === 'coach' &&
+            item.theme === theme &&
+            item.width === width &&
+            item.state === 'full-interacted',
+        ),
+      ).toHaveLength(1);
+      for (const [chapter, required] of Object.entries(chapterStates))
+        for (const state of required)
+          expect(
+            states.filter(
+              (item) =>
+                item.audience === 'coach' &&
+                item.theme === theme &&
+                item.width === width &&
+                item.state === `coach-${chapter}-${state}`,
+            ),
+          ).toHaveLength(1);
+    }
+  expect(
+    states.filter((item) => item.status !== 'APPROVED' || !item.approvedPixelReference),
+    'NEEDS_OWNER_REVIEW: candidate screenshots cannot become approved baselines automatically. Missing current states must block the gate.',
+  ).toEqual([]);
 });
 
 async function openLanding(page: Page, entry: ArchiveCase) {
@@ -91,6 +155,18 @@ async function settleVisibleAssets(page: Page) {
       .every((image) => image.complete && image.naturalWidth > 0),
   );
   await page.evaluate(() => document.fonts.ready);
+  const progress = page.locator('#progress');
+  if (
+    (await progress.count()) &&
+    (await progress.locator('[aria-busy]').evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.bottom > 0 && bounds.top < innerHeight;
+    }))
+  ) {
+    await expect(progress.getByRole('heading', { name: 'Объём тренировок' })).toBeVisible();
+    await expect(progress.locator('.data-viz-chart')).toBeVisible();
+    await expect(progress.getByText('Загружаем пример прогресса…')).toHaveCount(0);
+  }
 }
 
 async function prepareInteractiveState(page: Page, entry: ArchiveCase) {
@@ -185,12 +261,18 @@ for (const entry of cases) {
   if (!disposition) throw new Error(`Missing archive disposition for ${entry.file}`);
 
   if (disposition.comparisonStatus === 'OWNER_SUPERSEDED') {
-    test(`${entry.file}: current frozen owner baseline`, async ({ page }, testInfo: TestInfo) => {
+    test(`${entry.file}: later-owner reference coverage, not pixel parity`, async ({
+      page,
+    }, testInfo: TestInfo) => {
       await openLanding(page, entry);
       for (const selector of disposition.baselineAssertions ?? [])
         await expect(page.locator(selector)).toHaveCount(1);
       for (const selector of disposition.baselineAbsent ?? [])
         await expect(page.locator(selector)).toHaveCount(0);
+      const replacement = entry.audience === 'athlete' ? '#coach-promo' : '#coach-connect';
+      if (disposition.visualProof !== 'FROZEN_FIRST_SCREEN')
+        await page.locator(replacement).scrollIntoViewIfNeeded();
+      await settleVisibleAssets(page);
       const actual = await page.screenshot({
         path: path.join(evidence, 'candidate', `owner-baseline-${entry.file}`),
         animations: 'disabled',
@@ -206,13 +288,22 @@ for (const entry of cases) {
         expect(ownerSourceHash).toBe(approvedSourceHashes[path.basename(disposition.ownerSource)]);
       writeSceneResult(entry, disposition, {
         comparisonResult: 'NOT_COMPARABLE',
-        ownerBaselineResult: 'STRUCTURE_PASS',
-        ownerApproval: true,
+        ownerBaselineResult:
+          disposition.visualProof === 'FROZEN_FIRST_SCREEN'
+            ? 'CHECK_SEPARATE_FROZEN_PIXEL_SUITE'
+            : 'VISUAL_NOT_PROVEN',
+        structureResult: 'PASS',
+        ownerApproval: false,
+        approvedReferenceScope: 'FIRST_SCREEN_ONLY; current pixels require separate comparison',
         ownerSourcePresent: Boolean(ownerSourcePath && fs.existsSync(ownerSourcePath)),
         ownerSourcePath,
         ownerSourceHash,
       });
       await testInfo.attach('current-owner-baseline', { body: actual, contentType: 'image/png' });
+      expect(
+        disposition.visualProof,
+        'VISUAL_NOT_PROVEN: a first-screen reference cannot approve a replacement lower scene.',
+      ).toBe('FROZEN_FIRST_SCREEN');
     });
     continue;
   }
@@ -221,6 +312,9 @@ for (const entry of cases) {
     await openLanding(page, entry);
     await prepareInteractiveState(page, entry);
     const target = page.locator(entry.selector).first();
+    await scrollToScene(page, target, entry);
+    await waitForSceneState(page, target, entry);
+    // Lazy content changes section height; recompute scroll after its real state is ready.
     await scrollToScene(page, target, entry);
     await waitForSceneState(page, target, entry);
     const actual = await page.screenshot({
@@ -233,28 +327,59 @@ for (const entry of cases) {
     const crop = entry.sourceCrop;
     expect(candidate.width).toBe(crop.width);
     expect(candidate.height).toBe(crop.height);
-    let changed = 0;
-    for (let y = 0; y < crop.height; y++)
-      for (let x = 0; x < crop.width; x++) {
-        const a = (y * crop.width + x) * 4;
-        const b = ((y + crop.y) * source.width + x + crop.x) * 4;
-        if (
-          [0, 1, 2].some(
-            (channel) => Math.abs(candidate.data[a + channel]! - source.data[b + channel]!) > 16,
-          )
-        )
-          changed++;
-      }
-    const ratio = changed / (crop.width * crop.height);
+    const scene = regionCases[entry.file as keyof typeof regionCases];
+    const full = compareLandingPixels(source, candidate, crop);
+    const results = scene.regions.map((region) => {
+      const result = compareLandingPixels(source, candidate, crop, region);
+      const prefix = `${entry.file}-${region.name}`;
+      for (const [suffix, pixels] of [
+        ['original', result.original],
+        ['candidate', result.actual],
+        ['diff', result.heatmap],
+      ] as const)
+        fs.writeFileSync(
+          path.join(evidence, 'regions', `${prefix}-${suffix}.png`),
+          PNG.sync.write(pixels),
+        );
+      return {
+        ...region,
+        changedPixelRatio: result.changedPixelRatio,
+        threshold: 0.01,
+        result: result.changedPixelRatio <= 0.01 ? 'PASS' : 'FAIL',
+        original: `regions/${prefix}-original.png`,
+        candidate: `regions/${prefix}-candidate.png`,
+        heatmap: `regions/${prefix}-diff.png`,
+      };
+    });
+    fs.writeFileSync(
+      path.join(evidence, 'normalized-originals', entry.file),
+      PNG.sync.write(full.original),
+    );
+    fs.writeFileSync(path.join(evidence, 'diff', entry.file), PNG.sync.write(full.heatmap));
+    const geometry = await page.locator('.ref-section, .strength-scene').evaluateAll((elements) =>
+      elements.map((element) => ({
+        id: element.id,
+        className: element.className,
+        bounds: element.getBoundingClientRect().toJSON(),
+      })),
+    );
     writeSceneResult(entry, disposition, {
-      comparisonResult: ratio <= 0.01 ? 'PIXEL_PASS' : 'PIXEL_FAIL',
-      changedPixelRatio: ratio,
+      comparisonResult: results.every((result) => result.result === 'PASS')
+        ? 'REGION_PASS'
+        : 'REGION_FAIL',
+      changedPixelRatio: full.changedPixelRatio,
+      fullScreenRatioIsAcceptance: false,
+      regions: results,
+      excluded: scene.excluded,
+      geometry,
       ownerApproval: false,
     });
     await testInfo.attach('candidate', { body: actual, contentType: 'image/png' });
     expect(
-      ratio,
-      'Archive pixel mismatch. Inspect gallery; do not update the owner reference.',
-    ).toBeLessThanOrEqual(0.01);
+      results
+        .filter((result) => result.result !== 'PASS')
+        .map((result) => ({ region: result.name, ratio: result.changedPixelRatio })),
+      'Unchanged archive region differs. Inspect capture provenance and the regional gallery; never change the reference or tolerance.',
+    ).toEqual([]);
   });
 }

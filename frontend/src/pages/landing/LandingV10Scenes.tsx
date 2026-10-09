@@ -55,7 +55,7 @@ function Action({
     </a>
   );
 }
-function SectionTitle({
+export function SectionTitle({
   index,
   title,
   children,
@@ -298,7 +298,7 @@ export function ArchiveProgress() {
         </Action>
       </SectionTitle>
       <LandingProgress
-        wrapperClassName="ref-product ref-progress-panel"
+        className="ref-product ref-progress-panel"
         href={demoCabinetUrlForHostname(window.location.hostname, 'self_training', 'progress')}
       />
     </LandingChapter>
