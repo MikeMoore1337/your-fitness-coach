@@ -27,9 +27,11 @@ const allowedLatinWords = new Map([
   ['PWA', 'web application abbreviation'],
   ['QR', 'common technical abbreviation'],
   ['TMA', 'Telegram Mini App abbreviation'],
+  ['TELEGRAM', 'official external platform name'],
   ['UI', 'interface abbreviation'],
   ['URL', 'web address abbreviation'],
   ['UX', 'interface abbreviation'],
+  ['YFC', 'official product abbreviation'],
   ['XLSX', 'file format abbreviation'],
   ['Telegram', 'official external platform name'],
 ]);
@@ -37,6 +39,8 @@ const allowedLatinWords = new Map([
 const allowedLatinPhrases = new Map([
   ['Your Fitness Coach', 'official product brand'],
   ['Coach OS', 'official product name'],
+  ['COACH OS', 'official product name'],
+  ['Coach Today', 'official product surface'],
 ]);
 
 const userFacingAttributes = new Set([

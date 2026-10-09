@@ -11,6 +11,8 @@ import { LandingV10Faq } from './LandingV10Faq';
 import { LandingV10Actions } from './LandingV10Hero';
 import type { LandingAudience } from './landingAudience';
 
+const SELF_TRAINING_SCENARIO: DemoScenario = 'self_training';
+
 const links: {
   scenario: DemoScenario;
   title: string;
@@ -19,7 +21,7 @@ const links: {
   icon: IconName;
 }[] = [
   {
-    scenario: 'self_training',
+    scenario: SELF_TRAINING_SCENARIO,
     title: 'Тренировка',
     description: 'Начните занятие и отметьте подход.',
     section: 'today',
@@ -129,7 +131,9 @@ export function LandingV10SharedSections({
               <Icon name={link.icon} size={56} />
               <div>
                 <h3>
-                  {coach && link.scenario === 'self_training' ? 'Тренировка клиента' : link.title}
+                  {coach && link.scenario === SELF_TRAINING_SCENARIO
+                    ? 'Тренировка клиента'
+                    : link.title}
                 </h3>
                 <p>{link.description}</p>
               </div>

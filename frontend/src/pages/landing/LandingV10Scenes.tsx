@@ -8,6 +8,12 @@ import LandingProgressContent from './LandingProgressContent';
 import { TrainingScenario } from '../demo/TrainingScenario';
 import { landingAudienceHref } from './landingAudience';
 import '../demo/demo.css';
+
+const NUTRITION_TAB_PLAN = 'plan';
+const NUTRITION_TAB_GROCERY = 'grocery';
+const COACH_TAB_FACTS = 'facts';
+const COACH_TAB_CHANGES = 'changes';
+
 const initialTraining: DemoSelfTrainingState = {
   kind: 'self_training' as const,
   screen: 'today' as const,
@@ -176,16 +182,16 @@ export function ArchiveNutrition() {
             ))}
           </nav>
           <div className="ref-tab-body" key={tab}>
-            {tab === 'plan' ? (
+            {tab === NUTRITION_TAB_PLAN ? (
               <>
                 <small>ЗАВТРАК · ЗАПЛАНИРОВАНО</small>
                 <h3>Овсянка с ягодами</h3>
                 <p>Рецепт добавлен в план. Это ещё не запись о съеденном.</p>
-                <button className="landing-button" onClick={() => setTab('grocery')}>
+                <button className="landing-button" onClick={() => setTab(NUTRITION_TAB_GROCERY)}>
                   Посмотреть покупки <Icon name="arrow-right" size={20} />
                 </button>
               </>
-            ) : tab === 'grocery' ? (
+            ) : tab === NUTRITION_TAB_GROCERY ? (
               <>
                 <small>ИЗ ПЛАНОВОГО РЕЦЕПТА</small>
                 <h3>Список покупок</h3>
@@ -300,7 +306,7 @@ export function ArchiveProgress() {
   );
 }
 export function ArchiveCoachWork({ compact = false }: { compact?: boolean } = {}) {
-  const [tab, setTab] = useState('facts');
+  const [tab, setTab] = useState(COACH_TAB_FACTS);
   const [preview, setPreview] = useState(false);
   const [applied, setApplied] = useState(false);
   const [sent, setSent] = useState(false);
@@ -336,7 +342,7 @@ export function ArchiveCoachWork({ compact = false }: { compact?: boolean } = {}
         ))}
       </nav>
       <div className="ref-tab-body" key={tab}>
-        {tab === 'facts' ? (
+        {tab === COACH_TAB_FACTS ? (
           <>
             <small>ОБЗОР КЛИЕНТА</small>
             <h3>Факты перед решением</h3>
@@ -354,11 +360,11 @@ export function ArchiveCoachWork({ compact = false }: { compact?: boolean } = {}
                 <dd>Посмотреть изменения</dd>
               </div>
             </dl>
-            <button className="landing-button" onClick={() => setTab('changes')}>
+            <button className="landing-button" onClick={() => setTab(COACH_TAB_CHANGES)}>
               Открыть изменения <Icon name="arrow-right" size={20} />
             </button>
           </>
-        ) : tab === 'changes' ? (
+        ) : tab === COACH_TAB_CHANGES ? (
           <>
             <small>ПРОГРАММА / ВЕРСИЯ 2</small>
             <h3>
