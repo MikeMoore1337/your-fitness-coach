@@ -4,7 +4,7 @@ import { demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
 import { Icon } from '../../shared/ui/Icon';
 import { glassProps } from '../../shared/ui/Glass';
 import { LandingChapter } from './LandingChapter';
-import LandingProgressContent from './LandingProgressContent';
+import { LandingProgress } from './LandingProgress';
 import { TrainingScenario } from '../demo/TrainingScenario';
 import { landingAudienceHref } from './landingAudience';
 import '../demo/demo.css';
@@ -297,11 +297,10 @@ export function ArchiveProgress() {
           Посмотреть пример прогресса
         </Action>
       </SectionTitle>
-      <div className="ref-product ref-progress-panel">
-        <LandingProgressContent
-          href={demoCabinetUrlForHostname(window.location.hostname, 'self_training', 'progress')}
-        />
-      </div>
+      <LandingProgress
+        wrapperClassName="ref-product ref-progress-panel"
+        href={demoCabinetUrlForHostname(window.location.hostname, 'self_training', 'progress')}
+      />
     </LandingChapter>
   );
 }

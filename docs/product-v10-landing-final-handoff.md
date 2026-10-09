@@ -35,8 +35,9 @@ difference chapters are not mounted on the trainer route.
 The archive's Coach Today appears in the athlete references as well as the trainer
 references; the current implementation therefore keeps one shared `ArchiveCoachWork`
 component and renders it once per audience page. The last three archive screenshots
-remain review material only. No controller, controller v2, production cutover,
-commit, PR, merge, or issue close was performed.
+remain review material only. Controller and controller v2 remain absent; production
+cutover, merge, and issue close are still not performed. The delivery candidate is
+tracked by open PR #902 against `master`.
 
 ### Visual evidence and normalization
 
@@ -888,6 +889,49 @@ DELIVERY_PREPARATION=AUTHORIZED
 MERGE=NOT_STARTED
 DEPLOY=NOT_STARTED
 PRODUCTION_CUTOVER=FORBIDDEN
+CONTROLLER=ABSENT
+CONTROLLER_V2=ABSENT
+```
+
+## 34. Task #895 delivery preparation after owner approval
+
+The owner approved the final correction visually, so the current header, hero audience
+control, compact tertiary Glass CTAs, and athlete/trainer composition are frozen. The
+implementation changes in this worktree are limited to regression-contract alignment and
+below-fold landing scene loading: the existing `LandingProgress` shell now defers its heavy
+content, while `TaskProgress` remains shared and the existing `TrainingScenario` interaction
+is unchanged. No backend, auth, SEO, analytics, DemoCabinet, or production runtime contract
+was changed.
+
+The archive pixel comparator remains available through
+`frontend/playwright.landing-visual.config.ts` for owner review. Its immutable archive
+hash checks and normalized captures are preserved; the default required E2E run excludes the
+older pixel comparator because the approved final-correction baseline supersedes that earlier
+capture treatment. Goldens were not rewritten.
+
+Current local evidence before the PR update:
+
+- landing unit tests: 30/30 passed;
+- targeted Chromium routing/auth/public/Glass/motion checks: 90/90 passed;
+- performance, brand, and current public-visual checks: 24/24 passed;
+- TypeScript, ESLint, Russian UI guard, changed-file Prettier, `git diff --check`, and Vite
+  production build: passed;
+- known pre-existing demo-mode nutrition quick-add failure remains documented at
+  `frontend/tests/e2e/demo-mode.spec.ts:1318` and was not changed by #895.
+
+The existing PR is [#902](https://github.com/MikeMoore1337/your-fitness-coach/pull/902),
+targeting `master` and linked to Issue [#895](https://github.com/MikeMoore1337/your-fitness-coach/issues/895).
+The PR must remain open until exact-head required CI is green and a separate delivery approval
+authorizes merge. No merge, deploy, production cutover, or issue close is authorized by this
+handoff update.
+
+```text
+OWNER_VISUAL_APPROVAL=APPROVED
+VISUAL_BASELINE=FROZEN
+TASK_895_PR=OPEN
+TASK_895_MERGE=NOT_STARTED
+TASK_895_PRODUCTION_DEPLOY=NOT_STARTED
+TASK_895_READY_FOR_DELIVERY_APPROVAL=YES_IF_EXACT_HEAD_CI_GREEN
 CONTROLLER=ABSENT
 CONTROLLER_V2=ABSENT
 ```

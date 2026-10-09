@@ -172,7 +172,7 @@ test('Landing ведёт на canonical Login, а protected route сохраня
   await mockAuthApi(page);
   await page.goto('/');
   await page
-    .locator('.landing-hero__actions')
+    .locator('.ref-hero .landing-hero__actions')
     .getByRole('link', { name: 'Начать со своими данными', exact: true })
     .click();
 

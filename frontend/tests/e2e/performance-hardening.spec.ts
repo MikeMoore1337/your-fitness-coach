@@ -317,7 +317,7 @@ test('Client navigation preserves metadata owned by a lazy public landing route'
   await page.goto('/');
 
   await page
-    .locator('.landing-v10-header-audience')
+    .locator('.landing-v10-hero-audience')
     .getByRole('link', { name: 'Для тренера', exact: true })
     .click();
 

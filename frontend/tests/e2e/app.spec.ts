@@ -1292,7 +1292,7 @@ test('Mobile Web и Telegram используют одну YFC palette и гео
 test('primary CTA лендинга и Войти остаются lime в обеих темах', async ({ page }) => {
   await page.goto('/');
   await page.mouse.move(0, 700);
-  const primary = page.locator('.landing-hero__actions').getByRole('link', {
+  const primary = page.locator('.ref-hero .landing-hero__actions').getByRole('link', {
     name: 'Начать со своими данными',
     exact: true,
   });

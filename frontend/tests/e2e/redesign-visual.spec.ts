@@ -84,23 +84,9 @@ for (const width of [360, 390, 768, 1440])
             'border-radius',
             '14px',
           );
-          await expect(page.locator('.landing-practice__entry > img')).toHaveAttribute(
-            'src',
-            '/assets/marketing/practice-recording.webp',
-          );
-          await expect(page.locator('.landing-practice__entry > img')).toHaveCSS(
-            'border-radius',
-            '24px',
-          );
-          for (const step of await page.locator('.landing-start__steps li').all()) {
-            const alignment = await step.evaluate((node) =>
-              ['span', 'small', 'h3'].map((selector) => {
-                const box = node.querySelector(selector)!.getBoundingClientRect();
-                return box.y + box.height / 2;
-              }),
-            );
-            expect(Math.max(...alignment) - Math.min(...alignment)).toBeLessThan(2);
-          }
+          await expect(page.locator('.ref-hero .landing-v10-hero-tertiary')).toBeVisible();
+          await expect(page.locator('.ref-cycle')).toBeVisible();
+          await expect(page.locator('.ref-cycle ol > li')).toHaveCount(4);
         }
         await page.screenshot({
           path: testInfo.outputPath(`${name}-${width}-${theme}.png`),
