@@ -4,14 +4,15 @@
 
 ## Priority, non-negotiable
 
-1. **FINAL authority:** `final-858/` (27 captures) — the last #858 owner-approved athlete/trainer desktop/mobile, light/dark, 320/390, header/menu states. They supersede earlier exploration whenever a difference exists.
-2. **Full-page structure only:** `full-page-852/` (8 full-page captures) — B × C × Current YFC section composition, order, photographic chapters and Coach OS distinctions, with #858 taking precedence on hero/header/CTA/responsive.
-3. **Existing branded source:** [product-v10-landing references](../product-v10-landing/) — 10 already versioned screenshots for compact coach teaser, Coach Today and original transparent/glass header comparison.
-4. **Negative examples only:** production captures at `.artifacts/tasks/858/evidence/production/` or the screenshots of visually broken production reported by the owner. Never take these as the golden baseline.
+1. **Current canonical archive:** [Landing archive](../landing-archive-owner-canonical/) — 28 immutable originals; the last three are comparison galleries, not product scenes. Explicit later owner overrides apply only to their stated scope.
+2. **Later #895 correction:** [final-895](final-895/README.md) — 20 immutable first-screen/menu captures. Hero-only audience control, shared matte Glass header and full tertiary Glass CTA override the earlier header/hero decisions. These images do not approve lower trainer chapters. The documented mobile 44px-link delta remains FAIL, not a new baseline.
+3. **Absent archive states only:** `full-page-852/` (8 full-page captures) — approved six-chapter Coach OS source and full-page structure where the canonical archive has no corresponding scene. Restored local #898 WIP requires a new owner review.
+4. **Historical responsive states:** `final-858/` (27 captures) and [product-v10-landing references](../product-v10-landing/) (10 captures) are supplemental references only where the newer sources do not decide the state. They cannot override the archive or #895 correction.
+5. **Negative examples only:** production captures at `.artifacts/tasks/858/evidence/production/` or screenshots rejected by the owner. Never take these as the golden baseline.
 
 Do not change text wrapping, fonts/weights, typography sizes, spacing, section density, backgrounds, header glass, image crops, button geometry, Coach OS scenes or mobile behavior under a 'polish' rationale without owner visual reapproval.
 
-## Final owner-approved viewport snapshots (most authoritative)
+## Historical #858 viewport snapshots (priority above applies)
 
 - [athlete-desktop-dark-header.png](final-858/athlete-desktop-dark-header.png) — 1440×82, sha256 `9de526b9a2b7…`
 - [athlete-desktop-dark.png](final-858/athlete-desktop-dark.png) — 1440×900, sha256 `915b4f56946b…`
@@ -64,3 +65,9 @@ Do not change text wrapping, fonts/weights, typography sizes, spacing, section d
 ## SHA-256
 
 See [SHA256-MANIFEST.json](SHA256-MANIFEST.json) for dimensions, file sizes and full SHA-256 of each image.
+
+## Complete recovery approval for PR #902
+
+Complete recovery WIP is approved with a release-scoped historical pixel exception.
+Frozen images remain unchanged. See [owner decision](../../../product-v10-landing-release-895.md)
+and [approved state hashes](../product-v10-landing-acceptance.json).

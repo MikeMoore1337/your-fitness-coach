@@ -225,12 +225,17 @@ function demoWeeklyReview(date: string) {
   };
 }
 
-async function assertHeaderMark(page: Page, surface: 'light' | 'dark', size: number) {
+async function assertHeaderMark(
+  page: Page,
+  surface: 'light' | 'dark',
+  width: number,
+  height = width,
+) {
   const mark = page.locator('.landing-header .landing-brand__mark');
   await expect(mark).toBeVisible();
   await expect(mark).toHaveAttribute('src', `/assets/brand/yfc-mark-${surface}.svg`);
-  await expect(mark).toHaveCSS('width', `${size}px`);
-  await expect(mark).toHaveCSS('height', `${size}px`);
+  await expect(mark).toHaveCSS('width', `${width}px`);
+  await expect(mark).toHaveCSS('height', `${height}px`);
   await expect(mark).toHaveCSS('object-fit', 'contain');
   await expect(mark).toHaveAttribute('alt', '');
 }
@@ -378,7 +383,7 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     });
     await page.reload();
     // The landing header stays on the dark surface even when the page theme is light.
-    await assertHeaderMark(page, 'dark', 44);
+    await assertHeaderMark(page, 'dark', 38, 44);
     const wordmark = page.locator('.landing-header .yfc-lockup__wordmark');
     await expect(wordmark).toBeVisible();
     const brandBounds = await page.locator('.public-shell__brand').boundingBox();
@@ -399,11 +404,8 @@ test('canonical brand assets render on light and dark public surfaces', async ({
     if (viewport.name === 'mobile') {
       await page.getByRole('button', { name: 'Закрыть меню', exact: true }).click();
     }
-    await assertHeaderMark(page, 'dark', 44);
-    await expect(page.locator('#landing-v10-athlete-title')).toHaveCSS(
-      'color',
-      'rgb(255, 255, 255)',
-    );
+    await assertHeaderMark(page, 'dark', 38, 44);
+    await expect(page.locator('#landing-title')).toHaveCSS('color', 'rgb(255, 255, 255)');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(viewport.width);
 
     if (viewport.name === 'mobile') {

@@ -1,7 +1,7 @@
 import { clearAllDemoSessions, type DemoSelfTrainingState } from '../../features/demo/demoApi';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { AppLink } from '../../shared/navigation/router';
-import { TaskProgress } from '../../shared/ui/DataViz';
+import { TaskProgress } from '../../shared/ui/TaskProgress';
 import { Badge, Button, Metric } from '../../shared/ui/common';
 
 function DemoLoginAction({ scenario }: { scenario: 'self_training' }) {

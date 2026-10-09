@@ -10,7 +10,6 @@ import { demoCabinetUrlForHostname, loginUrlForHostname } from '../../shared/nav
 import { AppThemeToggle } from '../../shared/ui/AppThemeToggle';
 import { Icon } from '../../shared/ui/Icon';
 import { PublicShell } from '../../shared/ui/PublicShell';
-import { LandingAudienceSwitch } from './LandingAudienceSwitch';
 import type { LandingAudience } from './landingAudience';
 import './landing-v10.css';
 
@@ -47,7 +46,15 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
     })();
     let attempts = 0;
     const timer = window.setInterval(() => {
-      const target = document.getElementById(targetId);
+      const target =
+        document.getElementById(targetId) ??
+        document.getElementById(
+          targetId === 'coach-promo'
+            ? 'coach-work'
+            : targetId.startsWith('coach-')
+              ? 'product'
+              : 'top',
+        );
       if (!target && attempts++ < 20) return;
       window.clearInterval(timer);
       target?.scrollIntoView({ block: 'start' });
@@ -93,7 +100,7 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
   };
 
   const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Tab') return;
+    if (!mobileMenuOpen || event.key !== 'Tab') return;
     const focusable = Array.from(
       navigationRef.current?.querySelectorAll<HTMLElement>('a[href], button:not([disabled])') ?? [],
     ).filter((element) => element.offsetParent !== null);
@@ -111,7 +118,7 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
 
   return (
     <PublicShell
-      className={`landing-page landing-v10-page${mobileMenuOpen ? ' landing-v10-page--menu-open' : ''}`}
+      className={`landing-page landing-v10-page landing-v10-page--${audience}${mobileMenuOpen ? ' landing-v10-page--menu-open' : ''}`}
       headerBrandSurface="dark"
       homeHref="/"
       skipTarget="landing-v10-content"
@@ -132,15 +139,7 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
               Вопросы
             </a>
           </nav>
-          <div className="landing-v10-header-audience">
-            <LandingAudienceSwitch audience={audience} />
-          </div>
           <div className="landing-v10-mobile-menu-controls">
-            <LandingAudienceSwitch
-              audience={audience}
-              showLabel={false}
-              onNavigate={() => closeMobileMenu(true)}
-            />
             <AppThemeToggle navigation />
           </div>
         </div>
@@ -157,7 +156,7 @@ export function LandingV10Shell({ audience, children }: LandingV10ShellProps) {
               })
             }
           >
-            Войти
+            Войти <Icon name="arrow-right" size={20} />
           </a>
           <button
             ref={menuButtonRef}

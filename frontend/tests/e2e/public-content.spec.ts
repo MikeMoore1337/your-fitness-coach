@@ -336,13 +336,13 @@ test('landing emits a privacy-safe acquisition event without changing the deskto
     path: testInfo.outputPath('landing-acquisition-desktop-1440-light.png'),
   });
   await page
-    .locator('.landing-hero__actions')
+    .locator('.ref-hero .landing-hero__actions')
     .getByRole('link', { name: 'Начать со своими данными', exact: true })
     .evaluate((element) => {
       element.addEventListener('click', (event) => event.preventDefault(), { once: true });
     });
   await page
-    .locator('.landing-hero__actions')
+    .locator('.ref-hero .landing-hero__actions')
     .getByRole('link', { name: 'Начать со своими данными', exact: true })
     .click();
 

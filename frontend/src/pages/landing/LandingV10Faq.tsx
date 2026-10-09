@@ -1,5 +1,6 @@
 import { Icon } from '../../shared/ui/Icon';
 import { LandingChapter } from './LandingChapter';
+import type { LandingAudience } from './landingAudience';
 
 const FAQ_ITEMS = [
   {
@@ -8,36 +9,45 @@ const FAQ_ITEMS = [
       'Нет. Тренировки, питание и прогресс доступны в браузере. Мини-приложение Telegram — быстрый дополнительный вход к тем же основным сценариям.',
   },
   {
-    question: 'Что произойдёт с изменениями в демо?',
+    question: 'Кто меняет программу?',
     answer:
-      'Они останутся только в подготовленной демо-сессии и не перенесутся в аккаунт. После входа вы начнёте настройку чистого профиля со своими данными.',
+      'Изменения программы и целей остаются явными действиями пользователя или его тренера. Подготовленные демо-данные не относятся к реальным аккаунтам.',
   },
   {
-    question: 'Приложение само меняет программу или питание?',
+    question: 'Сообщения отправляются автоматически?',
     answer:
-      'Нет. Приложение показывает план, факты и объяснимые ориентиры. Изменения программы и целей остаются явными действиями пользователя или его тренера.',
+      'Нет. Черновик сообщения остаётся под контролем тренера до отдельного подтверждения. Публичные сцены ничего не отправляют.',
   },
   {
-    question: 'Можно ли управлять своими данными?',
+    question: 'Кто оказывает тренерские услуги?',
+    answer:
+      'Тренер — независимый пользователь сервиса. YFC не является стороной договора между тренером и клиентом и не подменяет медицинскую помощь.',
+  },
+  {
+    question: 'Что происходит с данными?',
     answer:
       'В профиле доступны экспорт данных, отвязка способов входа и удаление аккаунта. Данные подготовленных демо-сценариев отделены от реальных аккаунтов.',
   },
 ] as const;
 
-export function LandingV10Faq() {
+export function LandingV10Faq({ audience }: { audience: LandingAudience }) {
+  const coach = audience === 'coach';
   return (
     <LandingChapter
       id="faq"
-      className="landing-assurance landing-v10-faq"
+      className="ref-section ref-faq"
       aria-labelledby="landing-v10-faq-title"
     >
       <header>
-        <p className="landing-kicker">ЧЕСТНЫЕ ОГРАНИЧЕНИЯ</p>
-        <h2 id="landing-v10-faq-title">Перед тем как начать.</h2>
+        <p className="landing-kicker">ПЕРЕД ТЕМ КАК НАЧАТЬ</p>
+        <h2 id="landing-v10-faq-title">{coach ? 'Понятные правила.' : 'Понятные границы.'}</h2>
       </header>
       <div className="landing-faq-list">
         {FAQ_ITEMS.map((item) => (
-          <details key={item.question}>
+          <details
+            key={item.question}
+            id={item.question === 'Что происходит с данными?' ? 'privacy' : undefined}
+          >
             <summary>
               {item.question}
               <Icon name="plus" size={20} />

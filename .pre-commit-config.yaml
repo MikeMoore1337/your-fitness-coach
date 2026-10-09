@@ -18,6 +18,8 @@ repos:
       - id: check-merge-conflict
       - id: check-added-large-files
         args: ["--maxkb=500"]
+        # Four immutable owner-approved #895 frames; hashes are checked by the visual suite.
+        exclude: ^docs/design/references/product-v10-landing-approved/final-895/(athlete|coach)-(light|dark)-desktop-first-screen\.png$
       - id: debug-statements
 
   - repo: https://github.com/astral-sh/ruff-pre-commit

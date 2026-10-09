@@ -1,97 +1,111 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LandingV10AthletePage from '../../../../src/pages/landing/LandingV10AthletePage';
 import { NavigationProvider } from '../../../../src/shared/navigation/router';
-
 function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
       <NavigationProvider>
         <LandingV10AthletePage />
       </NavigationProvider>
     </QueryClientProvider>,
   );
 }
-
-describe('LandingV10AthletePage', () => {
-  afterEach(() => {
-    cleanup();
-    window.history.replaceState({}, '', '/');
-    localStorage.clear();
-    vi.restoreAllMocks();
-    vi.unstubAllGlobals();
+afterEach(() => {
+  cleanup();
+  window.history.replaceState({}, '', '/');
+  localStorage.clear();
+  vi.restoreAllMocks();
+});
+describe('canonical archive athlete composition', () => {
+  it('returns legal-dialog focus to its actual trigger when clicks do not focus buttons', () => {
+    renderPage();
+    const dialog = document.querySelector('dialog')!;
+    const show = vi.fn();
+    Object.defineProperty(dialog, 'showModal', { value: show });
+    for (const name of ['Условия использования', 'Политика конфиденциальности']) {
+      const trigger = screen.getByRole('button', { name });
+      fireEvent.click(trigger);
+      expect(show).toHaveBeenCalled();
+      fireEvent(dialog, new Event('close'));
+      expect(trigger).toHaveFocus();
+      trigger.blur();
+    }
   });
-
-  it('keeps the approved athlete story and exposes only the compact Coach OS teaser', () => {
+  it('keeps the archive section order, Coach Today and real destinations', () => {
     const { container } = renderPage();
-
-    expect(screen.getByRole('heading', { level: 1, name: 'СИЛА В ДЕЙСТВИИ.' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /От первого действия/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Каждый подход/ })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /Ориентир рядом с фактами/ })).toBeInTheDocument();
+    const hero = within(container.querySelector('.ref-hero')! as HTMLElement);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('СИЛА В ДЕЙСТВИИ.');
     expect(
-      screen.getByRole('heading', { name: /Смотрите на движение недели/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('heading', { name: 'Вы тренер? Знакомьтесь с Coach OS.' }),
-    ).toHaveLength(1);
-    expect(container.querySelectorAll('.landing-v10-coach-promo')).toHaveLength(1);
-    expect(screen.queryByText(/Coach Today|Не потерять важное/)).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Попробовать демо тренировки' })).toHaveAttribute(
-      'href',
-      '/demo?cabinet=1&scenario=self_training&section=today',
-    );
-    expect(screen.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveAttribute(
-      'href',
-      '#training',
-    );
-    expect(screen.getAllByText('Браузер и мини-приложение Telegram')).toHaveLength(2);
-    expect(screen.getByRole('navigation', { name: 'Навигация по странице' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Демо' })).toHaveAttribute(
-      'href',
-      '/demo?cabinet=1&scenario=self_training&section=today',
-    );
-    expect(screen.getByRole('link', { name: 'Вопросы' })).toHaveAttribute('href', '#faq');
-    expect(screen.getByRole('heading', { name: 'Перед тем как начать.' })).toBeInTheDocument();
-  });
-
-  it('switches the synthetic nutrition preview without implying consumed equals planned', () => {
-    renderPage();
-
-    expect(screen.getByRole('tab', { name: 'План' })).toHaveAttribute('aria-selected', 'true');
-    fireEvent.click(screen.getByRole('tab', { name: 'Покупки' }));
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('Список из плана');
-    fireEvent.click(screen.getByRole('tab', { name: 'Дневник' }));
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('Нет записи — это пропуск данных');
-  });
-
-  it('keeps the weekly review local and sends the trainer CTA to the trainer landing', () => {
-    renderPage();
-
-    fireEvent.click(screen.getByRole('button', { name: '5' }));
-    expect(screen.getByRole('button', { name: '5' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText(/Отмечено: 5 из 5/)).toBeInTheDocument();
+      [...container.querySelectorAll('main > section')].map((e) => e.classList[0]),
+    ).toHaveLength(12);
+    expect(container.querySelectorAll('.strength-scene')).toHaveLength(1);
+    expect(container.querySelectorAll('#coach-work')).toHaveLength(0);
+    expect(container.querySelectorAll('#coach-promo')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: /Знакомьтесь с Coach OS/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Возможности для тренера' })).toHaveAttribute(
       'href',
       '/for-trainers',
     );
-  });
-
-  it('preserves campaign and in-page context when the teaser switches audience', () => {
-    window.history.replaceState({}, '', '/for-athletes?utm_campaign=v10#coach-work');
+    expect(hero.getByRole('link', { name: 'Начать со своими данными' })).toHaveAttribute(
+      'href',
+      '/app',
+    );
+    expect(hero.getByRole('link', { name: 'Попробовать демо тренировки' })).toHaveAttribute(
+      'href',
+      '/demo?cabinet=1&scenario=self_training&section=today',
+    );
+    expect(hero.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveAttribute(
+      'href',
+      '#training',
+    );
+    expect(hero.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveAttribute(
+      'data-glass',
+    );
+    expect(
+      hero
+        .getByRole('link', { name: 'Посмотреть пример тренировки' })
+        .compareDocumentPosition(hero.getByText(/Браузер и мини-приложение Telegram/)),
+    ).toBe(4);
+    expect(screen.getByRole('heading', { name: 'Понятные границы.' })).toBeInTheDocument();
+  }, 15000);
+  it('does not turn planned food into a diary entry without an explicit action', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     renderPage();
-
-    expect(screen.getByRole('link', { name: 'Возможности для тренера' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: 'Покупки' }));
+    expect(screen.getByText('60 г')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Дневник' }));
+    expect(screen.getByText('Записи пока нет')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Отметить съеденное в примере' }));
+    expect(screen.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it('runs and resets the local training example without creating a real demo session', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const { container } = renderPage();
+    const training = within(container.querySelector('#training')! as HTMLElement);
+    fireEvent.click(training.getByRole('button', { name: 'Начать тренировку' }));
+    for (let i = 0; i < 3; i++)
+      fireEvent.click(training.getByRole('button', { name: /Завершить текущий подход/ }));
+    fireEvent.click(training.getByRole('button', { name: 'Завершить тренировку' }));
+    expect(training.getByText('24 мин')).toBeInTheDocument();
+    fireEvent.click(training.getByRole('button', { name: 'Перейти к прогрессу' }));
+    expect(training.getByText('+4.2%')).toBeInTheDocument();
+    fireEvent.click(training.getByRole('button', { name: 'Сбросить пример' }));
+    expect(training.getByRole('button', { name: 'Начать тренировку' })).toBeInTheDocument();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+  it('keeps review input local and campaign/hash on audience links', () => {
+    window.history.replaceState({}, '', '/?utm_campaign=v10#coach-work');
+    const { container } = renderPage();
+    fireEvent.click(screen.getByRole('radio', { name: '3', hidden: true }));
+    expect(screen.getByText(/В примере выбран ответ 3 из 5/)).toBeInTheDocument();
+    expect(container.querySelector('#coach-promo a')).toHaveAttribute(
       'href',
       '/for-trainers?utm_campaign=v10#coach-work',
     );
-  });
-
-  it('does not call a product API while rendering the staged composition', () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    renderPage();
-    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

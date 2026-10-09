@@ -1,0 +1,42 @@
+name: Landing pinned visual review
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  landing-visual:
+    # Approved #895 captures were made on Windows. This independent gate stays
+    # manual as a historical diagnostic; the PR #902 owner exception never makes it PASS.
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      LANDING_VISUAL_EVIDENCE_DIR: ${{ github.workspace }}/.artifacts/tasks/895/evidence/region-recovery
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build candidate
+        working-directory: frontend
+        run: npm run build
+      - name: Install pinned Chromium
+        working-directory: frontend
+        run: npx playwright install chromium
+      - name: Compare immutable approved references and archive regions
+        working-directory: frontend
+        run: npm run e2e:landing-visual
+      - name: Preserve all comparison results, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-visual-${{ github.sha }}
+          path: .artifacts/tasks/895/evidence/region-recovery
+          if-no-files-found: error

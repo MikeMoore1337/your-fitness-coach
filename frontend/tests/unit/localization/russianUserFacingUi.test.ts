@@ -16,6 +16,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     '<span>Следующий review</span>',
     '<label>Follow-up, если нужен</label>',
     '<p>Nutrition Planning</p>',
+    '<span>Client overview</span>',
     '<Button>Schedule follow-up</Button>',
     '<input aria-label="Review date" />',
     'const message = `Schedule follow-up for ${clientName}`;',
@@ -31,6 +32,7 @@ describe('RUSSIAN_USER_FACING_UI guard', () => {
     "const path = 'rollout_preview';",
     '<span>Your Fitness Coach</span>',
     '<span>Как работает Coach OS</span>',
+    '<span>Client 360 / обзор клиента</span>',
     '<input aria-label="Дата проверки" />',
   ])('allows Russian copy, identifiers, and documented exceptions: %s', (source) => {
     const result = runGuard(source);

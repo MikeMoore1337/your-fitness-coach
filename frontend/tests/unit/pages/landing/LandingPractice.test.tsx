@@ -13,6 +13,20 @@ describe('landing practice session boundary', () => {
   afterEach(cleanup);
   beforeEach(() => vi.clearAllMocks());
 
+  it('shows the approved V10 training preview before the real demo starts', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <LandingPractice approvedPreview />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByTestId('landing-v10-training-preview')).toBeInTheDocument();
+    expect(screen.getByText('Силовая А')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать тренировку' })).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+    expect(loadDemoSession).not.toHaveBeenCalled();
+  });
+
   it('starts no session before the visitor acts and prevents concurrent starts', async () => {
     let rejectRequest: (error: Error) => void = () => {
       throw new Error('Request not started');

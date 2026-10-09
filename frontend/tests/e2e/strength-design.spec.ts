@@ -76,7 +76,7 @@ test.describe('motion demonstration', () => {
     const scene = page.locator('.strength-scene');
     await expect(
       page
-        .locator('.landing-hero__actions')
+        .locator('.ref-hero .landing-hero__actions')
         .getByRole('link', { name: 'Начать со своими данными', exact: true }),
     ).toBeInViewport();
     await expect(scene).toHaveAttribute('data-phase', '0');
@@ -88,7 +88,7 @@ test.describe('motion demonstration', () => {
     await expect(scene).toHaveAttribute('data-phase', '0');
     await page.reload();
     await expect(scene).toHaveAttribute('data-phase', '0');
-    await page.locator('.landing-v10-faq').scrollIntoViewIfNeeded();
+    await page.locator('#faq').scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute('data-phase', '2');
     await scene.scrollIntoViewIfNeeded();
     await expect(scene).toHaveAttribute('data-phase', '2');

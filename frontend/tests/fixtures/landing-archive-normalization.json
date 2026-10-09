@@ -1,0 +1,702 @@
+[
+  {
+    "file": "2026-10-08_14-04.png",
+    "description": "Athlete hero and product cycle",
+    "audience": "athlete",
+    "selector": ".ref-hero",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 32,
+      "width": 1644,
+      "height": 1215
+    },
+    "candidateClip": {
+      "x": 4,
+      "y": 0,
+      "width": 1644,
+      "height": 1215
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 0
+    }
+  },
+  {
+    "file": "2026-10-08_14-05.png",
+    "description": "Athlete training strength scene: effort",
+    "audience": "athlete",
+    "selector": ".strength-scene",
+    "state": "effort",
+    "viewport": {
+      "width": 1648,
+      "height": 1242
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 43,
+      "width": 1641,
+      "height": 1242
+    },
+    "candidateClip": {
+      "x": 7,
+      "y": 0,
+      "width": 1641,
+      "height": 1242
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-05_1.png",
+    "description": "Athlete training strength scene: record/effort alternate",
+    "audience": "athlete",
+    "selector": ".strength-scene",
+    "state": "record",
+    "viewport": {
+      "width": 1648,
+      "height": 1245
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 47,
+      "width": 1646,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 2,
+      "y": 0,
+      "width": 1646,
+      "height": 1245
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-05_2.png",
+    "description": "Athlete training strength scene: result",
+    "audience": "athlete",
+    "selector": ".strength-scene",
+    "state": "result",
+    "viewport": {
+      "width": 1648,
+      "height": 1244
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 34,
+      "width": 1641,
+      "height": 1244
+    },
+    "candidateClip": {
+      "x": 7,
+      "y": 0,
+      "width": 1641,
+      "height": 1244
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-05_3.png",
+    "description": "Athlete Today/training and nutrition planner",
+    "audience": "athlete",
+    "selector": "#training",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 53,
+      "width": 1643,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 5,
+      "y": 0,
+      "width": 1643,
+      "height": 1246
+    },
+    "scrollOffset": 22,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 0
+    }
+  },
+  {
+    "file": "2026-10-08_14-06.png",
+    "description": "Athlete training and nutrition purchase tab",
+    "audience": "athlete",
+    "selector": "#training",
+    "state": "summary-purchases",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 45,
+      "width": 1642,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 6,
+      "y": 0,
+      "width": 1642,
+      "height": 1246
+    },
+    "scrollOffset": 22,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 0
+    }
+  },
+  {
+    "file": "2026-10-08_14-07.png",
+    "description": "Athlete nutrition actual diary tab",
+    "audience": "athlete",
+    "selector": "#training",
+    "state": "progress-diary",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 37,
+      "width": 1645,
+      "height": 1244
+    },
+    "candidateClip": {
+      "x": 3,
+      "y": 0,
+      "width": 1645,
+      "height": 1244
+    },
+    "scrollOffset": 54,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 32
+    }
+  },
+  {
+    "file": "2026-10-08_14-07_1.png",
+    "description": "Athlete progress and weekly review, initial",
+    "audience": "athlete",
+    "selector": "#progress",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 8,
+      "y": 44,
+      "width": 1648,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1245
+    },
+    "scrollOffset": 24,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 24
+    }
+  },
+  {
+    "file": "2026-10-08_14-07_2.png",
+    "description": "Athlete progress and weekly review, selected state",
+    "audience": "athlete",
+    "selector": "#progress",
+    "state": "weekly",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 48,
+      "width": 1648,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1245
+    },
+    "scrollOffset": 24,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 24
+    }
+  },
+  {
+    "file": "2026-10-08_14-08.png",
+    "description": "Athlete Coach OS teaser and interactive Coach Today",
+    "audience": "athlete",
+    "selector": ".ref-bridge",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 53,
+      "width": 1643,
+      "height": 1242
+    },
+    "candidateClip": {
+      "x": 5,
+      "y": 0,
+      "width": 1643,
+      "height": 1242
+    },
+    "scrollOffset": -12,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -12
+    }
+  },
+  {
+    "file": "2026-10-08_14-08_1.png",
+    "description": "Athlete Coach OS interactive change state",
+    "audience": "athlete",
+    "selector": ".ref-bridge",
+    "state": "changes",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 2,
+      "y": 50,
+      "width": 1648,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1246
+    },
+    "scrollOffset": -12,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -12
+    }
+  },
+  {
+    "file": "2026-10-08_14-08_2.png",
+    "description": "Athlete Coach OS interactive message state",
+    "audience": "athlete",
+    "selector": ".ref-bridge",
+    "state": "message",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 45,
+      "width": 1644,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 4,
+      "y": 0,
+      "width": 1644,
+      "height": 1246
+    },
+    "scrollOffset": -12,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -12
+    }
+  },
+  {
+    "file": "2026-10-08_14-08_3.png",
+    "description": "Athlete why, demo entry and continuity",
+    "audience": "athlete",
+    "selector": ".ref-difference",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 40,
+      "width": 1633,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 15,
+      "y": 0,
+      "width": 1633,
+      "height": 1246
+    },
+    "scrollOffset": -6,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -6
+    }
+  },
+  {
+    "file": "2026-10-08_14-08_4.png",
+    "description": "Athlete browser/Telegram, FAQ, CTA",
+    "audience": "athlete",
+    "selector": "#continuity",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 24,
+      "width": 1645,
+      "height": 1244
+    },
+    "candidateClip": {
+      "x": 3,
+      "y": 0,
+      "width": 1645,
+      "height": 1244
+    },
+    "scrollOffset": -24,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -24
+    }
+  },
+  {
+    "file": "2026-10-08_14-09.png",
+    "description": "Athlete final FAQ and CTA/footer",
+    "audience": "athlete",
+    "selector": "#faq",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 52,
+      "width": 1647,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 1,
+      "y": 0,
+      "width": 1647,
+      "height": 1246
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 80
+    }
+  },
+  {
+    "file": "2026-10-08_14-10.png",
+    "description": "Trainer hero and trainer work cycle",
+    "audience": "coach",
+    "selector": ".ref-hero",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 73,
+      "width": 1646,
+      "height": 1214
+    },
+    "candidateClip": {
+      "x": 2,
+      "y": 0,
+      "width": 1646,
+      "height": 1214
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 0
+    }
+  },
+  {
+    "file": "2026-10-08_14-10_1.png",
+    "description": "Trainer Coach Today and workflow structure",
+    "audience": "coach",
+    "selector": "#coach-work",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 52,
+      "width": 1643,
+      "height": 1241
+    },
+    "candidateClip": {
+      "x": 5,
+      "y": 0,
+      "width": 1643,
+      "height": 1241
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -24
+    }
+  },
+  {
+    "file": "2026-10-08_14-10_2.png",
+    "description": "Trainer photo-led program/strength preview",
+    "audience": "coach",
+    "selector": ".ref-bridge",
+    "state": "bridge-effort",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 47,
+      "width": 1646,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 2,
+      "y": 0,
+      "width": 1646,
+      "height": 1246
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": -4
+    }
+  },
+  {
+    "file": "2026-10-08_14-10_3.png",
+    "description": "Trainer strength preview interaction",
+    "audience": "coach",
+    "selector": ".strength-scene",
+    "state": "effort",
+    "viewport": {
+      "width": 1648,
+      "height": 1245
+    },
+    "sourceCrop": {
+      "x": 2,
+      "y": 52,
+      "width": 1648,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1245
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-10_4.png",
+    "description": "Trainer strength preview alternative interaction",
+    "audience": "coach",
+    "selector": ".strength-scene",
+    "state": "record",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 54,
+      "width": 1646,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 2,
+      "y": 0,
+      "width": 1646,
+      "height": 1246
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-11.png",
+    "description": "Trainer strength preview result",
+    "audience": "coach",
+    "selector": ".strength-scene",
+    "state": "result",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 2,
+      "y": 46,
+      "width": 1648,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1246
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 2
+    }
+  },
+  {
+    "file": "2026-10-08_14-11_1.png",
+    "description": "Trainer workflow interactive chapters",
+    "audience": "coach",
+    "selector": "#training",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 61,
+      "width": 1647,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 1,
+      "y": 0,
+      "width": 1647,
+      "height": 1245
+    },
+    "scrollOffset": 38,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 38
+    }
+  },
+  {
+    "file": "2026-10-08_14-11_2.png",
+    "description": "Trainer lower chapters with browser/Telegram preview",
+    "audience": "coach",
+    "selector": "#progress",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 47,
+      "width": 1648,
+      "height": 1246
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1246
+    },
+    "scrollOffset": 48,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 48
+    }
+  },
+  {
+    "file": "2026-10-08_14-12.png",
+    "description": "Trainer continuity, account and privacy/FAQ",
+    "audience": "coach",
+    "selector": ".ref-difference",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 40,
+      "width": 1646,
+      "height": 1241
+    },
+    "candidateClip": {
+      "x": 2,
+      "y": 0,
+      "width": 1646,
+      "height": 1241
+    },
+    "scrollOffset": 66,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 66
+    }
+  },
+  {
+    "file": "2026-10-08_14-12_1.png",
+    "description": "Trainer final call to action and footer",
+    "audience": "coach",
+    "selector": "#faq",
+    "state": "initial",
+    "viewport": {
+      "width": 1648,
+      "height": 1246
+    },
+    "sourceCrop": {
+      "x": 0,
+      "y": 50,
+      "width": 1648,
+      "height": 1245
+    },
+    "candidateClip": {
+      "x": 0,
+      "y": 0,
+      "width": 1648,
+      "height": 1245
+    },
+    "scrollOffset": 0,
+    "registrationMeasured": {
+      "dx": 0,
+      "dy": 80
+    }
+  }
+]
