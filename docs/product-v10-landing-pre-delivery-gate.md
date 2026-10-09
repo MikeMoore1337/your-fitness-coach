@@ -1,11 +1,12 @@
 # Landing v10 — final pre-delivery gate (#895–#900 / PR #902)
 
-Audit date: 2026-10-09. Controlled parity recovery is based on the existing PR #902
-worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7`; `origin/master` remains
+Audit date: 2026-10-09. Controlled parity recovery started from the existing PR #902
+worktree at `c824119c2e69dd2c84f7393b85528ea5e254cbd7` and is now verified at exact
+head `f7ec1acd3bd31bb4ed9c709ce9ea13b28d894d48`; `origin/master` remains
 `64e90857157a013ce1f28c655eeefaf765cb779b`. The recovery diff is limited to the
-dedicated visual spec and its disposition fixture; runtime/frontend/backend code is
-unchanged. PR #902 remains OPEN, CLEAN and MERGEABLE at the last GitHub snapshot;
-the exact post-recovery head and its Checks must be read after push.
+dedicated visual spec, its disposition fixture and these traceability documents;
+runtime/frontend/backend code is unchanged. PR #902 is OPEN, CLEAN and MERGEABLE;
+required CI run `37937220046` is GREEN at the exact head.
 
 ```text
 OWNER_VISUAL_APPROVAL=APPROVED
@@ -60,13 +61,15 @@ and [summary JSON](D:/Pet-projects/your-fitness-coach/.artifacts/tasks/895/evide
 
 ## Checks and reproducibility
 
-- [Required CI run 37922378285](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37922378285): SUCCESS on `4bfc6061a1d6c288c6e5fa86ff54f21cee3f5f5c`,
+- [Required CI run 37937220046](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37937220046): SUCCESS on exact head `f7ec1acd3bd31bb4ed9c709ce9ea13b28d894d48`,
   aggregate `checks` green; frontend/unit/smoke, Python, security/CodeQL/audits,
   migrated stack, containers and workflow/deployment policy jobs succeeded.
-- [Required mobile job](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37922378285/job/113793200777):
+- [Required mobile job](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37937220046/job/113849129157):
   Chromium + WebKit, 10/10 PASS. The checked-in mobile config selects both projects;
   this is the shared application mobile regression group, not archive Landing
   pixel parity in WebKit.
+- Historical pre-recovery CI run [37922378285](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/37922378285)
+  remains retained for chronology only; it is not evidence for the current exact head.
 - Firefox/extended scheduled cross-browser groups: **SKIPPED by scope**, neither
   PASS nor FAIL. No Firefox archive or Landing parity claim is made.
 - Fresh local TypeScript and Vite production build passed (562 modules). Vite
