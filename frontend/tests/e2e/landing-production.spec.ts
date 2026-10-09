@@ -1,472 +1,276 @@
 import { expect, test, type Page } from '@playwright/test';
-
-async function openLanding(
-  page: Page,
-  path: string,
-  theme: 'light' | 'dark',
-  viewport: { width: number; height: number },
-) {
-  await page.setViewportSize(viewport);
+async function open(page: Page, route: string, theme: 'light' | 'dark', width: number) {
+  await page.setViewportSize({ width, height: width < 700 ? 844 : 1100 });
   await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-  await page.goto(path, { waitUntil: 'domcontentloaded' });
-  await page.evaluate(() => localStorage.removeItem('app-theme'));
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.locator('[data-landing-audience]')).toBeVisible();
-  await expect(page.locator('.landing-hero__image')).toHaveJSProperty('complete', true);
-  await expect(page.locator('.landing-hero__image')).toHaveAttribute('alt', /.+/);
+  await page.addInitScript((v) => localStorage.setItem('app-theme', v), theme);
+  await page.goto(route);
+  await expect(page.locator('.ref-hero h1')).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 }
-
-async function expectNoHorizontalOverflow(page: Page, width: number) {
-  await expect
-    .poll(() =>
-      page.evaluate(() => ({
-        content: document.documentElement.scrollWidth,
-        viewport: window.innerWidth,
-      })),
-    )
-    .toEqual({ content: width, viewport: width });
-}
-
-async function expectDesktopHeaderNavigationToBeUnframed(page: Page) {
-  const navigation = page.locator('.landing-v10-header-navigation');
-  const styles = await navigation.evaluate((element) => {
-    const computed = getComputedStyle(element);
-    return {
-      borderTopWidth: computed.borderTopWidth,
-      borderTopStyle: computed.borderTopStyle,
-      background: computed.backgroundColor,
-      boxShadow: computed.boxShadow,
-      backdropFilter: computed.backdropFilter,
-    };
-  });
-  expect(styles.borderTopWidth).toBe('0px');
-  expect(styles.borderTopStyle).toBe('none');
-  expect(styles.background).toBe('rgba(0, 0, 0, 0)');
-  expect(styles.boxShadow).toBe('none');
-  expect(styles.backdropFilter).toBe('none');
-  await expect(
-    navigation.locator('.landing-v10-header-audience .landing-v10-audience-switch__label'),
-  ).toHaveCSS('color', 'rgba(255, 255, 255, 0.78)');
-  await expect(
-    navigation.locator('.landing-v10-header-audience .landing-v10-audience-switch'),
-  ).toHaveAttribute('aria-label', 'Выбор аудитории');
-}
-
-async function expectAccessibleDarkButton(locator: ReturnType<Page['locator']>) {
-  const contrast = await locator.evaluate((element) => {
-    const parseRgb = (value: string) => {
-      const channels = value.match(/[\d.]+/g)?.map(Number);
-      if (!channels || channels.length < 3) return null;
-      return channels.slice(0, 3).map((channel) => channel / 255);
-    };
-    const luminance = (rgb: number[]) =>
-      rgb.reduce((sum, channel, index) => {
-        const linear = channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-        return sum + linear * [0.2126, 0.7152, 0.0722][index]!;
-      }, 0);
-    const styles = getComputedStyle(element);
-    const foreground = parseRgb(styles.color);
-    const background = parseRgb(styles.backgroundColor);
-    if (!foreground || !background) return 0;
-    const foregroundLuminance = luminance(foreground);
-    const backgroundLuminance = luminance(background);
-    const lighter = Math.max(foregroundLuminance, backgroundLuminance);
-    const darker = Math.min(foregroundLuminance, backgroundLuminance);
-    return (lighter + 0.05) / (darker + 0.05);
-  });
-  expect(contrast).toBeGreaterThanOrEqual(4.5);
-}
-
-test.beforeEach(async ({ page }) => {
-  await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-});
-
-test('approved athlete and trainer compositions stay audience-specific', async ({ page }) => {
-  await openLanding(page, '/', 'dark', { width: 1440, height: 900 });
-
-  await expect(page.getByRole('heading', { level: 1, name: 'СИЛА В ДЕЙСТВИИ.' })).toBeVisible();
-  await expect(page.locator('[data-landing-audience="athlete"]')).toBeVisible();
-  await expect(page.locator('.landing-v10-coach-promo')).toHaveCount(1);
-  await expect(
-    page.getByRole('heading', { name: /Вы тренер\? Знакомьтесь с Coach OS/ }),
-  ).toHaveCount(1);
-  await expect(page.getByText(/Не потерять важное/)).toHaveCount(0);
-  await expect(
-    page.locator(
-      '.landing-v10-header-audience .landing-v10-audience-switch__link[data-audience="coach"]',
-    ),
-  ).toHaveAttribute('href', '/for-trainers');
-  await expect(page.getByRole('link', { name: 'Попробовать демо тренировки' })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=self_training&section=today',
-  );
-  await expect(page.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveAttribute(
-    'href',
-    '#training',
-  );
-  await expect(page.getByRole('link', { name: 'Демо', exact: true })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=self_training&section=today',
-  );
-  await expect(page.getByRole('link', { name: 'Вопросы' })).toHaveAttribute('href', '#faq');
-
-  await openLanding(page, '/for-trainers', 'dark', { width: 1440, height: 900 });
-  await expect(
-    page.getByRole('heading', { level: 1, name: 'ВАШ МЕТОД В ДЕЙСТВИИ.' }),
-  ).toBeVisible();
-  await expect(page.locator('[data-landing-audience="coach"]')).toBeVisible();
-  await expect(page.locator('[data-coach-chapter="coach-today"]')).toHaveCount(1);
-  await expect(page.locator('[data-testid="coach-today-preview"]')).toHaveCount(1);
-  await expect(page.locator('.strength-scene')).toHaveCount(0);
-  await expect(page.locator('.landing-v10-coach-promo')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'Как работает Coach OS' })).toHaveAttribute(
-    'href',
-    '#coach-work',
-  );
-  await expect(page.getByRole('link', { name: 'Демо', exact: true })).toHaveAttribute(
-    'href',
-    '/demo?cabinet=1&scenario=trainer&section=trainer',
-  );
-  await expect(
-    page.locator(
-      '.landing-v10-header-audience .landing-v10-audience-switch__link[data-audience="athlete"]',
-    ),
-  ).toHaveAttribute('href', '/for-athletes');
-});
-
-test('public audience routes keep SEO and deep-link contracts', async ({ page }) => {
-  await openLanding(page, '/', 'light', { width: 390, height: 844 });
-  await expect(page).toHaveTitle(/тренировки, питание и прогресс/i);
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-    'href',
-    'http://127.0.0.1:4173/',
-  );
-
-  await openLanding(page, '/for-athletes?utm_source=owner#coach-work', 'light', {
-    width: 390,
-    height: 844,
-  });
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow');
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-    'href',
-    'http://127.0.0.1:4173/',
-  );
-  await expect(page.locator('[data-coach-chapter="coach-today"]')).toHaveCount(0);
-
-  await openLanding(page, '/for-trainers', 'light', { width: 390, height: 844 });
-  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
-  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
-    'href',
-    'http://127.0.0.1:4173/for-trainers',
-  );
-  await expectNoHorizontalOverflow(page, 390);
-});
-
-test('glass header, CTAs and keyboard skip target remain usable on desktop and mobile', async ({
-  page,
-}, testInfo) => {
-  for (const state of [
-    { name: 'athlete-desktop-light', path: '/', theme: 'light' as const, width: 1440, height: 900 },
-    { name: 'athlete-desktop-dark', path: '/', theme: 'dark' as const, width: 1440, height: 900 },
-    {
-      name: 'athlete-mobile-light',
-      path: '/for-athletes',
-      theme: 'light' as const,
-      width: 390,
-      height: 844,
-    },
-    {
-      name: 'athlete-mobile-dark',
-      path: '/for-athletes',
-      theme: 'dark' as const,
-      width: 390,
-      height: 844,
-    },
-    {
-      name: 'athlete-mobile-320-light',
-      path: '/for-athletes',
-      theme: 'light' as const,
-      width: 320,
-      height: 800,
-    },
-    {
-      name: 'athlete-mobile-320-dark',
-      path: '/for-athletes',
-      theme: 'dark' as const,
-      width: 320,
-      height: 800,
-    },
-    {
-      name: 'trainer-desktop-light',
-      path: '/for-trainers',
-      theme: 'light' as const,
-      width: 1440,
-      height: 900,
-    },
-    {
-      name: 'trainer-desktop-dark',
-      path: '/for-trainers',
-      theme: 'dark' as const,
-      width: 1440,
-      height: 900,
-    },
-    {
-      name: 'trainer-mobile-light',
-      path: '/for-trainers',
-      theme: 'light' as const,
-      width: 390,
-      height: 844,
-    },
-    {
-      name: 'trainer-mobile-dark',
-      path: '/for-trainers',
-      theme: 'dark' as const,
-      width: 390,
-      height: 844,
-    },
-    {
-      name: 'trainer-mobile-320-light',
-      path: '/for-trainers',
-      theme: 'light' as const,
-      width: 320,
-      height: 800,
-    },
-    {
-      name: 'trainer-mobile-320-dark',
-      path: '/for-trainers',
-      theme: 'dark' as const,
-      width: 320,
-      height: 800,
-    },
-  ]) {
-    await openLanding(page, state.path, state.theme, {
-      width: state.width,
-      height: state.height,
-    });
-    await expect(page.locator('.landing-header')).toHaveCSS('backdrop-filter', /blur/);
-    await expect(page.getByRole('link', { name: 'К содержимому' })).toBeVisible();
-    await expect(page.locator('.landing-button--compact')).toBeVisible();
-    await expectNoHorizontalOverflow(page, state.width);
-
-    const activeAudience = state.path === '/for-trainers' ? 'coach' : 'athlete';
-    const audienceSwitch =
-      state.width <= 680
-        ? page.locator('.landing-v10-hero-audience .landing-v10-audience-switch')
-        : page.locator('.landing-v10-header-audience .landing-v10-audience-switch');
-    await expect(audienceSwitch).toBeVisible();
-    await expect(audienceSwitch.locator('.landing-v10-audience-switch__label')).toHaveCount(
-      state.width <= 680 ? 0 : 1,
-    );
-    if (state.width <= 680) {
-      const brandBox = await page.locator('.landing-brand').boundingBox();
-      const headerActionsBox = await page.locator('.landing-header__actions').boundingBox();
-      expect(brandBox).not.toBeNull();
-      expect(headerActionsBox).not.toBeNull();
-      expect(brandBox!.y).toBeLessThan(headerActionsBox!.y + headerActionsBox!.height);
-      expect(headerActionsBox!.y).toBeLessThan(brandBox!.y + brandBox!.height);
-      for (const control of await page
-        .locator('.landing-header__actions :is(.landing-button--compact, .landing-menu-toggle)')
-        .all()) {
-        expect((await control.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-      }
-    }
+for (const width of [320, 360, 390, 430, 768, 1280, 1366, 1440, 1498, 1600, 1920])
+  for (const theme of ['light', 'dark'] as const)
     for (const audience of ['athlete', 'coach'] as const) {
-      const link = audienceSwitch.locator(
-        `.landing-v10-audience-switch__link[data-audience="${audience}"]`,
-      );
-      await expect(link).toBeVisible();
-      expect((await link.boundingBox())?.height).toBeGreaterThanOrEqual(44);
-      const colors = await link.evaluate((element) => {
-        const styles = getComputedStyle(element);
-        return { color: styles.color, background: styles.backgroundColor };
-      });
-      expect(colors.color).toMatch(/^rgb/);
-      if (audience === activeAudience) {
-        expect(colors.background).toBe('rgb(182, 242, 56)');
-      }
-    }
-
-    const navigation = page.getByRole('navigation', { name: 'Навигация по странице' });
-    if (state.width <= 680) {
-      const menuButton = page.getByRole('button', { name: 'Открыть меню' });
-      await expect(menuButton).toBeVisible();
-      await expect(navigation).toBeHidden();
-      await menuButton.click();
-      await expect(page.getByRole('button', { name: 'Закрыть меню' })).toBeVisible();
-      await expect(navigation).toBeVisible();
-      await expect(navigation.getByRole('link', { name: 'Продукт' })).toBeFocused();
-      const menuAudience = page.locator(
-        '.landing-v10-mobile-menu-controls .landing-v10-audience-switch',
-      );
-      await expect(menuAudience).toBeVisible();
-      await expect(menuAudience.locator('.landing-v10-audience-switch__label')).toHaveCount(0);
-      const menuTheme = page.locator('.app-theme-toggle--nav');
-      await expect(menuTheme).toBeVisible();
-      await page.keyboard.press('Shift+Tab');
-      await expect(menuTheme).toBeFocused();
-      await page.keyboard.press('Tab');
-      await expect(navigation.getByRole('link', { name: 'Продукт' })).toBeFocused();
-      const themeBefore = await page.locator('html').getAttribute('data-color-scheme');
-      await menuTheme.click();
-      await expect(page.locator('html')).toHaveAttribute(
-        'data-color-scheme',
-        themeBefore === 'dark' ? 'light' : 'dark',
-      );
-      await menuTheme.click();
-      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', themeBefore!);
-      await page.screenshot({
-        path: testInfo.outputPath(`${state.name}-menu-open.png`),
-        fullPage: false,
-      });
-    } else {
-      await expect(navigation).toBeVisible();
-      await expectDesktopHeaderNavigationToBeUnframed(page);
-    }
-    await expect(navigation.getByRole('link', { name: 'Продукт' })).toHaveAttribute(
-      'href',
-      '#product',
-    );
-    await expect(navigation.getByRole('link', { name: 'Демо' })).toHaveAttribute(
-      'href',
-      activeAudience === 'athlete'
-        ? '/demo?cabinet=1&scenario=self_training&section=today'
-        : '/demo?cabinet=1&scenario=trainer&section=trainer',
-    );
-    await expect(navigation.getByRole('link', { name: 'Вопросы' })).toHaveAttribute('href', '#faq');
-    if (state.width <= 680) {
-      await page.getByRole('button', { name: 'Закрыть меню' }).click();
-      await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeFocused();
-    }
-
-    const skipLink = page.getByRole('link', { name: 'К содержимому' });
-    await skipLink.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#landing-v10-content')).toBeFocused();
-
-    if (activeAudience === 'athlete') {
-      const athleteDemo = page.getByRole('link', {
-        name: 'Попробовать демо тренировки',
-        exact: true,
-      });
-      await expect(athleteDemo).toHaveAttribute(
-        'href',
-        '/demo?cabinet=1&scenario=self_training&section=today',
-      );
-      await expectAccessibleDarkButton(athleteDemo);
-      await expect(page.getByRole('link', { name: 'Возможности для тренера' })).toHaveAttribute(
-        'href',
-        '/for-trainers',
-      );
-      await expect(
-        page.getByRole('link', { name: 'Посмотреть пример тренировки' }),
-      ).toHaveAttribute('href', '#training');
-      if (state.width <= 680) {
-        const heroSwitchBox = await audienceSwitch.boundingBox();
-        const heroActionsBox = await page.locator('.landing-hero__actions').boundingBox();
-        expect(heroSwitchBox).not.toBeNull();
-        expect(heroActionsBox).not.toBeNull();
-        expect(heroSwitchBox!.y + heroSwitchBox!.height).toBeLessThan(heroActionsBox!.y);
-      }
-      await expect(page.getByRole('link', { name: 'Посмотреть пример тренировки' })).toHaveCSS(
-        'backdrop-filter',
-        /blur/,
-      );
-      await expectAccessibleDarkButton(
-        page.getByRole('link', { name: 'Посмотреть пример тренировки' }),
-      );
-    } else if (state.path === '/for-trainers') {
-      await expect(page.getByRole('link', { name: 'Начать как тренер' }).first()).toHaveAttribute(
-        'href',
-        '/login?next=%2Fapp%3Ftrainer_intent%3D1',
-      );
-      const trainerDemo = page.getByRole('link', { name: 'Попробовать демо для тренера' }).first();
-      await expect(trainerDemo).toHaveAttribute(
-        'href',
-        '/demo?cabinet=1&scenario=trainer&section=trainer',
-      );
-      await expectAccessibleDarkButton(trainerDemo);
-      await expect(page.getByRole('link', { name: 'Как работает Coach OS' })).toHaveAttribute(
-        'href',
-        '#coach-work',
-      );
-      await expect(page.getByRole('link', { name: 'Как работает Coach OS' })).toHaveCSS(
-        'backdrop-filter',
-        /blur/,
-      );
-      await expectAccessibleDarkButton(page.getByRole('link', { name: 'Как работает Coach OS' }));
-    }
-
-    if (
-      state.name.includes('-desktop-') ||
-      state.name === 'athlete-mobile-dark' ||
-      state.name === 'athlete-mobile-320-light' ||
-      state.name === 'trainer-mobile-320-dark'
-    ) {
-      await page.locator('.landing-header').screenshot({
-        path: testInfo.outputPath(`${state.name}-header.png`),
-      });
-    }
-
-    await page.screenshot({
-      path: testInfo.outputPath(`${state.name}.png`),
-      fullPage: false,
-    });
-  }
-});
-
-test('responsive header contract holds across required widths and themes', async ({ page }) => {
-  for (const width of [768, 1280, 360, 375, 430]) {
-    for (const theme of ['light', 'dark'] as const) {
-      for (const path of ['/', '/for-trainers']) {
-        await openLanding(page, path, theme, { width, height: width <= 680 ? 800 : 900 });
-        await expectNoHorizontalOverflow(page, width);
-
-        const isMobile = width <= 680;
-        const audienceSwitch = page.locator(
-          isMobile
-            ? '.landing-v10-hero-audience .landing-v10-audience-switch'
-            : '.landing-v10-header-audience .landing-v10-audience-switch',
+      test(`${audience} ${theme} ${width}: geometry, labels and destinations`, async ({ page }) => {
+        await open(page, audience === 'coach' ? '/for-trainers' : '/', theme, width);
+        const hero = page.locator('.ref-hero');
+        for (const label of ['Для себя', 'Для тренера'])
+          await expect(hero.getByRole('link', { name: label, exact: true })).toBeVisible();
+        await expect(hero.locator('[aria-current="page"]')).toHaveText(
+          audience === 'coach' ? 'Для тренера' : 'Для себя',
         );
-        await expect(audienceSwitch).toBeVisible();
-        await expect(audienceSwitch.locator('.landing-v10-audience-switch__label')).toHaveCount(
-          isMobile ? 0 : 1,
+        await expect(
+          hero.getByRole('link', {
+            name: audience === 'coach' ? 'Как работает Coach OS' : 'Посмотреть пример тренировки',
+          }),
+        ).toHaveAttribute('href', audience === 'coach' ? '#coach-work' : '#training');
+        await expect(
+          hero.getByRole('link', {
+            name: audience === 'coach' ? 'Начать как тренер' : 'Начать со своими данными',
+          }),
+        ).toHaveAttribute(
+          'href',
+          audience === 'coach' ? '/login?next=%2Fapp%3Ftrainer_intent%3D1' : '/app',
         );
-
-        const navigation = page.getByRole('navigation', { name: 'Навигация по странице' });
-        if (isMobile) {
-          await expect(page.getByRole('button', { name: 'Открыть меню' })).toBeVisible();
-          await page.getByRole('button', { name: 'Открыть меню' }).click();
-          await expect(navigation).toBeVisible();
-          await expect(
-            page.locator('.landing-v10-mobile-menu-controls .app-theme-toggle--nav'),
-          ).toBeVisible();
-          await page.getByRole('button', { name: 'Закрыть меню' }).click();
-        } else {
-          await expect(navigation).toBeVisible();
-          await expectDesktopHeaderNavigationToBeUnframed(page);
-          await expect(page.getByRole('link', { name: 'Войти' })).toBeVisible();
+        await expect(
+          hero.getByRole('link', {
+            name:
+              audience === 'coach' ? 'Попробовать демо для тренера' : 'Попробовать демо тренировки',
+          }),
+        ).toHaveAttribute(
+          'href',
+          audience === 'coach'
+            ? '/demo?cabinet=1&scenario=trainer&section=trainer'
+            : '/demo?cabinet=1&scenario=self_training&section=today',
+        );
+        await expect(hero.locator('.landing-hero__actions a').first()).toHaveAttribute(
+          'href',
+          audience === 'coach' ? '/login?next=%2Fapp%3Ftrainer_intent%3D1' : '/app',
+        );
+        await expect(hero.locator('.landing-hero__actions a').nth(1)).toHaveAttribute(
+          'href',
+          audience === 'coach'
+            ? '/demo?cabinet=1&scenario=trainer&section=trainer'
+            : '/demo?cabinet=1&scenario=self_training&section=today',
+        );
+        await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+        await expect(
+          page.locator('.public-shell__header .landing-v10-audience-switch'),
+        ).toHaveCount(0);
+        await expect(page.locator('.public-shell__header')).not.toContainText('Сценарий');
+        await expect(hero.locator('.landing-v10-audience-switch')).toHaveCount(1);
+        const headerMaterial = await page.locator('.public-shell__header').evaluate((element) => {
+          const style = getComputedStyle(element);
+          const headerRect = element.getBoundingClientRect();
+          const heroRect = document.querySelector('.ref-hero')?.getBoundingClientRect();
+          return {
+            backgroundColor: style.backgroundColor,
+            backgroundImage: style.backgroundImage,
+            position: style.position,
+            width: headerRect.width,
+            heroTop: heroRect?.top ?? null,
+            backdropFilter:
+              style.backdropFilter ||
+              (style as CSSStyleDeclaration & { webkitBackdropFilter?: string })
+                .webkitBackdropFilter ||
+              '',
+          };
+        });
+        expect(headerMaterial.backgroundColor).toMatch(/rgba?\(/);
+        expect(headerMaterial.backgroundColor).not.toMatch(/rgba?\([^)]*,\s*1\s*\)/);
+        expect(headerMaterial.backgroundImage).not.toBe('none');
+        expect(headerMaterial.backdropFilter).toContain('blur');
+        if (width >= 681) {
+          expect(headerMaterial.position).toBe('sticky');
+          expect(headerMaterial.width).toBeGreaterThanOrEqual(width - 1);
+          expect(headerMaterial.heroTop).toBeLessThanOrEqual(1);
         }
-      }
+        const tertiary = hero.locator('.landing-v10-hero-tertiary');
+        await expect(tertiary).toBeVisible();
+        await expect(tertiary).toHaveAttribute('data-glass');
+        await expect(tertiary).toHaveAttribute('data-glass-variant', 'clear');
+        const ctaOrder = await hero.evaluate((element) => {
+          const actions = element.querySelector('.landing-hero__actions')!;
+          const tertiary = element.querySelector('.landing-v10-hero-tertiary')!;
+          const platform = element.querySelector('.landing-hero__platform')!;
+          return {
+            actionsBeforeTertiary: Boolean(
+              actions.compareDocumentPosition(tertiary) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ),
+            tertiaryBeforePlatform: Boolean(
+              tertiary.compareDocumentPosition(platform) & Node.DOCUMENT_POSITION_FOLLOWING,
+            ),
+          };
+        });
+        expect(ctaOrder.actionsBeforeTertiary).toBe(true);
+        expect(ctaOrder.tertiaryBeforePlatform).toBe(true);
+        const geometry = await page.evaluate(() => ({
+          overflow: document.documentElement.scrollWidth - innerWidth,
+          boxes: [
+            ...document.querySelectorAll<HTMLElement>(
+              '.ref-hero h1 span, .ref-hero .landing-button, .landing-header__actions > *, .landing-v10-hero-audience a',
+            ),
+          ]
+            .filter((e) => e.offsetWidth)
+            .map((e) => ({
+              text: e.textContent,
+              rect: e.getBoundingClientRect().toJSON(),
+              scroll: e.scrollWidth,
+              width: e.clientWidth,
+            })),
+          overlap:
+            document.querySelector('.landing-v10-hero-audience')!.getBoundingClientRect().bottom >
+            document.querySelector('h1')!.getBoundingClientRect().top,
+        }));
+        expect(geometry.overflow).toBe(0);
+        expect(geometry.overlap).toBe(false);
+        for (const box of geometry.boxes) {
+          expect(box.rect.left, box.text ?? '').toBeGreaterThanOrEqual(0);
+          expect(box.rect.right, box.text ?? '').toBeLessThanOrEqual(width + 1);
+          expect(box.scroll).toBeLessThanOrEqual(box.width + 1);
+        }
+        expect(
+          await hero
+            .locator('h1 span')
+            .last()
+            .evaluate((e) => {
+              const r = document.createRange();
+              r.selectNodeContents(e);
+              return r.getClientRects().length;
+            }),
+        ).toBe(1);
+        for (const target of await hero
+          .locator('.landing-button, .landing-v10-audience-switch__link')
+          .all())
+          expect((await target.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+        await expect(page.locator('.strength-scene')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#coach-work')).toHaveCount(audience === 'coach' ? 1 : 0);
+        await expect(page.locator('#coach-promo')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#training')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#nutrition')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        await expect(page.locator('#progress')).toHaveCount(audience === 'athlete' ? 1 : 0);
+        for (const section of await page.locator('main > section').all()) {
+          await section.scrollIntoViewIfNeeded();
+          expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(
+            0,
+          );
+        }
+      });
     }
-  }
-});
-
-test('audience switching preserves campaign context and browser history', async ({ page }) => {
-  await openLanding(page, '/for-athletes?utm_campaign=v10#coach-work', 'dark', {
-    width: 390,
-    height: 844,
-  });
+test('mobile menu focus, theme, audience, Escape and resize', async ({ page }) => {
+  await open(page, '/', 'light', 320);
+  const trigger = page.getByRole('button', { name: 'Открыть меню' });
+  await trigger.click();
+  const nav = page.getByRole('navigation', { name: 'Навигация по странице' });
+  await expect(nav.getByRole('link', { name: 'Продукт' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  const toggle = page.locator('.app-theme-toggle--nav');
+  await expect(toggle).toBeFocused();
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  await expect(nav).toBeHidden();
+  await trigger.click();
+  await expect(nav.getByRole('link', { name: 'Для тренера', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(nav).toBeHidden();
   await page
-    .locator('.landing-v10-hero-audience .landing-v10-audience-switch__link[data-audience="coach"]')
+    .locator('.landing-v10-hero-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
+    .click();
+  await expect(page).toHaveURL('/for-trainers');
+  await expect(page.locator('.landing-v10-hero-audience [aria-current="page"]')).toHaveText(
+    'Для тренера',
+  );
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(nav).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'К содержимому' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('main')).toBeFocused();
+});
+test('canonical, alias indexation, campaign and hash history', async ({ page }) => {
+  await open(page, '/?utm_campaign=v10#coach-work', 'dark', 390);
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'index, follow');
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute(
+    'href',
+    new URL('/', page.url()).href,
+  );
+  await expect(page.locator('#product')).toBeInViewport();
+  await page
+    .locator('.landing-v10-hero-audience')
+    .getByRole('link', { name: 'Для тренера', exact: true })
     .click();
   await expect(page).toHaveURL('/for-trainers?utm_campaign=v10#coach-work');
-  await expect(page.locator('[data-coach-chapter="coach-today"]')).toBeVisible();
-  await expect(page.locator('[data-coach-chapter="coach-today"]')).toBeInViewport();
+  await expect(page.locator('#coach-work')).toBeInViewport();
   await page.goBack();
-  await expect(page).toHaveURL('/for-athletes?utm_campaign=v10#coach-work');
-  await expect(page.locator('[data-coach-chapter="coach-today"]')).toHaveCount(0);
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(300);
+  await expect(page).toHaveURL('/?utm_campaign=v10#coach-work');
+  await expect(page.locator('#product')).toBeInViewport();
+  await page.goto('/for-athletes');
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, follow');
+  await page.goto('/for-trainers#coach-promo');
+  await expect(page.locator('#coach-work')).toBeInViewport();
+});
+test('all archive interactive states remain explicit and local', async ({ page }) => {
+  await open(page, '/', 'dark', 1440);
+  const writes: string[] = [];
+  page.on('request', (r) => {
+    if (r.url().includes('/api/') && r.method() !== 'GET') writes.push(r.url());
+  });
+  const training = page.locator('#training');
+  await training.getByRole('button', { name: 'Начать тренировку' }).click();
+  for (let i = 0; i < 3; i++)
+    await training.getByRole('button', { name: 'Завершить текущий подход' }).click();
+  await training.getByRole('button', { name: 'Завершить тренировку' }).click();
+  await expect(training.getByText('24 мин')).toBeVisible();
+  await training.getByRole('button', { name: 'Перейти к прогрессу' }).click();
+  await expect(training.getByText('+4.2%')).toBeVisible();
+  await page.getByRole('button', { name: 'Покупки', exact: true }).click();
+  await expect(page.getByText('60 г', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Дневник', exact: true }).click();
+  await expect(page.getByText('Записи пока нет')).toBeVisible();
+  await page.getByRole('button', { name: 'Отметить съеденное в примере' }).click();
+  await expect(page.getByRole('button', { name: 'Запись сохранена в примере' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Открыть изменения' }).click();
+  await page.getByRole('button', { name: 'Посмотреть перед применением' }).click();
+  await page.getByRole('button', { name: 'Подтвердить в примере', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Подтверждено в примере' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Сообщение', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Текст черновика' }).fill('Локальный пример');
+  await page.getByRole('button', { name: 'Подтвердить черновик в примере' }).click();
+  await expect(page.getByRole('textbox')).toHaveValue('Локальный пример');
+  expect(writes).toEqual([]);
+});
+import { installTelegramHarness } from './fixtures/mobile-tma';
+for (const theme of ['light', 'dark'] as const)
+  test(`mocked TMA public surface, safe-area and resize ${theme}`, async ({ page }) => {
+    await installTelegramHarness(page, {
+      initData: '',
+      colorScheme: theme,
+      safeAreaInset: { top: 24, bottom: 34, left: 0, right: 0 },
+      contentSafeAreaInset: { top: 24, bottom: 0, left: 0, right: 0 },
+    });
+    for (const route of ['/', '/for-trainers']) {
+      await open(page, route, theme, 390);
+      await expect(page.locator('.ref-hero')).toBeVisible();
+      await page.getByRole('button', { name: 'Открыть меню' }).click();
+      await expect(page.getByRole('navigation', { name: 'Навигация по странице' })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.setViewportSize({ width: 320, height: 640 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0);
+      await expect(page.getByRole('link', { name: 'Войти', exact: true })).toBeVisible();
+    }
+  });
+test('archive legal placeholder is explicit and returns keyboard focus', async ({ page }) => {
+  await open(page, '/', 'dark', 390);
+  const button = page.getByRole('button', { name: 'Условия использования', exact: true });
+  await button.click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(
+    page.getByText('Это предварительная версия лендинга. Юридический документ ещё не подключён.'),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(button).toBeFocused();
 });

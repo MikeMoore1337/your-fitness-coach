@@ -1,3 +1,4 @@
+import { glassProps } from '../../shared/ui/Glass';
 import { landingAudienceHref, type LandingAudience, type LandingLocation } from './landingAudience';
 import './landing-v10.css';
 
@@ -26,6 +27,8 @@ export function LandingAudienceSwitch({
         {AUDIENCES.map((item) => (
           <a
             key={item.id}
+            {...glassProps('clear', true)}
+            data-glass-tone="on-image"
             className="landing-v10-audience-switch__link"
             href={landingAudienceHref(item.id, location)}
             aria-current={item.id === audience ? 'page' : undefined}

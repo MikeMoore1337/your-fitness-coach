@@ -1160,7 +1160,7 @@ test('demo uses production today composition and persists one workout set throug
   }
   await page.goto('/');
   await page
-    .locator('.landing-hero__actions')
+    .locator('.ref-hero .landing-hero__actions')
     .getByRole('link', { name: 'Попробовать демо тренировки', exact: true })
     .click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');

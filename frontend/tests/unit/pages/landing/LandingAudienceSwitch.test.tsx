@@ -75,6 +75,12 @@ describe('Landing v10 audience foundation', () => {
       'data-landing-audience',
       'athlete',
     );
+    expect(
+      container.querySelector('.public-shell__header .landing-v10-audience-switch'),
+    ).toBeNull();
+    expect(
+      container.querySelector('.landing-v10-mobile-menu-controls .landing-v10-audience-switch'),
+    ).toBeNull();
     expect(screen.getByRole('link', { name: 'Войти' })).toHaveAttribute('href', '/login');
   });
 });
