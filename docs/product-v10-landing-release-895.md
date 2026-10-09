@@ -104,3 +104,21 @@ mandatory. GitHub PR Checks, Actions and Issue comments record final delivery st
 [pre-delivery history](product-v10-landing-pre-delivery-gate.md) preserve prior
 REJECTED/WAITING/FAIL. Their old stop statuses are superseded only by the owner
 decision above; they are not current delivery authority.
+
+## Exact-head CI correction before merge
+
+First full-recovery HEAD b94cfe84 failed required CI: the copy guard lacked the
+approved official name Client 360, the full-page Coach Today unit lookup exceeded
+5 seconds, and Docker's frontend-only build context could not resolve test-only
+static JSON imports from docs. These are technical check defects, not accepted
+visual exceptions. The fixes preserve runtime and appearance: exact phrase-only
+allowlist with positive/negative regression, scoped Coach Today queries retaining
+all assertions/timeouts, and typed runtime manifest reads following the existing
+archive comparator pattern. No Docker/backend code or baseline is changed.
+
+Fresh unchanged-runtime browser checks passed **132/132** (66 Chromium + 66 WebKit).
+The post-approval dedicated historical suite is **8 PASS / 39 FAIL**, zero skips:
+approval inventory now passes under the explicit owner decision; all 13 active
+archive scene, ten lower-reference and sixteen mobile frozen failures remain FAIL.
+The earlier 7/40 report is preserved as history. No pixel failure became PASS.
+New exact-head required CI must replace the failed first attempt before merge.

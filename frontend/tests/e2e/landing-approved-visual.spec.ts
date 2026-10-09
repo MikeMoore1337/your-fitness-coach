@@ -5,7 +5,6 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 import cases from '../fixtures/landing-archive-normalization.json' with { type: 'json' };
 import dispositions from '../fixtures/landing-archive-disposition.json' with { type: 'json' };
 import regionCases from '../fixtures/landing-archive-regions.json' with { type: 'json' };
-import acceptance from '../../../docs/design/references/product-v10-landing-acceptance.json' with { type: 'json' };
 import { PNG, compareLandingPixels } from './fixtures/landing-pixels';
 const root = path.resolve(
   process.env.LANDING_ARCHIVE_ROOT ?? '../docs/design/references/landing-archive-owner-canonical',
@@ -20,6 +19,21 @@ const ownerEvidence = path.resolve(
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'MANIFEST.json'), 'utf8')) as {
   source_zip_sha256: string;
   images: { filename: string; sha256: string }[];
+};
+const acceptance = JSON.parse(
+  fs.readFileSync(
+    path.resolve('../docs/design/references/product-v10-landing-acceptance.json'),
+    'utf8',
+  ),
+) as {
+  mandatoryCandidateStates: Array<{
+    audience: string;
+    theme: string;
+    width: number;
+    state: string;
+    status: string;
+    approvedPixelReference: unknown;
+  }>;
 };
 
 type ArchiveCase = (typeof cases)[number];

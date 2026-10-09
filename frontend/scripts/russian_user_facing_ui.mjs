@@ -41,6 +41,7 @@ const allowedLatinPhrases = new Map([
   ['Coach OS', 'official product name'],
   ['COACH OS', 'official product name'],
   ['Coach Today', 'official product surface'],
+  ['Client 360', 'official product surface'],
 ]);
 
 const userFacingAttributes = new Set([

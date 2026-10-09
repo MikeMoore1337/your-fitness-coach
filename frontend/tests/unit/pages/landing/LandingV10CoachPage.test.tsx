@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import LandingV10CoachPage from '../../../../src/pages/landing/LandingV10CoachPage';
@@ -46,20 +46,23 @@ describe('canonical archive trainer composition', () => {
   });
   it('requires separate preview and confirmation; messages remain local', () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    renderPage();
-    fireEvent.click(screen.getByRole('button', { name: 'Открыть изменения' }));
-    expect(screen.getByText('Подготовлено изменение')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Посмотреть перед применением' }));
-    expect(screen.getByText('Просмотр перед применением')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить в примере' }));
-    expect(screen.getByRole('button', { name: 'Подтверждено в примере' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Сообщение' }));
-    fireEvent.change(screen.getByRole('textbox', { name: 'Текст черновика' }), {
+    const { container } = renderPage();
+    const section = container.querySelector<HTMLElement>('#coach-work');
+    expect(section).toBeInTheDocument();
+    const coach = within(section!);
+    fireEvent.click(coach.getByRole('button', { name: 'Открыть изменения' }));
+    expect(coach.getByText('Подготовлено изменение')).toBeInTheDocument();
+    fireEvent.click(coach.getByRole('button', { name: 'Посмотреть перед применением' }));
+    expect(coach.getByText('Просмотр перед применением')).toBeInTheDocument();
+    fireEvent.click(coach.getByRole('button', { name: 'Подтвердить в примере' }));
+    expect(coach.getByRole('button', { name: 'Подтверждено в примере' })).toBeDisabled();
+    fireEvent.click(coach.getByRole('button', { name: 'Сообщение' }));
+    fireEvent.change(coach.getByRole('textbox', { name: 'Текст черновика' }), {
       target: { value: 'Новый локальный черновик' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Подтвердить черновик в примере' }));
-    expect(screen.getByRole('textbox')).toHaveValue('Новый локальный черновик');
-    expect(screen.getByRole('textbox')).toBeDisabled();
+    fireEvent.click(coach.getByRole('button', { name: 'Подтвердить черновик в примере' }));
+    expect(coach.getByRole('textbox')).toHaveValue('Новый локальный черновик');
+    expect(coach.getByRole('textbox')).toBeDisabled();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
   it('preserves bounded trainer onboarding and the existing DemoCabinet', () => {

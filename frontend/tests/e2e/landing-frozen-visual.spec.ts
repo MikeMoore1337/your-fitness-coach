@@ -2,10 +2,20 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import manifest from '../../../docs/design/references/product-v10-landing-approved/final-895/MANIFEST.json' with { type: 'json' };
 import { PNG, compareLandingPixels } from './fixtures/landing-pixels';
 
 const root = path.resolve('../docs/design/references/product-v10-landing-approved/final-895');
+const manifest = JSON.parse(fs.readFileSync(path.join(root, 'MANIFEST.json'), 'utf8')) as {
+  images: Array<{
+    file: string;
+    sha256: string;
+    width: number;
+    height: number;
+    theme: string;
+    audience: string;
+    menu: boolean;
+  }>;
+};
 const evidence = path.resolve(
   process.env.LANDING_VISUAL_EVIDENCE_DIR ?? '../.artifacts/tasks/895/evidence/region-recovery',
 );
