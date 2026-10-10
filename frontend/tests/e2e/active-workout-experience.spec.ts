@@ -1884,6 +1884,10 @@ for (const width of [320, 360, 393, 430]) {
               ?.getAttribute('data-workout-set-id'),
           };
         });
+        await page.screenshot({
+          path: testInfo.outputPath(`resting-dock-${width}-${theme}.png`),
+          animations: 'disabled',
+        });
         const beforeUrl = page.url();
         const beforeSection = new URL(beforeUrl).searchParams.get('section') ?? 'today';
         await page.touchscreen.tap(
@@ -1894,10 +1898,6 @@ for (const width of [320, 360, 393, 430]) {
           'data-workout-set-id',
           '202',
         );
-        await page.screenshot({
-          path: testInfo.outputPath(`resting-dock-${width}-${theme}.png`),
-          animations: 'disabled',
-        });
         await testInfo.attach(`resting-dock-${width}-${theme}.json`, {
           body: JSON.stringify({ geometry, writes }),
           contentType: 'application/json',
