@@ -196,6 +196,10 @@ frontend/openapi.json
 
 frontend/.npm-cache*/
 
+# Optional agent tooling may emit browser cookies, screenshots and security findings.
+.playwright-cli/
+strix_runs/
+
 # Owner-only planning, findings and operational/legal workpapers stay local.
 /codex-backlog/tasks/automation
 /codex-backlog/tasks/done
