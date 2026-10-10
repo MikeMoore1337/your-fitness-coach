@@ -115,9 +115,7 @@ def build_manifest(
     return {**document, "manifest_sha256": sha256_bytes(_canonical(document))}
 
 
-def validate_manifest(
-    document: object, *, allow_historical_prompt: bool = False
-) -> dict[str, Any]:
+def validate_manifest(document: object, *, allow_historical_prompt: bool = False) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise ReleaseManifestError("release manifest must be an object")
     required = {
