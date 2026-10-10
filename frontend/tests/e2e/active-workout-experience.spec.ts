@@ -2122,7 +2122,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
 test.describe('#914 rest timer pointer lifecycle', () => {
   test.use({
     hasTouch: true,
-    isMobile: async ({ browserName }, use) => use(browserName !== 'firefox'),
+    isMobile: async ({ browserName }, run) => run(browserName !== 'firefox'),
   });
 
   async function prepare(page: Page, width: number, theme: 'dark' | 'light', telegram = false) {
@@ -2448,7 +2448,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
   test('rapid skip alone blocks the 202→201 PATCH regression after the panel closes', async ({
     page,
   }, testInfo) => {
-    const context = await prepare(page, 360, 'dark');
+    const context = await prepare(page, 393, 'dark');
     const point = await alignPrevious(page, true);
     await page.touchscreen.tap(point.x, point.y);
     await page.touchscreen.tap(point.x, point.y);

@@ -5574,7 +5574,6 @@ button.today-text-link {
   font-size: 0.8rem;
 }
 .active-workout-rest {
-  --glass-tinted-opacity: 0.95;
   position: sticky;
   top: var(--yfc-layout-safe-top, 0px);
   z-index: 30;
@@ -5590,9 +5589,6 @@ button.today-text-link {
   padding: 9px 10px;
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-control);
-}
-:root[data-color-scheme='light'] .active-workout-rest {
-  --glass-tinted-opacity: 0.96;
 }
 .active-workout-rest [hidden] {
   display: none;

@@ -89,12 +89,14 @@
   --glass-blur: 12px;
 }
 
-:root .app-quick-add-panel[data-glass][data-glass-variant] {
+:root .app-quick-add-panel[data-glass][data-glass-variant],
+:root .active-workout-rest[data-glass][data-glass-variant] {
   --glass-tinted-opacity: 0.95;
   --glass-blur: 20px;
 }
 
-:root[data-color-scheme='light'] .app-quick-add-panel[data-glass][data-glass-variant] {
+:root[data-color-scheme='light'] .app-quick-add-panel[data-glass][data-glass-variant],
+:root[data-color-scheme='light'] .active-workout-rest[data-glass][data-glass-variant] {
   --glass-tinted-opacity: 0.96;
 }
 
