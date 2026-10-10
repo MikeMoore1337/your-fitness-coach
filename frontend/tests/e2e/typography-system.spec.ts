@@ -50,7 +50,9 @@ for (const width of [360, 393])
           const family = (node: Element) =>
             getComputedStyle(node).fontFamily.replace(/,.*/, '').replaceAll(/["']/g, '');
           return [
-            ...element.querySelectorAll('h1,h2,h3,p,label,input,select,textarea,td,dd,strong'),
+            ...element.querySelectorAll(
+              'h1,h2,h3,p,label,input,select,textarea,td,dd,strong,svg text',
+            ),
           ]
             .filter((node) => node.getBoundingClientRect().height > 0)
             .filter((node) => !node.closest('h1,h2,h3') || /^H[123]$/.test(node.tagName))
