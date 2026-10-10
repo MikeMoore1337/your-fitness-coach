@@ -3716,8 +3716,7 @@ def test_landing_v10_no_js_fallback_matches_public_audience_copy(client, monkeyp
         assert response.status_code == 200
         assert response.headers["x-robots-tag"] == "index, follow"
         assert (
-            f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />'
-            in response.text
+            f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />' in response.text
         )
         assert f"<h1>{heading}</h1>" in response.text
         assert lead in response.text
@@ -3731,9 +3730,9 @@ def test_landing_v10_no_js_fallback_matches_public_audience_copy(client, monkeyp
     assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in alias.text
     assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in alias.text
 
-    frontend_template = (
-        Path(__file__).resolve().parents[2] / "frontend" / "index.html"
-    ).read_text(encoding="utf-8")
+    frontend_template = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(
+        encoding="utf-8"
+    )
     assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in frontend_template
     assert "Тренировки, питание и прогресс — в одном приложении" not in frontend_template
 
