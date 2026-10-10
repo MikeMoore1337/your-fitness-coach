@@ -456,6 +456,9 @@ def _validate_staged_release(release_dir: Path, manifest: dict[str, Any]) -> Non
         "deploy/hermes-editorial-worker/editorial_worker.py": release_dir
         / "editorial-worker"
         / "editorial_worker.py",
+        "deploy/hermes-editorial-worker/EDITORIAL_STYLE_PROMPT.txt": release_dir
+        / "editorial-worker"
+        / "EDITORIAL_STYLE_PROMPT.txt",
         "deploy/hermes-editorial-worker/hermes-provenance.json": release_dir
         / "editorial-worker"
         / "hermes-provenance.json",
@@ -516,7 +519,7 @@ def _stage_release(
         ):
             _atomic_copy(discovery_root / name, temporary / name, mode=0o444, uid=0, gid=0)
         editorial_root = source_root / "deploy" / "hermes-editorial-worker"
-        for name in ("editorial_worker.py", "hermes-provenance.json"):
+        for name in ("editorial_worker.py", "EDITORIAL_STYLE_PROMPT.txt", "hermes-provenance.json"):
             _atomic_copy(
                 editorial_root / name,
                 temporary / "editorial-worker" / name,
