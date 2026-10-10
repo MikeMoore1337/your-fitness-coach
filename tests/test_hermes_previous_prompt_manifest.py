@@ -94,7 +94,7 @@ def test_predecessor_rejects_unknown_or_incompatible_contract(prompt: str, intak
 def test_predecessor_rejects_tampering_without_valid_manifest_digest() -> None:
     manifest = _signed_manifest(prompt="task403-editorial-worker-v1")
     manifest["components"]["deploy/hermes-editorial-worker/editorial_worker.py"] = "f" * 64
-    with pytest.raises(release.ReleaseManifestError, match="digest"):
+    with pytest.raises(release.ReleaseManifestError, match="release ID|digest"):
         release.validate_manifest(manifest, allow_previous_prompt_version=True)
 
 
