@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { AppLink } from '../shared/navigation/router';
-import { Glass, glassProps } from '../shared/ui/Glass';
+import { glassProps } from '../shared/ui/Glass';
 import { Icon, type IconName } from '../shared/ui/Icon';
 import { useModalA11y } from '../shared/ui/useModalA11y';
 import {
@@ -19,35 +20,35 @@ export interface QuickAddAction {
 export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
   {
     key: 'food',
-    label: 'Добавить еду',
+    label: 'Еда',
     detail: 'Быстрый ввод в дневник питания',
     icon: 'nav-nutrition',
     to: '/app?section=nutrition&quick_add=food',
   },
   {
     key: 'water',
-    label: 'Добавить воду',
+    label: 'Вода',
     detail: 'Открыть трекер жидкости',
     icon: 'water',
     to: '/app?section=nutrition&hydration=quick',
   },
   {
     key: 'cardio',
-    label: 'Добавить кардио',
+    label: 'Кардио',
     detail: 'Записать ручную активность',
     icon: 'week-cardio',
     to: '/app?section=today&cardio=1',
   },
   {
     key: 'measurement',
-    label: 'Добавить замер',
+    label: 'Замер',
     detail: 'Вес или окружность тела',
     icon: 'body-measurement',
     to: '/app?section=progress&focus=measurements',
   },
   {
     key: 'wellbeing',
-    label: 'Отметить самочувствие',
+    label: 'Самочувствие',
     detail: 'Короткий ежедневный check-in',
     icon: 'checklist',
     to: '/app?section=today&wellbeing=1',
@@ -64,7 +65,10 @@ export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
       className="app-quick-add-trigger"
       data-testid="quick-add-trigger"
       type="button"
-      onClick={onOpen}
+      onClick={(event) => {
+        event.currentTarget.focus();
+        onOpen();
+      }}
     >
       <Icon name="plus" className="app-quick-add-trigger__plus" />
       <span className="app-quick-add-trigger__label">Добавить</span>
@@ -82,6 +86,24 @@ export function QuickAddSheet({
   open: boolean;
 }) {
   const panelRef = useModalA11y<HTMLDivElement>(open, onClose);
+  useEffect(() => {
+    if (!open) return;
+    const layer = panelRef.current?.parentElement;
+    const trigger = layer?.parentElement?.querySelector<HTMLElement>('.app-quick-add-trigger');
+    const background = [...(layer?.parentElement?.children ?? [])].filter(
+      (element): element is HTMLElement => element instanceof HTMLElement && element !== layer,
+    );
+    const previous = background.map((element) => element.inert);
+    background.forEach((element) => {
+      element.inert = true;
+    });
+    return () => {
+      background.forEach((element, index) => {
+        element.inert = previous[index] ?? false;
+      });
+      trigger?.focus({ preventScroll: true });
+    };
+  }, [open, panelRef]);
   if (!open) return null;
 
   return (
@@ -89,12 +111,15 @@ export function QuickAddSheet({
       className="app-quick-add-layer"
       data-testid="quick-add-layer"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) {
+          event.preventDefault();
+          onClose();
+        }
       }}
     >
-      <Glass
+      <div
+        {...glassProps('tinted')}
         aria-labelledby="quick-add-title"
-        variant="tinted"
         aria-modal="true"
         className="app-quick-add-panel"
         data-testid="quick-add-sheet"
@@ -103,10 +128,7 @@ export function QuickAddSheet({
         tabIndex={-1}
       >
         <header className="app-quick-add-panel__header">
-          <div>
-            <span className="eyebrow">Быстрое действие</span>
-            <h2 id="quick-add-title">Что добавить?</h2>
-          </div>
+          <h2 id="quick-add-title">Что добавить?</h2>
           <button
             aria-label="Закрыть быстрые действия"
             className="app-quick-add-panel__close"
@@ -116,10 +138,6 @@ export function QuickAddSheet({
             <Icon name="close" size={20} />
           </button>
         </header>
-        <p className="app-quick-add-panel__intro">
-          Выберите операцию — откроется существующий экран записи, без новых данных или скрытых
-          подтверждений.
-        </p>
         <nav aria-label="Быстрые действия" className="app-quick-add-panel__actions">
           {actions.map((action) => (
             <AppLink
@@ -142,18 +160,17 @@ export function QuickAddSheet({
               </span>
               <span className="app-quick-add-action__copy">
                 <strong>{action.label}</strong>
-                <small>{action.detail}</small>
               </span>
               <Icon
                 aria-hidden="true"
                 className="app-quick-add-action__arrow"
-                name="arrow-right"
+                name="chevron-right"
                 size={16}
               />
             </AppLink>
           ))}
         </nav>
-      </Glass>
+      </div>
     </div>
   );
 }

@@ -528,27 +528,30 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
                   Завершить
                 </Button>
               )}
-              <Button onClick={() => setEditing(session)} type="button" variant="secondary">
-                Изменить
-              </Button>
-              <Button
-                disabled={remove.isPending}
-                onClick={async () => {
-                  if (
-                    await confirm({
-                      title: 'Удалить cardio-запись?',
-                      message: `${activityLabels[session.activity_type]}, ${formatSessionDate(session.scheduled_at)}. Запись будет удалена безвозвратно.`,
-                      confirmText: 'Удалить',
-                    })
-                  ) {
-                    remove.mutate(session.id);
-                  }
-                }}
-                type="button"
-                variant="danger"
-              >
-                Удалить
-              </Button>
+              <details className="cardio-session-row__menu">
+                <summary>Действия с записью</summary>
+                <Button onClick={() => setEditing(session)} type="button" variant="secondary">
+                  Изменить
+                </Button>
+                <Button
+                  disabled={remove.isPending}
+                  onClick={async () => {
+                    if (
+                      await confirm({
+                        title: 'Удалить кардио-запись?',
+                        message: `${activityLabels[session.activity_type]}, ${formatSessionDate(session.scheduled_at)}. Запись будет удалена безвозвратно.`,
+                        confirmText: 'Удалить',
+                      })
+                    ) {
+                      remove.mutate(session.id);
+                    }
+                  }}
+                  type="button"
+                  variant="danger"
+                >
+                  Удалить
+                </Button>
+              </details>
             </div>
           </article>
         ),

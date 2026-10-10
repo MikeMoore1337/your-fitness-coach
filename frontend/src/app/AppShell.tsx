@@ -541,7 +541,7 @@ export function AppShell({
                           ? ' app-bottom-nav__btn--mobile-hidden'
                           : ''
                       }`}
-                      {...(active ? glassProps('clear', true) : {})}
+                      {...(active && !mobileNavigation ? glassProps('clear', true) : {})}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);

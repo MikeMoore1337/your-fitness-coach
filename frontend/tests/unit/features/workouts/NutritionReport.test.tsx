@@ -213,6 +213,7 @@ describe('NutritionPeriodReport', () => {
     ).toBeVisible();
     expect(screen.getByRole('img', { name: /Калории по дням за период/ })).toBeVisible();
     expect(screen.getByText(/Точки — фактические значения/)).toBeVisible();
+    fireEvent.click(screen.getByText('История целей питания'));
     expect(screen.getByText('Принятая адаптация')).toBeVisible();
     expect(screen.getAllByText('Новая цель').length).toBeGreaterThan(0);
     expect(screen.getByText('2 из 3')).toBeVisible();

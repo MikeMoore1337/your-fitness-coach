@@ -102,7 +102,7 @@ test('current action and floating dock preserve the shared navigation contract',
     await expect(page.locator('.ui-semantic-artwork')).toHaveCount(0);
     await expect(page.locator('.today-workout-spotlight')).toHaveCSS('background-image', 'none');
     await expect(dock).toHaveCSS('position', 'fixed');
-    await expect(dock).toHaveCSS('border-radius', '24px');
+    await expect(dock).toHaveCSS('border-radius', '22px');
     await expectNoOverlap(action, dock);
     await expectNoHorizontalOverflow(page);
 
@@ -168,7 +168,7 @@ test('current action and floating dock preserve the shared navigation contract',
   await page.getByRole('button', { name: 'Быстро добавить' }).click();
   await page
     .getByRole('dialog', { name: 'Что добавить?' })
-    .getByRole('link', { name: /Добавить кардио/ })
+    .getByRole('link', { name: 'Кардио', exact: true })
     .click();
   const cardioFieldTops = await page.locator('.cardio-form__core').evaluate((form) => {
     const top = (selector: string) =>
@@ -334,6 +334,7 @@ test('body trend keeps smooth truthful geometry, area fill and measurement alter
   }
 
   const measurementHistory = page.locator('.measurement-history');
+  await page.locator('.progress-measurement-editor > summary').click();
   await measurementHistory.scrollIntoViewIfNeeded();
   await expect(measurementHistory).toBeVisible();
   await expectNoOverlap(
@@ -389,7 +390,7 @@ test('mocked TMA dark uses the same chart and safe-area floating dock', async ({
   });
   await expect
     .poll(() => dock.evaluate((element) => getComputedStyle(element).bottom))
-    .toBe('28px');
+    .toBe('40px');
   await expect(insight.locator('.data-viz-chart')).toHaveAttribute('data-motion-phase', 'idle');
   await expectNoHorizontalOverflow(page);
   if (capture) {

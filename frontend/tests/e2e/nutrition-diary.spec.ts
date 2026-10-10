@@ -5,6 +5,7 @@ import type {
   NutritionSuggestions as NutritionSuggestionsResponse,
 } from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
+import { installTelegramHarness } from './fixtures/mobile-tma';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -1110,11 +1111,11 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
   await expect(
-    page.getByTestId('meal-planner').getByText('Планирование питания', { exact: true }),
+    page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
   ).toBeVisible();
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
-  await expect(grocery.getByText('Планирование питания', { exact: true })).toBeVisible();
+  await expect(grocery.getByText('Список покупок', { exact: true })).toBeVisible();
   await expect(page.getByText('Nutrition Planning', { exact: true })).toHaveCount(0);
   await grocery.locator('summary').click();
   await expect(grocery.getByText('Список ещё не сформирован', { exact: true })).toBeVisible();
@@ -1765,10 +1766,10 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await expect(
     page.getByRole('progressbar', { name: /Калории:/ }).locator(':scope > span'),
   ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
-  await expect(page.getByRole('link', { name: 'Питание', exact: true })).toHaveCSS(
-    'background-color',
-    'rgb(27, 31, 31)',
-  );
+  const activeNutrition = page.getByRole('link', { name: 'Питание', exact: true });
+  await expect(activeNutrition).toHaveAttribute('aria-current', 'page');
+  await expect(activeNutrition).toHaveCSS('color', 'rgb(185, 234, 114)');
+  await expect(activeNutrition).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
     'aria-expanded',
@@ -1829,3 +1830,73 @@ test('Russian search supplements local food with USDA generic result and persist
     path: '../.artifacts/runtime/tests/screenshots/task-114a/generic-rice-added-390x844.png',
   });
 });
+
+for (const width of [360, 393, 430]) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const runtime of ['web', 'tma'] as const) {
+      test(`#868 water intent ${width} ${theme} ${runtime}`, async ({ page }, testInfo) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((mode) => localStorage.setItem('app-theme', mode), theme);
+        if (runtime === 'tma') {
+          await installTelegramHarness(page, {
+            colorScheme: theme,
+            viewportHeight: 844,
+            safeAreaInset: { top: 24, bottom: 34, left: 0, right: 0 },
+            contentSafeAreaInset: { top: 16, bottom: 0, left: 0, right: 0 },
+          });
+        }
+        const apiState = await mockNutritionApi(page, 'loading');
+        await page.goto('/app?section=nutrition');
+        await expect(page.getByText('Загружаем гидратацию…')).toBeVisible();
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.goto('/app?section=today');
+        const water = async () => {
+          await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
+          await page.getByRole('link', { name: 'Вода', exact: true }).click();
+        };
+        await water();
+        await expect(page).toHaveURL(/hydration=quick/);
+        apiState.releaseHydrationLoading();
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+        await expect(preset).toBeInViewport({ ratio: 1 });
+        await expect(preset).toBeFocused();
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        const dock = page.locator('#appBottomNav');
+        const presetBox = await preset.boundingBox();
+        const dockBox = await dock.boundingBox();
+        if (dockBox) expect(presetBox!.y + presetBox!.height).toBeLessThan(dockBox.y);
+        await page.screenshot({ path: testInfo.outputPath('water-intent-visible.png') });
+        await preset.click();
+        await expect(hydration.getByText('Добавлено 250 мл')).toBeVisible();
+        await expect(hydration.getByText('1100 из 2200 мл', { exact: true })).toBeVisible();
+        const volume = hydration
+          .getByRole('region', { name: 'Другой объём' })
+          .getByLabel('Объём, мл');
+        await volume.fill('425');
+        await page.evaluate(() => {
+          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+          window.scrollTo(0, 0);
+        });
+        await water();
+        await expect(preset).toBeInViewport({ ratio: 1 });
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        await expect(volume).toHaveValue('425');
+        await page.evaluate(() => window.scrollTo(0, 0));
+        await page.goBack();
+        await expect(page).not.toHaveURL(/hydration=quick/);
+        await expect(volume).toHaveValue('425');
+        expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+          width + 1,
+        );
+        await page.reload();
+        await expect(
+          hydration.getByRole('button', { name: 'Другой напиток, история и цель' }),
+        ).toBeVisible();
+        await expect(preset).not.toBeFocused();
+      });
+    }
+  }
+}

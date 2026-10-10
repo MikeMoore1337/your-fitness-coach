@@ -467,29 +467,20 @@ test('Task 294 keeps period tabs balanced and custom period truthful when opened
   await expectNoHorizontalOverflow(page);
 });
 
-test('Task 294 uses one shared navigation treatment in Profile and Progress', async ({ page }) => {
+test('Task 294 keeps Profile and approved Progress navigation accessible on mobile', async ({
+  page,
+}) => {
   await installPlatformApi(page, { browserSession: true, fixedDate: FIXED_DATE });
   await page.setViewportSize({ width: 390, height: 844 });
 
   await openApp(page, 'profile');
   const profileNavigation = page.locator('.profile-settings-nav.section-navigation');
   await expect(profileNavigation).toBeVisible();
-  const profileStyle = await profileNavigation
-    .locator(':scope > a')
-    .first()
-    .evaluate((item) => {
-      const styles = getComputedStyle(item);
-      return {
-        borderRadius: styles.borderRadius,
-        backgroundColor: styles.backgroundColor,
-        borderTopWidth: styles.borderTopWidth,
-      };
-    });
   const profileNavigationMetrics = await profileNavigation.evaluate((navigation) => ({
     columns: getComputedStyle(navigation).gridTemplateColumns.split(' ').length,
     itemHeights: Array.from(navigation.children).map((item) => item.getBoundingClientRect().height),
   }));
-  expect(profileNavigationMetrics.columns).toBe(2);
+  expect(profileNavigationMetrics.columns).toBe(1);
   expect(Math.max(...profileNavigationMetrics.itemHeights)).toBeLessThanOrEqual(60);
   const profileFitnessLink = profileNavigation.getByRole('link', { name: 'Цели' });
   await profileFitnessLink.click();
@@ -499,25 +490,18 @@ test('Task 294 uses one shared navigation treatment in Profile and Progress', as
   await openApp(page, 'progress');
   const progressNavigation = page.locator('.progress-category-nav.section-navigation');
   await expect(progressNavigation).toBeVisible();
-  const progressStyle = await progressNavigation
-    .locator(':scope > a')
-    .nth(1)
-    .evaluate((item) => {
-      const styles = getComputedStyle(item);
-      return {
-        borderRadius: styles.borderRadius,
-        backgroundColor: styles.backgroundColor,
-        borderTopWidth: styles.borderTopWidth,
-      };
-    });
-  expect(progressStyle).toEqual(profileStyle);
-  const progressNavigationMetrics = await progressNavigation.evaluate((navigation) => ({
-    columns: getComputedStyle(navigation).gridTemplateColumns.split(' ').length,
-    itemHeights: Array.from(navigation.children).map((item) => item.getBoundingClientRect().height),
-  }));
-  expect(progressNavigationMetrics.columns).toBe(2);
+  const progressNavigationMetrics = await progressNavigation
+    .locator('.progress-category-nav__rail')
+    .evaluate((rail) => ({
+      display: getComputedStyle(rail).display,
+      overflow: getComputedStyle(rail).overflowX,
+      itemHeights: Array.from(rail.children).map((item) => item.getBoundingClientRect().height),
+    }));
+  expect(progressNavigationMetrics.display).toBe('flex');
+  expect(progressNavigationMetrics.overflow).toBe('auto');
+  expect(Math.min(...progressNavigationMetrics.itemHeights)).toBeGreaterThanOrEqual(44);
   expect(Math.max(...progressNavigationMetrics.itemHeights)).toBeLessThanOrEqual(60);
-  await expect(progressNavigation.locator(':scope > a').first()).toHaveAttribute(
+  await expect(progressNavigation.getByRole('link').first()).toHaveAttribute(
     'aria-current',
     'page',
   );
