@@ -4682,6 +4682,11 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     scroll-margin-bottom: var(--yfc-mobile-dock-clearance);
   }
 
+  /* Keep the active workout's final controls in the scrollable safe area above the fixed dock. */
+  .active-workout--design-v2 {
+    padding-bottom: var(--yfc-mobile-dock-clearance);
+  }
+
   html[data-yfc-keyboard='visible'] body:has(.app-shell--design-v2 #appBottomNav) {
     padding-bottom: max(18px, var(--yfc-layout-safe-bottom));
   }

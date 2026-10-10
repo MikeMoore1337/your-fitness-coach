@@ -1765,6 +1765,139 @@ test('active workout actionable controls clear the mobile bottom dock', async ({
   }
 });
 
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`resting active workout keeps the next set clear of the dock at ${width}px ${theme}`, async ({
+      browser,
+      baseURL,
+    }, testInfo) => {
+      const context = await browser.newContext({
+        baseURL,
+        viewport: { width, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        serviceWorkers: 'block',
+      });
+      const page = await context.newPage();
+      try {
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockActiveWorkout(page);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const firstSet = page.locator('[data-workout-set-id="201"]');
+        await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
+        await firstSet.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
+        await Promise.all([
+          waitForCompletedSetPatch(page, 201),
+          firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click(),
+        ]);
+        const currentSet = page.locator('[data-workout-set-id="202"]');
+        await currentSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
+        await currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
+        await currentSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+        await expect(page.locator('.active-workout-rest')).toBeVisible();
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+
+        const writes: string[] = [];
+        page.on('request', (request) => {
+          if (/\/workouts\/sets\//.test(request.url()) && request.method() !== 'GET') {
+            writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+          }
+        });
+        const geometry = await page.evaluate(() => {
+          const nav = document.querySelector<HTMLElement>('#appBottomNav')!;
+          const nextSet = document.querySelector<HTMLElement>('[data-workout-set-id="203"]')!;
+          const nextDone = nextSet.querySelector<HTMLElement>('[data-workout-field="done"]')!;
+          const current = document.querySelector<HTMLElement>('[data-workout-set-id="202"]')!;
+          const currentInput = current.querySelector<HTMLElement>('input')!;
+          const rest = document.querySelector<HTMLElement>('.active-workout-rest')!;
+          const activeNav =
+            nav.querySelector<HTMLElement>('[aria-current="page"]') ??
+            nav.querySelector<HTMLElement>('a, button')!;
+          const nextDoneRect = nextDone.getBoundingClientRect();
+          const navRect = nav.getBoundingClientRect();
+          const activeNavRect = activeNav.getBoundingClientRect();
+          const overlap = Math.max(
+            0,
+            Math.min(nextDoneRect.bottom, navRect.bottom) - Math.max(nextDoneRect.top, navRect.top),
+          );
+          const inputRestOverlap = Math.max(
+            0,
+            Math.min(
+              currentInput.getBoundingClientRect().bottom,
+              rest.getBoundingClientRect().bottom,
+            ) -
+              Math.max(currentInput.getBoundingClientRect().top, rest.getBoundingClientRect().top),
+          );
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            scrollY,
+            nav: navRect.toJSON(),
+            rest: rest.getBoundingClientRect().toJSON(),
+            currentSet: current.getBoundingClientRect().toJSON(),
+            currentInput: currentInput.getBoundingClientRect().toJSON(),
+            nextSet: nextSet.getBoundingClientRect().toJSON(),
+            nextDone: nextDoneRect.toJSON(),
+            overlap,
+            inputRestOverlap,
+            hit:
+              document
+                .elementFromPoint(
+                  nextDoneRect.left + nextDoneRect.width / 2,
+                  Math.min(nextDoneRect.bottom - 2, innerHeight - 2),
+                )
+                ?.getAttribute('data-workout-field') ?? null,
+            navHit: nav.contains(
+              document.elementFromPoint(
+                activeNavRect.left + activeNavRect.width / 2,
+                activeNavRect.top + activeNavRect.height / 2,
+              ),
+            ),
+            activeNav: activeNavRect.toJSON(),
+            current: document
+              .querySelector('[aria-current="step"]')
+              ?.getAttribute('data-workout-set-id'),
+          };
+        });
+        const beforeUrl = page.url();
+        const beforeSection = new URL(beforeUrl).searchParams.get('section') ?? 'today';
+        await page.touchscreen.tap(
+          geometry.activeNav.left + geometry.activeNav.width / 2,
+          geometry.activeNav.top + geometry.activeNav.height / 2,
+        );
+        await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+          'data-workout-set-id',
+          '202',
+        );
+        await page.screenshot({
+          path: testInfo.outputPath(`resting-dock-${width}-${theme}.png`),
+          animations: 'disabled',
+        });
+        await testInfo.attach(`resting-dock-${width}-${theme}.json`, {
+          body: JSON.stringify({ geometry, writes }),
+          contentType: 'application/json',
+        });
+        expect(geometry.overlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.inputRestOverlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.navHit).toBe(true);
+        expect(geometry.current).toBe('202');
+        expect(new URL(page.url()).searchParams.get('section') ?? 'today').toBe(beforeSection);
+        expect(writes).toEqual([]);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
 test('active workout has touch-size controls and no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockActiveWorkout(page);

@@ -1465,8 +1465,30 @@ export function TodayWorkout({
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     currentElement.scrollIntoView?.({
       behavior: reducedMotion ? 'auto' : 'smooth',
-      block: 'nearest',
+      // Keep the newly active set away from the fixed mobile dock while the rest panel is present.
+      block: 'center',
     });
+
+    const settleDockClearance = () => {
+      const navigation = document.getElementById('appBottomNav');
+      if (!navigation || window.matchMedia?.('(min-width: 900px)').matches) return;
+      const doneControls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
+      );
+      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
+      const nextControl = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
+      if (!nextControl) return;
+      const navigationTop = navigation.getBoundingClientRect().top;
+      const nextBottom = nextControl.getBoundingClientRect().bottom;
+      const overlap = nextBottom - navigationTop;
+      if (overlap <= 0) return;
+      window.scrollBy({
+        top: overlap + 8,
+        behavior: reducedMotion ? 'auto' : 'smooth',
+      });
+    };
+    const frameId = window.requestAnimationFrame(settleDockClearance);
+    return () => window.cancelAnimationFrame(frameId);
   }, [completed, currentSetId]);
 
   if (workout.isLoading)
