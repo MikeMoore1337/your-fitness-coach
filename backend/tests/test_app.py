@@ -3565,7 +3565,7 @@ def test_root_serves_public_landing_spa(client):
 
     assert response.status_code == 200
     assert '<main class="seo-fallback">' in response.text
-    assert "Тренировки, питание и прогресс" in response.text
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in response.text
     assert "no-store" in response.headers["cache-control"]
 
 
@@ -3915,7 +3915,7 @@ def test_public_api_resources_are_fetchable_but_not_indexable(client, path):
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
-        ("/for-trainers", "Рабочий кабинет тренера, который держит день"),
+        ("/for-trainers", "ВАШ МЕТОД В ДЕЙСТВИИ."),
         ("/knowledge", "Материалы, которые помогают понять"),
         (
             "/knowledge/nutrition/glycemic-index",
