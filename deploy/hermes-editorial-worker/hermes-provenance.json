@@ -18,13 +18,14 @@
     "version": "editorial-worker-v1",
     "jobSchema": "hermes-editorial-job-v1",
     "intakeSchema": "hermes-editorial-intake-v2",
-    "promptVersion": "task403-editorial-worker-v1",
+    "promptVersion": "task403-editorial-worker-v2-human-writing",
     "skillVersion": "yfc-hermes-editorial-v1",
     "sourceBehaviorPatches": {
       "relevanceGate": "hermes-relevance-v1, hermes-relevance-v2 or hermes-relevance-v3 required before provider",
       "richCaptionTarget": "850-1000 UTF-16 characters when evidence supports it",
       "providerRateLimit": "429 retry-after honored with a 60 second maximum; provider attempts remain bounded",
-      "sourceHashCanonicalization": "Canonical source hash normalizes URLs with the same tracking/query/path rules as YFC intake"
+      "sourceHashCanonicalization": "Canonical source hash normalizes URLs with the same tracking/query/path rules as YFC intake",
+      "humanWriting": "human-writing v1.3.1 (MIT) editorial-only compact rules; source grounding and YFC safety gates unchanged"
     },
     "provider": "OpenAI-compatible HTTP, local-only before Gate A",
     "publishCapability": false,

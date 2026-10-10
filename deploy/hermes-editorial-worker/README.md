@@ -35,6 +35,25 @@ provider и отправляет новую immutable revision с новым ide
 переигрывается бесконечно. Успешный preflight не является approval публикации:
 `manual_required`, Gate B/C и единственный publisher остаются на стороне YFC.
 
+### Human Writing: редакционный стиль только для Hermes
+
+В `editorial_worker.py` встроена компактная адаптация правил
+[human-writing v1.3.1](https://github.com/codemistake/human-writing/blob/main/SKILL.md)
+(лицензия MIT). Она применяется к первичному draft и повторному bounded repair
+во всех разрешённых provider modes. Это prompt-level правила: никакой установки
+стороннего agent runtime, новых API, зависимостей, запросов в сеть или новых прав нет.
+Полный `SKILL.md` намеренно не передаётся модели; использована только часть о
+естественном русском языке, без шаблонов, канцелярита и искусственных фактов.
+
+**Приоритет:** source grounding, точность, контекст исследования, неопределённость,
+предостережения, политика YFC, JSON contract и жёсткие ограничения длины выше стиля.
+`human-writing` не заменяет научный fact-check и не отменяет preflight, fail-closed
+remediation, ручную модерацию и запрет автопубликации.
+Реальный эффект на качество формулировок требует отдельной редакционной оценки
+материалов; passing tests подтверждает только подключение prompt и целостность контрактов.
+Версия prompt: `task403-editorial-worker-v2-human-writing`. Версия intake skill по-прежнему
+`yfc-hermes-editorial-v1`, поскольку intake schema и provenance contract не менялись.
+
 Worker не содержит source fetching, scheduler, database client, shell/tool dispatch,
 browser, MCP, plugins, Telegram Bot API или publish endpoint. Полный Hermes monolith
 не является частью image. Upstream Hermes сохраняется как provenance contract и
