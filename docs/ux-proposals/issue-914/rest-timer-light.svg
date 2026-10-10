@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="393" height="500" viewBox="0 0 393 500" role="img" aria-labelledby="title desc">
+ <title id="title">YFC: таймер отдыха, светлая тема, предложенный компактный интерфейс</title>
+ <desc id="desc">Таймер 1:24, далее выпады, подход 2. Три равнозначные кнопки +30 секунд, +60 секунд, Пропустить. Вторичная коррекция минус 30 секунд. Внизу отдельная карточка текущего подхода. Концептуальный макет, не production.</desc>
+ <rect width="393" height="500" fill="#F9FAF7"/>
+ <g font-family="Arial, Helvetica, sans-serif">
+ <rect x="8" y="12" width="377" height="219" rx="27" fill="#ECF0E9" stroke="#BBC4BA" stroke-width="1.5"/>
+ <text x="29" y="44" fill="#657169" font-size="13" font-weight="700" letter-spacing="1">ОТДЫХ</text>
+ <text x="29" y="105" fill="#131A15" font-size="43" font-weight="750">1:24</text>
+ <text x="140" y="64" fill="#657169" font-size="14">Далее: Выпады</text>
+ <text x="140" y="91" fill="#131A15" font-size="18" font-weight="700">Подход 2 из 3</text>
+ <text x="29" y="124" fill="#657169" font-size="11.5">Время отдыха · регулируется отдельно от подходов</text>
+ <rect x="20" y="142" width="110" height="53" rx="15" fill="#FFFFFF" stroke="#BBC4BA"/>
+ <rect x="141" y="142" width="110" height="53" rx="15" fill="#FFFFFF" stroke="#BBC4BA"/>
+ <rect x="262" y="142" width="110" height="53" rx="15" fill="#FFFFFF" stroke="#BBC4BA"/>
+ <text x="75" y="176" fill="#131A15" font-size="16.5" font-weight="700" text-anchor="middle">+30 сек</text>
+ <text x="196" y="176" fill="#131A15" font-size="16.5" font-weight="700" text-anchor="middle">+60 сек</text>
+ <text x="317" y="176" fill="#131A15" font-size="14.3" font-weight="700" text-anchor="middle">Пропустить</text>
+ <text x="29" y="215" fill="#657169" font-size="13">-30 сек</text>
+ <text x="372" y="215" fill="#657169" font-size="11.5" text-anchor="end">Не меняет подход</text>
+ <rect x="20" y="254" width="353" height="185" rx="25" fill="#FFFFFF" stroke="#B6F51B" stroke-width="2.5"/>
+ <rect x="36" y="271" width="4" height="25" rx="2" fill="#B6F51B"/>
+ <text x="52" y="287" font-size="13" font-weight="700" fill="#657169" letter-spacing=".5">ТЕКУЩИЙ ПОДХОД</text>
+ <text x="38" y="331" font-size="23" font-weight="700" fill="#131A15">Выпады · подход 2</text>
+ <text x="38" y="367" font-size="19" fill="#131A15">25 кг  ×  8 повторений</text>
+ <path d="M38 390 H354" stroke="#BBC4BA"/>
+ <text x="38" y="416" font-size="12.5" fill="#657169">Регулировка отдыха не переключает подход</text>
+ <text x="196.5" y="475" text-anchor="middle" fill="#657169" font-size="11.5">КОНЦЕПТ · OWNER UI APPROVAL REQUIRED</text>
+ </g></svg>
