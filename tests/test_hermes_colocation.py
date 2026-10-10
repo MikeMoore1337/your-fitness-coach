@@ -647,9 +647,7 @@ def test_staged_release_components_must_match_manifest(tmp_path: Path) -> None:
     with pytest.raises(hermes.ColocationError, match="does not match manifest"):
         hermes._validate_staged_release(release, manifest)
 
-    shutil.copyfile(
-        root / "deploy/hermes-discovery/hermes_health.py", release / "hermes_health.py"
-    )
+    shutil.copyfile(root / "deploy/hermes-discovery/hermes_health.py", release / "hermes_health.py")
     prompt_path = release / "editorial-worker" / "EDITORIAL_STYLE_PROMPT.txt"
     prompt_path.write_text("tampered\n", encoding="utf-8")
     with pytest.raises(hermes.ColocationError, match="does not match manifest"):
