@@ -36,7 +36,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
       await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
       await expect(nav).toHaveCSS('box-shadow', /inset/);
-      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(6px\)/ : 'none');
+      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(12px\)/ : 'none');
       await expectNoHorizontalOverflow(page);
       // Content containers remain ordinary surfaces; navigation alone carries this material.
       await expect(
@@ -54,7 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveAttribute('data-glass-variant', 'tinted');
-      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(8px\)/);
+      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       await page.screenshot({ path: testInfo.outputPath(`quick-add-${width}-${theme}.png`) });
       await page.keyboard.press('Escape');
       await expect(sheet).toBeHidden();

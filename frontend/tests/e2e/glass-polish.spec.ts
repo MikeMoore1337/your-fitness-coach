@@ -37,12 +37,34 @@ for (const theme of ['dark', 'light'] as const) {
     const sections = (await page
       .getByRole('navigation', { name: 'Разделы прогресса' })
       .boundingBox())!;
-    expect(sections.y - download.y - download.height).toBeLessThanOrEqual(20);
+    expect(sections.y - download.y - download.height).toBeLessThanOrEqual(4);
+    const downloadTextBottom = await page
+      .getByRole('link', { name: 'Скачать отчёт' })
+      .evaluate((element) => {
+        const text = document.createRange();
+        text.selectNodeContents(element);
+        return text.getBoundingClientRect().bottom;
+      });
+    const categoryText = (await rail.locator('a strong').first().boundingBox())!;
+    expect(categoryText.y - downloadTextBottom).toBeLessThanOrEqual(34);
 
     const add = page.getByRole('button', { name: 'Быстро добавить', exact: true });
     await add.click();
     const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
-    await expect(sheet).toHaveCSS('backdrop-filter', /blur\(8px\)/);
+    await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+    for (const surface of [sheet, page.locator('#appBottomNav')]) {
+      const alpha = await surface.evaluate((element) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext('2d')!;
+        context.fillStyle = getComputedStyle(element).backgroundColor;
+        context.fillRect(0, 0, 1, 1);
+        return context.getImageData(0, 0, 1, 1).data[3]! / 255;
+      });
+      expect(alpha).toBeGreaterThanOrEqual(0.9 - 1 / 255);
+      expect(alpha).toBeLessThan(1);
+    }
+    await expect(page.locator('.progress-overview')).not.toHaveAttribute('data-glass');
     const contrast = await page.evaluate(() => {
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 1;
@@ -133,7 +155,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(add).toHaveCSS('background-color', 'rgb(178, 245, 32)');
 
     await page.reload();
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(6px\)/);
+    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(12px\)/);
     // Exercise the unsupported-backdrop branch by removing only its @supports opt-in.
     const supportRules = await page.evaluate(() => {
       let count = 0;
@@ -175,7 +197,7 @@ for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430]) {
       await page.setViewportSize({ width, height: 844 });
       const dock = page.locator('#appBottomNav');
-      await expect(dock).toHaveCSS('backdrop-filter', /blur\(6px\)/);
+      await expect(dock).toHaveCSS('backdrop-filter', /blur\(12px\)/);
       expect((await dock.boundingBox())!.y + 60).toBeLessThanOrEqual(844 - 34 - 12);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const bottom = page

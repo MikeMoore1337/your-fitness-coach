@@ -32,6 +32,26 @@ for (const width of [320, 360, 393, 430])
       await expect(tabs).toHaveCount(4);
       await expect(page.locator('.progress-overview')).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
+      const periods = page.getByRole('tablist', { name: 'Период прогресса' });
+      for (const label of ['7 дней', '30 дней', '90 дней']) {
+        const period = periods.getByRole('tab', { name: label, exact: true });
+        await period.click();
+        await expect(period).toHaveAttribute('aria-selected', 'true');
+        const textFits = await period.evaluate((element) => {
+          const bounds = element.getBoundingClientRect();
+          const text = document.createRange();
+          text.selectNodeContents(element);
+          const lines = [...text.getClientRects()];
+          return (
+            bounds.width >= 44 &&
+            bounds.height >= 44 &&
+            lines.length === 1 &&
+            lines[0]!.left >= bounds.left &&
+            lines[0]!.right <= bounds.right
+          );
+        });
+        expect(textFits, `${label} at ${width}px`).toBe(true);
+      }
       const calorieLines = await page
         .locator('.progress-overview__metric strong')
         .filter({ hasText: 'ккал' })
@@ -48,7 +68,7 @@ for (const width of [320, 360, 393, 430])
       expect(navigationBox.height).toBe(60);
       expect(triggerBox.height).toBe(navigationBox.height);
       expect(triggerBox.y).toBe(navigationBox.y);
-      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(6px\)/);
+      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(12px\)/);
       await expect(trigger).toHaveCSS('backdrop-filter', /blur\(8px\)/);
       expect(triggerBox.x - navigationBox.x - navigationBox.width).toBeGreaterThanOrEqual(16);
       for (const tab of await tabs.all()) {
@@ -70,7 +90,7 @@ for (const width of [320, 360, 393, 430])
       }
       await trigger.click();
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
-      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(8px\)/);
+      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       const icons = await sheet.locator('.app-quick-add-action__icon').evaluateAll((elements) =>
         elements.map((element) => {
           const style = getComputedStyle(element);

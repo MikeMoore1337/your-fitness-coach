@@ -83,6 +83,21 @@
   --glass-blur: 8px;
 }
 
+/* Floating navigation needs to suppress text behind it without adding another optical plane. */
+:root .app-bottom-nav[data-glass][data-glass-variant] {
+  --glass-opacity: var(--glass-tinted-opacity);
+  --glass-blur: 12px;
+}
+
+:root .app-quick-add-panel[data-glass][data-glass-variant] {
+  --glass-tinted-opacity: 0.95;
+  --glass-blur: 20px;
+}
+
+:root[data-color-scheme='light'] .app-quick-add-panel[data-glass][data-glass-variant] {
+  --glass-tinted-opacity: 0.96;
+}
+
 @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   :root [data-glass][data-glass-variant] {
     --glass-fill: rgb(var(--glass-rgb) / var(--glass-opacity));
