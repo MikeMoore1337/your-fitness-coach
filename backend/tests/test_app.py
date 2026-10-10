@@ -3715,7 +3715,10 @@ def test_landing_v10_no_js_fallback_matches_public_audience_copy(client, monkeyp
 
         assert response.status_code == 200
         assert response.headers["x-robots-tag"] == "index, follow"
-        assert f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />' in response.text
+        assert (
+            f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />'
+            in response.text
+        )
         assert f"<h1>{heading}</h1>" in response.text
         assert lead in response.text
         assert section in response.text
