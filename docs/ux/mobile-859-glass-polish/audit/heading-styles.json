@@ -1,0 +1,802 @@
+[
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "dark",
+    "section": "today",
+    "name": "webkit-360-dark-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 336,
+      "height": 64.796875,
+      "top": 106,
+      "right": 348,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "dark",
+    "section": "programs",
+    "name": "webkit-360-dark-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 336,
+      "height": 42.3125,
+      "top": 97,
+      "right": 348,
+      "bottom": 139.3125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "dark",
+    "section": "nutrition",
+    "name": "webkit-360-dark-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 336,
+      "height": 44.453125,
+      "top": 94,
+      "right": 348,
+      "bottom": 138.453125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "dark",
+    "section": "progress",
+    "name": "webkit-360-dark-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 86.75,
+      "width": 201.40625,
+      "height": 34.5,
+      "top": 86.75,
+      "right": 213.40625,
+      "bottom": 121.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "dark",
+    "section": "report",
+    "name": "webkit-360-dark-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 288,
+      "height": 33.59375,
+      "top": 224,
+      "right": 324,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "light",
+    "section": "today",
+    "name": "webkit-360-light-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 336,
+      "height": 64.796875,
+      "top": 106,
+      "right": 348,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "light",
+    "section": "programs",
+    "name": "webkit-360-light-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 336,
+      "height": 42.3125,
+      "top": 97,
+      "right": 348,
+      "bottom": 139.3125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "light",
+    "section": "nutrition",
+    "name": "webkit-360-light-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 336,
+      "height": 44.453125,
+      "top": 94,
+      "right": 348,
+      "bottom": 138.453125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "light",
+    "section": "progress",
+    "name": "webkit-360-light-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 86.75,
+      "width": 201.40625,
+      "height": 34.5,
+      "top": 86.75,
+      "right": 213.40625,
+      "bottom": 121.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 360,
+    "theme": "light",
+    "section": "report",
+    "name": "webkit-360-light-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 288,
+      "height": 33.59375,
+      "top": 224,
+      "right": 324,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "dark",
+    "section": "today",
+    "name": "webkit-393-dark-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 369,
+      "height": 64.796875,
+      "top": 106,
+      "right": 381,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "dark",
+    "section": "programs",
+    "name": "webkit-393-dark-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 369,
+      "height": 46.203125,
+      "top": 97,
+      "right": 381,
+      "bottom": 143.203125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "dark",
+    "section": "nutrition",
+    "name": "webkit-393-dark-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 369,
+      "height": 48.515625,
+      "top": 94,
+      "right": 381,
+      "bottom": 142.515625,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "dark",
+    "section": "progress",
+    "name": "webkit-393-dark-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 86.75,
+      "width": 234.40625,
+      "height": 34.5,
+      "top": 86.75,
+      "right": 246.40625,
+      "bottom": 121.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "dark",
+    "section": "report",
+    "name": "webkit-393-dark-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 321,
+      "height": 33.59375,
+      "top": 224,
+      "right": 357,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "light",
+    "section": "today",
+    "name": "webkit-393-light-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 369,
+      "height": 64.796875,
+      "top": 106,
+      "right": 381,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "light",
+    "section": "programs",
+    "name": "webkit-393-light-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 369,
+      "height": 46.203125,
+      "top": 97,
+      "right": 381,
+      "bottom": 143.203125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "light",
+    "section": "nutrition",
+    "name": "webkit-393-light-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 369,
+      "height": 48.515625,
+      "top": 94,
+      "right": 381,
+      "bottom": 142.515625,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "light",
+    "section": "progress",
+    "name": "webkit-393-light-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 86.75,
+      "width": 234.40625,
+      "height": 34.5,
+      "top": 86.75,
+      "right": 246.40625,
+      "bottom": 121.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "before",
+    "width": 393,
+    "theme": "light",
+    "section": "report",
+    "name": "webkit-393-light-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 321,
+      "height": 33.59375,
+      "top": 224,
+      "right": 357,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "dark",
+    "section": "today",
+    "name": "webkit-360-dark-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 336,
+      "height": 64.796875,
+      "top": 106,
+      "right": 348,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "dark",
+    "section": "programs",
+    "name": "webkit-360-dark-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 336,
+      "height": 42.3125,
+      "top": 97,
+      "right": 348,
+      "bottom": 139.3125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "dark",
+    "section": "nutrition",
+    "name": "webkit-360-dark-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 336,
+      "height": 44.453125,
+      "top": 94,
+      "right": 348,
+      "bottom": 138.453125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "dark",
+    "section": "progress",
+    "name": "webkit-360-dark-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 90.75,
+      "width": 160,
+      "height": 34.5,
+      "top": 90.75,
+      "right": 172,
+      "bottom": 125.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "dark",
+    "section": "report",
+    "name": "webkit-360-dark-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 288,
+      "height": 33.59375,
+      "top": 224,
+      "right": 324,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "light",
+    "section": "today",
+    "name": "webkit-360-light-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 336,
+      "height": 64.796875,
+      "top": 106,
+      "right": 348,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "light",
+    "section": "programs",
+    "name": "webkit-360-light-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 336,
+      "height": 42.3125,
+      "top": 97,
+      "right": 348,
+      "bottom": 139.3125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "light",
+    "section": "nutrition",
+    "name": "webkit-360-light-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 336,
+      "height": 44.453125,
+      "top": 94,
+      "right": 348,
+      "bottom": 138.453125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "light",
+    "section": "progress",
+    "name": "webkit-360-light-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 90.75,
+      "width": 160,
+      "height": 34.5,
+      "top": 90.75,
+      "right": 172,
+      "bottom": 125.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 360,
+    "theme": "light",
+    "section": "report",
+    "name": "webkit-360-light-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 288,
+      "height": 33.59375,
+      "top": 224,
+      "right": 324,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "dark",
+    "section": "today",
+    "name": "webkit-393-dark-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 369,
+      "height": 64.796875,
+      "top": 106,
+      "right": 381,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "dark",
+    "section": "programs",
+    "name": "webkit-393-dark-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 369,
+      "height": 46.203125,
+      "top": 97,
+      "right": 381,
+      "bottom": 143.203125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "dark",
+    "section": "nutrition",
+    "name": "webkit-393-dark-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 369,
+      "height": 48.515625,
+      "top": 94,
+      "right": 381,
+      "bottom": 142.515625,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "dark",
+    "section": "progress",
+    "name": "webkit-393-dark-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 90.75,
+      "width": 193,
+      "height": 34.5,
+      "top": 90.75,
+      "right": 205,
+      "bottom": 125.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "dark",
+    "section": "report",
+    "name": "webkit-393-dark-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 321,
+      "height": 33.59375,
+      "top": 224,
+      "right": 357,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "light",
+    "section": "today",
+    "name": "webkit-393-light-heading-today.png",
+    "title": "СЕГОДНЯ",
+    "box": {
+      "x": 12,
+      "y": 106,
+      "width": 369,
+      "height": 64.796875,
+      "top": 106,
+      "right": 381,
+      "bottom": 170.796875,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "light",
+    "section": "programs",
+    "name": "webkit-393-light-heading-programs.png",
+    "title": "План",
+    "box": {
+      "x": 12,
+      "y": 97,
+      "width": 369,
+      "height": 46.203125,
+      "top": 97,
+      "right": 381,
+      "bottom": 143.203125,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "light",
+    "section": "nutrition",
+    "name": "webkit-393-light-heading-nutrition.png",
+    "title": "Питание",
+    "box": {
+      "x": 12,
+      "y": 94,
+      "width": 369,
+      "height": 48.515625,
+      "top": 94,
+      "right": 381,
+      "bottom": 142.515625,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "light",
+    "section": "progress",
+    "name": "webkit-393-light-heading-progress.png",
+    "title": "Прогресс",
+    "box": {
+      "x": 12,
+      "y": 90.75,
+      "width": 193,
+      "height": 34.5,
+      "top": 90.75,
+      "right": 205,
+      "bottom": 125.25,
+      "left": 12
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  },
+  {
+    "state": "after",
+    "width": 393,
+    "theme": "light",
+    "section": "report",
+    "name": "webkit-393-light-heading-report.png",
+    "title": "Отчёт о прогрессе",
+    "box": {
+      "x": 36,
+      "y": 224,
+      "width": 321,
+      "height": 33.59375,
+      "top": 224,
+      "right": 357,
+      "bottom": 257.59375,
+      "left": 36
+    },
+    "font": "Oswald, Arial Narrow, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "bodyFont": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"
+  }
+]

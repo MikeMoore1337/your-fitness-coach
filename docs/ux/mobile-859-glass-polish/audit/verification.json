@@ -1,0 +1,33 @@
+{
+  "head": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "runtime_capture_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "base_master": "ecb74acb45d1f63344a5ea4ac6986c905af160a0",
+  "frontend_unit": 807,
+  "backend_report_tests": 8,
+  "addressed_browser_cases": 65,
+  "critical_visual_cases_per_environment": 10,
+  "engines": [
+    "Chromium",
+    "WebKit"
+  ],
+  "widths": [
+    320,
+    360,
+    393,
+    430
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ],
+  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38054058067",
+  "ci_status": "success",
+  "unsupported_backdrop": "Real @supports opt-in removed via CSSOM in both engines; simulated unsupported engine",
+  "reduced_transparency": "Real media rule activated via CSSOM in both engines; Chromium CDP also covered by existing soft-glass suite",
+  "keyboard": "Editable focus plus visual/Telegram viewport models, not physical OS keyboard",
+  "data": "Synthetic API fixtures; real application production build, not deployed production",
+  "merge": false,
+  "deploy": false,
+  "env_change_required": false,
+  "final_status": "STOP_OWNER_RELEASE_APPROVAL"
+}

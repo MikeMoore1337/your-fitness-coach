@@ -1,0 +1,3682 @@
+{
+  "before_commit": "c7feee423c98b3f02b24244ee972484eaa40852c",
+  "runtime_capture_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "acceptance_head": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38054058067",
+  "screenshots": [
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-320-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-320-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-320-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-320-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-320-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-320-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-320-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-320-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-320-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-320-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-360-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-360-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-360-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-360-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-360-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-360-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-360-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-360-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-360-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-360-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-393-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-393-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-393-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-393-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-393-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-393-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-393-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-393-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-393-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-393-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-430-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-430-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-430-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-430-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-430-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/chromium-430-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/chromium-430-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-430-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/chromium-430-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/chromium-430-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-320-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-320-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-320-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-320-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-320-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-320-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-320-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-320-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-320-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-320-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "before/webkit-360-dark-heading-nutrition.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "before/webkit-360-dark-heading-programs.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-dark-heading-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "before/webkit-360-dark-heading-report.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "before/webkit-360-dark-heading-today.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-360-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-360-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-360-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-360-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "before/webkit-360-light-heading-nutrition.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "before/webkit-360-light-heading-programs.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-light-heading-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "before/webkit-360-light-heading-report.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "before/webkit-360-light-heading-today.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-360-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-360-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-360-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-360-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "before/webkit-393-dark-heading-nutrition.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "before/webkit-393-dark-heading-programs.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-dark-heading-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "before/webkit-393-dark-heading-report.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "before/webkit-393-dark-heading-today.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-393-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-393-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-393-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-393-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "before/webkit-393-light-heading-nutrition.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "before/webkit-393-light-heading-programs.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-light-heading-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "before/webkit-393-light-heading-report.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "before/webkit-393-light-heading-today.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-393-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-393-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-393-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-393-light-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-430-dark-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-430-dark-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-430-dark-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-430-dark-scroll.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "before/webkit-430-light-menu.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "before/webkit-430-light-progress-bottom.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-light-progress.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "before/webkit-430-light-navigation.png"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "before/webkit-430-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "1440",
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/chromium-1440-dark-desktop.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "1440",
+      "theme": "light",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/chromium-1440-light-desktop.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-320-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-320-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-320-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-320-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-320-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-320-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-320-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-320-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-320-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-320-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-360-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-360-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-360-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-360-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-360-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/chromium-360-dark-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/chromium-360-dark-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-360-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-360-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-360-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-360-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-360-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/chromium-360-light-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/chromium-360-light-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-393-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-393-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-393-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-393-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-20a",
+      "label": "Прокрутка 20%",
+      "path": "after/chromium-393-dark-scroll-20a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-50a",
+      "label": "Прокрутка 50%",
+      "path": "after/chromium-393-dark-scroll-50a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-85a",
+      "label": "Прокрутка 85%",
+      "path": "after/chromium-393-dark-scroll-85a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-393-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/chromium-393-dark-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/chromium-393-dark-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-393-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-393-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-393-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-393-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-20a",
+      "label": "Прокрутка 20%",
+      "path": "after/chromium-393-light-scroll-20a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-50a",
+      "label": "Прокрутка 50%",
+      "path": "after/chromium-393-light-scroll-50a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-85a",
+      "label": "Прокрутка 85%",
+      "path": "after/chromium-393-light-scroll-85a.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-393-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/chromium-393-light-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/chromium-393-light-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-430-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-430-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-430-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-430-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-430-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/chromium-430-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/chromium-430-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-430-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/chromium-430-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/chromium-430-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "1440",
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/webkit-1440-dark-desktop.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "1440",
+      "theme": "light",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/webkit-1440-light-desktop.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-320-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-320-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-320-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-320-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-320-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-320-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-320-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-320-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-320-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-320-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "after/webkit-360-dark-heading-nutrition.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "after/webkit-360-dark-heading-programs.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-dark-heading-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "after/webkit-360-dark-heading-report.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "after/webkit-360-dark-heading-today.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-360-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-360-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-360-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-360-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/webkit-360-dark-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/webkit-360-dark-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "after/webkit-360-light-heading-nutrition.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "after/webkit-360-light-heading-programs.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-light-heading-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "after/webkit-360-light-heading-report.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "after/webkit-360-light-heading-today.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-360-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-360-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-360-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-360-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/webkit-360-light-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/webkit-360-light-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "after/webkit-393-dark-heading-nutrition.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "after/webkit-393-dark-heading-programs.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-dark-heading-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "after/webkit-393-dark-heading-report.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "after/webkit-393-dark-heading-today.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-393-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-393-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-393-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-20a",
+      "label": "Прокрутка 20%",
+      "path": "after/webkit-393-dark-scroll-20a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-50a",
+      "label": "Прокрутка 50%",
+      "path": "after/webkit-393-dark-scroll-50a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-85a",
+      "label": "Прокрутка 85%",
+      "path": "after/webkit-393-dark-scroll-85a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-393-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/webkit-393-dark-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/webkit-393-dark-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-nutrition",
+      "label": "Питание",
+      "path": "after/webkit-393-light-heading-nutrition.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-programs",
+      "label": "План",
+      "path": "after/webkit-393-light-heading-programs.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-light-heading-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-report",
+      "label": "Отчёт",
+      "path": "after/webkit-393-light-heading-report.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "heading-today",
+      "label": "Сегодня",
+      "path": "after/webkit-393-light-heading-today.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-393-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-393-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-393-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-20a",
+      "label": "Прокрутка 20%",
+      "path": "after/webkit-393-light-scroll-20a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-50a",
+      "label": "Прокрутка 50%",
+      "path": "after/webkit-393-light-scroll-50a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-85a",
+      "label": "Прокрутка 85%",
+      "path": "after/webkit-393-light-scroll-85a.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-393-light-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · фокус в форме и клавиатура",
+      "path": "after/webkit-393-light-tma-keyboard.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · доступная высота 480",
+      "path": "after/webkit-393-light-tma-short.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-430-dark-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-430-dark-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-430-dark-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-430-dark-scroll.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню +",
+      "path": "after/webkit-430-light-menu.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Прогресс · нижние действия",
+      "path": "after/webkit-430-light-progress-bottom.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-light-progress.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Нижняя навигация",
+      "path": "after/webkit-430-light-navigation.png"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Стекло над содержимым",
+      "path": "after/webkit-430-light-scroll.png"
+    }
+  ],
+  "comparisons": [
+    {
+      "path": "comparisons/navigation-320-dark.jpg",
+      "label": "Нижняя навигация · 320 · dark"
+    },
+    {
+      "path": "comparisons/menu-320-dark.jpg",
+      "label": "Меню + · 320 · dark"
+    },
+    {
+      "path": "comparisons/progress-320-dark.jpg",
+      "label": "Прогресс · 320 · dark"
+    },
+    {
+      "path": "comparisons/navigation-320-light.jpg",
+      "label": "Нижняя навигация · 320 · light"
+    },
+    {
+      "path": "comparisons/menu-320-light.jpg",
+      "label": "Меню + · 320 · light"
+    },
+    {
+      "path": "comparisons/progress-320-light.jpg",
+      "label": "Прогресс · 320 · light"
+    },
+    {
+      "path": "comparisons/navigation-360-dark.jpg",
+      "label": "Нижняя навигация · 360 · dark"
+    },
+    {
+      "path": "comparisons/menu-360-dark.jpg",
+      "label": "Меню + · 360 · dark"
+    },
+    {
+      "path": "comparisons/progress-360-dark.jpg",
+      "label": "Прогресс · 360 · dark"
+    },
+    {
+      "path": "comparisons/navigation-360-light.jpg",
+      "label": "Нижняя навигация · 360 · light"
+    },
+    {
+      "path": "comparisons/menu-360-light.jpg",
+      "label": "Меню + · 360 · light"
+    },
+    {
+      "path": "comparisons/progress-360-light.jpg",
+      "label": "Прогресс · 360 · light"
+    },
+    {
+      "path": "comparisons/navigation-393-dark.jpg",
+      "label": "Нижняя навигация · 393 · dark"
+    },
+    {
+      "path": "comparisons/menu-393-dark.jpg",
+      "label": "Меню + · 393 · dark"
+    },
+    {
+      "path": "comparisons/progress-393-dark.jpg",
+      "label": "Прогресс · 393 · dark"
+    },
+    {
+      "path": "comparisons/navigation-393-light.jpg",
+      "label": "Нижняя навигация · 393 · light"
+    },
+    {
+      "path": "comparisons/menu-393-light.jpg",
+      "label": "Меню + · 393 · light"
+    },
+    {
+      "path": "comparisons/progress-393-light.jpg",
+      "label": "Прогресс · 393 · light"
+    },
+    {
+      "path": "comparisons/navigation-430-dark.jpg",
+      "label": "Нижняя навигация · 430 · dark"
+    },
+    {
+      "path": "comparisons/menu-430-dark.jpg",
+      "label": "Меню + · 430 · dark"
+    },
+    {
+      "path": "comparisons/progress-430-dark.jpg",
+      "label": "Прогресс · 430 · dark"
+    },
+    {
+      "path": "comparisons/navigation-430-light.jpg",
+      "label": "Нижняя навигация · 430 · light"
+    },
+    {
+      "path": "comparisons/menu-430-light.jpg",
+      "label": "Меню + · 430 · light"
+    },
+    {
+      "path": "comparisons/progress-430-light.jpg",
+      "label": "Прогресс · 430 · light"
+    },
+    {
+      "path": "comparisons/headings-360-dark.jpg",
+      "label": "Заголовки · 360 · dark"
+    },
+    {
+      "path": "comparisons/headings-360-light.jpg",
+      "label": "Заголовки · 360 · light"
+    },
+    {
+      "path": "comparisons/headings-393-dark.jpg",
+      "label": "Заголовки · 393 · dark"
+    },
+    {
+      "path": "comparisons/headings-393-light.jpg",
+      "label": "Заголовки · 393 · light"
+    }
+  ],
+  "files": [
+    {
+      "path": "after/chromium-1440-dark-desktop.png",
+      "bytes": 218901,
+      "sha256": "372f130bd3f1f50c452c03c69f44cfabb3bcab1c2763c3dcffe9636e9a506671"
+    },
+    {
+      "path": "after/chromium-1440-light-desktop.png",
+      "bytes": 223240,
+      "sha256": "ff5c11e8940f750776634226c266bd62740c4c7962ae8c1950e5741ff7e8f246"
+    },
+    {
+      "path": "after/chromium-320-dark-menu.png",
+      "bytes": 104214,
+      "sha256": "3761195ee8af87cde0192e66480719aada930bc167e23f4d0bd7684fcd6c9fee"
+    },
+    {
+      "path": "after/chromium-320-dark-navigation.png",
+      "bytes": 19267,
+      "sha256": "d69f593b1875e34ac54450f33121908d00c032cc214ee0d71999563a6c85c27c"
+    },
+    {
+      "path": "after/chromium-320-dark-progress-bottom.png",
+      "bytes": 58552,
+      "sha256": "e0c300effed8193c124b1b795e71d391aab36b3670b48b32f900110ebcba191e"
+    },
+    {
+      "path": "after/chromium-320-dark-progress.png",
+      "bytes": 80709,
+      "sha256": "f560b4c24007156d3004d0f65ee11797cfa7477e6e5ee61dfb1a147ab4a17ae1"
+    },
+    {
+      "path": "after/chromium-320-dark-scroll.png",
+      "bytes": 116576,
+      "sha256": "46ea2e1cffd6277bfacddc80423dff4d75c9cb4b8cac756208bdf69c0003f4b4"
+    },
+    {
+      "path": "after/chromium-320-light-menu.png",
+      "bytes": 100506,
+      "sha256": "e1c5b02b05090ff28c7310f844e6520c57bb6aa29e10fdb0975fa637b34ccb95"
+    },
+    {
+      "path": "after/chromium-320-light-navigation.png",
+      "bytes": 19826,
+      "sha256": "fc64f9b5e16dd75cd4f2425513eb912ef2e156f86d43884f50846841874da12d"
+    },
+    {
+      "path": "after/chromium-320-light-progress-bottom.png",
+      "bytes": 56613,
+      "sha256": "8f8911870e95b1ceaf2ffab72d5451d42ec4ec61d6238866cd29d07fc4128e4f"
+    },
+    {
+      "path": "after/chromium-320-light-progress.png",
+      "bytes": 79137,
+      "sha256": "0910b33b88a5bb4cf7842cadf07650715dc1c9d7fd1014f4c52859ce0235b00a"
+    },
+    {
+      "path": "after/chromium-320-light-scroll.png",
+      "bytes": 113282,
+      "sha256": "f42261bef793c144a7f5f4cd4ffeacab975d4c2c5694670e94529ada64c0dd8b"
+    },
+    {
+      "path": "after/chromium-360-dark-menu.png",
+      "bytes": 109475,
+      "sha256": "6052543ca292ca0f345640841e3136f3e169732c2f64f05adce19128fe353713"
+    },
+    {
+      "path": "after/chromium-360-dark-navigation.png",
+      "bytes": 19038,
+      "sha256": "6291ed0839d125a1f45e682dfb6fc5e0398faaf688dd4094385cd36edfc3c4aa"
+    },
+    {
+      "path": "after/chromium-360-dark-progress-bottom.png",
+      "bytes": 60317,
+      "sha256": "b2aa1c63f87eb62fafa1e0dca33526e1710843856b1f5a25450921ca9fd35bf1"
+    },
+    {
+      "path": "after/chromium-360-dark-progress.png",
+      "bytes": 83435,
+      "sha256": "83fc3cd7703b0a324db7ebbdce7622618595977d3df69bbacffe86976a250355"
+    },
+    {
+      "path": "after/chromium-360-dark-scroll.png",
+      "bytes": 129480,
+      "sha256": "25f41aeb0e598cafdbd0c358711fe668a8b02c81c748f004044abb6fe28aa848"
+    },
+    {
+      "path": "after/chromium-360-dark-tma-keyboard.png",
+      "bytes": 65651,
+      "sha256": "e93c8080eb5c5fbaf68689a094243927897ef1f09bf810323072226297a3108e"
+    },
+    {
+      "path": "after/chromium-360-dark-tma-short.png",
+      "bytes": 103578,
+      "sha256": "c36a2e4614ea51898ccbfe2185816354d0d5cbb079f3ca5ff2519a5257f46493"
+    },
+    {
+      "path": "after/chromium-360-light-menu.png",
+      "bytes": 106514,
+      "sha256": "cedbcc38f0c3ff9738a3b241ea11bc4f5f30e4cc423f650a95b8645b48d1bfe9"
+    },
+    {
+      "path": "after/chromium-360-light-navigation.png",
+      "bytes": 19589,
+      "sha256": "258010ce2de263ee8aa00f2e143343d167727a295587aab7430a827bbf25139c"
+    },
+    {
+      "path": "after/chromium-360-light-progress-bottom.png",
+      "bytes": 58828,
+      "sha256": "4ffe39502821484d5b27d2894340f2e50dea5de343a163ebc50cbb999c352f1b"
+    },
+    {
+      "path": "after/chromium-360-light-progress.png",
+      "bytes": 81884,
+      "sha256": "e7aaeacd2be5d25dc7f7d636408a7f80572c42abea89ebc0599eea150ac6b7b7"
+    },
+    {
+      "path": "after/chromium-360-light-scroll.png",
+      "bytes": 127032,
+      "sha256": "b65f0e0b221898f25ba5036fbcad97b2c841ddd36c2481666b65b4ba8186ef65"
+    },
+    {
+      "path": "after/chromium-360-light-tma-keyboard.png",
+      "bytes": 63582,
+      "sha256": "799268768a617c26f57b0385bec96c5fdb7bf9455ea7acf6a32333efc6a5bed4"
+    },
+    {
+      "path": "after/chromium-360-light-tma-short.png",
+      "bytes": 97426,
+      "sha256": "d02f9365b6c7795cac9399639d19b3a5d16a117d28bc2a419063367266b2894a"
+    },
+    {
+      "path": "after/chromium-393-dark-menu.png",
+      "bytes": 114620,
+      "sha256": "41c2c3556e86493242753813318be86de0111e565853815f517981145601e585"
+    },
+    {
+      "path": "after/chromium-393-dark-navigation.png",
+      "bytes": 19587,
+      "sha256": "b96ade915dd8dff4d573f8a0021aa3768e46be2204cebc2511be55cc1192b922"
+    },
+    {
+      "path": "after/chromium-393-dark-progress-bottom.png",
+      "bytes": 61308,
+      "sha256": "9d2b709a839911308baed820fb258525c9ea15ef725c6f534b5a828dc7944c86"
+    },
+    {
+      "path": "after/chromium-393-dark-progress.png",
+      "bytes": 87272,
+      "sha256": "00cf54ec6228c4ea269d1eee823f75790be29e6922f6dea9c88ee9052703ebcf"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-20a.png",
+      "bytes": 20619,
+      "sha256": "0b9f114b2206d71fa4f2f2a5f558fdc875d768354545b387f41efa4547beb224"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-50a.png",
+      "bytes": 21446,
+      "sha256": "b08481fbae7b65b9a18799fbd781880c28c254554c492b5f7deb38f2504d3417"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-85a.png",
+      "bytes": 15921,
+      "sha256": "d8c93b090796416db9595fd802ee072abfcdf30dcbb16a2f3bf9cacb4ccb4bef"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll.png",
+      "bytes": 63802,
+      "sha256": "3dbf0f2a986e3babb4a6317f9aaa6dbbb407aaa456b6cf9017e550a830a8f1f6"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-keyboard.png",
+      "bytes": 69290,
+      "sha256": "d56cb2c76d444af56e2e36666c208b44c00aa96037ab31e62686be8d0fd8b084"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-short.png",
+      "bytes": 108554,
+      "sha256": "700fe4fb9c5013af5b0d9f2bb95ab674eaadf8c401d39eb29fe88b5fca301371"
+    },
+    {
+      "path": "after/chromium-393-light-menu.png",
+      "bytes": 111755,
+      "sha256": "3de8236ef16202c7bd42437df52969c63dbea97473b389f41665bd67c6369800"
+    },
+    {
+      "path": "after/chromium-393-light-navigation.png",
+      "bytes": 20344,
+      "sha256": "4993e5b514ce1223ecb00dd886348495a79e9de8b726f26bb03f05c34ba10245"
+    },
+    {
+      "path": "after/chromium-393-light-progress-bottom.png",
+      "bytes": 60234,
+      "sha256": "7a7020534932e2ddf2030896c049613b3b06fbee02ccf2f6b5d7e3ab4e784901"
+    },
+    {
+      "path": "after/chromium-393-light-progress.png",
+      "bytes": 85929,
+      "sha256": "8d43d82c31ae1139bfd1046531479fcad8fabe0c6a6f6e32c56799ed101bc4e8"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-20a.png",
+      "bytes": 21742,
+      "sha256": "2f87334c28306e0ff7beecef700fe62c41db9607edd840a2496ef565c98d7f8e"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-50a.png",
+      "bytes": 21579,
+      "sha256": "b30e7a6c7834705a6e461156a410c31c023be787067192391307f8abb9461ca3"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-85a.png",
+      "bytes": 18003,
+      "sha256": "a70903a89fa211c383bba6b0bb402f5f603fd79cb86825ebf5de4b54871b417c"
+    },
+    {
+      "path": "after/chromium-393-light-scroll.png",
+      "bytes": 130224,
+      "sha256": "45d9a7d90bf34f600001063dd8a79f5fd8925968d7c5caead0d98849f71b41e5"
+    },
+    {
+      "path": "after/chromium-393-light-tma-keyboard.png",
+      "bytes": 67049,
+      "sha256": "191baadecc327ab5990250d8593e3a02698a59f519b23be4e549bff96d8bcea3"
+    },
+    {
+      "path": "after/chromium-393-light-tma-short.png",
+      "bytes": 101903,
+      "sha256": "3354d4a06d6633fca5f3ccba04da80d1b22fbbfc2d006920ba681358088ab358"
+    },
+    {
+      "path": "after/chromium-430-dark-menu.png",
+      "bytes": 118643,
+      "sha256": "d0e966b033c175c973d33e4cb91e3c13224c4fd9fed6901d74b8012b1bcdf992"
+    },
+    {
+      "path": "after/chromium-430-dark-navigation.png",
+      "bytes": 20192,
+      "sha256": "b0ec778416e1e17abdbefadfce2642f9b83a8cffd5a4fb4701351b79f1b12dbc"
+    },
+    {
+      "path": "after/chromium-430-dark-progress-bottom.png",
+      "bytes": 61206,
+      "sha256": "eab17aaee47f37a7b365623615db3321656164502049572e5b33a0a708328e7d"
+    },
+    {
+      "path": "after/chromium-430-dark-progress.png",
+      "bytes": 89498,
+      "sha256": "0b8843f8a497607c2c16258017f14a2e179d9ce595aa0f13965a8475f247a458"
+    },
+    {
+      "path": "after/chromium-430-dark-scroll.png",
+      "bytes": 64358,
+      "sha256": "46eb56fa51e60b21378ffb8ed2a8d007b6c7c377005f940a5a219dbbc3678fa5"
+    },
+    {
+      "path": "after/chromium-430-light-menu.png",
+      "bytes": 116857,
+      "sha256": "710e1e037473b076267c7eaa9f24adc608cd5bb4c2baf53999c6c248ca63afac"
+    },
+    {
+      "path": "after/chromium-430-light-navigation.png",
+      "bytes": 20926,
+      "sha256": "d6e2032d0a5c494dbd596e1e9f2d5d2067aa66855cb388c498b7e576202d29b0"
+    },
+    {
+      "path": "after/chromium-430-light-progress-bottom.png",
+      "bytes": 60285,
+      "sha256": "8a3b88a839df8be2cb9725812637790d1a99491bd5eb3c4f363c5c79ff0fb5a7"
+    },
+    {
+      "path": "after/chromium-430-light-progress.png",
+      "bytes": 88597,
+      "sha256": "d8f84c89b84618c804cc52fcb7b9c723c66468335deef992a98f256c01ff2690"
+    },
+    {
+      "path": "after/chromium-430-light-scroll.png",
+      "bytes": 134829,
+      "sha256": "efa877f03ccfd34d006961bdffaccf16736e80eb9b596c6d5ea8878305705096"
+    },
+    {
+      "path": "after/webkit-1440-dark-desktop.png",
+      "bytes": 136621,
+      "sha256": "9eea396f5ebb3108bbf9137088cb796fbefc1b7f6a67b03c9b32d9728ec64130"
+    },
+    {
+      "path": "after/webkit-1440-light-desktop.png",
+      "bytes": 118978,
+      "sha256": "affd2767641ba011ad772ed1e64cc3cd8d807245735fc59748ccaff695a4353e"
+    },
+    {
+      "path": "after/webkit-320-dark-menu.png",
+      "bytes": 76910,
+      "sha256": "1cffd982e12794cc1d21a667b9c965c5fee2d1cf13b6ff4d8076aab47a096983"
+    },
+    {
+      "path": "after/webkit-320-dark-navigation.png",
+      "bytes": 16842,
+      "sha256": "402a7d0964bd375591aa9a8302535af84cab1bfa4261c72c35789204683b211e"
+    },
+    {
+      "path": "after/webkit-320-dark-progress-bottom.png",
+      "bytes": 44898,
+      "sha256": "31ded9ce395a45b68f6cb6f3f56ec23093f6a7b4028f949393b06cb7d4f5b2a2"
+    },
+    {
+      "path": "after/webkit-320-dark-progress.png",
+      "bytes": 60156,
+      "sha256": "9a00ff6ae6f4bce677fed19f0adaf6b9c6c44338c35af59963bf1ea08d519d88"
+    },
+    {
+      "path": "after/webkit-320-dark-scroll.png",
+      "bytes": 47097,
+      "sha256": "486a065a99807b128f152ee124319df7158eac3c7ef9015c03b5161407b90a75"
+    },
+    {
+      "path": "after/webkit-320-light-menu.png",
+      "bytes": 67706,
+      "sha256": "2fc383f82c04654e0200bd133fae79f4de5cd42c94a74d6ea66a6967e177b34a"
+    },
+    {
+      "path": "after/webkit-320-light-navigation.png",
+      "bytes": 17783,
+      "sha256": "2a2174e7b2e45286f608db4583f01515b9b5b6b172b920f42706e05f29a2dcf5"
+    },
+    {
+      "path": "after/webkit-320-light-progress-bottom.png",
+      "bytes": 43764,
+      "sha256": "f891037d589d541551fd1528c82e4528b8591f89b3fdf7d712269827f6492b05"
+    },
+    {
+      "path": "after/webkit-320-light-progress.png",
+      "bytes": 56298,
+      "sha256": "8f589aa199908e81ad4593b4e6e9610e5e77d2c3a9d746c25e461c8a63b0c6f0"
+    },
+    {
+      "path": "after/webkit-320-light-scroll.png",
+      "bytes": 46124,
+      "sha256": "fe61254cca10a5371a7042be4aa03721208cf4af43a5906a57dcbd11877e0e95"
+    },
+    {
+      "path": "after/webkit-360-dark-heading-nutrition.png",
+      "bytes": 52129,
+      "sha256": "338f3c89358546ce66d2dff34f17a3258e6c783da4eb9ff50f28f22f53fa3e1e"
+    },
+    {
+      "path": "after/webkit-360-dark-heading-programs.png",
+      "bytes": 45757,
+      "sha256": "15f389a2c3cb682a573b54a45e19c78ef28755b2b8afaf1c0bad778ecc6e4b15"
+    },
+    {
+      "path": "after/webkit-360-dark-heading-progress.png",
+      "bytes": 62012,
+      "sha256": "fb334e98e6f5be7c42f6bff490647cb46e3745db384e9e0e346d896aeede8e2c"
+    },
+    {
+      "path": "after/webkit-360-dark-heading-report.png",
+      "bytes": 41556,
+      "sha256": "e19a6cd5fa35a8f9292bb5c5a2b117c4c8a066415f38d8e8d576a7b1ec37e63b"
+    },
+    {
+      "path": "after/webkit-360-dark-heading-today.png",
+      "bytes": 118926,
+      "sha256": "ddabde8d5d2800a270f70e10d1212a012cb64d1e4d9c31fb181db48a45e70485"
+    },
+    {
+      "path": "after/webkit-360-dark-menu.png",
+      "bytes": 79684,
+      "sha256": "f5551c674d64b797da79db22448f63b7602bba5cc044c35967edae70f56b6360"
+    },
+    {
+      "path": "after/webkit-360-dark-navigation.png",
+      "bytes": 17494,
+      "sha256": "112ba3ed48bd5ec6e206656e4bf0845a938d1ded1fcbca49b02e3b8ec7ef4741"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-bottom.png",
+      "bytes": 46053,
+      "sha256": "114fca7cea0d2c5a9aadf278a460d603ac9f7f282dc609edd00bbd871f29dc4d"
+    },
+    {
+      "path": "after/webkit-360-dark-progress.png",
+      "bytes": 62239,
+      "sha256": "9d04472828ec0abce634a0c11d63735e54da22c7be9525464be455994a09395d"
+    },
+    {
+      "path": "after/webkit-360-dark-scroll.png",
+      "bytes": 51371,
+      "sha256": "cd7b90a4e7fc2e7059df8ce40367b46d702ccfde18610436f4835b6a2250b2f3"
+    },
+    {
+      "path": "after/webkit-360-dark-tma-keyboard.png",
+      "bytes": 48374,
+      "sha256": "8afe56ebc674ef5716fc66e5247d052b6a91f9dbd9d0d11d3d805f7abb58cb6b"
+    },
+    {
+      "path": "after/webkit-360-dark-tma-short.png",
+      "bytes": 73637,
+      "sha256": "2d0e8b0e13e2b39fcd8099ed17cb3af1fb4f1efe0b1ed1319ab557a6a0a7835c"
+    },
+    {
+      "path": "after/webkit-360-light-heading-nutrition.png",
+      "bytes": 51267,
+      "sha256": "3c1cc9f32471d4079415e6584066623776eb05e047897233ebbdb358e14d32cd"
+    },
+    {
+      "path": "after/webkit-360-light-heading-programs.png",
+      "bytes": 45284,
+      "sha256": "521b970ca60e44bd829081e8b91e9ba104bf973dece5ad8a0459cfcc77347f02"
+    },
+    {
+      "path": "after/webkit-360-light-heading-progress.png",
+      "bytes": 57895,
+      "sha256": "2de97b79b15060fda4ecc40cc8f49c4e045a472d8375b633f93a426eb19df10e"
+    },
+    {
+      "path": "after/webkit-360-light-heading-report.png",
+      "bytes": 38906,
+      "sha256": "683a40887b9ada959b56fa330700df18585aa555c97d5c36e3905f0c505b93d7"
+    },
+    {
+      "path": "after/webkit-360-light-heading-today.png",
+      "bytes": 118263,
+      "sha256": "758e4ad377addc581b68bd9b870264dfc88960fb8043ddacf2555bdd43c67a3f"
+    },
+    {
+      "path": "after/webkit-360-light-menu.png",
+      "bytes": 69250,
+      "sha256": "77032060ece2f9081711804b8dfd786823e280a1e29c9252d5a2181fb9301438"
+    },
+    {
+      "path": "after/webkit-360-light-navigation.png",
+      "bytes": 18495,
+      "sha256": "8a0c1ca29a10c10d44853f260ad62d4ca329c3d7b543654022189b660cd6822d"
+    },
+    {
+      "path": "after/webkit-360-light-progress-bottom.png",
+      "bytes": 44856,
+      "sha256": "b12ddbb9bc568014a34cbac476856c95c5b741e6b1a6d27d9c3bf9160a2e5545"
+    },
+    {
+      "path": "after/webkit-360-light-progress.png",
+      "bytes": 57882,
+      "sha256": "05ccffd93822dd9ba6e9f87e571640d455f40d29d211b8ee6c576f944336eb8f"
+    },
+    {
+      "path": "after/webkit-360-light-scroll.png",
+      "bytes": 50359,
+      "sha256": "4a97a0b004a68ad8b73f23711679b0e6bd0029b0cad7454ad4e5642f204e79e4"
+    },
+    {
+      "path": "after/webkit-360-light-tma-keyboard.png",
+      "bytes": 45949,
+      "sha256": "dcffedd0382462163b0fbacb23ceb0eb8fafedcfe32bfc7f678891f60265eadf"
+    },
+    {
+      "path": "after/webkit-360-light-tma-short.png",
+      "bytes": 67265,
+      "sha256": "2a895759ebfebb4dcd45269e4fa2e301a676064049c0985de5001be2229808ad"
+    },
+    {
+      "path": "after/webkit-393-dark-heading-nutrition.png",
+      "bytes": 52909,
+      "sha256": "bf4795eb330c61eb187a31643d47f4f886f83fc9e61f21e24a37cd2a33814be6"
+    },
+    {
+      "path": "after/webkit-393-dark-heading-programs.png",
+      "bytes": 46604,
+      "sha256": "787b70b1dd245dc9dd36077c24bdd2a3205de2b5f0689724f5c7b3e6983868e1"
+    },
+    {
+      "path": "after/webkit-393-dark-heading-progress.png",
+      "bytes": 63817,
+      "sha256": "145f588b71c0d7290a3ca7b4365a5630a328841cb611f6084d9d822354be2620"
+    },
+    {
+      "path": "after/webkit-393-dark-heading-report.png",
+      "bytes": 43932,
+      "sha256": "bced9c075618322e9e72f5830114f006273b1f47ea2400b14375c3dbb5b121c8"
+    },
+    {
+      "path": "after/webkit-393-dark-heading-today.png",
+      "bytes": 123644,
+      "sha256": "aa90902db4a7ddbbeb5865f2c84b315d18f3071a7e72be3093306a5e747d1332"
+    },
+    {
+      "path": "after/webkit-393-dark-menu.png",
+      "bytes": 82262,
+      "sha256": "fc739275ebb98a240249c660904492101bc194cfbba756acb4822a8eb5337dd9"
+    },
+    {
+      "path": "after/webkit-393-dark-navigation.png",
+      "bytes": 17676,
+      "sha256": "904bb86700faad8755c4e6e24cce43137e0a4c836af04d51daf63fbdad36af6d"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-bottom.png",
+      "bytes": 46985,
+      "sha256": "3b3a6b4378e1570ee4c71e7a8352e83be4c52cbe702a1ff3978c5feaab73a06a"
+    },
+    {
+      "path": "after/webkit-393-dark-progress.png",
+      "bytes": 64088,
+      "sha256": "05b88d1ee4348709ec03c863cc2893c080e971debc33f799761bbd8ad5e6af53"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-20a.png",
+      "bytes": 16879,
+      "sha256": "d5aa0ab5060910e69ec1550f3870cc41045f03e38ec34fe90e0bfbd835551113"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-50a.png",
+      "bytes": 18467,
+      "sha256": "6ac3acd611112b2b3656ebc198ffa33328b3bb83653814c8c6bc239518131869"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-85a.png",
+      "bytes": 12744,
+      "sha256": "cccd7304b0d3dc662cb5e085c8ef88e34ebc89819650a7ccd0bf70876256f898"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll.png",
+      "bytes": 69243,
+      "sha256": "2c5ae443effd246bd6eb3f470332c3fd7a9a4799121cfb2f2c4cb2c216a0a992"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-keyboard.png",
+      "bytes": 54579,
+      "sha256": "f4dc5c7166540b1142f7c056b17e520ae051d6a4b8c42327854f7fcf1fbadafb"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-short.png",
+      "bytes": 75811,
+      "sha256": "81dc2a003df3177599fd56ec839686dab104aeacbda45d10a5f8d34600a1cf65"
+    },
+    {
+      "path": "after/webkit-393-light-heading-nutrition.png",
+      "bytes": 52336,
+      "sha256": "d956cd6a80ae302f49f7f6b1fd654b3d55c48eaa4625100a4c4f7b4a1d62b7d6"
+    },
+    {
+      "path": "after/webkit-393-light-heading-programs.png",
+      "bytes": 46512,
+      "sha256": "3275e0ad8180e4b63687013998d89c10192af0f8762bc551ec1f34daa9a39f2f"
+    },
+    {
+      "path": "after/webkit-393-light-heading-progress.png",
+      "bytes": 59879,
+      "sha256": "d0b19f051e4dd05fea1e4cd460813f8f44d533a494ec1fff03ecdc1a1ee2f9eb"
+    },
+    {
+      "path": "after/webkit-393-light-heading-report.png",
+      "bytes": 41313,
+      "sha256": "b6a4da0594690457cadae83b0687a6c6daeefc5a666c9cf4a57ba47e097bd1aa"
+    },
+    {
+      "path": "after/webkit-393-light-heading-today.png",
+      "bytes": 123662,
+      "sha256": "71568007e5d475970ae79a918a225358f641e8a9e55618d09e95b0818e5e255c"
+    },
+    {
+      "path": "after/webkit-393-light-menu.png",
+      "bytes": 71533,
+      "sha256": "62c01c5b1f19419ef6bd438b8d587fa4a6b9573f7133c275be0ba108573b0772"
+    },
+    {
+      "path": "after/webkit-393-light-navigation.png",
+      "bytes": 18919,
+      "sha256": "bcc49da632cc80cc4e884a20b983f68d5290bb3c4f90844a852e59958da0160a"
+    },
+    {
+      "path": "after/webkit-393-light-progress-bottom.png",
+      "bytes": 46000,
+      "sha256": "7b3ed03940c17c7fe6469edc6d7c1a65e6fed3872e7444b9132c3d67c83d5bc7"
+    },
+    {
+      "path": "after/webkit-393-light-progress.png",
+      "bytes": 60039,
+      "sha256": "d08dfcd072eb793190ae0ec77ea06c289e86c4eae78bdf3527ac0560d8ec76e8"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-20a.png",
+      "bytes": 17934,
+      "sha256": "3abed293dbd769250ad2e27d7400eaf1487194b481e6412356869f863f453036"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-50a.png",
+      "bytes": 19416,
+      "sha256": "78a5e0179e8cf0830d7122656f8b476944398b2c54482cce6dc2638ae4b479c9"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-85a.png",
+      "bytes": 14717,
+      "sha256": "23ed85af9ebde58d66df61aef18c302df39f8c8188f8d9825cc4f0fe939b23ef"
+    },
+    {
+      "path": "after/webkit-393-light-scroll.png",
+      "bytes": 68349,
+      "sha256": "2a1f3bd5357215ba066fc8db2b7ec82c91e00637cba8120d562cc9e88e567273"
+    },
+    {
+      "path": "after/webkit-393-light-tma-keyboard.png",
+      "bytes": 48561,
+      "sha256": "35cb201c33b99952dd27330517dd6ef386e4de199692b36c535fcba7f07cc38f"
+    },
+    {
+      "path": "after/webkit-393-light-tma-short.png",
+      "bytes": 69458,
+      "sha256": "d2e1fa5ae1db8eafb751c62640dbdcba8b05effcf2ac236aaed200feec86082a"
+    },
+    {
+      "path": "after/webkit-430-dark-menu.png",
+      "bytes": 84503,
+      "sha256": "ef9392ed6ba78d9e390aabb74d0249030bc13d6e20e1ce38af3944281294c40a"
+    },
+    {
+      "path": "after/webkit-430-dark-navigation.png",
+      "bytes": 17434,
+      "sha256": "5eb53a021d410dc53eabfe9bc7a8409a5b01d8d57dcb4319f33cf089397e5eff"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-bottom.png",
+      "bytes": 48093,
+      "sha256": "24e5f8c731c473de4925cc573feec6cf497906fdd26d5296fd3c714e4310584e"
+    },
+    {
+      "path": "after/webkit-430-dark-progress.png",
+      "bytes": 65576,
+      "sha256": "4bb775cfa49160cd7f80422e9d68aa64facf35ac8242fc6a7e46e12e1aa149de"
+    },
+    {
+      "path": "after/webkit-430-dark-scroll.png",
+      "bytes": 70086,
+      "sha256": "5bad63d8dd08151b9e1573bead8b001aabb22af996ee08302b1284c35c388225"
+    },
+    {
+      "path": "after/webkit-430-light-menu.png",
+      "bytes": 73340,
+      "sha256": "21cf531b573639b18fb576d77e471813578a15c4deec2c139d65f31dc17b80c3"
+    },
+    {
+      "path": "after/webkit-430-light-navigation.png",
+      "bytes": 19041,
+      "sha256": "763de116d39ecc2bf232defa73e571e078ac05727f4ed9c0a2b5f99e78639579"
+    },
+    {
+      "path": "after/webkit-430-light-progress-bottom.png",
+      "bytes": 47026,
+      "sha256": "7d33dc0630b6799901eb95d98b5f3f3268c0d4bb0ad4bf23631146ad89a40f3d"
+    },
+    {
+      "path": "after/webkit-430-light-progress.png",
+      "bytes": 61497,
+      "sha256": "38208eb9268b43362b68588fd593cb2bb8597a78c442a9c386f1bd2f4ad48139"
+    },
+    {
+      "path": "after/webkit-430-light-scroll.png",
+      "bytes": 69058,
+      "sha256": "602da76ab139706f5563e5dd137c20cdfc5cda4244732cdeba8e78f5bbffe49f"
+    },
+    {
+      "path": "audit/after-geometry.json",
+      "bytes": 285871,
+      "sha256": "bb0152e1a361ac7a69ed6d365daf68ec5c981bd0ab842aa44e542674d612a363"
+    },
+    {
+      "path": "audit/before-geometry.json",
+      "bytes": 271707,
+      "sha256": "2d887b80898c09bbaa9a8db3f6cdaef2ea8ed46c48982bb15fb8957479b5317b"
+    },
+    {
+      "path": "audit/changed-files.json",
+      "bytes": 14493,
+      "sha256": "8778df38e92b3327b08b9713aa87ebac542fcc0a014abcbb2d7adad7a5a37f08"
+    },
+    {
+      "path": "audit/changed-files.md",
+      "bytes": 44104,
+      "sha256": "014d23d9ff66f02aaffeb196d5933bcdcb725c9d17991d3434042dfdd0ab076a"
+    },
+    {
+      "path": "audit/ci.json",
+      "bytes": 7117,
+      "sha256": "f2e16fc10c5926a5e6df5745e9ddb399b38f8e3599eb4ff0e0b391714b7257b3"
+    },
+    {
+      "path": "audit/heading-styles.json",
+      "bytes": 23815,
+      "sha256": "c7b2fb5ca964bf35c3ce242568ef76d2ec6cb90f10c3478c43d3fa5304b5b4a6"
+    },
+    {
+      "path": "audit/pdf-verification.json",
+      "bytes": 1505,
+      "sha256": "89f42bb36f847270f016accfb3288aaf6914d210abeff263a5f90a218e4ba198"
+    },
+    {
+      "path": "audit/performance.json",
+      "bytes": 11466,
+      "sha256": "7fe075d4ecb977a78c6ced0978eed3c6cc7e4e9feebf9ac092cb95bcea062348"
+    },
+    {
+      "path": "audit/report-fixture.json",
+      "bytes": 13294,
+      "sha256": "6bb43660ce133bbd29a5f047a38d0c6c45af2de852b8d1270799b225b67eafb6"
+    },
+    {
+      "path": "audit/tma-checks.json",
+      "bytes": 2999,
+      "sha256": "49dec0b9d1c50c8055c1c92921cca222b91fc1db44905fbbe8f3638235244cac"
+    },
+    {
+      "path": "audit/verification.json",
+      "bytes": 1144,
+      "sha256": "2fc4883c0ac21f4b89f3a30e8eaaa92d81081c722cb8f89bc736bc224ddcc6a2"
+    },
+    {
+      "path": "before/chromium-320-dark-menu.png",
+      "bytes": 54778,
+      "sha256": "f66ecd5ec154b442e3403689f7e457a444b91a5668f43c9053a88657460d0d6f"
+    },
+    {
+      "path": "before/chromium-320-dark-navigation.png",
+      "bytes": 13527,
+      "sha256": "1dd805ed6761bb948a7ec5586ec40f48c0ed273af21905683ddaf6c95eb7ce34"
+    },
+    {
+      "path": "before/chromium-320-dark-progress-bottom.png",
+      "bytes": 53404,
+      "sha256": "ae60655948503d2c287909f99867e264338b7d9d50e0dd82997f59f0979290b1"
+    },
+    {
+      "path": "before/chromium-320-dark-progress.png",
+      "bytes": 68389,
+      "sha256": "6fe9d6ef0966c94f80e02c9e2b30b7879e9494c53fa66c432c14bb23eaa8cdbc"
+    },
+    {
+      "path": "before/chromium-320-dark-scroll.png",
+      "bytes": 111916,
+      "sha256": "0a56d2a15d84ce3543bb3dc89f314b7f8e27f6194a19e03a8c6066053bc658f2"
+    },
+    {
+      "path": "before/chromium-320-light-menu.png",
+      "bytes": 55667,
+      "sha256": "7484504d6964d7cbc0ad33755b934d85c5dcd68e627be2a3f5c10f154f5e3d47"
+    },
+    {
+      "path": "before/chromium-320-light-navigation.png",
+      "bytes": 13829,
+      "sha256": "f9b829f7aea4ce98e7b39dc8b21f6f89fb4cfbd6fafb2ddb5bc795b2d7d647c1"
+    },
+    {
+      "path": "before/chromium-320-light-progress-bottom.png",
+      "bytes": 50445,
+      "sha256": "fce9609f9ce2d93901d6f521894c741be992d1833ad9048902638336cc0ef689"
+    },
+    {
+      "path": "before/chromium-320-light-progress.png",
+      "bytes": 67161,
+      "sha256": "adaa0df5947189dbec37e5f85cf2ed04d293c18bda5a8013791d0a9b3366535d"
+    },
+    {
+      "path": "before/chromium-320-light-scroll.png",
+      "bytes": 49306,
+      "sha256": "3bc17590ddba64e94b69f4aba4ec55e00039af877d9445be33660ff7dc6c22c3"
+    },
+    {
+      "path": "before/chromium-360-dark-menu.png",
+      "bytes": 57654,
+      "sha256": "e08cd51a0d9c391cd08381d2959b845def3d6b9ae867e896b76fa1e5354f9c8d"
+    },
+    {
+      "path": "before/chromium-360-dark-navigation.png",
+      "bytes": 13641,
+      "sha256": "29006958a9459756e5c4b0ae59a03a6de800b2926ea660da392a737a63b22b18"
+    },
+    {
+      "path": "before/chromium-360-dark-progress-bottom.png",
+      "bytes": 54370,
+      "sha256": "c9d0c26a4ca62605b564a631c39d34f15bda2d9991bfeff48b061e02da9b2e88"
+    },
+    {
+      "path": "before/chromium-360-dark-progress.png",
+      "bytes": 74220,
+      "sha256": "7e031403dfd6ad209e1f1802c5e2fe3ba761e390c513d748060988764f338510"
+    },
+    {
+      "path": "before/chromium-360-dark-scroll.png",
+      "bytes": 121448,
+      "sha256": "6094531794e6e54df1a1f31221e17784ebd4e18c96e1e411ceca6f84691e7bea"
+    },
+    {
+      "path": "before/chromium-360-light-menu.png",
+      "bytes": 58760,
+      "sha256": "8697ca8fc6fd6de5931f8bff2b28c7e731298a1986960c232833589fc53948f1"
+    },
+    {
+      "path": "before/chromium-360-light-navigation.png",
+      "bytes": 14008,
+      "sha256": "fbc22dac0adfdfa64b63614447efb1b76b31868e7624c2bc3e7d1504965ebb7b"
+    },
+    {
+      "path": "before/chromium-360-light-progress-bottom.png",
+      "bytes": 51684,
+      "sha256": "45d193f55168002a10b1419ffecd827b5371cbdbb564f7a780a442ca063b2999"
+    },
+    {
+      "path": "before/chromium-360-light-progress.png",
+      "bytes": 72773,
+      "sha256": "e3b4da24e9047910accf923af96d15a289bd7ec24c897551dcb83efd474e3fc7"
+    },
+    {
+      "path": "before/chromium-360-light-scroll.png",
+      "bytes": 121265,
+      "sha256": "bb39e7861348e53e383ab966f5e6b0fb7cae61701452d4d00eefd03fbf6aabcc"
+    },
+    {
+      "path": "before/chromium-393-dark-menu.png",
+      "bytes": 58529,
+      "sha256": "9552556d9512d1dce636e0ed50cac21d6333b2b4dd190f28da0490d1fded2d0f"
+    },
+    {
+      "path": "before/chromium-393-dark-navigation.png",
+      "bytes": 14441,
+      "sha256": "d8c3186d982706f8e07d1d78a8bc884c055941c520e09cac67ea6bd97d1af716"
+    },
+    {
+      "path": "before/chromium-393-dark-progress-bottom.png",
+      "bytes": 54775,
+      "sha256": "0c4cd05de582739853f9fd9fbd222410cf12de809a4f22724931ab63c8291121"
+    },
+    {
+      "path": "before/chromium-393-dark-progress.png",
+      "bytes": 77237,
+      "sha256": "6e04755def868dc60c5bd9a89bed47b1abe9bc9f92e8c45a359ad865f5948516"
+    },
+    {
+      "path": "before/chromium-393-dark-scroll.png",
+      "bytes": 74220,
+      "sha256": "2665afe6bc4edc10ae36f382bdd372e2c21763236c0d3a109dcaa452730d6d93"
+    },
+    {
+      "path": "before/chromium-393-light-menu.png",
+      "bytes": 60242,
+      "sha256": "0c292165c216becd9e1c7a97285df56e0b1a2b286b71b64443952f1cfdfe97a0"
+    },
+    {
+      "path": "before/chromium-393-light-navigation.png",
+      "bytes": 14944,
+      "sha256": "b2df0ea09b18134613c6af326eea37d5e5f2b772617b02ad06ac5c225057dad7"
+    },
+    {
+      "path": "before/chromium-393-light-progress-bottom.png",
+      "bytes": 52200,
+      "sha256": "031a1910d983c524a7683523d458eaec7365a6121c711028792e2c476ef5e6aa"
+    },
+    {
+      "path": "before/chromium-393-light-progress.png",
+      "bytes": 75846,
+      "sha256": "cc491c25dafad2535611b23af5b315a21b9aae29b925132e580724d6cafac047"
+    },
+    {
+      "path": "before/chromium-393-light-scroll.png",
+      "bytes": 70785,
+      "sha256": "089733584d130e3772d6e3d2ebf4274e837361e08f6db7c9ed143b0e12922999"
+    },
+    {
+      "path": "before/chromium-430-dark-menu.png",
+      "bytes": 59540,
+      "sha256": "1786214c3c61d8d2f1946e49e2114661a9d12e07a440629e0bb14d6a48fb59f6"
+    },
+    {
+      "path": "before/chromium-430-dark-navigation.png",
+      "bytes": 14362,
+      "sha256": "687b2f23ff1cf12fc36786f7e412de59cf6ea3ba7ac2ca24e0e4b88c71b3e027"
+    },
+    {
+      "path": "before/chromium-430-dark-progress-bottom.png",
+      "bytes": 54259,
+      "sha256": "2ecd46b85967833d96520ef6feaf2707460c41018f0a1f226ce81288708c4424"
+    },
+    {
+      "path": "before/chromium-430-dark-progress.png",
+      "bytes": 79120,
+      "sha256": "1c2be8d52a457034aadda97bfabcce93d7051af286adcf89a3b491d5e813d73a"
+    },
+    {
+      "path": "before/chromium-430-dark-scroll.png",
+      "bytes": 52355,
+      "sha256": "bddae6b6d195c48afb2fa351f2a9aafac552989ce32de9ac3ac73835572bdfc7"
+    },
+    {
+      "path": "before/chromium-430-light-menu.png",
+      "bytes": 61333,
+      "sha256": "7b3fde6d9f75c03c88e356554ff7dd2cbf3cdae72ea587f52fa9c16ccc1d735d"
+    },
+    {
+      "path": "before/chromium-430-light-navigation.png",
+      "bytes": 14761,
+      "sha256": "d41382df8b56640d11ca6a07dff9583e19272adbc8cbbd2e24e4f503f6206814"
+    },
+    {
+      "path": "before/chromium-430-light-progress-bottom.png",
+      "bytes": 51776,
+      "sha256": "f464437df43f9a0c096fb3dbe7089e35f207bacd6ca8882465bf4a2bbb6333b8"
+    },
+    {
+      "path": "before/chromium-430-light-progress.png",
+      "bytes": 77934,
+      "sha256": "d822fec770c0ce700b8cbb3806acb49a694f6e678e428bd4256166fb8c5a4c7d"
+    },
+    {
+      "path": "before/chromium-430-light-scroll.png",
+      "bytes": 130662,
+      "sha256": "0c0f96410e49078877f3c43f8a6dba123010dece4f90bc2bceb468414c28fe6a"
+    },
+    {
+      "path": "before/webkit-320-dark-menu.png",
+      "bytes": 46811,
+      "sha256": "67cabef0006a4d549be90fda638266105380686f83c092f20866c114e922e4cc"
+    },
+    {
+      "path": "before/webkit-320-dark-navigation.png",
+      "bytes": 12229,
+      "sha256": "b0d71ff3b472fb030bd3dec9812deb5c3e68042bb8d75a70543e1f1f7989fc12"
+    },
+    {
+      "path": "before/webkit-320-dark-progress-bottom.png",
+      "bytes": 41072,
+      "sha256": "00d024ceb9386e284c71cfcb0c36d596320ba15e9e9b1184bb3464b2a558fc5e"
+    },
+    {
+      "path": "before/webkit-320-dark-progress.png",
+      "bytes": 51481,
+      "sha256": "804373e83598af5fb69d7e74572afd3dc666ef96e2e38efad0cc8c94ead2c526"
+    },
+    {
+      "path": "before/webkit-320-dark-scroll.png",
+      "bytes": 43890,
+      "sha256": "019d7cd43949d26e82f05d1eed113479374f1d5ad3af76862be0c3ca1c3bec7f"
+    },
+    {
+      "path": "before/webkit-320-light-menu.png",
+      "bytes": 45052,
+      "sha256": "1d54a1fc797a521add89adc9095d4fd9904a927b048bbae348d4c2be2ea634f6"
+    },
+    {
+      "path": "before/webkit-320-light-navigation.png",
+      "bytes": 12785,
+      "sha256": "4da0e8f880b0cf634a02b99285dbd62693c5334cc8a298a745de3e43c0f0f229"
+    },
+    {
+      "path": "before/webkit-320-light-progress-bottom.png",
+      "bytes": 39414,
+      "sha256": "11fdc00c6206e1e185249e7f300637073ac63383ccec57123e9734da1143f9a1"
+    },
+    {
+      "path": "before/webkit-320-light-progress.png",
+      "bytes": 47293,
+      "sha256": "1fd50f53c6df50cbcb1a02b7019cfd713192708707300a970d3ca820ba33d1c6"
+    },
+    {
+      "path": "before/webkit-320-light-scroll.png",
+      "bytes": 42007,
+      "sha256": "2b79aaf4f8526ebfd839ecc6cc65b5e9037855e97fbefd02014ad8fde24eafc1"
+    },
+    {
+      "path": "before/webkit-360-dark-heading-nutrition.png",
+      "bytes": 46901,
+      "sha256": "c1744f2497e8c435c5c0950e14124fb0d8f7d45e6a3981a3cc81c5b9a61a9b53"
+    },
+    {
+      "path": "before/webkit-360-dark-heading-programs.png",
+      "bytes": 42183,
+      "sha256": "3ee61228ec6238acdac0c638d01643930ceb6c95809cc8c9f214d9a09cea5089"
+    },
+    {
+      "path": "before/webkit-360-dark-heading-progress.png",
+      "bytes": 54859,
+      "sha256": "831de17a9d91361997a1c8827fc34297f23e6ce36988b08c17abf68ff51d41eb"
+    },
+    {
+      "path": "before/webkit-360-dark-heading-report.png",
+      "bytes": 41556,
+      "sha256": "e19a6cd5fa35a8f9292bb5c5a2b117c4c8a066415f38d8e8d576a7b1ec37e63b"
+    },
+    {
+      "path": "before/webkit-360-dark-heading-today.png",
+      "bytes": 113501,
+      "sha256": "070e106702bb74937ec2008456417da2a32c5c52c19b79cdc71f7c1d7a6839f5"
+    },
+    {
+      "path": "before/webkit-360-dark-menu.png",
+      "bytes": 48899,
+      "sha256": "bd1a9daddb64c667a6c4e96415b59a8b8bafcabbfb5184377fda97413e25c051"
+    },
+    {
+      "path": "before/webkit-360-dark-navigation.png",
+      "bytes": 12759,
+      "sha256": "76adfdbedcf12448ca791c730845001d35af9bac0fdb55c0452dee06367c6341"
+    },
+    {
+      "path": "before/webkit-360-dark-progress-bottom.png",
+      "bytes": 41993,
+      "sha256": "cc0080e8df5696fdcb223398f8b7f5fc8fe4889a31d16663bef03b4731991672"
+    },
+    {
+      "path": "before/webkit-360-dark-progress.png",
+      "bytes": 55507,
+      "sha256": "5746d63791bcfb4bef15a0d740eece8e75571bdb1ff1db619a0c11dd1b84afc8"
+    },
+    {
+      "path": "before/webkit-360-dark-scroll.png",
+      "bytes": 47027,
+      "sha256": "d911429cc270533e7b78faa36a110ed42ee5d58373ba0b56f16749621e82f4ec"
+    },
+    {
+      "path": "before/webkit-360-light-heading-nutrition.png",
+      "bytes": 45447,
+      "sha256": "6abef3f0bad4e9362ef9673778d84f544e16fe67225bf0ad5f8cdd1b132a12b8"
+    },
+    {
+      "path": "before/webkit-360-light-heading-programs.png",
+      "bytes": 41044,
+      "sha256": "9ff2551404f76b4937d4ae58cfa1e5dff001e011bcdffecef56ae1de405d340c"
+    },
+    {
+      "path": "before/webkit-360-light-heading-progress.png",
+      "bytes": 50226,
+      "sha256": "5d4137c94ca846f3545c764fd962e61d3242c3292149bd1923368a8181000313"
+    },
+    {
+      "path": "before/webkit-360-light-heading-report.png",
+      "bytes": 38906,
+      "sha256": "683a40887b9ada959b56fa330700df18585aa555c97d5c36e3905f0c505b93d7"
+    },
+    {
+      "path": "before/webkit-360-light-heading-today.png",
+      "bytes": 112066,
+      "sha256": "a34f516cd068a8aaed06097ffdb2ab5d3b116304a97caa066c188f1910f5473c"
+    },
+    {
+      "path": "before/webkit-360-light-menu.png",
+      "bytes": 46710,
+      "sha256": "2efda5a9cd52a41997624aa892b55bc7c66045871a96996c33ab116ab3215185"
+    },
+    {
+      "path": "before/webkit-360-light-navigation.png",
+      "bytes": 13300,
+      "sha256": "8d872726e3b9945ae3fb3baac1d866e90b34dfd35b96acbc3ef2445253d13ca2"
+    },
+    {
+      "path": "before/webkit-360-light-progress-bottom.png",
+      "bytes": 40275,
+      "sha256": "929247d747cb91a6efd82cd7f5408072cec3c31e8c0ff31a8a562d8ba0edbfd9"
+    },
+    {
+      "path": "before/webkit-360-light-progress.png",
+      "bytes": 50795,
+      "sha256": "6300afc05a6bf9c2c4fa194cf69f937ef10d590eb0b2a687d5d29814bf33013f"
+    },
+    {
+      "path": "before/webkit-360-light-scroll.png",
+      "bytes": 45109,
+      "sha256": "7c2c6e69a795e70b164b9512bdff7df8b01d0d109d24b1b8203779179d75b7af"
+    },
+    {
+      "path": "before/webkit-393-dark-heading-nutrition.png",
+      "bytes": 47247,
+      "sha256": "3d96fadbd7526449b7ada974a88f1aef374b079ac07d4226312141f0633a0a0d"
+    },
+    {
+      "path": "before/webkit-393-dark-heading-programs.png",
+      "bytes": 42965,
+      "sha256": "902019402d72298596e808d8b321947652c2edfd5f45fbf5a8d0b2b6a9505f96"
+    },
+    {
+      "path": "before/webkit-393-dark-heading-progress.png",
+      "bytes": 57296,
+      "sha256": "9bb63d72c0a2624de436066d72cbd9eacbd1d4b918314677260097ca93fb2bec"
+    },
+    {
+      "path": "before/webkit-393-dark-heading-report.png",
+      "bytes": 43932,
+      "sha256": "bced9c075618322e9e72f5830114f006273b1f47ea2400b14375c3dbb5b121c8"
+    },
+    {
+      "path": "before/webkit-393-dark-heading-today.png",
+      "bytes": 118372,
+      "sha256": "89b539f7b528bfd88416a6dfb37f05977600c7b11957cecf9ed1b22ad8a8a913"
+    },
+    {
+      "path": "before/webkit-393-dark-menu.png",
+      "bytes": 49651,
+      "sha256": "c0bd26457e5ded6e17c96b117a9b57a8119c6d018da578eb0208a9963d48bf59"
+    },
+    {
+      "path": "before/webkit-393-dark-navigation.png",
+      "bytes": 13347,
+      "sha256": "50ee51015c784e344123c0c0575a6656f114da5671b8802e39398b8d90452245"
+    },
+    {
+      "path": "before/webkit-393-dark-progress-bottom.png",
+      "bytes": 42825,
+      "sha256": "08c8b21d74efcbc236caceebd462ca7b46043d3e1d9210f986d1ddf1ccdc5831"
+    },
+    {
+      "path": "before/webkit-393-dark-progress.png",
+      "bytes": 57415,
+      "sha256": "44b85942ea3e1582b18f08d5f0f045b8bbcad8877950f70f2c6ff45de69950eb"
+    },
+    {
+      "path": "before/webkit-393-dark-scroll.png",
+      "bytes": 65275,
+      "sha256": "c2d5c8aad7bb742e1699ac2ea2f43599d5b394378e1602b43a75ada69325c748"
+    },
+    {
+      "path": "before/webkit-393-light-heading-nutrition.png",
+      "bytes": 45754,
+      "sha256": "acc0f2457bbc886a87d884d4be5767bf373a6b61a722d77ba68363f35d913321"
+    },
+    {
+      "path": "before/webkit-393-light-heading-programs.png",
+      "bytes": 41784,
+      "sha256": "fa9fd2b3e9c95a19b12c3088bdcfc3d036c05cbea3d810173fd1d765a9ea3def"
+    },
+    {
+      "path": "before/webkit-393-light-heading-progress.png",
+      "bytes": 52298,
+      "sha256": "8ca205f06e0fa0b92acaa397fbd674ca50ad7152a17a64088ed20a372163fb0e"
+    },
+    {
+      "path": "before/webkit-393-light-heading-report.png",
+      "bytes": 41313,
+      "sha256": "b6a4da0594690457cadae83b0687a6c6daeefc5a666c9cf4a57ba47e097bd1aa"
+    },
+    {
+      "path": "before/webkit-393-light-heading-today.png",
+      "bytes": 117016,
+      "sha256": "bd3f57da01a34cc9128764f286425b90889f9e93cdd00d43202dc4c38340d806"
+    },
+    {
+      "path": "before/webkit-393-light-menu.png",
+      "bytes": 47335,
+      "sha256": "d9c14122abcb7122da5a8f396b9cc7806522d3cfe5ff0db8b1198ed5ddebefa3"
+    },
+    {
+      "path": "before/webkit-393-light-navigation.png",
+      "bytes": 13881,
+      "sha256": "d36bff26829d3359ed293f0caa7695136d46051914e448e395bdfc818410e648"
+    },
+    {
+      "path": "before/webkit-393-light-progress-bottom.png",
+      "bytes": 40895,
+      "sha256": "a4f6c95fdba0f5d08dfd0fb55606bbd3228099206af229766a3123b7a5bab185"
+    },
+    {
+      "path": "before/webkit-393-light-progress.png",
+      "bytes": 52413,
+      "sha256": "1a566a25c088144ec8e345d3a0cb757d1e9eeda52872bd486d603d0c6d51357d"
+    },
+    {
+      "path": "before/webkit-393-light-scroll.png",
+      "bytes": 63132,
+      "sha256": "0da7fb50454b289e6e2d6e4335c179609160452ab06d21b8f718e42f9abb81ba"
+    },
+    {
+      "path": "before/webkit-430-dark-menu.png",
+      "bytes": 50565,
+      "sha256": "404d47d00837a93c52711d789e1d4e7e55a987b307ad893a8b5eb3584d4dc28b"
+    },
+    {
+      "path": "before/webkit-430-dark-navigation.png",
+      "bytes": 13438,
+      "sha256": "2117a9ee23629f3dfab78f5bf6387d413548854d3cbdf553ba6117bd36cd4515"
+    },
+    {
+      "path": "before/webkit-430-dark-progress-bottom.png",
+      "bytes": 43617,
+      "sha256": "86813681da4987229a8dd811c7b6738b2421ef8c5ffd2dd7f29afb839196d9f2"
+    },
+    {
+      "path": "before/webkit-430-dark-progress.png",
+      "bytes": 58914,
+      "sha256": "27263659e5f5ac8be58728b71fcbb7d2beafeba6dedb83a502cf57ac58c95b5f"
+    },
+    {
+      "path": "before/webkit-430-dark-scroll.png",
+      "bytes": 65700,
+      "sha256": "bf900f84c555fef8d8392a79869ab537db603fd068dcb2064d11d1305660471a"
+    },
+    {
+      "path": "before/webkit-430-light-menu.png",
+      "bytes": 47878,
+      "sha256": "2c701f939a0adbf9d83f0f33b55933f352727ce7338033499bb2d306bbcc257c"
+    },
+    {
+      "path": "before/webkit-430-light-navigation.png",
+      "bytes": 13769,
+      "sha256": "f155aac8242d76c403fca52fa23c948bf54a0078cf80c7a68867adce714542a3"
+    },
+    {
+      "path": "before/webkit-430-light-progress-bottom.png",
+      "bytes": 41559,
+      "sha256": "d612bb5e92fc59bb3b201451e50de62080080bdb7695d98100c9b8cc28dfcfef"
+    },
+    {
+      "path": "before/webkit-430-light-progress.png",
+      "bytes": 53462,
+      "sha256": "9e1f029fbea0b1607679ea611dae4477f7b1680608d40ed4991a49107ae82ba5"
+    },
+    {
+      "path": "before/webkit-430-light-scroll.png",
+      "bytes": 63530,
+      "sha256": "828b3d46c74fb8c62b7271dca41ca80267190d52d0a68b1aaa487798deb6858c"
+    },
+    {
+      "path": "comparisons/browser-pdf.jpg",
+      "bytes": 140051,
+      "sha256": "7d9ebbc9f4842357d211cbd87d0e1412d02c03ec89acba816b33ffe92e7d2ff1"
+    },
+    {
+      "path": "comparisons/ci-font-environment.jpg",
+      "bytes": 42205,
+      "sha256": "df445a59f779c56c06f40f533765027ace0b11ea660ff009638a5590d9be805a"
+    },
+    {
+      "path": "comparisons/headings-360-dark.jpg",
+      "bytes": 136827,
+      "sha256": "7c04d49e0dbff3576d9af7158bd87c6654349f3d4670e656ac24b1c05c0b0b97"
+    },
+    {
+      "path": "comparisons/headings-360-light.jpg",
+      "bytes": 129143,
+      "sha256": "d80c9348053da370e1b96fb01ae630a6b030509694a43b0a7c75413417995606"
+    },
+    {
+      "path": "comparisons/headings-393-dark.jpg",
+      "bytes": 150614,
+      "sha256": "2a40cea0e78b8d4e31551c079f0319dd810a5dc282420e28d23c4a612cdf8de5"
+    },
+    {
+      "path": "comparisons/headings-393-light.jpg",
+      "bytes": 139491,
+      "sha256": "a5c178419a5b979bbf45dae53e96558509153fb7507d26651eb38a41cd357225"
+    },
+    {
+      "path": "comparisons/menu-320-dark.jpg",
+      "bytes": 101335,
+      "sha256": "0b032812da956fb9308a9c52ebabecf2a3bcb3fa42bb0672bb7531f4792ea7cb"
+    },
+    {
+      "path": "comparisons/menu-320-light.jpg",
+      "bytes": 98910,
+      "sha256": "7cf7786ec64cffb7fcc13064eff4b1acd2bda8bed7fa781dac729d67eb57b77d"
+    },
+    {
+      "path": "comparisons/menu-360-dark.jpg",
+      "bytes": 105191,
+      "sha256": "0785d45f7e03f7967c792b8d010da2a10a7d098de732a27cfae8d750617dd900"
+    },
+    {
+      "path": "comparisons/menu-360-light.jpg",
+      "bytes": 102677,
+      "sha256": "942aed49ef1c5a4bd84465258a57e2a63cc1ac5a9cafb94dbf5a7de38dc62974"
+    },
+    {
+      "path": "comparisons/menu-393-dark.jpg",
+      "bytes": 115624,
+      "sha256": "d24d91ab1cfd7bce8112d392c9130608a1322d522e1f3046e17a8fa055e6e2f5"
+    },
+    {
+      "path": "comparisons/menu-393-light.jpg",
+      "bytes": 112427,
+      "sha256": "e3cda19d285008950135ffd11b55a3219baabb9e1280656a2d2d037a95657858"
+    },
+    {
+      "path": "comparisons/menu-430-dark.jpg",
+      "bytes": 118358,
+      "sha256": "19c6ceb2a50ad71a77bcb94728ac95dfb3c77907046875d572b4fa7dfe9e64aa"
+    },
+    {
+      "path": "comparisons/menu-430-light.jpg",
+      "bytes": 114994,
+      "sha256": "795ba9f111eaba002187839e1be87eb218aca444e29672cf80cc628266dc404f"
+    },
+    {
+      "path": "comparisons/navigation-320-dark.jpg",
+      "bytes": 29605,
+      "sha256": "18ada5332d19c8ac3a80053d33b4a1eeba5f99dbe475a2d09896d6380c2e1b78"
+    },
+    {
+      "path": "comparisons/navigation-320-light.jpg",
+      "bytes": 28033,
+      "sha256": "0e8b1a405672f3c0e71d954b55869b885e95e86045d6070401bdcc9d49af9589"
+    },
+    {
+      "path": "comparisons/navigation-360-dark.jpg",
+      "bytes": 28923,
+      "sha256": "49485f7e6cc164b0e8107b855b9d6c156b806da6a7f968cf3788bcd3504fca8f"
+    },
+    {
+      "path": "comparisons/navigation-360-light.jpg",
+      "bytes": 27469,
+      "sha256": "80e1a18dbdf07e5f187fee99242b7285869429f9167525913cf7430bb902dce9"
+    },
+    {
+      "path": "comparisons/navigation-393-dark.jpg",
+      "bytes": 32495,
+      "sha256": "34db46c682dc80578caed4f074dfc01336880ffe0bc2b975b6dfdbc933238ab1"
+    },
+    {
+      "path": "comparisons/navigation-393-light.jpg",
+      "bytes": 30580,
+      "sha256": "438ad3b729801f8960655612d536790168745a8eebca65137ab1f409afc2eb8d"
+    },
+    {
+      "path": "comparisons/navigation-430-dark.jpg",
+      "bytes": 33377,
+      "sha256": "f16d1e6e24286d59a7dc2051ae8557f0bf4357af28de1dc1d34efdc955c82aa4"
+    },
+    {
+      "path": "comparisons/navigation-430-light.jpg",
+      "bytes": 31484,
+      "sha256": "b2b02e78b5b0ac8b1f345b8f9233fa51668060c0099e73c38f9069d0c3d67c7d"
+    },
+    {
+      "path": "comparisons/progress-320-dark.jpg",
+      "bytes": 134611,
+      "sha256": "ed9faa3361ae62ab3e2c671d9f53828d233ea75cdb7122c28effd6557a1113cf"
+    },
+    {
+      "path": "comparisons/progress-320-light.jpg",
+      "bytes": 129744,
+      "sha256": "aef3b7f981272eb753111e75fc5fd083423d46a29430ba95c6ca7680e8266d2c"
+    },
+    {
+      "path": "comparisons/progress-360-dark.jpg",
+      "bytes": 141404,
+      "sha256": "fdbc301d672ee78c5016ab4d47f7431b47be705cc6740c5b6a87804efbb6e001"
+    },
+    {
+      "path": "comparisons/progress-360-light.jpg",
+      "bytes": 136374,
+      "sha256": "41f6227419971497e6f7918dd66c1f38484c7f86a872f8dfda1b67a4d7e0a41d"
+    },
+    {
+      "path": "comparisons/progress-393-dark.jpg",
+      "bytes": 154835,
+      "sha256": "c43c04a59a1123cf19e149ddbb4d052af6aa4d12e1a4ca434830822a168d2b6a"
+    },
+    {
+      "path": "comparisons/progress-393-light.jpg",
+      "bytes": 147718,
+      "sha256": "3a540bcc267989376372cd44a02479402640d7ab38890ac0f8a1254c432c2a93"
+    },
+    {
+      "path": "comparisons/progress-430-dark.jpg",
+      "bytes": 158647,
+      "sha256": "ba30ea7d7d7ddde673bd9947415663e8bbb4c62d6be16dd50c5c3e21705afdd1"
+    },
+    {
+      "path": "comparisons/progress-430-light.jpg",
+      "bytes": 152103,
+      "sha256": "a4609c590bb0dc6564b444643234b3cc1e8efa7f09f8f5a3a4dba9faebd0d860"
+    },
+    {
+      "path": "comparisons/server-pdf.jpg",
+      "bytes": 184941,
+      "sha256": "1c73edc843d625dbdfddb78dd3941a881864cb7b03ba5940aacd091e15e1008c"
+    },
+    {
+      "path": "index.html",
+      "bytes": 72448,
+      "sha256": "1ee3081cab476d4789af9d8b454085b4c0b5ede488e15f08f141755f004555fe"
+    },
+    {
+      "path": "pdf/after-browser-page-1.png",
+      "bytes": 116922,
+      "sha256": "ccf2ea321a95f30c340ba4e0fc18a18cb35822ae3399222f66cb66db3f958e09"
+    },
+    {
+      "path": "pdf/after-browser-page-2.png",
+      "bytes": 133402,
+      "sha256": "d50e1dd130b37fcf579673d5d03112dfe5ceefcd715374ace72c8b679d3f724f"
+    },
+    {
+      "path": "pdf/after-browser-page-3.png",
+      "bytes": 88322,
+      "sha256": "80314828f97398ca3d9e221615017e282e9e4539178f0074dd282fa778f9f66f"
+    },
+    {
+      "path": "pdf/after-browser-page-4.png",
+      "bytes": 106205,
+      "sha256": "aea3e5c1b4bf36fdc42f9c645bd67a16c0cf95f60f85c0992f1be52f41036098"
+    },
+    {
+      "path": "pdf/after-browser-page-5.png",
+      "bytes": 78620,
+      "sha256": "a859664cdfa9e16cc2d36346db0550b3ba9886d95c25c0e091e91ff6214cb4f8"
+    },
+    {
+      "path": "pdf/after-server-page-1.png",
+      "bytes": 134577,
+      "sha256": "00573def95a81d62eea2fa792eb92703485eec990d3322e9d5c6a60d0ed56f91"
+    },
+    {
+      "path": "pdf/after-server-page-2.png",
+      "bytes": 71500,
+      "sha256": "1aee468c293c81159205af01132cd06eadf4cecc887165d82e74608ae056301f"
+    },
+    {
+      "path": "pdf/before-browser-page-1.png",
+      "bytes": 116922,
+      "sha256": "ccf2ea321a95f30c340ba4e0fc18a18cb35822ae3399222f66cb66db3f958e09"
+    },
+    {
+      "path": "pdf/before-browser-page-2.png",
+      "bytes": 133402,
+      "sha256": "d50e1dd130b37fcf579673d5d03112dfe5ceefcd715374ace72c8b679d3f724f"
+    },
+    {
+      "path": "pdf/before-browser-page-3.png",
+      "bytes": 88322,
+      "sha256": "80314828f97398ca3d9e221615017e282e9e4539178f0074dd282fa778f9f66f"
+    },
+    {
+      "path": "pdf/before-browser-page-4.png",
+      "bytes": 106205,
+      "sha256": "aea3e5c1b4bf36fdc42f9c645bd67a16c0cf95f60f85c0992f1be52f41036098"
+    },
+    {
+      "path": "pdf/before-browser-page-5.png",
+      "bytes": 78620,
+      "sha256": "a859664cdfa9e16cc2d36346db0550b3ba9886d95c25c0e091e91ff6214cb4f8"
+    },
+    {
+      "path": "pdf/before-server-page-1.png",
+      "bytes": 134577,
+      "sha256": "00573def95a81d62eea2fa792eb92703485eec990d3322e9d5c6a60d0ed56f91"
+    },
+    {
+      "path": "pdf/before-server-page-2.png",
+      "bytes": 71500,
+      "sha256": "1aee468c293c81159205af01132cd06eadf4cecc887165d82e74608ae056301f"
+    },
+    {
+      "path": "pdf/browser-after.pdf",
+      "bytes": 424568,
+      "sha256": "b149d703d6656f53a5a7e3595db0ed30345ccab1ba8ee29a16b5dc493331b26d"
+    },
+    {
+      "path": "pdf/browser-before.pdf",
+      "bytes": 424568,
+      "sha256": "855280dc050dfca09f8ae2bf40ae00613fb6e3dd3fbcac0353830a775abe072e"
+    },
+    {
+      "path": "pdf/server-after.pdf",
+      "bytes": 41691,
+      "sha256": "bfe50c192798cb57be9cb04aa14a051cb0b924829c82085e753c6ed9137ff12f"
+    },
+    {
+      "path": "pdf/server-before.pdf",
+      "bytes": 41691,
+      "sha256": "04df4b2e711bc661acea8156b6fdba0738639ab22923c6e1af7049efe59ae1d0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 33538,
+      "sha256": "d4c2f690a439ce17ad8c63de41c7d86c80862aa8d42d9293fc4f35662da33fa2"
+    }
+  ]
+}

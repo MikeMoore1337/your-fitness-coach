@@ -1,0 +1,538 @@
+{
+  "note": "Local headless laboratory probe; Windows WebKit port, not physical iPhone FPS, Safari, field INP or Telegram runtime. Short paired samples do not establish a device performance guarantee.",
+  "samples": [
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 0,
+      "frames": 60,
+      "p50": 16,
+      "p95": 19,
+      "framesOver32": 0,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 0,
+      "frames": 60,
+      "p50": 16,
+      "p95": 32,
+      "framesOver32": 1,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 1,
+      "frames": 60,
+      "p50": 17,
+      "p95": 36,
+      "framesOver32": 6,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 1,
+      "frames": 60,
+      "p50": 27,
+      "p95": 36,
+      "framesOver32": 6,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 2,
+      "frames": 60,
+      "p50": 29,
+      "p95": 35,
+      "framesOver32": 7,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 2,
+      "frames": 60,
+      "p50": 24,
+      "p95": 35,
+      "framesOver32": 6,
+      "framesOver50": 0,
+      "longTasks": 0,
+      "visibleBlurPlanes": [
+        {
+          "className": "app-quick-add-trigger",
+          "area": 3600,
+          "filter": "blur(8px) saturate(1.12) brightness(1.03)"
+        },
+        {
+          "className": "app-bottom-nav",
+          "area": 17580,
+          "filter": "blur(6px) saturate(1.12) brightness(1.03)"
+        }
+      ]
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "after-blur-disabled",
+      "pass": 2,
+      "frames": 60,
+      "p50": 30,
+      "p95": 35,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "before",
+      "pass": 0,
+      "frames": 60,
+      "p50": 16,
+      "p95": 18,
+      "framesOver32": 0,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "after",
+      "pass": 0,
+      "frames": 60,
+      "p50": 26,
+      "p95": 35,
+      "framesOver32": 5,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "after",
+      "pass": 1,
+      "frames": 60,
+      "p50": 17,
+      "p95": 35,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "before",
+      "pass": 1,
+      "frames": 60,
+      "p50": 24,
+      "p95": 36,
+      "framesOver32": 7,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "before",
+      "pass": 2,
+      "frames": 60,
+      "p50": 29,
+      "p95": 35,
+      "framesOver32": 7,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "after",
+      "pass": 2,
+      "frames": 60,
+      "p50": 23,
+      "p95": 35,
+      "framesOver32": 7,
+      "framesOver50": 0,
+      "longTasks": 0,
+      "visibleBlurPlanes": [
+        {
+          "className": "app-quick-add-trigger",
+          "area": 3600,
+          "filter": "blur(8px) saturate(1.12) brightness(1.03)"
+        },
+        {
+          "className": "app-bottom-nav",
+          "area": 17580,
+          "filter": "blur(6px) saturate(1.12) brightness(1.03)"
+        }
+      ]
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "after-blur-disabled",
+      "pass": 2,
+      "frames": 60,
+      "p50": 25,
+      "p95": 34,
+      "framesOver32": 6,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 0,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 0,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 1,
+      "frames": 60,
+      "p50": 31,
+      "p95": 47,
+      "framesOver32": 9,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 1,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 9,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "before",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 9,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "after",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 6,
+      "framesOver50": 0,
+      "longTasks": 0,
+      "visibleBlurPlanes": [
+        {
+          "className": "app-quick-add-trigger",
+          "area": 3600,
+          "filter": "blur(8px) saturate(1.12) brightness(1.03)"
+        },
+        {
+          "className": "app-bottom-nav",
+          "area": 17580,
+          "filter": "blur(6px) saturate(1.12) brightness(1.03)"
+        }
+      ]
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "after-blur-disabled",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "before",
+      "pass": 0,
+      "frames": 60,
+      "p50": 31,
+      "p95": 47,
+      "framesOver32": 16,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "after",
+      "pass": 0,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "after",
+      "pass": 1,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 8,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "before",
+      "pass": 1,
+      "frames": 60,
+      "p50": 31,
+      "p95": 47,
+      "framesOver32": 12,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "before",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 11,
+      "framesOver50": 0,
+      "longTasks": 0
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "after",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 7,
+      "framesOver50": 0,
+      "longTasks": 0,
+      "visibleBlurPlanes": [
+        {
+          "className": "app-quick-add-trigger",
+          "area": 3600,
+          "filter": "blur(8px) saturate(1.12) brightness(1.03)"
+        },
+        {
+          "className": "app-bottom-nav",
+          "area": 17580,
+          "filter": "blur(6px) saturate(1.12) brightness(1.03)"
+        }
+      ]
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "after-blur-disabled",
+      "pass": 2,
+      "frames": 60,
+      "p50": 31,
+      "p95": 46,
+      "framesOver32": 10,
+      "framesOver50": 0,
+      "longTasks": 0
+    }
+  ],
+  "stationaryPairs": [
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "fraction": 0.2,
+      "a": "chromium-393-dark-scroll-20a.png",
+      "b": "chromium-393-dark-scroll-20b.png"
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "fraction": 0.5,
+      "a": "chromium-393-dark-scroll-50a.png",
+      "b": "chromium-393-dark-scroll-50b.png"
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "fraction": 0.85,
+      "a": "chromium-393-dark-scroll-85a.png",
+      "b": "chromium-393-dark-scroll-85b.png"
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "fraction": 0.2,
+      "a": "chromium-393-light-scroll-20a.png",
+      "b": "chromium-393-light-scroll-20b.png"
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "fraction": 0.5,
+      "a": "chromium-393-light-scroll-50a.png",
+      "b": "chromium-393-light-scroll-50b.png"
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "fraction": 0.85,
+      "a": "chromium-393-light-scroll-85a.png",
+      "b": "chromium-393-light-scroll-85b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "fraction": 0.2,
+      "a": "webkit-393-dark-scroll-20a.png",
+      "b": "webkit-393-dark-scroll-20b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "fraction": 0.5,
+      "a": "webkit-393-dark-scroll-50a.png",
+      "b": "webkit-393-dark-scroll-50b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "fraction": 0.85,
+      "a": "webkit-393-dark-scroll-85a.png",
+      "b": "webkit-393-dark-scroll-85b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "fraction": 0.2,
+      "a": "webkit-393-light-scroll-20a.png",
+      "b": "webkit-393-light-scroll-20b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "fraction": 0.5,
+      "a": "webkit-393-light-scroll-50a.png",
+      "b": "webkit-393-light-scroll-50b.png"
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "fraction": 0.85,
+      "a": "webkit-393-light-scroll-85a.png",
+      "b": "webkit-393-light-scroll-85b.png"
+    }
+  ],
+  "runtime_capture_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "stationary_frame_comparisons": {
+    "pairs": 12,
+    "pixel_differences": 0
+  },
+  "medians": [
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "before",
+      "p50_ms": 27,
+      "p95_ms": 35
+    },
+    {
+      "engine": "chromium",
+      "theme": "dark",
+      "phase": "after",
+      "p50_ms": 17,
+      "p95_ms": 35
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "before",
+      "p50_ms": 24,
+      "p95_ms": 35
+    },
+    {
+      "engine": "chromium",
+      "theme": "light",
+      "phase": "after",
+      "p50_ms": 23,
+      "p95_ms": 35
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "before",
+      "p50_ms": 31,
+      "p95_ms": 46
+    },
+    {
+      "engine": "webkit",
+      "theme": "dark",
+      "phase": "after",
+      "p50_ms": 31,
+      "p95_ms": 46
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "before",
+      "p50_ms": 31,
+      "p95_ms": 47
+    },
+    {
+      "engine": "webkit",
+      "theme": "light",
+      "phase": "after",
+      "p50_ms": 31,
+      "p95_ms": 46
+    }
+  ]
+}

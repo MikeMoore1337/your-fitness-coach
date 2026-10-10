@@ -1,0 +1,63 @@
+[
+  {
+    "kind": "browser",
+    "pages": 5,
+    "exact_text_unchanged": true,
+    "fonts": [
+      "AAAAAA+Inter-ExtraBold",
+      "ABAAAA+Inter-Bold",
+      "BAAAAA+Inter-ExtraBold",
+      "BBAAAA+Inter-Bold",
+      "CAAAAA+Inter",
+      "CBAAAA+Inter",
+      "DAAAAA+Inter",
+      "DBAAAA+Inter-SemiBold",
+      "EAAAAA+Oswald-Bold",
+      "EBAAAA+Inter-SemiBold",
+      "FAAAAA+Oswald-Bold",
+      "FBAAAA+Inter-Bold",
+      "GAAAAA+Inter-SemiBold",
+      "GBAAAA+Inter-Bold",
+      "HAAAAA+Inter-SemiBold",
+      "HBAAAA+Inter-Bold",
+      "IAAAAA+Inter",
+      "IBAAAA+Inter-Bold",
+      "JAAAAA+Inter",
+      "JBAAAA+Inter",
+      "KAAAAA+Inter-Bold",
+      "KBAAAA+Inter",
+      "LAAAAA+Inter",
+      "LBAAAA+Inter",
+      "MAAAAA+Inter",
+      "MBAAAA+Inter",
+      "NAAAAA+Inter-ExtraBold",
+      "NBAAAA+Inter-Bold",
+      "OAAAAA+Oswald-Bold",
+      "PAAAAA+Oswald-Bold",
+      "QAAAAA+Inter-Bold",
+      "RAAAAA+Inter-Bold",
+      "SAAAAA+Inter-Bold",
+      "TAAAAA+Inter-Bold",
+      "UAAAAA+Inter",
+      "VAAAAA+Inter",
+      "WAAAAA+Inter-Bold",
+      "XAAAAA+Inter-Bold",
+      "YAAAAA+Oswald-Bold",
+      "ZAAAAA+Oswald-Bold"
+    ],
+    "horizontal_bounds_valid": true,
+    "rendered_pages_pixel_identical": true
+  },
+  {
+    "kind": "server",
+    "pages": 2,
+    "exact_text_unchanged": true,
+    "fonts": [
+      "AAAAAA+Inter-Bold",
+      "AAAAAA+Inter-Regular",
+      "AAAAAA+Oswald-Bold"
+    ],
+    "horizontal_bounds_valid": true,
+    "rendered_pages_pixel_identical": true
+  }
+]
