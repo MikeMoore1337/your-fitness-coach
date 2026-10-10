@@ -264,7 +264,7 @@ describe('PublicContentPage', () => {
     ['/nutrition', /рассчитать кбжу: калории, белки, жиры и углеводы/i],
     ['/calculators/1rm', /калькулятор 1пм: оценочный одноповторный максимум/i],
     ['/progress', /прогресс, который можно проверить/i],
-    ['/for-trainers', /рабочий кабинет тренера, который держит день/i],
+    ['/for-trainers', /ваш метод в действии\./i],
     ['/knowledge', /материалы, которые помогают понять/i],
   ])('renders a distinct indexable intent for %s', (path, heading) => {
     renderPath(path);
