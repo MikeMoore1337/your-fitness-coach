@@ -2832,18 +2832,6 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-primary);
 }
 
-.active-workout--design-v2 ~ .active-workout-rest {
-  border-color: var(--v2-lime);
-  border-radius: var(--v2-control-radius);
-  background: var(--v2-surface);
-  color: var(--v2-text-primary);
-  box-shadow: none;
-}
-
-.active-workout--design-v2 ~ .active-workout-rest--complete {
-  border-color: var(--v2-lime);
-}
-
 /* Login / public continuity */
 body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   background: var(--v2-canvas);
@@ -3634,13 +3622,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .active-workout--design-v2 .active-workout-set__done {
     grid-column: 1 / -1;
-  }
-
-  .active-workout--design-v2 ~ .active-workout-rest {
-    inset: max(0px, env(safe-area-inset-top, 0px)) 0 auto;
-    width: 100%;
-    border-width: 2px 0;
-    border-radius: 0;
   }
 
   .auth-public-shell--design-v2 .public-shell__header,
@@ -4676,10 +4657,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     padding-top: max(var(--v2-space-3), var(--yfc-layout-safe-top));
     padding-right: max(var(--v2-space-3), var(--yfc-layout-safe-right));
     padding-left: max(var(--v2-space-3), var(--yfc-layout-safe-left));
-  }
-
-  .app-shell--design-v2 .active-workout--design-v2 ~ .active-workout-rest {
-    inset: var(--yfc-layout-safe-top) 0 auto;
   }
 }
 
