@@ -1,0 +1,3158 @@
+{
+  "source_sha": "18d3e7224164b201d50679858713bb015f5227db",
+  "baseline_sha": "9a6594af1d674eaf4ca1bc419b0569c5a5a6c036",
+  "baseline_note": "origin/master 0277d132 plus preserved PR #907; actual app captures, deterministic synthetic API fixtures",
+  "after_capture": "Installed Playwright WebKit 1.62.1; local production Vite build; synthetic API fixtures; desktop 1440; mocked Telegram viewport/safe area; simulated visualViewport keyboard",
+  "not_proven": [
+    "physical iPhone",
+    "VoiceOver",
+    "real Telegram client",
+    "production deployment"
+  ],
+  "merge": false,
+  "deploy": false,
+  "env_change_required": false,
+  "owner_gates": {
+    "871": "Policy for reminder time already passed today",
+    "872": "Original XLSX required"
+  },
+  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38044270525",
+  "screens": [
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-360-dark-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-360-dark-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-360-dark-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-360-dark-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-360-dark-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-360-dark-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-360-dark-report.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-360-dark-today.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-360-light-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-360-light-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-360-light-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-360-light-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-360-light-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-light-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-360-light-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-360-light-report.png"
+    },
+    {
+      "state": "before",
+      "width": "360",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-360-light-today.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-393-dark-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "before/webkit-393-dark-completed-exercise.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "before/webkit-393-dark-completed-expanded.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-393-dark-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-393-dark-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-393-dark-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-393-dark-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-393-dark-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-393-dark-report.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-393-dark-today.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-393-light-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-393-light-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-393-light-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-393-light-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-393-light-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-light-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-393-light-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-393-light-report.png"
+    },
+    {
+      "state": "before",
+      "width": "393",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-393-light-today.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-430-dark-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-430-dark-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-430-dark-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-430-dark-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-430-dark-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-dark-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-430-dark-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-430-dark-report.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-430-dark-today.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "before/webkit-430-light-catalog.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "before/webkit-430-light-manage.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "before/webkit-430-light-nutrition.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "before/webkit-430-light-profile.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "before/webkit-430-light-programs.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-light-progress.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "before/webkit-430-light-quick-add.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "before/webkit-430-light-report.png"
+    },
+    {
+      "state": "before",
+      "width": "430",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "before/webkit-430-light-today.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-360-dark-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-360-dark-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-360-dark-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-360-dark-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-360-dark-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-360-dark-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-360-dark-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-360-dark-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-360-dark-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-360-dark-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-360-dark-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-360-dark-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-360-dark-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-360-dark-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-360-dark-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-360-dark-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-360-dark-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-360-dark-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-360-dark-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-360-dark-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-360-dark-report.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-360-dark-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-360-dark-today.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-360-light-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-360-light-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-360-light-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-360-light-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-360-light-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-360-light-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-360-light-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-360-light-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-360-light-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-360-light-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-360-light-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-360-light-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-360-light-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-360-light-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-360-light-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-360-light-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-360-light-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-360-light-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-360-light-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-light-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-360-light-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-360-light-report.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-360-light-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-360-light-today.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-393-dark-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-393-dark-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-393-dark-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-393-dark-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-393-dark-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-393-dark-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-393-dark-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-393-dark-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-393-dark-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-393-dark-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-393-dark-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-393-dark-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-393-dark-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-body-full",
+      "label": "Прогресс · Тело · полностью",
+      "path": "after/webkit-393-dark-progress-body-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-393-dark-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-cardio-full",
+      "label": "Прогресс · Кардио · полностью",
+      "path": "after/webkit-393-dark-progress-cardio-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-393-dark-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-history-full",
+      "label": "Прогресс · История · полностью",
+      "path": "after/webkit-393-dark-progress-history-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-393-dark-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-nutrition-full",
+      "label": "Прогресс · Питание · полностью",
+      "path": "after/webkit-393-dark-progress-nutrition-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-393-dark-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-training-full",
+      "label": "Прогресс · Тренировки · полностью",
+      "path": "after/webkit-393-dark-progress-training-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-393-dark-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-wellbeing-full",
+      "label": "Прогресс · Самочувствие · полностью",
+      "path": "after/webkit-393-dark-progress-wellbeing-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-393-dark-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-393-dark-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-393-dark-report.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-393-dark-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-393-dark-today.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-393-light-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-393-light-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-393-light-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-393-light-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-393-light-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-393-light-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-393-light-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-393-light-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-393-light-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-393-light-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-393-light-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-393-light-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-393-light-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-body-full",
+      "label": "Прогресс · Тело · полностью",
+      "path": "after/webkit-393-light-progress-body-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-393-light-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-cardio-full",
+      "label": "Прогресс · Кардио · полностью",
+      "path": "after/webkit-393-light-progress-cardio-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-393-light-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-history-full",
+      "label": "Прогресс · История · полностью",
+      "path": "after/webkit-393-light-progress-history-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-393-light-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-nutrition-full",
+      "label": "Прогресс · Питание · полностью",
+      "path": "after/webkit-393-light-progress-nutrition-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-393-light-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-training-full",
+      "label": "Прогресс · Тренировки · полностью",
+      "path": "after/webkit-393-light-progress-training-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-393-light-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-wellbeing-full",
+      "label": "Прогресс · Самочувствие · полностью",
+      "path": "after/webkit-393-light-progress-wellbeing-full.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-393-light-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-light-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-393-light-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-393-light-report.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-393-light-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-393-light-today.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-430-dark-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-430-dark-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-430-dark-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-430-dark-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-430-dark-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-430-dark-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-430-dark-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-430-dark-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-430-dark-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-430-dark-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-430-dark-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-430-dark-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-430-dark-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-430-dark-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-430-dark-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-430-dark-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-430-dark-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-430-dark-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-430-dark-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-430-dark-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-430-dark-report.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-430-dark-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-430-dark-today.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "catalog",
+      "label": "Справочник",
+      "path": "after/webkit-430-light-catalog.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "completed-exercise",
+      "label": "Завершённое упражнение",
+      "path": "after/webkit-430-light-completed-exercise.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "completed-expanded",
+      "label": "Подходы завершённого упражнения",
+      "path": "after/webkit-430-light-completed-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-430-light-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "grocery-expanded",
+      "label": "Список покупок",
+      "path": "after/webkit-430-light-grocery-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "manage",
+      "label": "Управление программой",
+      "path": "after/webkit-430-light-manage.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "meal-plan-expanded",
+      "label": "План питания",
+      "path": "after/webkit-430-light-meal-plan-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "nutrition",
+      "label": "Питание",
+      "path": "after/webkit-430-light-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "picker-keyboard",
+      "label": "Выбор · клавиатура",
+      "path": "after/webkit-430-light-picker-keyboard.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "picker",
+      "label": "Выбор упражнения",
+      "path": "after/webkit-430-light-picker.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "profile-goals",
+      "label": "Цели и параметры",
+      "path": "after/webkit-430-light-profile-goals.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "profile",
+      "label": "Профиль",
+      "path": "after/webkit-430-light-profile.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "programs",
+      "label": "План",
+      "path": "after/webkit-430-light-programs.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-body",
+      "label": "Прогресс · Тело",
+      "path": "after/webkit-430-light-progress-body.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-cardio",
+      "label": "Прогресс · Кардио",
+      "path": "after/webkit-430-light-progress-cardio.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-history",
+      "label": "Прогресс · История",
+      "path": "after/webkit-430-light-progress-history.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-nutrition",
+      "label": "Прогресс · Питание",
+      "path": "after/webkit-430-light-progress-nutrition.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-training",
+      "label": "Прогресс · Тренировки",
+      "path": "after/webkit-430-light-progress-training.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-wellbeing",
+      "label": "Прогресс · Самочувствие",
+      "path": "after/webkit-430-light-progress-wellbeing.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-light-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "quick-add",
+      "label": "Быстрое добавление",
+      "path": "after/webkit-430-light-quick-add.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-430-light-report.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "schedule-expanded",
+      "label": "Все восемь недель",
+      "path": "after/webkit-430-light-schedule-expanded.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "today",
+      "label": "Сегодня",
+      "path": "after/webkit-430-light-today.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "dark",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-desktop-dark-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-desktop-dark-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "dark",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-desktop-dark-report.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "light",
+      "view": "editor",
+      "label": "Редактор программы",
+      "path": "after/webkit-desktop-light-editor.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-desktop-light-progress.png"
+    },
+    {
+      "state": "after",
+      "width": "1440",
+      "theme": "light",
+      "view": "report",
+      "label": "Мобильный отчёт",
+      "path": "after/webkit-desktop-light-report.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "dark",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-360-dark-short-menu.png"
+    },
+    {
+      "state": "after",
+      "width": "360",
+      "theme": "light",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-360-light-short-menu.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "dark",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-393-dark-short-menu.png"
+    },
+    {
+      "state": "after",
+      "width": "393",
+      "theme": "light",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-393-light-short-menu.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "dark",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-430-dark-short-menu.png"
+    },
+    {
+      "state": "after",
+      "width": "430",
+      "theme": "light",
+      "view": "short-menu",
+      "label": "TMA · короткий экран",
+      "path": "after/webkit-tma-430-light-short-menu.png"
+    }
+  ],
+  "files": [
+    {
+      "path": "after/webkit-360-dark-catalog.png",
+      "bytes": 57550,
+      "sha256": "0f714497a2ea76571565dddc77d37ddbd0a4c296bd9d564d5713c9efe0d08525"
+    },
+    {
+      "path": "after/webkit-360-dark-completed-exercise.png",
+      "bytes": 40701,
+      "sha256": "b51f6c0649f3624165edefcb1ead428cf907b3bda3f15e09f2b136154dc1e924"
+    },
+    {
+      "path": "after/webkit-360-dark-completed-expanded.png",
+      "bytes": 43421,
+      "sha256": "ac3d0e2185c67e14302d7b29c8bf05b0a4ac7f108c641b3b2f0729a592c97ab8"
+    },
+    {
+      "path": "after/webkit-360-dark-editor.png",
+      "bytes": 43357,
+      "sha256": "94438e7b682f1e7c7d14222bd1c34c08f21dc59f7da7124bc8587e581864f7fe"
+    },
+    {
+      "path": "after/webkit-360-dark-grocery-expanded.png",
+      "bytes": 42733,
+      "sha256": "d9a1ee2cbbf0feacfb144f41cf4e216d0f4e8f3c590d4363e4f5b9d477ff490f"
+    },
+    {
+      "path": "after/webkit-360-dark-manage.png",
+      "bytes": 55806,
+      "sha256": "f215b34116d98d904323693ae693dc6debe05217ccac7c59130b0abd0a95c871"
+    },
+    {
+      "path": "after/webkit-360-dark-meal-plan-expanded.png",
+      "bytes": 47561,
+      "sha256": "c9a06da8701bb6637b761236cd03e04e373c577a8436ee72f24280f5f3b51aa5"
+    },
+    {
+      "path": "after/webkit-360-dark-nutrition.png",
+      "bytes": 46035,
+      "sha256": "430b84af122fc5146e2ad55391db973433df2bbdab473ed8ff6e3340d86fe4fb"
+    },
+    {
+      "path": "after/webkit-360-dark-picker-keyboard.png",
+      "bytes": 33841,
+      "sha256": "1942e683f1aa4238819835f2ecd049e713c128479c53ec17dba8747077c88207"
+    },
+    {
+      "path": "after/webkit-360-dark-picker.png",
+      "bytes": 26451,
+      "sha256": "ac809e250c2050840d6ec265b9c1317c4b8ad3a88d293c0a125975e618d2f95e"
+    },
+    {
+      "path": "after/webkit-360-dark-profile-goals.png",
+      "bytes": 40261,
+      "sha256": "12e227b58bf47a450676dd1e75623081ea05f510fb3178f9a9a0475fd8c88b8c"
+    },
+    {
+      "path": "after/webkit-360-dark-profile.png",
+      "bytes": 46670,
+      "sha256": "cbffba55b1ae1368f4e528d619bc08647d95fae685d9fed474821d5c164b96ea"
+    },
+    {
+      "path": "after/webkit-360-dark-programs.png",
+      "bytes": 47353,
+      "sha256": "6ac0fea677223fd26ff9a0c1d95c408381fa3c3472a7b8bea9d4f92a6d63668c"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-body.png",
+      "bytes": 54461,
+      "sha256": "5d422ec2c3be19fea462b40a5b19102f0f1b69632a651c35065b7409bfe246de"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-cardio.png",
+      "bytes": 48245,
+      "sha256": "5decd9a75370c944ff37aca17506d3e9a54f4e7f7a752fb769ffe01f3abbfcd1"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-history.png",
+      "bytes": 46915,
+      "sha256": "d3844fb8d45a445d056a9254409105458b30d85ee1cd9a3ac147e2fd13c4db7d"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-nutrition.png",
+      "bytes": 49597,
+      "sha256": "91bbc53c840db56cfbc0ac2bd94263869ce970d52205518924aca38eaa4e4daa"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-training.png",
+      "bytes": 51818,
+      "sha256": "1e17ca205e498b04e937a218f24f791461150d33767268b5d9a7e5590bbe2c47"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-wellbeing.png",
+      "bytes": 53299,
+      "sha256": "79ad54209ebdbc3e2988436c6360a3a51f5446cd5694cb0fea63fb6d5cb0392d"
+    },
+    {
+      "path": "after/webkit-360-dark-progress.png",
+      "bytes": 55075,
+      "sha256": "e7fb10912878609637a722e4a040a3035f3d71a5109e980648627a8c096a2b66"
+    },
+    {
+      "path": "after/webkit-360-dark-quick-add.png",
+      "bytes": 48531,
+      "sha256": "f0db29e91e2cc49c1c0e80605ac7a4f0b4dc4acc2935605e858978d783f941a3"
+    },
+    {
+      "path": "after/webkit-360-dark-report.png",
+      "bytes": 42659,
+      "sha256": "82f75d670aa5e7e5a3cb020b037a59e7f54a8574ace2c947093c905535176633"
+    },
+    {
+      "path": "after/webkit-360-dark-schedule-expanded.png",
+      "bytes": 45153,
+      "sha256": "7dbe6216c4deaba4ba12e866eea9a721863524c92093d9906678014222ea3ca6"
+    },
+    {
+      "path": "after/webkit-360-dark-today.png",
+      "bytes": 112685,
+      "sha256": "df13b734db6a798854e71ce6342bb996d57dcfd8943bce213091e5335c359038"
+    },
+    {
+      "path": "after/webkit-360-light-catalog.png",
+      "bytes": 58214,
+      "sha256": "cd0fc815f846c007d5c455fa75b96bc2327143a68d87c325a42cf23484490d4b"
+    },
+    {
+      "path": "after/webkit-360-light-completed-exercise.png",
+      "bytes": 39093,
+      "sha256": "0b3010ccdf991f7c7e9600397147558d44ae781629c5dc173ed29dbed1fbf177"
+    },
+    {
+      "path": "after/webkit-360-light-completed-expanded.png",
+      "bytes": 40607,
+      "sha256": "bd6ed978083eafc3ecedba25d3e692f7fa6fb4ac47c974e6192beaf3705a2bc9"
+    },
+    {
+      "path": "after/webkit-360-light-editor.png",
+      "bytes": 41596,
+      "sha256": "544c8d5a266c832c04eaa5c4c8baf36fa7c5b41c630ccaf5ec7b31ddfccc2cf2"
+    },
+    {
+      "path": "after/webkit-360-light-grocery-expanded.png",
+      "bytes": 40038,
+      "sha256": "92ed03162646370738e22d528af08012c67c850ee911a98ea1a33361c0a85638"
+    },
+    {
+      "path": "after/webkit-360-light-manage.png",
+      "bytes": 53526,
+      "sha256": "6ee82dbef0741418922c2b576db7831f92c92879916c9581b94775bb709e602c"
+    },
+    {
+      "path": "after/webkit-360-light-meal-plan-expanded.png",
+      "bytes": 43650,
+      "sha256": "16e27019b147eb7e80d7e06a2e8632bdab1136fe3b67a2944d29f8a023c99fea"
+    },
+    {
+      "path": "after/webkit-360-light-nutrition.png",
+      "bytes": 44938,
+      "sha256": "76dcac2a092fa6a14225b5938a6c8a238f1f28d72bae2916843d88fa299e6e3b"
+    },
+    {
+      "path": "after/webkit-360-light-picker-keyboard.png",
+      "bytes": 34146,
+      "sha256": "3ffd8387cf337edf6ce8bab6755ffe1f9d17e591ceaeb39f963fc9478b4c9759"
+    },
+    {
+      "path": "after/webkit-360-light-picker.png",
+      "bytes": 27058,
+      "sha256": "91dffe275a055382d19ccca618473eb5cf71f914cb83941001c9ab8591690f81"
+    },
+    {
+      "path": "after/webkit-360-light-profile-goals.png",
+      "bytes": 38563,
+      "sha256": "fd33d1b55d502cdfdcf609b27e2b4cd1532123924b23368eeb581433a1a8cd07"
+    },
+    {
+      "path": "after/webkit-360-light-profile.png",
+      "bytes": 45122,
+      "sha256": "c762f60de00d74961aa4c11828c74dac3395e0af15b5562c3dc39b7fe0dfda2a"
+    },
+    {
+      "path": "after/webkit-360-light-programs.png",
+      "bytes": 46116,
+      "sha256": "70fe4c5a717a71701329fbaf916c09dd5e237c0415c04c3a0b355943ef5fa32d"
+    },
+    {
+      "path": "after/webkit-360-light-progress-body.png",
+      "bytes": 50026,
+      "sha256": "fafce5870327922a828a63be9c6b314c5036c73db9050809e9e7bf4dbbbdd91c"
+    },
+    {
+      "path": "after/webkit-360-light-progress-cardio.png",
+      "bytes": 44900,
+      "sha256": "8caaa9f07911e660e2899667d3a0407cca3a889181b71d8879d05ad2ffd9ea41"
+    },
+    {
+      "path": "after/webkit-360-light-progress-history.png",
+      "bytes": 43333,
+      "sha256": "48dcb4706d103d8858053d8b92d1409c0cafe62e6a21a7c25ea17979c04aca6d"
+    },
+    {
+      "path": "after/webkit-360-light-progress-nutrition.png",
+      "bytes": 45708,
+      "sha256": "1ffdcbc36019efaa9bc3f1f860845887f50b01909aee8216ea0a3032a0f59de5"
+    },
+    {
+      "path": "after/webkit-360-light-progress-training.png",
+      "bytes": 47865,
+      "sha256": "fea3d7a248268b24dc1f7dccf0436afb42438938215a0107e74e1afe59767603"
+    },
+    {
+      "path": "after/webkit-360-light-progress-wellbeing.png",
+      "bytes": 49162,
+      "sha256": "2734519032df15c4ae90bb338cf62de53683a2b48d94ca054a47006b76960b18"
+    },
+    {
+      "path": "after/webkit-360-light-progress.png",
+      "bytes": 50580,
+      "sha256": "870c53e6500f97f1e9f1360cafb8c075e95b8ec52eeb10ae4e4a61750c984c51"
+    },
+    {
+      "path": "after/webkit-360-light-quick-add.png",
+      "bytes": 46461,
+      "sha256": "a6d415225c779120fa4194f48851a4cc30d4c34bc1efaf0032532be20576852e"
+    },
+    {
+      "path": "after/webkit-360-light-report.png",
+      "bytes": 39840,
+      "sha256": "ea266eff1f0458aeec652f68171119ca70f48e40a8df9b18599949aee1293a2e"
+    },
+    {
+      "path": "after/webkit-360-light-schedule-expanded.png",
+      "bytes": 42216,
+      "sha256": "29f846524df6287d7b2bf90ccdd6d9b030db97ba833af82b7447c1a02fcec14b"
+    },
+    {
+      "path": "after/webkit-360-light-today.png",
+      "bytes": 111451,
+      "sha256": "3b867d10632f99e634e8314a61ff613f6fbc6e5e9c71f177707f1c6107bfa5c6"
+    },
+    {
+      "path": "after/webkit-393-dark-catalog.png",
+      "bytes": 61033,
+      "sha256": "42f963698a7241531573bee0271c9a9bc4b01a78a2fc2fe568bb751a1ac1a6f2"
+    },
+    {
+      "path": "after/webkit-393-dark-completed-exercise.png",
+      "bytes": 40584,
+      "sha256": "4c37c677f31355fb2b817f9021850fc2dd313cca6f31d43f1ce3bef41b7b1b73"
+    },
+    {
+      "path": "after/webkit-393-dark-completed-expanded.png",
+      "bytes": 44016,
+      "sha256": "28d3c8fa3bd5a20bd23e5c52f79bad2619e5a4c5c73f29edf33338e10fccafde"
+    },
+    {
+      "path": "after/webkit-393-dark-editor.png",
+      "bytes": 43892,
+      "sha256": "ba9012c5d96b8c92f6c8f68447a623bb93c5f79013a840700d211d061cfc58ea"
+    },
+    {
+      "path": "after/webkit-393-dark-grocery-expanded.png",
+      "bytes": 43237,
+      "sha256": "67892aa1514433c175e29ce9801ef238fa7ffbda0e516d58a6b5ad6d5b792a39"
+    },
+    {
+      "path": "after/webkit-393-dark-manage.png",
+      "bytes": 55755,
+      "sha256": "3570a19e74e751a440ac9bdcc8d13c5f3d2789f18517c529e43b362e1b8a39a1"
+    },
+    {
+      "path": "after/webkit-393-dark-meal-plan-expanded.png",
+      "bytes": 48158,
+      "sha256": "6502b5307cb9206ed983bd216fe75eecd79a99cb8615b1e4aecad903d5211b0e"
+    },
+    {
+      "path": "after/webkit-393-dark-nutrition.png",
+      "bytes": 46315,
+      "sha256": "9fafa1010040d57f4e18fb5121e03aa88506e3cda6ffc66a5369c9897d8c5766"
+    },
+    {
+      "path": "after/webkit-393-dark-picker-keyboard.png",
+      "bytes": 34287,
+      "sha256": "484f5c2683b783fcc4fff2689c3aac8109b2ca55d3b21f10154171d1b8d23c0c"
+    },
+    {
+      "path": "after/webkit-393-dark-picker.png",
+      "bytes": 26600,
+      "sha256": "882d68ea79c37f85b4f216f938847351d40095199c5066d442676977db260be6"
+    },
+    {
+      "path": "after/webkit-393-dark-profile-goals.png",
+      "bytes": 40870,
+      "sha256": "238d4053e7d21706c805035c372d27c2f8062552adcd70e810b99669f453248f"
+    },
+    {
+      "path": "after/webkit-393-dark-profile.png",
+      "bytes": 47517,
+      "sha256": "07b1181fb9426e2ebe93ba6d57df670031c64ae8377e749ed22982cebb2d799e"
+    },
+    {
+      "path": "after/webkit-393-dark-programs.png",
+      "bytes": 48043,
+      "sha256": "935eab382e7258c0c690e4394d0fbb3c1a418a17087731b5282eec791da93a21"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-body-full.png",
+      "bytes": 99361,
+      "sha256": "066f858672cc4f5c1f40895b53ba4ebd33ed47a826c7a479d0c934b88857ba25"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-body.png",
+      "bytes": 56418,
+      "sha256": "476f7874e5d54bb425459d0a41f9f61e123dc9df1bcd701603abdab958bf9d63"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-cardio-full.png",
+      "bytes": 63562,
+      "sha256": "9fc473ac6c919adece0915b6bd70eb7d8617da169578f40e64793d54c2225990"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-cardio.png",
+      "bytes": 49597,
+      "sha256": "a3ee50cc1f5e1c79fcbebab50724bccb1c2f98697b262e7134c34333bd7e3e63"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-history-full.png",
+      "bytes": 48990,
+      "sha256": "5c668bdeeac3722be3f061ca39579949ce91930a446c27353c0a92e1e55d1c15"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-history.png",
+      "bytes": 48427,
+      "sha256": "7fc31b769a42c0f478c76d372b85ce6e88fc2164aba358a16d04aa5bf4aefe45"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-nutrition-full.png",
+      "bytes": 206489,
+      "sha256": "fc8324fbbfefbdce3c0fefa80f685809568601d237a0e742b1f3025656db7a61"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-nutrition.png",
+      "bytes": 50921,
+      "sha256": "92b434a3768c497b3aa6b7920f3cf835d41da018ad36fff703a2383e1295db0d"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-training-full.png",
+      "bytes": 100817,
+      "sha256": "047e78425390959147661cfa9a9e03ffb9eab98c8c7f44b8c97987e4bba0090e"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-training.png",
+      "bytes": 53049,
+      "sha256": "58daed868c3a9bee0dae90d5f31f81de878c025145283ca4ac2e08a9ea53b06a"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-wellbeing-full.png",
+      "bytes": 57150,
+      "sha256": "dd6413876202e7cfd7d7923764aec571669eec2c44c6381b4490ca567f41f376"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-wellbeing.png",
+      "bytes": 56522,
+      "sha256": "0283200a7c719a4ed8d49e482bc3cbd7c6a14b3e94a01f44a083f9eb66ffee84"
+    },
+    {
+      "path": "after/webkit-393-dark-progress.png",
+      "bytes": 57052,
+      "sha256": "685c215cafb143ec4411aa1c9b98ee4ef9ce3cd90914515604b2f21b473c50c7"
+    },
+    {
+      "path": "after/webkit-393-dark-quick-add.png",
+      "bytes": 49400,
+      "sha256": "191c01187e72ea5ffa6f14ab44a9cc237d876b289847b1b9b747b4c0c95b711d"
+    },
+    {
+      "path": "after/webkit-393-dark-report.png",
+      "bytes": 45104,
+      "sha256": "6883431ec880970b52d8a354b9ae9d6ce2271102c9a7cd5ce1749db45e29a566"
+    },
+    {
+      "path": "after/webkit-393-dark-schedule-expanded.png",
+      "bytes": 48793,
+      "sha256": "267c5bc3b93e9ebb4586a363cf52fb825a6845a43eee789db58bc29314f4c894"
+    },
+    {
+      "path": "after/webkit-393-dark-today.png",
+      "bytes": 117734,
+      "sha256": "09fe7513a30698696d0c14ec56221827fb4c09a5b2761cb9fa9ffa8cb5cca262"
+    },
+    {
+      "path": "after/webkit-393-light-catalog.png",
+      "bytes": 61085,
+      "sha256": "67fdb350f3c31d7265a3109b4fd145814d9cbb6423f0e903fe39ea0c0f7dd8e1"
+    },
+    {
+      "path": "after/webkit-393-light-completed-exercise.png",
+      "bytes": 38925,
+      "sha256": "7941b65631df80c77b632db09dd423ccf68eb0da442313d01d398d9731b9fbd1"
+    },
+    {
+      "path": "after/webkit-393-light-completed-expanded.png",
+      "bytes": 41185,
+      "sha256": "b3b80ec8d5065832f421c192bd44e36469b4e8906e38443dc181a292bb6a341e"
+    },
+    {
+      "path": "after/webkit-393-light-editor.png",
+      "bytes": 42366,
+      "sha256": "35d439c4e5efbeba21d0fece4dc7ad96af62e601d72596312fa9f6592446edd8"
+    },
+    {
+      "path": "after/webkit-393-light-grocery-expanded.png",
+      "bytes": 40437,
+      "sha256": "cfa207d6fb95d4415b14a9fae6a6ad115d7bfb7077bd7ee9ae0924314f734169"
+    },
+    {
+      "path": "after/webkit-393-light-manage.png",
+      "bytes": 53845,
+      "sha256": "05e618707855b4f3188bef6fcd0160726f24edef55ac0d32d826f0e6b14df2c7"
+    },
+    {
+      "path": "after/webkit-393-light-meal-plan-expanded.png",
+      "bytes": 44882,
+      "sha256": "cd82ad5185326a6e4786349cceab2670e325e4a301196aebcc147a2d23a653a4"
+    },
+    {
+      "path": "after/webkit-393-light-nutrition.png",
+      "bytes": 45282,
+      "sha256": "3f01a24c08dccd8bcb56bb224b0802f091bb1f6923ad09dde626fcd97a0b6a54"
+    },
+    {
+      "path": "after/webkit-393-light-picker-keyboard.png",
+      "bytes": 34552,
+      "sha256": "19e7e6f4351523dc966eed0c1cf7de466ce3d82eb7d05b36def88814d0d3277d"
+    },
+    {
+      "path": "after/webkit-393-light-picker.png",
+      "bytes": 27375,
+      "sha256": "b451cfb33fbda2e575e8612bb9302cf8d0410b4569df1671152032e5dad31331"
+    },
+    {
+      "path": "after/webkit-393-light-profile-goals.png",
+      "bytes": 39024,
+      "sha256": "b9b4b3da97c202fbd261e9493124b0d8bb63069f08e587e597d8d75df0cae92c"
+    },
+    {
+      "path": "after/webkit-393-light-profile.png",
+      "bytes": 45948,
+      "sha256": "3472466fd967bd4ace2b2c74dfce0be5627e3971062c1af2dc938401bf227a1c"
+    },
+    {
+      "path": "after/webkit-393-light-programs.png",
+      "bytes": 46738,
+      "sha256": "e998415a2a74efa981410af25d0c5f8ee20b57c51b3af2ae34f3819396ee81ae"
+    },
+    {
+      "path": "after/webkit-393-light-progress-body-full.png",
+      "bytes": 92158,
+      "sha256": "7059a4e3ecd027b7d7c6cc89a30e567a5220266fdb4b6c6d08419ba3bc59ca0e"
+    },
+    {
+      "path": "after/webkit-393-light-progress-body.png",
+      "bytes": 51720,
+      "sha256": "7bc76cbcee759f477b01a0b06f47668737f5c5b61bde96f945c09198567eb7b1"
+    },
+    {
+      "path": "after/webkit-393-light-progress-cardio-full.png",
+      "bytes": 59454,
+      "sha256": "c385c6afc3a029370c5bf191822e3c01372657f40902798d100bfd720bc5b940"
+    },
+    {
+      "path": "after/webkit-393-light-progress-cardio.png",
+      "bytes": 45993,
+      "sha256": "907e2e09fbdcea23a8fb1f9f1f15fd1cc7e389ab4c95a885d93077de202dc0de"
+    },
+    {
+      "path": "after/webkit-393-light-progress-history-full.png",
+      "bytes": 45412,
+      "sha256": "53aafd5198e56d3d6903457a56e310e0aab6364ae74d26dc7e62cb9377bdb35c"
+    },
+    {
+      "path": "after/webkit-393-light-progress-history.png",
+      "bytes": 44693,
+      "sha256": "8d1be64389b8a67f3f119d2c18bab781f76278c91c1e274af956f7949e03fc7d"
+    },
+    {
+      "path": "after/webkit-393-light-progress-nutrition-full.png",
+      "bytes": 190380,
+      "sha256": "451e5a47e144cc677e3789de7ac0e4bd6d296a77317585bcb4c740f94924cb2c"
+    },
+    {
+      "path": "after/webkit-393-light-progress-nutrition.png",
+      "bytes": 46888,
+      "sha256": "8ed126315ac66670157c8221c346763d19b7a92a9fa8fedbf40a83b5ccdee53a"
+    },
+    {
+      "path": "after/webkit-393-light-progress-training-full.png",
+      "bytes": 92957,
+      "sha256": "af320aec24a3007851142dfa925652f079a5c6d35b782ab0d2b2bc66fa379b0b"
+    },
+    {
+      "path": "after/webkit-393-light-progress-training.png",
+      "bytes": 49107,
+      "sha256": "d67eb3059a43579c91009aa79b67c467c3ebfa9be4f57e7e29444e6765c2695b"
+    },
+    {
+      "path": "after/webkit-393-light-progress-wellbeing-full.png",
+      "bytes": 52532,
+      "sha256": "40033165112367b485888f908fd0bb69c82aa8430bf89c66f677660c8d3eb89a"
+    },
+    {
+      "path": "after/webkit-393-light-progress-wellbeing.png",
+      "bytes": 51959,
+      "sha256": "9b9f38c875540f2f6348da92f6c04879c60ee7963ff09afd362c2c8c9119ceb1"
+    },
+    {
+      "path": "after/webkit-393-light-progress.png",
+      "bytes": 52298,
+      "sha256": "90fc588722ed2491c2e58e9e5b06454ba4156dcf4fd231256dd7752e32d1b7fc"
+    },
+    {
+      "path": "after/webkit-393-light-quick-add.png",
+      "bytes": 47318,
+      "sha256": "8727fab40d27bf894be7b7d21f5b736168b51f20da3a785f1ac678bc767d56c9"
+    },
+    {
+      "path": "after/webkit-393-light-report.png",
+      "bytes": 42315,
+      "sha256": "4377a1535c6cd0fe45f1225f71c52183c02eb1ed919f171354407a7753916593"
+    },
+    {
+      "path": "after/webkit-393-light-schedule-expanded.png",
+      "bytes": 45802,
+      "sha256": "0f89dad6b97b576ced45ccae6adc934167b5ab83334e042de4028626d9767372"
+    },
+    {
+      "path": "after/webkit-393-light-today.png",
+      "bytes": 116516,
+      "sha256": "456c5fbdd4c939e91bd81ddba3e2a2b4604b2a96d9d4dbf8290bb445c5588c89"
+    },
+    {
+      "path": "after/webkit-430-dark-catalog.png",
+      "bytes": 64274,
+      "sha256": "8d93822631ecde9bd38e041689f116c5470f206d53135e358960a77d47244471"
+    },
+    {
+      "path": "after/webkit-430-dark-completed-exercise.png",
+      "bytes": 42821,
+      "sha256": "7d168894a1e951bd38f7fbea9a69f05b2f493285069a107899a150f3678a041a"
+    },
+    {
+      "path": "after/webkit-430-dark-completed-expanded.png",
+      "bytes": 48249,
+      "sha256": "f0ea7728f1928cef96369aa37376c2c8adf1785b87645395a2bdb26be8413614"
+    },
+    {
+      "path": "after/webkit-430-dark-editor.png",
+      "bytes": 47724,
+      "sha256": "5416c2b00468a3c4576d8fafcb01c0c4bee5a24f2a0f94dae3806cd37eeb9c69"
+    },
+    {
+      "path": "after/webkit-430-dark-grocery-expanded.png",
+      "bytes": 43815,
+      "sha256": "d4de76a72eed6c5864dd61ab9d002100f9c90676c8ec0d01c11c7c28e023bd83"
+    },
+    {
+      "path": "after/webkit-430-dark-manage.png",
+      "bytes": 58148,
+      "sha256": "09d5690ca1c1ee0a174c55f6e474c43c0d61f61b27f7583013781f82d5650257"
+    },
+    {
+      "path": "after/webkit-430-dark-meal-plan-expanded.png",
+      "bytes": 46017,
+      "sha256": "fd7954c50ab072f165e8a1336e8a09992f777556ea30e5046bfc1578e2370e2f"
+    },
+    {
+      "path": "after/webkit-430-dark-nutrition.png",
+      "bytes": 46707,
+      "sha256": "b85f2c8b71239fa8f0899431c4f15e8c3723b9019ee32b2daba3ff500da58ec0"
+    },
+    {
+      "path": "after/webkit-430-dark-picker-keyboard.png",
+      "bytes": 35405,
+      "sha256": "98469b2ca02b12141bef25a6856c1d9fd454372c6a4f938df5da3f071f0f8d0c"
+    },
+    {
+      "path": "after/webkit-430-dark-picker.png",
+      "bytes": 28703,
+      "sha256": "4bd3db04c7825d9bca9cfd77932c1521a6ce5408f57dc0643d515ada1ebe07d3"
+    },
+    {
+      "path": "after/webkit-430-dark-profile-goals.png",
+      "bytes": 40356,
+      "sha256": "d362865a0132cbc74c52a90170b6d973c49834bb91dd7d8073c7110964c49c51"
+    },
+    {
+      "path": "after/webkit-430-dark-profile.png",
+      "bytes": 49743,
+      "sha256": "068653f20408e1ec8391ac8caaffaf95a7ad2af52ab9a0b1bc518e599862767c"
+    },
+    {
+      "path": "after/webkit-430-dark-programs.png",
+      "bytes": 49093,
+      "sha256": "5cac1b0186fddd92ccaa4071aa7d32715716e073e236ae43e7e60f5f1a526170"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-body.png",
+      "bytes": 57234,
+      "sha256": "70790c316e736889b414bade2a262bc0e60106cf1ca1c3db7bd420095941984a"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-cardio.png",
+      "bytes": 51074,
+      "sha256": "767ddf2bbd957422d4f2727c20ee87d8017e55e6db2c0a9444039d1eb9b5dd86"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-history.png",
+      "bytes": 48902,
+      "sha256": "c6b2751764da3887ae2cedc84accd1b0d089e7836354e5edfb477f91727c6ef6"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-nutrition.png",
+      "bytes": 51525,
+      "sha256": "78d3c2bba7452076626f468db23ce5a10baf674bac364493d11666ba1fdb1926"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-training.png",
+      "bytes": 53348,
+      "sha256": "522e61ed01c83dfaaecffb1a2edaf8a5db575190ab02e046bacc204772dd02dc"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-wellbeing.png",
+      "bytes": 57073,
+      "sha256": "4aaf657395f25bceff56a38045edb07a01dc1e016e37dc0a6c8408251cb9936c"
+    },
+    {
+      "path": "after/webkit-430-dark-progress.png",
+      "bytes": 58334,
+      "sha256": "a2554d8f9b4c0a2906a1de5893743489466d5ca1ea59f1f626b38b24a1f95a48"
+    },
+    {
+      "path": "after/webkit-430-dark-quick-add.png",
+      "bytes": 50036,
+      "sha256": "108b17510577a22108a917c1a8f70268b054e8fb9d2f6b658aef42c2d4c4f5d8"
+    },
+    {
+      "path": "after/webkit-430-dark-report.png",
+      "bytes": 47993,
+      "sha256": "a058f6562d612dddd1a33514c415e4446bcc16676d136a9899789f63444519dd"
+    },
+    {
+      "path": "after/webkit-430-dark-schedule-expanded.png",
+      "bytes": 49235,
+      "sha256": "2aa9ba1f7fb8bc9b66567265aa802254c2054b295f73f1ee15025da4a52d8e3e"
+    },
+    {
+      "path": "after/webkit-430-dark-today.png",
+      "bytes": 122310,
+      "sha256": "e8709663eba6184279a4303342549d7b1a013098eb80a3d2acb4e20cc0d8e63e"
+    },
+    {
+      "path": "after/webkit-430-light-catalog.png",
+      "bytes": 63720,
+      "sha256": "c9016f4cc3e3105065ce7cd86d824e2b6a8064a39c7a1aab8c3365767ae43f54"
+    },
+    {
+      "path": "after/webkit-430-light-completed-exercise.png",
+      "bytes": 41075,
+      "sha256": "a278ee1a42709f2634a521492ab0d29c3eb163a0eaf6f9c4d43238677a542a2d"
+    },
+    {
+      "path": "after/webkit-430-light-completed-expanded.png",
+      "bytes": 45251,
+      "sha256": "0c3be546eb025fe8bad3f66036821d125b9a94ce9811bee40333d01a783d3b02"
+    },
+    {
+      "path": "after/webkit-430-light-editor.png",
+      "bytes": 45865,
+      "sha256": "72cefc180a937bf23a1e5270d923e191b27b7bd1a900b8efb7e2cbf55a7aacd3"
+    },
+    {
+      "path": "after/webkit-430-light-grocery-expanded.png",
+      "bytes": 40988,
+      "sha256": "aff831899bbdd8a43f56b421291879c958269183e7c80bdac321b4278b176e8e"
+    },
+    {
+      "path": "after/webkit-430-light-manage.png",
+      "bytes": 55893,
+      "sha256": "dc476e98e151504f256f69c400fca03c7912de5563f93babd149a051a5d9ba94"
+    },
+    {
+      "path": "after/webkit-430-light-meal-plan-expanded.png",
+      "bytes": 43153,
+      "sha256": "6a55e58833dbdcc2d3260cb4d90d06a8309879173c8dea50dcbb0920dc122d09"
+    },
+    {
+      "path": "after/webkit-430-light-nutrition.png",
+      "bytes": 45614,
+      "sha256": "860e0f81294aacf33b09fe86f7154f7aba4846406d1ce8955ec9683fed537b1e"
+    },
+    {
+      "path": "after/webkit-430-light-picker-keyboard.png",
+      "bytes": 35549,
+      "sha256": "54b493de368aa0e0451b3c4a2f469144e316aafe10ee1c12b03fd38b033f5891"
+    },
+    {
+      "path": "after/webkit-430-light-picker.png",
+      "bytes": 29640,
+      "sha256": "228bae7e37d288842daa5a57555d18ae25263dd97b0b7134fefdd85109af15a4"
+    },
+    {
+      "path": "after/webkit-430-light-profile-goals.png",
+      "bytes": 38750,
+      "sha256": "654aa4795711a153142295afbe24db8c694063e03e877e07c9301a825fbed18b"
+    },
+    {
+      "path": "after/webkit-430-light-profile.png",
+      "bytes": 48012,
+      "sha256": "37fa932e73e64ffecf4ec4c3ee3e3dd7979dc74ae581f81c917eacc7539a57d4"
+    },
+    {
+      "path": "after/webkit-430-light-programs.png",
+      "bytes": 47659,
+      "sha256": "fe4c7800ece02ccc4abd3643aada299fa415291d864439596f92d7a8e2813b7b"
+    },
+    {
+      "path": "after/webkit-430-light-progress-body.png",
+      "bytes": 52393,
+      "sha256": "3c90e1991c47a56cd38bfb83dbee110f7f2b344659a2f20f4a55bf2264b791a6"
+    },
+    {
+      "path": "after/webkit-430-light-progress-cardio.png",
+      "bytes": 47192,
+      "sha256": "e85eafa4bfb0c54c8462a67feafbe4ca534d10543c5351741ee0d8d6175cca31"
+    },
+    {
+      "path": "after/webkit-430-light-progress-history.png",
+      "bytes": 45007,
+      "sha256": "316092b4e46dbb45426201f1b5e46e774222a8406697a00835a74f034a419bcd"
+    },
+    {
+      "path": "after/webkit-430-light-progress-nutrition.png",
+      "bytes": 47295,
+      "sha256": "1fe4f43e9c92e05693b1d2550c23171c4948e542757552d669d84898c31c323b"
+    },
+    {
+      "path": "after/webkit-430-light-progress-training.png",
+      "bytes": 49284,
+      "sha256": "639480cf78360937974f90e94682adf55e93374e002f3322171165513e2aad86"
+    },
+    {
+      "path": "after/webkit-430-light-progress-wellbeing.png",
+      "bytes": 52322,
+      "sha256": "cd5ef46bac55bd081d53be1a3badf766d83a2d508743eaba81d7a4ae12c7066a"
+    },
+    {
+      "path": "after/webkit-430-light-progress.png",
+      "bytes": 53370,
+      "sha256": "fda54adf1687f450688f0167d65283a431c65b742a19260b4fc303aa5010d79c"
+    },
+    {
+      "path": "after/webkit-430-light-quick-add.png",
+      "bytes": 47794,
+      "sha256": "de9fc715001863e1e00fa4c0c53b41d7c394f14860044523faf35c3b20b41c47"
+    },
+    {
+      "path": "after/webkit-430-light-report.png",
+      "bytes": 44740,
+      "sha256": "74040908da6e539cb9ee642fe7f28ab0276c482e368f3662061544050b88ec84"
+    },
+    {
+      "path": "after/webkit-430-light-schedule-expanded.png",
+      "bytes": 46256,
+      "sha256": "28c53cab7d0ce61ca639c47c98173fcbfe220095baf2a366f1c10562109e483f"
+    },
+    {
+      "path": "after/webkit-430-light-today.png",
+      "bytes": 120912,
+      "sha256": "4508eca749da402475a545a69552e9e3c6649e36334188d79318effdfcff462d"
+    },
+    {
+      "path": "after/webkit-desktop-dark-editor.png",
+      "bytes": 87576,
+      "sha256": "2e404436eb28409c3f6c2eb52017765bb196cc61d70b998f6c71afcdd77e82e3"
+    },
+    {
+      "path": "after/webkit-desktop-dark-progress.png",
+      "bytes": 125522,
+      "sha256": "30e4606cd56ae1ce8835c130f4268e5cbca0f1f9347019e69e90507eacc574e7"
+    },
+    {
+      "path": "after/webkit-desktop-dark-report.png",
+      "bytes": 79799,
+      "sha256": "139e33ee74fd6da419266570f8dc3f299e7e7883f2ca5fd95580842748aed2fd"
+    },
+    {
+      "path": "after/webkit-desktop-light-editor.png",
+      "bytes": 82816,
+      "sha256": "d0ba641fda212b421943d04ade5c14981a5f115edb0956eaa0af93667d49b64b"
+    },
+    {
+      "path": "after/webkit-desktop-light-progress.png",
+      "bytes": 109496,
+      "sha256": "2a0ddc27b4ccd173acaf50d3a99a29f91a43c56bb44c64186c0a6f7c82bf09e4"
+    },
+    {
+      "path": "after/webkit-desktop-light-report.png",
+      "bytes": 70258,
+      "sha256": "6d479ff8bad4d79cde15f79091268725859fc5f207a43e2ce0806ac02ef72573"
+    },
+    {
+      "path": "after/webkit-tma-360-dark-short-menu.png",
+      "bytes": 25025,
+      "sha256": "5716ea631d0eb25464bbbe613b6d08ed5690573b278c15d9f2fa1210fc30e97a"
+    },
+    {
+      "path": "after/webkit-tma-360-light-short-menu.png",
+      "bytes": 26812,
+      "sha256": "de8d2bcfbe5b589d75601315dcad75f2b23e3fa96a480137b302af3719da71f8"
+    },
+    {
+      "path": "after/webkit-tma-393-dark-short-menu.png",
+      "bytes": 25387,
+      "sha256": "62de332cb29ee420e32e1bce2082a088eab8ff99a90bc5e20884b1b30c67ebad"
+    },
+    {
+      "path": "after/webkit-tma-393-light-short-menu.png",
+      "bytes": 27163,
+      "sha256": "5432cbd8ba1f202555b42a8d05d39441004f3caca8540d8b8bc9ad25c8ef6fb3"
+    },
+    {
+      "path": "after/webkit-tma-430-dark-short-menu.png",
+      "bytes": 25807,
+      "sha256": "f39777c3538f7418e4554fb6e04bcf3cd47e3f0305dde32c2721292171368ab8"
+    },
+    {
+      "path": "after/webkit-tma-430-light-short-menu.png",
+      "bytes": 27463,
+      "sha256": "47dfdae6f40d33e71776a13fabf0fe33e950104a90d259339ebd727261792d88"
+    },
+    {
+      "path": "before/webkit-360-dark-catalog.png",
+      "bytes": 67226,
+      "sha256": "d55c1eda82829cf346ffe47ed02b21da84c543e2b76a006258a0966d69692ef6"
+    },
+    {
+      "path": "before/webkit-360-dark-manage.png",
+      "bytes": 58440,
+      "sha256": "3a149a0f06f411e1159b13803d77cb64398bb3e0a2d41658dd55c68e19551d34"
+    },
+    {
+      "path": "before/webkit-360-dark-nutrition.png",
+      "bytes": 52848,
+      "sha256": "6bbf73938728b3e704bc14753b56317367da140e227672be6f563831ad6655d3"
+    },
+    {
+      "path": "before/webkit-360-dark-profile.png",
+      "bytes": 61420,
+      "sha256": "a09f843281235d91daeec92e9ba6f6fa03030ad130041c61433299c72a6d9b2f"
+    },
+    {
+      "path": "before/webkit-360-dark-programs.png",
+      "bytes": 50676,
+      "sha256": "75a9a6a8cd50078e97da26870ac721fd4d469ef4c8b6620af96b30c2e365a513"
+    },
+    {
+      "path": "before/webkit-360-dark-progress.png",
+      "bytes": 55273,
+      "sha256": "0d94b8caf6889f7650d377dd9ff4fa8b3fca7858e5b343303cb8cc0a6e6750ff"
+    },
+    {
+      "path": "before/webkit-360-dark-quick-add.png",
+      "bytes": 80526,
+      "sha256": "b025c2965c5351d378e9510436596c579c9245a2ed9f3eb697c8d9c68b71a260"
+    },
+    {
+      "path": "before/webkit-360-dark-report.png",
+      "bytes": 42396,
+      "sha256": "a5e988a6533e79493de4f1897fe1d13666c255cf0fa4d06f77c10057fc1d5c1e"
+    },
+    {
+      "path": "before/webkit-360-dark-today.png",
+      "bytes": 118830,
+      "sha256": "a395f5c5ac793ad8949c39ded1016fe242310e1d44e7e6436c1e29c3be7fd2e9"
+    },
+    {
+      "path": "before/webkit-360-light-catalog.png",
+      "bytes": 69192,
+      "sha256": "6fc79af0cbe37574c4570b66874e10e5a07a1631d07c660f42b4a91e6279f121"
+    },
+    {
+      "path": "before/webkit-360-light-manage.png",
+      "bytes": 58524,
+      "sha256": "f5388bfa793f5e2b6e9a9302417de488d652d18b34e304b98c7c611d0c41ce4c"
+    },
+    {
+      "path": "before/webkit-360-light-nutrition.png",
+      "bytes": 52654,
+      "sha256": "77d18043443cf942aa815a010bcfa5f24a0d184f4098c3bc4146063f9dac4096"
+    },
+    {
+      "path": "before/webkit-360-light-profile.png",
+      "bytes": 61250,
+      "sha256": "d8dff0ad7198ace1a2a81a1abc88c31acd91af2879e72c3c12b18cf2664a5629"
+    },
+    {
+      "path": "before/webkit-360-light-programs.png",
+      "bytes": 51164,
+      "sha256": "07d62ffff5db201ae7f6203004e1fac07d34f2ac48d2f80ee5a794d2e8259e2a"
+    },
+    {
+      "path": "before/webkit-360-light-progress.png",
+      "bytes": 52355,
+      "sha256": "95ad936fae9c4cb76e97046f565bcd65dafefc9a906e4fe01dd1f5ea862b4522"
+    },
+    {
+      "path": "before/webkit-360-light-quick-add.png",
+      "bytes": 70551,
+      "sha256": "1e4504115fb81a3d771fa206b494413b0eab515cc67bfb1a8334319c012d26ac"
+    },
+    {
+      "path": "before/webkit-360-light-report.png",
+      "bytes": 40129,
+      "sha256": "ffc518a4c8ac16876a4ccc9dc311da4283cbb983de83a40bb235429e5060b5f6"
+    },
+    {
+      "path": "before/webkit-360-light-today.png",
+      "bytes": 119403,
+      "sha256": "bca6288d4a6de7f868640ba49c81d1f435bc10f86046f507ad90b52588e379ba"
+    },
+    {
+      "path": "before/webkit-393-dark-catalog.png",
+      "bytes": 69638,
+      "sha256": "cee3e691ca8e0733c516cb7fed099e998f730e286f44bb78525f39e1c9627b64"
+    },
+    {
+      "path": "before/webkit-393-dark-completed-exercise.png",
+      "bytes": 48556,
+      "sha256": "1603e51bd6be89a13082e66f9317638fbbe4ec073bdb627d0f4aa83c586f3a35"
+    },
+    {
+      "path": "before/webkit-393-dark-completed-expanded.png",
+      "bytes": 53151,
+      "sha256": "18e60777c41b15452450baf9606b6729f2326effc283f7c84b8224c920f5aa26"
+    },
+    {
+      "path": "before/webkit-393-dark-manage.png",
+      "bytes": 59575,
+      "sha256": "d2be2f2494d29d2cdf529923d107c5d6e94710f83f48fdc5c21b6328282141e5"
+    },
+    {
+      "path": "before/webkit-393-dark-nutrition.png",
+      "bytes": 53391,
+      "sha256": "c945abbd2e44f0dd18d787d4938d07a6213a0d9e244b32b0fb80499cb51a2d62"
+    },
+    {
+      "path": "before/webkit-393-dark-profile.png",
+      "bytes": 61650,
+      "sha256": "849a4f03de239d11b7ca2636c4ec632626d6cf13bd681ad657bd51887164cfce"
+    },
+    {
+      "path": "before/webkit-393-dark-programs.png",
+      "bytes": 51592,
+      "sha256": "64389852e13d74f3f8e1f346201fa8bd37d5dd75a6e3e052b03b5fd5f082ad36"
+    },
+    {
+      "path": "before/webkit-393-dark-progress.png",
+      "bytes": 56586,
+      "sha256": "074b3d7a563066b67ebc39ea1336ce99ad1f6bc60a12a1628a979888f9410f0d"
+    },
+    {
+      "path": "before/webkit-393-dark-quick-add.png",
+      "bytes": 82646,
+      "sha256": "9345a2cbae2574832ef395ba147d5259d304290ce912e8ea9868c0cf1301d325"
+    },
+    {
+      "path": "before/webkit-393-dark-report.png",
+      "bytes": 46237,
+      "sha256": "3c492ac361941e922b27666f61a4b8792c28bee1bbe780e81a3f8a5c19208cf7"
+    },
+    {
+      "path": "before/webkit-393-dark-today.png",
+      "bytes": 123894,
+      "sha256": "52b89f6153c7ec38e7c1bf4f508092034947bb4cb26d096416b0a4464277e0e9"
+    },
+    {
+      "path": "before/webkit-393-light-catalog.png",
+      "bytes": 71060,
+      "sha256": "e905010be3e71974d3a28a98631b40a581b09802fdee1029556e25411686a91d"
+    },
+    {
+      "path": "before/webkit-393-light-manage.png",
+      "bytes": 59576,
+      "sha256": "9e868f535fb51daaa8ff9a24718fb6b5684af4ac4c1efc79f924e5111b5978ba"
+    },
+    {
+      "path": "before/webkit-393-light-nutrition.png",
+      "bytes": 53343,
+      "sha256": "fce0cba96103d3ebabb92ae25ec2bc00792b91e83f72753ca851881d5f03cca0"
+    },
+    {
+      "path": "before/webkit-393-light-profile.png",
+      "bytes": 61155,
+      "sha256": "f8b488fbd40c61ee702c1b1bdf33ce202f19e3b0d9a3b79cff0a79ea2d5589c0"
+    },
+    {
+      "path": "before/webkit-393-light-programs.png",
+      "bytes": 52097,
+      "sha256": "80ebafed98542e053812f1d582d37fb0360804019b1ad68488093a0b50738a8f"
+    },
+    {
+      "path": "before/webkit-393-light-progress.png",
+      "bytes": 53792,
+      "sha256": "e9326c2641184a0db8e78737fdaacd793b4cd5bbaf06476cfeacd4ed6c39bd64"
+    },
+    {
+      "path": "before/webkit-393-light-quick-add.png",
+      "bytes": 72259,
+      "sha256": "14c84ca867cf79d48b85daec97c96ddb7a58dc0a9fd59aa8d1756a692dbf0992"
+    },
+    {
+      "path": "before/webkit-393-light-report.png",
+      "bytes": 43686,
+      "sha256": "ef24f11b428528eeb8854a411d02bf88bb1d20dd26fa148ef7f459f23bfed8ff"
+    },
+    {
+      "path": "before/webkit-393-light-today.png",
+      "bytes": 124765,
+      "sha256": "e0756c9c0ced56d8d1a5e645d7d35e878d17b6d448cc4431a08e022512be23a7"
+    },
+    {
+      "path": "before/webkit-430-dark-catalog.png",
+      "bytes": 72145,
+      "sha256": "ffdfe575617515bb44380d82c2c01be6f5c22c25c5b1a5e26d25e193a9b57406"
+    },
+    {
+      "path": "before/webkit-430-dark-manage.png",
+      "bytes": 62400,
+      "sha256": "868adafc869aee7d5f2bc43c3663f73758c4e280f2df43a640ef46772b689acb"
+    },
+    {
+      "path": "before/webkit-430-dark-nutrition.png",
+      "bytes": 54331,
+      "sha256": "60df94de23c768b809f842920c4a978fdd02c43a947279598c6bbb9b00cccf48"
+    },
+    {
+      "path": "before/webkit-430-dark-profile.png",
+      "bytes": 62139,
+      "sha256": "9caa05e3aa91abdd1110b6cb83caec994cd246a1f9fd9f73d5e4b3b7cc6a540d"
+    },
+    {
+      "path": "before/webkit-430-dark-programs.png",
+      "bytes": 53118,
+      "sha256": "37977a1e75a3afa493a663dd3aba67da8c65efb223587025a6cae8a5737a121f"
+    },
+    {
+      "path": "before/webkit-430-dark-progress.png",
+      "bytes": 57398,
+      "sha256": "d498be0986d6ae648e69c4e410747daa8c6750a720dc91e43c06b067da549ebf"
+    },
+    {
+      "path": "before/webkit-430-dark-quick-add.png",
+      "bytes": 83324,
+      "sha256": "abae5a46027173f0bc552b11256e53b993f14d5960a185238283f2998d992aea"
+    },
+    {
+      "path": "before/webkit-430-dark-report.png",
+      "bytes": 51245,
+      "sha256": "ad419d894d237d543b87797a932e8599b5c47595cb9f7dd7b6011281a8630e10"
+    },
+    {
+      "path": "before/webkit-430-dark-today.png",
+      "bytes": 128794,
+      "sha256": "528d93604b2b4580accc5206ff8dc248c23a87cfd925f9f51077ce8c50936661"
+    },
+    {
+      "path": "before/webkit-430-light-catalog.png",
+      "bytes": 73755,
+      "sha256": "6739253381da8cc3ef183dd6bb57bb905a8e67b4939687d6220f7e72c50c6921"
+    },
+    {
+      "path": "before/webkit-430-light-manage.png",
+      "bytes": 62535,
+      "sha256": "c306498d50d027b0f29e1a5b3aba2c381107d4a79c0265036021d82cf4ef597f"
+    },
+    {
+      "path": "before/webkit-430-light-nutrition.png",
+      "bytes": 54427,
+      "sha256": "163dbca09eade59d897754932d050f7eae3d241b893b532a956e549c110ef7f1"
+    },
+    {
+      "path": "before/webkit-430-light-profile.png",
+      "bytes": 61988,
+      "sha256": "f998dc1955a1a34207bccd136baf8db44a14042152da0b9f93160ca4a1f61d88"
+    },
+    {
+      "path": "before/webkit-430-light-programs.png",
+      "bytes": 53776,
+      "sha256": "890ec2c436e8052f939ec6e84f60e4fb80bf20b81b70e8fac19bf7b7e7903193"
+    },
+    {
+      "path": "before/webkit-430-light-progress.png",
+      "bytes": 54507,
+      "sha256": "a453f0318b80156a005e93b66dcd56e0418ea2cb3de6f45b7baa811c99f3a138"
+    },
+    {
+      "path": "before/webkit-430-light-quick-add.png",
+      "bytes": 72929,
+      "sha256": "60b1d29c3e24e177de41bc8aaa0b674deb81f86c3c4fd586475ddf3c4960060e"
+    },
+    {
+      "path": "before/webkit-430-light-report.png",
+      "bytes": 47776,
+      "sha256": "e4380248b76ed888f79bc9145b2bba5295e7459ef997248b761825950e86f3f1"
+    },
+    {
+      "path": "before/webkit-430-light-today.png",
+      "bytes": 129745,
+      "sha256": "6939120d5e5527fe1cf35ae254ef3a290f14aa9ecd091e637383381440a08d35"
+    },
+    {
+      "path": "before/webkit-860-validation.png",
+      "bytes": 43561,
+      "sha256": "938c024bf6cbcaf564304bb79e0a52df05a5224200fc63ef6305f725d193a5bb"
+    },
+    {
+      "path": "before/webkit-868-water.png",
+      "bytes": 53398,
+      "sha256": "db837a26742bd002d521e940afe02956c2780103e40dcce99cbe8ec56aae9f27"
+    },
+    {
+      "path": "before/webkit-active-full.png",
+      "bytes": 142975,
+      "sha256": "f44a727b0b6db9bcc9e78d2e5eeec341bef0b693d95100d3e747ae57ad9dd71e"
+    },
+    {
+      "path": "before/webkit-catalog-full.png",
+      "bytes": 70798,
+      "sha256": "4693d670f9134336af1076b2840d282fca8ed6738185907ae8d14b63fe3fff50"
+    },
+    {
+      "path": "before/webkit-manage-full.png",
+      "bytes": 239816,
+      "sha256": "1d0834908778ab26db68e05d0d28a479544a9892c0d894d657b0f12c51a1a008"
+    },
+    {
+      "path": "before/webkit-nutrition-full.png",
+      "bytes": 134758,
+      "sha256": "f76dc4d9bf0fa08804cdfb815c201da6914c25957d27a0c71654e7087f288732"
+    },
+    {
+      "path": "before/webkit-profile-full.png",
+      "bytes": 93931,
+      "sha256": "3e7f2f4f40419a7f7e947daca4248470c1ead107c4a994b980e87ff16092cbb3"
+    },
+    {
+      "path": "before/webkit-programs-full.png",
+      "bytes": 52268,
+      "sha256": "10d6029c571059d45e16e99f064e37cfad0a161a0111f92d111f25bfeb9af355"
+    },
+    {
+      "path": "before/webkit-progress-full.png",
+      "bytes": 174189,
+      "sha256": "5a41e2cc7ef6147cec159c47a2e949bc8c418e633c0984d17520a7830b990b09"
+    },
+    {
+      "path": "before/webkit-report-full.png",
+      "bytes": 346641,
+      "sha256": "dcebc6991328274443681e468d3603acd5435b908a0b95730be263aea7579b25"
+    },
+    {
+      "path": "before/webkit-today-full.png",
+      "bytes": 138002,
+      "sha256": "37524350429c9e287e2541c1ee835440858f1722f98e7d1953eaeb6c1c656059"
+    },
+    {
+      "path": "comparisons/after-360-dark-overview.jpg",
+      "bytes": 287178,
+      "sha256": "178c9b4a7c40f22705b0d81db1276e9c68b4b54826ae51cd956b2d281402dcc8"
+    },
+    {
+      "path": "comparisons/after-360-light-overview.jpg",
+      "bytes": 272035,
+      "sha256": "bf524c5f95e58cfd5ae1d648667965f920b1d12ecf91abcf86c429602dab884e"
+    },
+    {
+      "path": "comparisons/after-393-dark-overview.jpg",
+      "bytes": 263340,
+      "sha256": "2592ada56dfad22f26b3303ef1617538f8a71aaa0cfed62b8dd2e2bf6afef7e5"
+    },
+    {
+      "path": "comparisons/after-393-light-overview.jpg",
+      "bytes": 249789,
+      "sha256": "c0ba2583a7637a97ec554aa9cc6b17b2bbdbd5af8904664d0bc80729a0f7c7a7"
+    },
+    {
+      "path": "comparisons/after-430-dark-overview.jpg",
+      "bytes": 251081,
+      "sha256": "41a4fec3f385e4818699bd2649ada00cde5ba3fe488d461ae966067b40eb8be9"
+    },
+    {
+      "path": "comparisons/after-430-light-overview.jpg",
+      "bytes": 236345,
+      "sha256": "f513c64c12873f2bf3fbff74fe0f7a81d155e8cd4445738672ce1ed0af19f9a6"
+    },
+    {
+      "path": "comparisons/before-360-dark-overview.jpg",
+      "bytes": 290031,
+      "sha256": "feeea9b428bdefd0b9521ff1dd212dff8e5aa3a68f9f5ef3cb9a4f59b479fdb5"
+    },
+    {
+      "path": "comparisons/before-360-light-overview.jpg",
+      "bytes": 273975,
+      "sha256": "c0c4d86083fa0e2776dc8ac589fdd5fa9b5d77bb6d69e17c1c1cb9cbdc5eb63d"
+    },
+    {
+      "path": "comparisons/before-393-dark-overview.jpg",
+      "bytes": 267354,
+      "sha256": "c3e40e4e23ffbf85ad666873753b659b9f4df02856021720d0921639550e564c"
+    },
+    {
+      "path": "comparisons/before-393-light-overview.jpg",
+      "bytes": 251767,
+      "sha256": "97a79811459ef337c77fede2ce4e2eaadd47bb019d767a9e005cde99710ba580"
+    },
+    {
+      "path": "comparisons/before-430-dark-overview.jpg",
+      "bytes": 252186,
+      "sha256": "089368f9bda3a94cea5449dc3acdbe670c86f1b429915f8a29b6f275b85270b9"
+    },
+    {
+      "path": "comparisons/before-430-light-overview.jpg",
+      "bytes": 234962,
+      "sha256": "d184d4c018135e497f84bf71652f678d206f0da4b641a7b1f285f2d980f45d77"
+    },
+    {
+      "path": "comparisons/comparison-360-dark.jpg",
+      "bytes": 280066,
+      "sha256": "ee42c344f9f0da232670d19b7e38ef75863f1ad3386fe3997fbb976f15ad26d9"
+    },
+    {
+      "path": "comparisons/comparison-360-light.jpg",
+      "bytes": 265322,
+      "sha256": "51a003d3eca27b113a6f5ec04673a11efe67a49411f0e5184161e039e199262e"
+    },
+    {
+      "path": "comparisons/comparison-393-dark.jpg",
+      "bytes": 271052,
+      "sha256": "cef0fce3bdefecb8219ddedf8422c4ea8336b5b42ca8ab0fb0424604bd39dccb"
+    },
+    {
+      "path": "comparisons/comparison-393-light.jpg",
+      "bytes": 261619,
+      "sha256": "e81b493eae5a8e53b4232d36bbd9b5acf0f7880ca42ac0d81e98b5747c583fd3"
+    },
+    {
+      "path": "comparisons/comparison-430-dark.jpg",
+      "bytes": 295668,
+      "sha256": "1858f271f99f7754655fb5b9d62212086b4baefbfaae4e8a67ff00ab5662fd55"
+    },
+    {
+      "path": "comparisons/comparison-430-light.jpg",
+      "bytes": 279265,
+      "sha256": "eb17a5d1f3641e40b5d03884686004ef88276875133b82a81836fcdc5932f89e"
+    },
+    {
+      "path": "comparisons/quick-add-comparison.jpg",
+      "bytes": 125271,
+      "sha256": "50d4f793116c34ceb8239c8f8083deb7abda8f2b6952d6793373e0fea68c34d6"
+    },
+    {
+      "path": "index.html",
+      "bytes": 46238,
+      "sha256": "7662fd31cd202c3a03a59636bff7607618cc39f804890718b252cf902010bce0"
+    },
+    {
+      "path": "pdf/browser-report-page-1.png",
+      "bytes": 140942,
+      "sha256": "53f52859d5a7f59258a41e55fe319a7b06a2ae0a80af0db469b1b8004420015f"
+    },
+    {
+      "path": "pdf/browser-report-page-2.png",
+      "bytes": 161255,
+      "sha256": "d9d15031bb3c00592fcf7ecbcbd6b1274ec6e182017ac5ea340e7c15b4d031f6"
+    },
+    {
+      "path": "pdf/browser-report-page-3.png",
+      "bytes": 106183,
+      "sha256": "675150d628595773d484ce01aba157f57524c5bab9e219947c1fdfd7314f5e95"
+    },
+    {
+      "path": "pdf/browser-report-page-4.png",
+      "bytes": 127812,
+      "sha256": "b3b7248e18a896dd3abfcdde64a948d59c5da6265fcda534062710a36ffc64db"
+    },
+    {
+      "path": "pdf/browser-report-page-5.png",
+      "bytes": 95066,
+      "sha256": "016a98f81445c92ba1bf23fca72e55ec99ca69b656d1ca6a6e657bc8b77af975"
+    },
+    {
+      "path": "pdf/browser-report.pdf",
+      "bytes": 420614,
+      "sha256": "944208f752828b716829152e5ae498e815edf4e682e02dd33cc526831d3847f9"
+    },
+    {
+      "path": "pdf/server-report-page-1.png",
+      "bytes": 158424,
+      "sha256": "69c327e605bb7f16a86404753808e29a4e65a6d3b9c3cc8c5513b3880982983f"
+    },
+    {
+      "path": "pdf/server-report-page-2.png",
+      "bytes": 90906,
+      "sha256": "7233c853766279bcea81b2ffd8abc4c45b616c4346ccbea3b60c7338e2e07921"
+    },
+    {
+      "path": "pdf/server-report.pdf",
+      "bytes": 96028,
+      "sha256": "76172f26300a8443424e39189ee97f8383b41ee9cff336182ec5d33427a1b10c"
+    },
+    {
+      "path": "pdf-verification.json",
+      "bytes": 2706,
+      "sha256": "978fce7ea3900188a35ea13a259c28d6d59d990f5ef13ebf7e2e4f061723ac2d"
+    },
+    {
+      "path": "report-fixture.json",
+      "bytes": 13827,
+      "sha256": "76af6406829b3c0dab137ee3ff5967e11b080a2e97f83f54d14a337f0f14725b"
+    },
+    {
+      "path": "results.json",
+      "bytes": 45719,
+      "sha256": "73c07bf2c0cd3e7441d954efccf364ded4c55c1d597419f1b7dc635f1bfb939f"
+    },
+    {
+      "path": "supplement-results.json",
+      "bytes": 3755,
+      "sha256": "279fcd1b078ff6a27e886c2c2a45e16fa3891791cc8c7d805489ccafe267f3fd"
+    }
+  ],
+  "validated_head_sha": "7605801a7b9f695ffeded58ad08e5b9bf3b9b92a",
+  "runtime_note": "Validated head differs from captured source only in E2E screenshot state and PNG baselines; application/backend source trees are identical."
+}
