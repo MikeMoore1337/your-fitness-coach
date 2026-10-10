@@ -1,0 +1,3361 @@
+{
+  "runtime": "e120009b2e538951cbdd3c68129bb1f6c22ee73c",
+  "before_source": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+  "screenshots": [
+    {
+      "state": "after",
+      "path": "after/chromium-1440-dark-desktop.png",
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-1440-light-desktop.png",
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-keyboard.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-overview.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-short.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-skip-before.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-skip-pending.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-dark-tma-safe.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-keyboard.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-overview.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-short.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-skip-before.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-skip-pending.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-320-light-tma-safe.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-overview.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-skip-before.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-skip-pending.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-dark-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-overview.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-skip-before.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-skip-pending.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-360-light-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-keyboard.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-overview.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-short.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-skip-before.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-skip-pending.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-dark-tma-safe.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-keyboard.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-overview.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-short.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-skip-before.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-skip-pending.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-393-light-tma-safe.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-overview.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-skip-before.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-skip-pending.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-dark-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-overview.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-skip-before.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-skip-pending.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-430-light-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-768-dark-desktop.png",
+      "engine": "chromium",
+      "width": 768,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/chromium-768-light-desktop.png",
+      "engine": "chromium",
+      "width": 768,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-1440-dark-desktop.png",
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-1440-light-desktop.png",
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-keyboard.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-overview.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-short.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-skip-before.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-skip-pending.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-dark-tma-safe.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-keyboard.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-overview.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-short.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-skip-before.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-skip-pending.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-320-light-tma-safe.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-overview.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-skip-before.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-skip-pending.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-dark-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-overview.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-skip-before.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-skip-pending.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-360-light-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-keyboard.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-overview.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-short.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-skip-before.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-skip-pending.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-dark-tma-safe.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-keyboard.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры: доступное поле"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-overview.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-short.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA: высота 480 px"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-skip-before.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-skip-pending.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-393-light-tma-safe.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA: safe-area 24/34"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-overview.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-skip-before.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-skip-pending.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-dark-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-overview.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "overview",
+      "label": "Таймер и нижняя навигация"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-skip-before.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip-before",
+      "label": "Перед пропуском: текущий подход 202"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-skip-pending.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip-pending",
+      "label": "Повторный пропуск: область касания сохранена"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-430-light-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-768-dark-desktop.png",
+      "engine": "webkit",
+      "width": 768,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "after",
+      "path": "after/webkit-768-light-desktop.png",
+      "engine": "webkit",
+      "width": 768,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop: клавиатурный фокус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    }
+  ],
+  "comparisons": [
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-current-set.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-timer.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-skip.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-current-set.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-current-set.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-timer.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-skip.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-current-set.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-current-set.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-timer.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-skip.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-current-set.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-current-set.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-timer.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-skip.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-current-set.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-current-set.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-timer.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-skip.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-current-set.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-current-set.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-timer.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-skip.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-current-set.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-current-set.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-timer.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-skip.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-current-set.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-current-set.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-timer.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-skip.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После отдельного действия: компактный статус"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-current-set.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "current-set",
+      "label": "Подход 202 до и после пропуска"
+    }
+  ],
+  "files": [
+    {
+      "path": "after/chromium-1440-dark-desktop.png",
+      "bytes": 175621,
+      "sha256": "46165618a99040fa6ddff03083850aaca05426a33214cf4d76b24e8dbfc940af"
+    },
+    {
+      "path": "after/chromium-1440-light-desktop.png",
+      "bytes": 182156,
+      "sha256": "0704b2ffcf8b6e0f52e060881ffcaa687ed4dd5813335915d4b0623964bcb84a"
+    },
+    {
+      "path": "after/chromium-320-dark-keyboard.png",
+      "bytes": 45622,
+      "sha256": "97bddff6c9274bea337d207dca827006051e9dd7b91012d45dfde1b11fc5a412"
+    },
+    {
+      "path": "after/chromium-320-dark-overview.png",
+      "bytes": 73311,
+      "sha256": "d8e97789b49d0a4e8c3d35d866195ade77dbaa6e7ce86b5179a55592ef02818b"
+    },
+    {
+      "path": "after/chromium-320-dark-plus30.png",
+      "bytes": 64459,
+      "sha256": "67767f7e05c92b489f58cc9cd4b6790c0cef7278b9d84e050c845c8f3f827146"
+    },
+    {
+      "path": "after/chromium-320-dark-plus60.png",
+      "bytes": 64526,
+      "sha256": "03bdda75e6f17e4aebfca0ab010bf113737bebcb045034ac32fa1561e6dc1900"
+    },
+    {
+      "path": "after/chromium-320-dark-short.png",
+      "bytes": 58729,
+      "sha256": "5e3c1c6d6469ec21fceacb2ec450e277f84d4e5e2fc385971e17d8565926e1aa"
+    },
+    {
+      "path": "after/chromium-320-dark-skip-before.png",
+      "bytes": 65564,
+      "sha256": "d012e1d5f9db8821cad72b9d8990d25d5c8c09890cdfe64106078b39efdf348e"
+    },
+    {
+      "path": "after/chromium-320-dark-skip-pending.png",
+      "bytes": 61290,
+      "sha256": "029b7f0c8c72695fb42a429ae26f65571853fffcc32254d8e222bd14d7b89a93"
+    },
+    {
+      "path": "after/chromium-320-dark-skip.png",
+      "bytes": 56526,
+      "sha256": "931efb57bae3be1ef076db50ba911ff3a43205e2d62cec32051df5dfaaa6e2d2"
+    },
+    {
+      "path": "after/chromium-320-dark-timer.png",
+      "bytes": 64151,
+      "sha256": "230068f35fa19c4fbaa572f33877b8c65c3175d685731e6640ef44f15ae3b2db"
+    },
+    {
+      "path": "after/chromium-320-dark-tma-safe.png",
+      "bytes": 70783,
+      "sha256": "e11577406db9f2f67d0ca12b3b3104b7021b166e66e0dfc8ace774a061c46433"
+    },
+    {
+      "path": "after/chromium-320-light-keyboard.png",
+      "bytes": 43782,
+      "sha256": "b5a6105628a5d589fa2310d5a73623243f1811201de6a7c2497fcefa491aac62"
+    },
+    {
+      "path": "after/chromium-320-light-overview.png",
+      "bytes": 69684,
+      "sha256": "62083fe36fe2ce541f2ff2de35cc53ca58bf834d2220d7d8c57c8a612867613e"
+    },
+    {
+      "path": "after/chromium-320-light-plus30.png",
+      "bytes": 61878,
+      "sha256": "8b23b0d9cc01a8b86912ad3c30144ebaa5a4a777032c113646c4210ada36556a"
+    },
+    {
+      "path": "after/chromium-320-light-plus60.png",
+      "bytes": 61995,
+      "sha256": "3b9c9cd4c9bfc6a27e6c09cbc3d3e8f86befc43549fc7f2ab2f985bb21dda72c"
+    },
+    {
+      "path": "after/chromium-320-light-short.png",
+      "bytes": 55958,
+      "sha256": "9797cb5c447b506d2dbee392dc04fbc31e7473613c85e35cff05e5a969cc03db"
+    },
+    {
+      "path": "after/chromium-320-light-skip-before.png",
+      "bytes": 62934,
+      "sha256": "9f1101ccd6c92d14ba13e5d58fda44bd38ceacc5b7d980cfc2af0d44c7dee017"
+    },
+    {
+      "path": "after/chromium-320-light-skip-pending.png",
+      "bytes": 59348,
+      "sha256": "ce9022c9c8e08091458d29ea798f49fb8f6c21a2d42a271542cbf211624ed4e4"
+    },
+    {
+      "path": "after/chromium-320-light-skip.png",
+      "bytes": 54872,
+      "sha256": "af00b7a0000dc66e0916e6cd9e4022cd3307ad22f5ef5586eff5210d950dd9b0"
+    },
+    {
+      "path": "after/chromium-320-light-timer.png",
+      "bytes": 61541,
+      "sha256": "519498b3b01c3609120e54fd3c19fe425bc79e1f96b42587cacb42fdf7432c70"
+    },
+    {
+      "path": "after/chromium-320-light-tma-safe.png",
+      "bytes": 68430,
+      "sha256": "e0756f2ba3d74adceebeb76174cb3028be950088ad8ebddfe1a865649e322b1b"
+    },
+    {
+      "path": "after/chromium-360-dark-overview.png",
+      "bytes": 76830,
+      "sha256": "e2d0d6aa3e247b4da15a6ca21bb7dc04104be58e38bce2da647483231b929d3d"
+    },
+    {
+      "path": "after/chromium-360-dark-plus30.png",
+      "bytes": 66469,
+      "sha256": "febef38cdf5f1bb711cf09ff0223afc2a699fabdba30273e482bfdacc4b8c9f7"
+    },
+    {
+      "path": "after/chromium-360-dark-plus60.png",
+      "bytes": 66408,
+      "sha256": "f170280f2f3694e8dae30a67249fc75a45aa00c7e7b225353d4199c87ca5e60d"
+    },
+    {
+      "path": "after/chromium-360-dark-skip-before.png",
+      "bytes": 67720,
+      "sha256": "8892101f378ea969827d1792edc0783ae12459d39592d0f6174e2edd4c5cdcc4"
+    },
+    {
+      "path": "after/chromium-360-dark-skip-pending.png",
+      "bytes": 63132,
+      "sha256": "c67d68774cb42ba3e12c25069258f750bd987e91356a2964f8411fe2125b8954"
+    },
+    {
+      "path": "after/chromium-360-dark-skip.png",
+      "bytes": 58092,
+      "sha256": "70de8e5a3e3fda09f582b94dd5b5f03763fa7d6aeaf26b361e18a6c6549440a1"
+    },
+    {
+      "path": "after/chromium-360-dark-timer.png",
+      "bytes": 66109,
+      "sha256": "bd32f9851cb1dc471e94d969b0b916631abd1e00a6334c51b72214929779fef2"
+    },
+    {
+      "path": "after/chromium-360-light-overview.png",
+      "bytes": 73534,
+      "sha256": "0bc8a0b3cf313a0f03c7d197b731a0858c72c83d3711c18fd0717bf9a50c310e"
+    },
+    {
+      "path": "after/chromium-360-light-plus30.png",
+      "bytes": 64265,
+      "sha256": "0fb2d6ff243c879ed5fe2619ce34c9ecd869664b67ebc437f1c2ac918dc86ac2"
+    },
+    {
+      "path": "after/chromium-360-light-plus60.png",
+      "bytes": 64288,
+      "sha256": "019a2bc9930075655f85c3c5cb9c0780feb8c4b0671dba64f0b3364484f39aa6"
+    },
+    {
+      "path": "after/chromium-360-light-skip-before.png",
+      "bytes": 65219,
+      "sha256": "0f77bb28a8310a3cf4659f828f4c23f2a59716224369fb10cab3972c5e06f9b2"
+    },
+    {
+      "path": "after/chromium-360-light-skip-pending.png",
+      "bytes": 61078,
+      "sha256": "a33dbebf5c00ceeb4a3cd1e4d33e850c23a151e0eacfa170759486773f4bb6cb"
+    },
+    {
+      "path": "after/chromium-360-light-skip.png",
+      "bytes": 56291,
+      "sha256": "81ec333d2a56226ecef6e27ba73d89f120286dbb0d9ca8b599d1f4e16ebc608e"
+    },
+    {
+      "path": "after/chromium-360-light-timer.png",
+      "bytes": 64128,
+      "sha256": "579e85366b17e1e89f51d8c18176ff5133de300dd699e791282257ab5ee0a4b4"
+    },
+    {
+      "path": "after/chromium-393-dark-keyboard.png",
+      "bytes": 51292,
+      "sha256": "7b8211a07048fa594869b4455c667a0b5afe0be093dabc4d84a2ce2c95295d86"
+    },
+    {
+      "path": "after/chromium-393-dark-overview.png",
+      "bytes": 83430,
+      "sha256": "e6c2c8c56ca24dd8783ed55fc631604e9043081c252873bf99dbf14d9895ab9a"
+    },
+    {
+      "path": "after/chromium-393-dark-plus30.png",
+      "bytes": 72153,
+      "sha256": "25e621d2aaebdc561b9525b473ea2fd3cea40366f5cb7c0dbf7b1dc01c3f50c3"
+    },
+    {
+      "path": "after/chromium-393-dark-plus60.png",
+      "bytes": 72080,
+      "sha256": "5e254b7557e0a73d687de96d5fa4a75bf81b5cf96ab8e16fafbba55e2c8fde0f"
+    },
+    {
+      "path": "after/chromium-393-dark-short.png",
+      "bytes": 63370,
+      "sha256": "0e94b6840538e6dcad44d9ae7821a944f8592d3bd2f0d315aa7c67e6d0e0a9e1"
+    },
+    {
+      "path": "after/chromium-393-dark-skip-before.png",
+      "bytes": 71038,
+      "sha256": "69d575d4dabcbb132e5aa5a2c2fb8dd81e332fccdc598f44ce3aff35dc1c2482"
+    },
+    {
+      "path": "after/chromium-393-dark-skip-pending.png",
+      "bytes": 65942,
+      "sha256": "496b6c7e2cdfe4346723d7757281f87e6bc520d52fd1d6ee8d37ee0f42652984"
+    },
+    {
+      "path": "after/chromium-393-dark-skip.png",
+      "bytes": 61227,
+      "sha256": "27d138fa1b0389761bf43ddc74b741f0bc72c9fae9b65edf9da2350f3e437e4c"
+    },
+    {
+      "path": "after/chromium-393-dark-timer.png",
+      "bytes": 71824,
+      "sha256": "52b57f3a28d3bfef77ee83b444214e9951e93caed9e308cb844610b99704b336"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-safe.png",
+      "bytes": 84865,
+      "sha256": "830b41fcf7c7c90d420eb4b62ebc5a5f949032da2e244613466c5d18e42639b5"
+    },
+    {
+      "path": "after/chromium-393-light-keyboard.png",
+      "bytes": 50732,
+      "sha256": "fc2308d7376d7315c771946ee5d7382e17bcc7048d3c22eec1922719cb2c351d"
+    },
+    {
+      "path": "after/chromium-393-light-overview.png",
+      "bytes": 80418,
+      "sha256": "4e7faeca35cd8f9b4d4877efcfeff3dff2d2a0c21923b3d7262dd33ba03f55f6"
+    },
+    {
+      "path": "after/chromium-393-light-plus30.png",
+      "bytes": 70165,
+      "sha256": "ad1e6c7ed8aecda7cb3f4b5eff8de3b7a3a05149042ced2506836a8e18688d4a"
+    },
+    {
+      "path": "after/chromium-393-light-plus60.png",
+      "bytes": 70088,
+      "sha256": "974c4c1d11c1cc71c5a36fd9c8b22a3d9a95e824a4e5ef93455ea17d28fcf09b"
+    },
+    {
+      "path": "after/chromium-393-light-short.png",
+      "bytes": 61871,
+      "sha256": "cc9ea20fc737bdd1928f06f0e71d40a78c870ed7b4b71ebfd2b92b05770f00c4"
+    },
+    {
+      "path": "after/chromium-393-light-skip-before.png",
+      "bytes": 68566,
+      "sha256": "e8ab6b50690d3adf0b07ddf20a14060965b249a58f12163b2ea0248ff9cebdd0"
+    },
+    {
+      "path": "after/chromium-393-light-skip-pending.png",
+      "bytes": 63868,
+      "sha256": "597c0557a928b487f7a141f551236e25b2b04fbf6074bfb777d988e0ad91d351"
+    },
+    {
+      "path": "after/chromium-393-light-skip.png",
+      "bytes": 59496,
+      "sha256": "56d1d79b8138f822f5c0302a35149b6aaed8ce2a0710d044df005ac4bbf94a35"
+    },
+    {
+      "path": "after/chromium-393-light-timer.png",
+      "bytes": 70014,
+      "sha256": "b2ff63be9b1a1c7c7c92752a611639ad386a6b23226e8a92a23b2a823b1de369"
+    },
+    {
+      "path": "after/chromium-393-light-tma-safe.png",
+      "bytes": 81622,
+      "sha256": "7aff1cfe62e17c3bd07dbecde0e7832b7b9a7319113639b05fb059c0ccc8b586"
+    },
+    {
+      "path": "after/chromium-430-dark-overview.png",
+      "bytes": 84428,
+      "sha256": "bdc313abadf6a2b901fc065e152943e61136e93c15d521cce80927d575a3ef57"
+    },
+    {
+      "path": "after/chromium-430-dark-plus30.png",
+      "bytes": 73440,
+      "sha256": "0225472ce401c29cc4f8875e498aa6942ed96f12d716f49cd4d825ebd53e5877"
+    },
+    {
+      "path": "after/chromium-430-dark-plus60.png",
+      "bytes": 73594,
+      "sha256": "7c21c4820d7841f00418e4406de91775f1564a550b5b4b1414570403a581c567"
+    },
+    {
+      "path": "after/chromium-430-dark-skip-before.png",
+      "bytes": 73904,
+      "sha256": "f2e303df89d0a4e2ac773d1cae43f9363140a2f3e1c65e0225b298c5d3a99714"
+    },
+    {
+      "path": "after/chromium-430-dark-skip-pending.png",
+      "bytes": 67920,
+      "sha256": "cbd8ef2b7356090b51963bdd70ba2e748fb52874802831836e4353cf7b85b321"
+    },
+    {
+      "path": "after/chromium-430-dark-skip.png",
+      "bytes": 60971,
+      "sha256": "834858239d0d82326ea289168f66bd8d4ea63018f098bb28aa0e8bea1f6e3364"
+    },
+    {
+      "path": "after/chromium-430-dark-timer.png",
+      "bytes": 73164,
+      "sha256": "f1ebdcbb6e3e80eef4adcfc0d34b854dc56d27210509b60ba5206afbd5025c7b"
+    },
+    {
+      "path": "after/chromium-430-light-overview.png",
+      "bytes": 81662,
+      "sha256": "f38f1650ce0f5b58c0bf20c5927e545347b45be759b5c98524ff636a08b35f68"
+    },
+    {
+      "path": "after/chromium-430-light-plus30.png",
+      "bytes": 71166,
+      "sha256": "f70f2002473d6944e386e04fc30c1db48943520eb62b2e914956e6d24c655853"
+    },
+    {
+      "path": "after/chromium-430-light-plus60.png",
+      "bytes": 71198,
+      "sha256": "ed6053e5546f35c22a2c0d599d64040497988c080d0ff9ab9245a41f8b680509"
+    },
+    {
+      "path": "after/chromium-430-light-skip-before.png",
+      "bytes": 71098,
+      "sha256": "3fee096226a81af0ace6305d37857581d6cfddeb47bc3369152b82bbfa0df354"
+    },
+    {
+      "path": "after/chromium-430-light-skip-pending.png",
+      "bytes": 66152,
+      "sha256": "3187438e9ec5f374203e22b190aca159df5dc3bf104b8bae41848365ef53ca33"
+    },
+    {
+      "path": "after/chromium-430-light-skip.png",
+      "bytes": 59713,
+      "sha256": "2069ef10f5031f403c618425b9473b197d63bb62d469202b1ec1f6f702e6860a"
+    },
+    {
+      "path": "after/chromium-430-light-timer.png",
+      "bytes": 71142,
+      "sha256": "6ce681fc3c065f752d39cff79c2dd69deb4a2f92a511b826a904cc522458d85d"
+    },
+    {
+      "path": "after/chromium-768-dark-desktop.png",
+      "bytes": 105063,
+      "sha256": "fbe481ee90fcd802eb474fec2616f716a5bd5bbaed9fcc12f1c6a4f83ced71fe"
+    },
+    {
+      "path": "after/chromium-768-light-desktop.png",
+      "bytes": 103698,
+      "sha256": "6bbadbb414b18693195d0f972c30caf4487bdb160f62601cf64cc3329f4c4541"
+    },
+    {
+      "path": "after/webkit-1440-dark-desktop.png",
+      "bytes": 117595,
+      "sha256": "d55fa28a7264c624c06672e1cbbc18b3cd79dc5eddf34c16d6c5c881963e5c7a"
+    },
+    {
+      "path": "after/webkit-1440-light-desktop.png",
+      "bytes": 107335,
+      "sha256": "d349eef561ada5d5a296f8d3f5842d9d7cf7a1412523db1954ae5b1d6666a894"
+    },
+    {
+      "path": "after/webkit-320-dark-keyboard.png",
+      "bytes": 37054,
+      "sha256": "c482e7ac522ee7b4d5a039ce1058cbc35b0a7beaadbf767e467cefcb89dbd155"
+    },
+    {
+      "path": "after/webkit-320-dark-overview.png",
+      "bytes": 57477,
+      "sha256": "78ba345893cfcc737ffd9ba599954f056cf3d523d36d0fb5196bde0abbb2e976"
+    },
+    {
+      "path": "after/webkit-320-dark-plus30.png",
+      "bytes": 49430,
+      "sha256": "45efc2f0ac08c92bf42b5324a17d3a436c4c1fb7ff2fa06ac0244101c11b02ed"
+    },
+    {
+      "path": "after/webkit-320-dark-plus60.png",
+      "bytes": 49806,
+      "sha256": "4a9858be072858a037a58fff1ca7f49ebcbacdd0d1abdb13be11d2deecc2858a"
+    },
+    {
+      "path": "after/webkit-320-dark-short.png",
+      "bytes": 46258,
+      "sha256": "d89846155e7d2140c2c47f9ac97df8e0f978c0bd7812635b5a8c87dee667d202"
+    },
+    {
+      "path": "after/webkit-320-dark-skip-before.png",
+      "bytes": 49651,
+      "sha256": "1c5098f888f83d19363da3a577653b6e30c157f01215b7d7da59ddb01d73fce9"
+    },
+    {
+      "path": "after/webkit-320-dark-skip-pending.png",
+      "bytes": 47165,
+      "sha256": "aece5fd7b26db165d3356b2d2a0b31c6f4df4d8509d0c62e09576aa1a57fcdeb"
+    },
+    {
+      "path": "after/webkit-320-dark-skip.png",
+      "bytes": 44800,
+      "sha256": "9234486c9bd11e8adca9d3d80928dc1637d0f8e92480424b2122ff043854e2e5"
+    },
+    {
+      "path": "after/webkit-320-dark-timer.png",
+      "bytes": 53484,
+      "sha256": "51c23e53446f92a1b286c00924484b8117151f1631714144a831594b999eb97b"
+    },
+    {
+      "path": "after/webkit-320-dark-tma-safe.png",
+      "bytes": 56461,
+      "sha256": "ba0d8e1b44e147786a3489e2dbf20491f23f7e4fa00115ee26f02efe787c89fc"
+    },
+    {
+      "path": "after/webkit-320-light-keyboard.png",
+      "bytes": 33508,
+      "sha256": "f045a419bb5498f7f3522ca5156bafbfc40dfbcb1954a3b6e157ad43f633815c"
+    },
+    {
+      "path": "after/webkit-320-light-overview.png",
+      "bytes": 53321,
+      "sha256": "52ee75d1e5a61e10cc5a5d5bd4153c37d1894c62d632418887d7a5d4c9d5ac9f"
+    },
+    {
+      "path": "after/webkit-320-light-plus30.png",
+      "bytes": 45896,
+      "sha256": "3326e91986c41a35fb30f124112c2fcbb3934c74ffbb3597ebca0b9ec0b2dcb6"
+    },
+    {
+      "path": "after/webkit-320-light-plus60.png",
+      "bytes": 46100,
+      "sha256": "a4104102a30b8cd787d3a06d696615b420d347cc05e497c4a206e51d6a766020"
+    },
+    {
+      "path": "after/webkit-320-light-short.png",
+      "bytes": 42791,
+      "sha256": "7a5db909143ff126c52f0f3b878fe1e216d3b88cdfd9ddac7f924a9370a88514"
+    },
+    {
+      "path": "after/webkit-320-light-skip-before.png",
+      "bytes": 45858,
+      "sha256": "8cc302b676bf3f0bb28b79b64631f74c0e8fde7374785e4641555aaf80c25135"
+    },
+    {
+      "path": "after/webkit-320-light-skip-pending.png",
+      "bytes": 43269,
+      "sha256": "b0c358e2a24548321e5c5c7366f0a7ce12bb47ffe72f8984942677dd0bc8d2f9"
+    },
+    {
+      "path": "after/webkit-320-light-skip.png",
+      "bytes": 42041,
+      "sha256": "5a34565d9c183be5fb9f140cb76dcac4130204da9e70c165e670ec9ff606a938"
+    },
+    {
+      "path": "after/webkit-320-light-timer.png",
+      "bytes": 49279,
+      "sha256": "5c35b07d70d312f9452675ed05f4ba7cce5743413fd6a29c526237b7a38e2723"
+    },
+    {
+      "path": "after/webkit-320-light-tma-safe.png",
+      "bytes": 52561,
+      "sha256": "7907c8add664c0292936feb37282a3a0de5bdd72abb40706360a09f7b33425c4"
+    },
+    {
+      "path": "after/webkit-360-dark-overview.png",
+      "bytes": 59897,
+      "sha256": "e41cf45a47c66e9a51244fdcba2d71b9404c139be79525108852b67add84c15a"
+    },
+    {
+      "path": "after/webkit-360-dark-plus30.png",
+      "bytes": 50933,
+      "sha256": "a8ef958bd859be31e2a3e7ded9ed78fbbe008b49f07c9df74fba7dfeb16a9d47"
+    },
+    {
+      "path": "after/webkit-360-dark-plus60.png",
+      "bytes": 51225,
+      "sha256": "1e207a51fba5a9b19cd071b7cbaf5f2903b14fb4450eea21826612406202b41d"
+    },
+    {
+      "path": "after/webkit-360-dark-skip-before.png",
+      "bytes": 50977,
+      "sha256": "20a5718ce11252cdcb826b154694525fd7b9badf49c09baa9da641fcfdb09253"
+    },
+    {
+      "path": "after/webkit-360-dark-skip-pending.png",
+      "bytes": 48308,
+      "sha256": "349f88f5282d78f96ea684e6eedd0b590a5d1609ffe893d01b1254a5b9abfa0a"
+    },
+    {
+      "path": "after/webkit-360-dark-skip.png",
+      "bytes": 45756,
+      "sha256": "6ef69d675f3ceba8c42709bc7c33d5a95baf9b35e94165e1e8449a1600223b58"
+    },
+    {
+      "path": "after/webkit-360-dark-timer.png",
+      "bytes": 52504,
+      "sha256": "4f1cf0abfc806e8d181ede24ce31f407f163effa271e563b0e3c002138570049"
+    },
+    {
+      "path": "after/webkit-360-light-overview.png",
+      "bytes": 56277,
+      "sha256": "6e57902c3aedca0fcc7f23269c68f839f6a746f263b3e82740f8e9829bc084b6"
+    },
+    {
+      "path": "after/webkit-360-light-plus30.png",
+      "bytes": 47807,
+      "sha256": "c4c64c984630481a8daee17154aa1d829b5ebbe139ecba9ce4c74ef87188e887"
+    },
+    {
+      "path": "after/webkit-360-light-plus60.png",
+      "bytes": 47444,
+      "sha256": "f2a70b4bd2162c050f6cef9b3627ae59720b4f5b6d23d153612c71ef5388452f"
+    },
+    {
+      "path": "after/webkit-360-light-skip-before.png",
+      "bytes": 47137,
+      "sha256": "66dadf3979e93582a5de046f9bed24b842e1c341fa1ee39510259c9dc5c84d30"
+    },
+    {
+      "path": "after/webkit-360-light-skip-pending.png",
+      "bytes": 44561,
+      "sha256": "98455f66c3419fab5d5ae900d9507aa309b5b1ec7af59fc923cfc27f804157e9"
+    },
+    {
+      "path": "after/webkit-360-light-skip.png",
+      "bytes": 42887,
+      "sha256": "4d3446ea2dd45b9dc81644aa53023dfa701825eb4facea0a838c2da7ae508eba"
+    },
+    {
+      "path": "after/webkit-360-light-timer.png",
+      "bytes": 48964,
+      "sha256": "289296326e1d0993bd02a066d7aa01b191ab77bb50140f17851bd2ebc83e20e5"
+    },
+    {
+      "path": "after/webkit-393-dark-keyboard.png",
+      "bytes": 41736,
+      "sha256": "1cbebd6392cb585959cc74bc76a7cb414aa12cfed1d85e9a97297c166de3927a"
+    },
+    {
+      "path": "after/webkit-393-dark-overview.png",
+      "bytes": 65910,
+      "sha256": "2d5a044942d73b375d2342f76037ea4b2ea9b511b21785650dcef1b0ff6ba423"
+    },
+    {
+      "path": "after/webkit-393-dark-plus30.png",
+      "bytes": 55764,
+      "sha256": "6aa8cfa952349b3c865d563111d9112fcdcb39f3f87eb7a786ebd348334dca46"
+    },
+    {
+      "path": "after/webkit-393-dark-plus60.png",
+      "bytes": 55984,
+      "sha256": "7c7e97d099647b169bc85b363babf198b76ab5eeb9b713f649fe548142c256a4"
+    },
+    {
+      "path": "after/webkit-393-dark-short.png",
+      "bytes": 50527,
+      "sha256": "196d3705ae44481fd4c1e56a9834dc56efd3cd0f696eee48b5d69c2cd306ade0"
+    },
+    {
+      "path": "after/webkit-393-dark-skip-before.png",
+      "bytes": 54251,
+      "sha256": "3405bad1726382030f9a26423bc5569138a828b7303a45385de03d7e8a1193d9"
+    },
+    {
+      "path": "after/webkit-393-dark-skip-pending.png",
+      "bytes": 51421,
+      "sha256": "d6e9794ce8eff0ff8f276e4cebe54c0db9eeed2595f808bdd954037298ba46ca"
+    },
+    {
+      "path": "after/webkit-393-dark-skip.png",
+      "bytes": 49015,
+      "sha256": "3de70223f9a9de593e758d2c4ae3235649b9ab31287552d085f6748ae8ea26a1"
+    },
+    {
+      "path": "after/webkit-393-dark-timer.png",
+      "bytes": 61849,
+      "sha256": "3ebc885c2612e12f3d71882b9f494bc1b1a713610bd6f2928b5353499c5409d9"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-safe.png",
+      "bytes": 65570,
+      "sha256": "31c90f685f3ce50b3860f15cb31c92c222a1815a42a0f261297d920fff818000"
+    },
+    {
+      "path": "after/webkit-393-light-keyboard.png",
+      "bytes": 38377,
+      "sha256": "e1e9b9d17e26045263b581547c05e937044dcd645205cb393a533505373dbc08"
+    },
+    {
+      "path": "after/webkit-393-light-overview.png",
+      "bytes": 61711,
+      "sha256": "01043db07d2dae46b1b70fb04a39f632e8e289e8babc4876254417030b86e5a6"
+    },
+    {
+      "path": "after/webkit-393-light-plus30.png",
+      "bytes": 52033,
+      "sha256": "a5999e2429e0b73a1f4640186277b88871f1d023ca63a951a8f8eeaea047e3ac"
+    },
+    {
+      "path": "after/webkit-393-light-plus60.png",
+      "bytes": 51624,
+      "sha256": "e45cea63c405ddd3044ba30d43441e14456c20859333a870e777be9818a75182"
+    },
+    {
+      "path": "after/webkit-393-light-short.png",
+      "bytes": 47385,
+      "sha256": "ff07b888565e81cee1cb050cc8d3d14f6d35e9a4b280d2cfdee8da2d1775e9a0"
+    },
+    {
+      "path": "after/webkit-393-light-skip-before.png",
+      "bytes": 49729,
+      "sha256": "a79ffc5fd74fac2d28aa2d88d658436cc4b614ab344e5b4b0343da950664bc30"
+    },
+    {
+      "path": "after/webkit-393-light-skip-pending.png",
+      "bytes": 46797,
+      "sha256": "d1f600bd9e63cd384553764301c2ef6d78cec5627c4c44989a46db621dd1d0e0"
+    },
+    {
+      "path": "after/webkit-393-light-skip.png",
+      "bytes": 45303,
+      "sha256": "0cec494bc29a5f499c3227720efd46bce751f27a177ad8399b6f42c7681ba952"
+    },
+    {
+      "path": "after/webkit-393-light-timer.png",
+      "bytes": 53268,
+      "sha256": "4d7cf4eb2a07683beddc908252067b242a6a550e37df8f0ba065d2b743686936"
+    },
+    {
+      "path": "after/webkit-393-light-tma-safe.png",
+      "bytes": 61419,
+      "sha256": "58fb6464257e3ec922883e875aa119b0944fb001bb7f03a90a13bf27f61211ac"
+    },
+    {
+      "path": "after/webkit-430-dark-overview.png",
+      "bytes": 64788,
+      "sha256": "9b90a6c53494a8d80ee0ce1d106c07b7dcb9c62bcdfdc6c2a8be5e5e0cf556a3"
+    },
+    {
+      "path": "after/webkit-430-dark-plus30.png",
+      "bytes": 54811,
+      "sha256": "e610c65bba2e5358cc58af1e9328c0fc3c4467a84d189dacbbf8a0ff7c78d753"
+    },
+    {
+      "path": "after/webkit-430-dark-plus60.png",
+      "bytes": 55023,
+      "sha256": "ecd881b66682ceb61cc95663e7bffa7d71e183c9cc268c1b40bcfd44db095afd"
+    },
+    {
+      "path": "after/webkit-430-dark-skip-before.png",
+      "bytes": 54017,
+      "sha256": "eb4995963d5456ce1ee5b96e00d7c9bf20f44693d743108e475fea2eacf7d6a1"
+    },
+    {
+      "path": "after/webkit-430-dark-skip-pending.png",
+      "bytes": 51153,
+      "sha256": "c1d0687a2cba6fe803f52dd123884d524915b5ea341089a897070295bafc367e"
+    },
+    {
+      "path": "after/webkit-430-dark-skip.png",
+      "bytes": 47674,
+      "sha256": "85c9c4f752d02e99ed6cf96a904afff81a45eae1afac40604bb92db4a13d40f1"
+    },
+    {
+      "path": "after/webkit-430-dark-timer.png",
+      "bytes": 56404,
+      "sha256": "6baa8bf6dc3ebd4019b7d4fcb336c54487b3e6a468bb470be242a4e8e77b3ec0"
+    },
+    {
+      "path": "after/webkit-430-light-overview.png",
+      "bytes": 61561,
+      "sha256": "3698cdee0b67ee30727117a18fc994eb6d9ce3b42facf3763fb0b26c8d69dd84"
+    },
+    {
+      "path": "after/webkit-430-light-plus30.png",
+      "bytes": 51849,
+      "sha256": "90e7383726b3c0fd29c89d0fba9cb52d0b9b190366988ceb3a859ccb520fa845"
+    },
+    {
+      "path": "after/webkit-430-light-plus60.png",
+      "bytes": 51402,
+      "sha256": "5b4695fbf7454bca83f295edc0320c2089a58dc70f6b2bcbb8979c739aa14486"
+    },
+    {
+      "path": "after/webkit-430-light-skip-before.png",
+      "bytes": 50617,
+      "sha256": "9b5109522236548a6c07982203dc630bae6c0d59cc0f09075d0f9f18b908d058"
+    },
+    {
+      "path": "after/webkit-430-light-skip-pending.png",
+      "bytes": 47229,
+      "sha256": "193e9f89393cee3a0183a3ff6e0c65c1dfbd5f802323644df4f67e3c0139eeb1"
+    },
+    {
+      "path": "after/webkit-430-light-skip.png",
+      "bytes": 44509,
+      "sha256": "625a092524988fa92c6667be3c872eda2096ed85e64bf6308d6b65aaff66aa2e"
+    },
+    {
+      "path": "after/webkit-430-light-timer.png",
+      "bytes": 56546,
+      "sha256": "9b013007e5c6382d1322466ecf78efd72ebfb35666b85a565f5540d232974eed"
+    },
+    {
+      "path": "after/webkit-768-dark-desktop.png",
+      "bytes": 80924,
+      "sha256": "ce8d7a2a0fe963f29fa5bc15bf2e101a77f586533f8089f9ff229b780c4ee367"
+    },
+    {
+      "path": "after/webkit-768-light-desktop.png",
+      "bytes": 77202,
+      "sha256": "bc9a2a146ea13336591d449593c47e981b27ff4f1732a329bd9fb10db77cf5df"
+    },
+    {
+      "path": "audit/changed-files.txt",
+      "bytes": 26327,
+      "sha256": "d04bd768466d84da1b3118516c5554bf96fc64b578d93c5aab372e74ce996aae"
+    },
+    {
+      "path": "audit/ci-blocker.json",
+      "bytes": 3089,
+      "sha256": "7a80667abafc59d856f9b28c9e8d08694dc2d3dce882abb0de8dcd643894be07"
+    },
+    {
+      "path": "audit/ci-blocker.md",
+      "bytes": 2081,
+      "sha256": "54d7cb55109a7e7146f21bb5fdcbab5c5629836aeccfd915616c580292033f0a"
+    },
+    {
+      "path": "audit/final-related-results.json",
+      "bytes": 298,
+      "sha256": "bb9b489f3b5a4194860c926a1be052d427c097fe906ef9ff180eb13b20edc036"
+    },
+    {
+      "path": "audit/final-timer-results.json",
+      "bytes": 299,
+      "sha256": "78dee44c5751737e0a96bbc455bf019d3dc3e177333e201072877fd208e5c739"
+    },
+    {
+      "path": "audit/glass.json",
+      "bytes": 5453,
+      "sha256": "1ce7e31b173f828b8167c7a6cdbc8cd1f0421642a5948c157b2b5b30502fdb44"
+    },
+    {
+      "path": "audit/integration.json",
+      "bytes": 386,
+      "sha256": "f92fc2ceee70d54aa52546ed0511aa507132f72861076f4664326e8b9dd63a5f"
+    },
+    {
+      "path": "audit/native-actions/chromium-1440-dark-desktop-keyboard.json",
+      "bytes": 227,
+      "sha256": "7eafbb12848d70e999355a60e16ef134562788c4c4a7fe830e4442b9ee31905b"
+    },
+    {
+      "path": "audit/native-actions/chromium-1440-light-desktop-keyboard.json",
+      "bytes": 228,
+      "sha256": "e0a290a6c18b5dbdb901e742bf4dc761acbc9da05dae5adb1813862f4a0eb697"
+    },
+    {
+      "path": "audit/native-actions/chromium-320-dark-mobile-actions.json",
+      "bytes": 54283,
+      "sha256": "5dcdb95c952db0d8eaffa1d1a56f6adabd98c98ff8da99394305a81bfa373b0a"
+    },
+    {
+      "path": "audit/native-actions/chromium-320-dark-tma-safe-short-keyboard.json",
+      "bytes": 417,
+      "sha256": "86b2f1f48a2b30ebd2c71c03c61c6cc67f31a6b225c31cee1e4ff6eaf36b2ad0"
+    },
+    {
+      "path": "audit/native-actions/chromium-320-light-mobile-actions.json",
+      "bytes": 54287,
+      "sha256": "581baf765b27e3f492bdf07861e2a9ce59f2543a7bcb0d2068c687ab3ac8c739"
+    },
+    {
+      "path": "audit/native-actions/chromium-320-light-tma-safe-short-keyboard.json",
+      "bytes": 418,
+      "sha256": "9f1287dde3974f0760f8cca0d2871be843cb1e7f10b430d294ecd74b9bc54b93"
+    },
+    {
+      "path": "audit/native-actions/chromium-360-dark-mobile-actions.json",
+      "bytes": 54515,
+      "sha256": "3e8563f75634a0b868f98d27a3c4b9ec2cad2cfe513f0ddf618bdbc6f1cae1a2"
+    },
+    {
+      "path": "audit/native-actions/chromium-360-light-mobile-actions.json",
+      "bytes": 54519,
+      "sha256": "173ea8baa5273465e7353cd94c65a1ae4688aece11094b7c06be864aff658a74"
+    },
+    {
+      "path": "audit/native-actions/chromium-393-dark-mobile-actions.json",
+      "bytes": 54533,
+      "sha256": "7bd9db1ef76c74dac83bd8c3ffe22bc845a8f0153a79d29c2ded1d615a75d5c6"
+    },
+    {
+      "path": "audit/native-actions/chromium-393-dark-tma-safe-short-keyboard.json",
+      "bytes": 419,
+      "sha256": "cb462544e6e68793e12a7476be20f66c642383c999afb867f6e8d0571d52b50b"
+    },
+    {
+      "path": "audit/native-actions/chromium-393-light-mobile-actions.json",
+      "bytes": 54537,
+      "sha256": "1e693cabb6bda64655c5f36503aede53cac7570397c0302507d14218699046cc"
+    },
+    {
+      "path": "audit/native-actions/chromium-393-light-tma-safe-short-keyboard.json",
+      "bytes": 420,
+      "sha256": "7aa5700a7f649dbf6a02e37b21fbaf58394a18d8ee35576d57748e4527d9f427"
+    },
+    {
+      "path": "audit/native-actions/chromium-430-dark-mobile-actions.json",
+      "bytes": 54508,
+      "sha256": "e540765e12b0f5b7cf3792351647a4269cfd915791561a3468195400bbaaa747"
+    },
+    {
+      "path": "audit/native-actions/chromium-430-light-mobile-actions.json",
+      "bytes": 54512,
+      "sha256": "477d4cfd87d00c48003a5826812a4c093ba28ec4731496cb2bba0166a20b920e"
+    },
+    {
+      "path": "audit/native-actions/chromium-768-dark-desktop-keyboard.json",
+      "bytes": 225,
+      "sha256": "76774146a76578d354e41345108285764359409f7ae3e110ac0e6ec5f9b14994"
+    },
+    {
+      "path": "audit/native-actions/chromium-768-light-desktop-keyboard.json",
+      "bytes": 226,
+      "sha256": "3431d49f9bdcd5e59aa98b6e5a44f14f6085b998a50af6958fddd8ab9619afb3"
+    },
+    {
+      "path": "audit/native-actions/webkit-1440-dark-desktop-keyboard.json",
+      "bytes": 225,
+      "sha256": "1875b6be6d0fa88a796ca031f0e284de8d8766f47ebc79e0b5f0041e7ca757d1"
+    },
+    {
+      "path": "audit/native-actions/webkit-1440-light-desktop-keyboard.json",
+      "bytes": 226,
+      "sha256": "87b87e98517bd948c68bb49a0cf1eba873db79d0338efd1a37a2aeb42dcfcd0d"
+    },
+    {
+      "path": "audit/native-actions/webkit-320-dark-mobile-actions.json",
+      "bytes": 54225,
+      "sha256": "a67668d601b3c2646c52420a7e108f8bf429019f9be155b0b7fcabee11fab7c2"
+    },
+    {
+      "path": "audit/native-actions/webkit-320-dark-tma-safe-short-keyboard.json",
+      "bytes": 415,
+      "sha256": "d96e5dc1fceb52e936cb140297277ff102957b801e3a72e50431dea60da71d1f"
+    },
+    {
+      "path": "audit/native-actions/webkit-320-light-mobile-actions.json",
+      "bytes": 54229,
+      "sha256": "47b5d74752271c560b9b710f97ed1ce7293f9111b4987ca9efa22781a76c4a45"
+    },
+    {
+      "path": "audit/native-actions/webkit-320-light-tma-safe-short-keyboard.json",
+      "bytes": 416,
+      "sha256": "24682a3f91f491ae431580dd7fa63998b16457eacf5b2ab52334db4e232d26eb"
+    },
+    {
+      "path": "audit/native-actions/webkit-360-dark-mobile-actions.json",
+      "bytes": 54254,
+      "sha256": "11fa12b616a8b7893ad20ddeabe351ff3478005fc5e50e346e44a14fbd599d8c"
+    },
+    {
+      "path": "audit/native-actions/webkit-360-light-mobile-actions.json",
+      "bytes": 54258,
+      "sha256": "79359d5793bb8ef10840a1c68fe12c18d27d9014d63f29f822e14b3bf2bd9841"
+    },
+    {
+      "path": "audit/native-actions/webkit-393-dark-mobile-actions.json",
+      "bytes": 54253,
+      "sha256": "a79f28abb2c81a2ebf4ce8b584241b1b8a152ac16de8dea04da04ee08489b795"
+    },
+    {
+      "path": "audit/native-actions/webkit-393-dark-tma-safe-short-keyboard.json",
+      "bytes": 416,
+      "sha256": "8f758017b06f1992439b1f184ea865684bb2e3d91b45cdd3d28254bfbbc65cd9"
+    },
+    {
+      "path": "audit/native-actions/webkit-393-light-mobile-actions.json",
+      "bytes": 54257,
+      "sha256": "b11eb3090b71202f03434d79bbce091617b9fba6b6d8686193da89dd254e45f8"
+    },
+    {
+      "path": "audit/native-actions/webkit-393-light-tma-safe-short-keyboard.json",
+      "bytes": 417,
+      "sha256": "66e2dda44c3fb3dec0c5197cab6c12848a97ef78e61186567f134bcf6997bbdf"
+    },
+    {
+      "path": "audit/native-actions/webkit-430-dark-mobile-actions.json",
+      "bytes": 54254,
+      "sha256": "335544bc1300796b81b6595c43dc18708f32b3b3dcb196be78d23e26b095892f"
+    },
+    {
+      "path": "audit/native-actions/webkit-430-light-mobile-actions.json",
+      "bytes": 54258,
+      "sha256": "2e9378a4a5497f03730ff1de37876e73d24f2fcc4a7c86f4e05a7042b1fa34ae"
+    },
+    {
+      "path": "audit/native-actions/webkit-768-dark-desktop-keyboard.json",
+      "bytes": 223,
+      "sha256": "79b7c8e2e5b78010e42eabedc916742ff1de32d3e4d14dcebe5a7ef4d801bd50"
+    },
+    {
+      "path": "audit/native-actions/webkit-768-light-desktop-keyboard.json",
+      "bytes": 224,
+      "sha256": "4baba8d4924dd15928166d055042cce5a65c9bcf9499bf8dac3714ad2284e780"
+    },
+    {
+      "path": "audit/native-actions.json",
+      "bytes": 46285,
+      "sha256": "a75be5217bf5a58482608384b1f7eaf899ba02e8a1365155df2b1780d94e7e55"
+    },
+    {
+      "path": "audit/tests.json",
+      "bytes": 831,
+      "sha256": "f28979f041dec0a1c62fd65c2e8e81841de01864ddec3b0cf9cb7e1443132224"
+    },
+    {
+      "path": "before/chromium-320-dark-skip.png",
+      "bytes": 52530,
+      "sha256": "d581552bd2097c07c2b6ba4e7c01af82448af856329d6f825ac9ecc2f05dc088"
+    },
+    {
+      "path": "before/chromium-320-dark-timer.png",
+      "bytes": 61550,
+      "sha256": "005c7a1123e85cc1eaedd29c08563cc8f309fe5e1f24d3b3d302b610b565d5c9"
+    },
+    {
+      "path": "before/chromium-320-light-skip.png",
+      "bytes": 48700,
+      "sha256": "9e5af39ee0706a48e3852a6dbc0802855f0c555adaab9068de15f715a537c5b5"
+    },
+    {
+      "path": "before/chromium-320-light-timer.png",
+      "bytes": 59720,
+      "sha256": "07a800446da006c6ba27355e175ae8c65bfb9ee7993cb5716bcb55d2f5ed4538"
+    },
+    {
+      "path": "before/chromium-360-dark-skip.png",
+      "bytes": 54593,
+      "sha256": "00674ac549b66657323f7d202e2004a51dee1abda64a2248d77a85c9ddc25dc8"
+    },
+    {
+      "path": "before/chromium-360-dark-timer.png",
+      "bytes": 63417,
+      "sha256": "ac7dfaa498537bc7107107a7ee2bf686b7f09e67a912efafc59213c96ff2a17a"
+    },
+    {
+      "path": "before/chromium-360-light-skip.png",
+      "bytes": 50542,
+      "sha256": "ad51aea41dc52bdea77a96f43feaba754114fa1f965947e36e12067c37c4b2c8"
+    },
+    {
+      "path": "before/chromium-360-light-timer.png",
+      "bytes": 62085,
+      "sha256": "0bfcf13b165778de902e34e324fdcd8bad6620c43eb93841ab5d3af65be72e25"
+    },
+    {
+      "path": "before/chromium-393-dark-skip.png",
+      "bytes": 59281,
+      "sha256": "210dab8cace524fc898585bcb5f31a6bbdb30173f17e206322ad03c3811fae58"
+    },
+    {
+      "path": "before/chromium-393-dark-timer.png",
+      "bytes": 69204,
+      "sha256": "c2d0fa7b082af1995d193a632cf49c5bcffc78f018eb669154f1340a6b2f42db"
+    },
+    {
+      "path": "before/chromium-393-light-skip.png",
+      "bytes": 55624,
+      "sha256": "720e4f0af9bbe425ddd5701bd0800860d05a93301ea0f7f24ce6bb3b8ca6734e"
+    },
+    {
+      "path": "before/chromium-393-light-timer.png",
+      "bytes": 67875,
+      "sha256": "1a4aea4ff47e9d5a61cbd93243314e087fc0d0addf0cb218f2dc5409e3f03f14"
+    },
+    {
+      "path": "before/chromium-430-dark-skip.png",
+      "bytes": 59067,
+      "sha256": "226ad9b8c7a88c4d8387f948d3ab057be3d779bc886925d4d3edfd395c3a4720"
+    },
+    {
+      "path": "before/chromium-430-dark-timer.png",
+      "bytes": 69648,
+      "sha256": "77f10a512d1c8f49581c037674e55c488e08f65ffab3af916ab7285cdce9331b"
+    },
+    {
+      "path": "before/chromium-430-light-skip.png",
+      "bytes": 55312,
+      "sha256": "5fdc6c5274ab076f0cd8dc0d3d4df1b2d0e7e7a66e2183262ff34162daac3c8d"
+    },
+    {
+      "path": "before/chromium-430-light-timer.png",
+      "bytes": 68607,
+      "sha256": "1ceae6acb6ad7b24d25a9f3fc18b2b7f96af1015e7e1d412a2c95fe9cabd7e4e"
+    },
+    {
+      "path": "before/webkit-320-dark-skip.png",
+      "bytes": 41055,
+      "sha256": "2f36adfa4b4651d9936b8515c37629d77ad00db28bd4acf325a5df8599e92fb1"
+    },
+    {
+      "path": "before/webkit-320-dark-timer.png",
+      "bytes": 47797,
+      "sha256": "081a30d1bd14f85a179eb9b411285d597ade3aa7807cc42e0b1cfb1c2ec15263"
+    },
+    {
+      "path": "before/webkit-320-light-skip.png",
+      "bytes": 38579,
+      "sha256": "12cb6ead2f0251057ec1a62a339f86a80f27fb96b34aef554c84d95bd5aedaa9"
+    },
+    {
+      "path": "before/webkit-320-light-timer.png",
+      "bytes": 40148,
+      "sha256": "0239ef3904d9cb831f8e4ce6528123b907660b6f391394f7ea1b585d3cc8ce8f"
+    },
+    {
+      "path": "before/webkit-360-dark-skip.png",
+      "bytes": 42130,
+      "sha256": "a9d9705742121e95f08ec99e18632798321ed62a5ed75ce26649e815aa72c654"
+    },
+    {
+      "path": "before/webkit-360-dark-timer.png",
+      "bytes": 48653,
+      "sha256": "0609f67d93db862bda8b43a44f34de39af9f21e3a63800428cfa06c0d0a1f965"
+    },
+    {
+      "path": "before/webkit-360-light-skip.png",
+      "bytes": 39523,
+      "sha256": "d4e0502c933c497ce87c0837bdefa407a89c06982cb3dca72f76e6203521edb7"
+    },
+    {
+      "path": "before/webkit-360-light-timer.png",
+      "bytes": 40867,
+      "sha256": "42cd03be063821e5c3297caf1b13e340cc8cee223644c9a013c32354eaa9d117"
+    },
+    {
+      "path": "before/webkit-393-dark-skip.png",
+      "bytes": 47693,
+      "sha256": "883c53dbffb03526a2157840db99af4c763f683b5c3bdb09d8626d553ffbaeb2"
+    },
+    {
+      "path": "before/webkit-393-dark-timer.png",
+      "bytes": 53625,
+      "sha256": "d8fcddfe4eb3db352ce0cd4c50cd1a4cf54d4d0b579c610c303faf690eb6d134"
+    },
+    {
+      "path": "before/webkit-393-light-skip.png",
+      "bytes": 44562,
+      "sha256": "3c49cd28d31f5fdc55336b9d9463ffc94850b6ad7f19daba3db456b0e9b7e9aa"
+    },
+    {
+      "path": "before/webkit-393-light-timer.png",
+      "bytes": 44592,
+      "sha256": "43b5c5cc3e4ff4972edee8d9e5db684f26b0a7cc64c05631edc174d21bfdcc15"
+    },
+    {
+      "path": "before/webkit-430-dark-skip.png",
+      "bytes": 46420,
+      "sha256": "71089e09f73a420b10b4eefb882d66e8e4006c28e4abc1be817c854f2aa753c0"
+    },
+    {
+      "path": "before/webkit-430-dark-timer.png",
+      "bytes": 52966,
+      "sha256": "2bf36b372948a99c2c775285e5e4e3bdda5702e2f17b213c0056e75256e38c75"
+    },
+    {
+      "path": "before/webkit-430-light-skip.png",
+      "bytes": 43673,
+      "sha256": "6ae12e115dfd5cc3e5e434f92f34dd035c30c65b1f91088facf1f3f203b7c8da"
+    },
+    {
+      "path": "before/webkit-430-light-timer.png",
+      "bytes": 44249,
+      "sha256": "dd254dff84a81ef9734f35f459058cf1a48029498cf8e216bd4d3b094345dba9"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-current-set.jpg",
+      "bytes": 120311,
+      "sha256": "88612c9f70c434709febc94dc1ccfeedaf96a6f08736d4d03581d4b2a9ecc9ab"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-skip.jpg",
+      "bytes": 117800,
+      "sha256": "d0a7ad8a534efc8b29d812486e80c2da9a3bcec2c2b74b749b9e5d4efd7f09ac"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-timer.jpg",
+      "bytes": 119072,
+      "sha256": "c6b196bb93bf7232f7416cdeb61066630750b8b0812c0b7c01c3e347452c4ea9"
+    },
+    {
+      "path": "comparisons/chromium-320-light-current-set.jpg",
+      "bytes": 110572,
+      "sha256": "85bf02268713a5582afe5020452d5655197684219d76cbf184146ddc64beef82"
+    },
+    {
+      "path": "comparisons/chromium-320-light-skip.jpg",
+      "bytes": 106511,
+      "sha256": "9517b02aa74eea75f698e770e6ff381515dd4f2cea960b9ecf9269372b1e6a39"
+    },
+    {
+      "path": "comparisons/chromium-320-light-timer.jpg",
+      "bytes": 108369,
+      "sha256": "984713ad32806c314831987a5e2610a8b6739d500dc4d1a7768d14fe0205de86"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-current-set.jpg",
+      "bytes": 124852,
+      "sha256": "6f4c2d4e2fa91692d51341662fbb68e78a8e8bb0995e6f28b413d948c797e0db"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-skip.jpg",
+      "bytes": 122055,
+      "sha256": "28a3883b4cbd75affa91d4e2046d9a36cea2208667641a0755eb2258b0b88e57"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-timer.jpg",
+      "bytes": 123504,
+      "sha256": "53a9057eee4eaf64ee94bc03b2da18d66898d71d025b2dfcc7f57a3b1a900785"
+    },
+    {
+      "path": "comparisons/chromium-360-light-current-set.jpg",
+      "bytes": 114425,
+      "sha256": "770346efd99d2f820358117b74e1c097026a9263178a7ea454f94c05f71a721d"
+    },
+    {
+      "path": "comparisons/chromium-360-light-skip.jpg",
+      "bytes": 110213,
+      "sha256": "e1ee65eec2ee2c19bfaa8caefc29d331eae150f3c2a1df02570b6f95572d537d"
+    },
+    {
+      "path": "comparisons/chromium-360-light-timer.jpg",
+      "bytes": 112079,
+      "sha256": "55f32f529001db022917d43c936dd04daa6c555e2818f3fecc4370e5e1846786"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-current-set.jpg",
+      "bytes": 141270,
+      "sha256": "6268a55e38f949cd1ad3a4ebef686cd3dd9f0334c88f4af94ac3d06e8b6d60ae"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-skip.jpg",
+      "bytes": 137063,
+      "sha256": "4427eb6284cadd271ef332fb21357ac0ce7b44dff4d2f04a94ae2e35aa0c9466"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-timer.jpg",
+      "bytes": 142983,
+      "sha256": "907f47c13fbaf69540df83ddad4408bf8dc4dbd217a9dfce791878edce950fbf"
+    },
+    {
+      "path": "comparisons/chromium-393-light-current-set.jpg",
+      "bytes": 126426,
+      "sha256": "d7a04def2f2c11f096ab48cd73c59ea8361a7f66581e9a43725f66c8d7746bf6"
+    },
+    {
+      "path": "comparisons/chromium-393-light-skip.jpg",
+      "bytes": 122273,
+      "sha256": "7ecaaed33209783113bc67e856633b16d8721a943f5af01a13a97115db040f0d"
+    },
+    {
+      "path": "comparisons/chromium-393-light-timer.jpg",
+      "bytes": 127931,
+      "sha256": "b433286cc2c43c4b56b39383cacb5892c54ff38d7fde58d7546974ea62abe4f4"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-current-set.jpg",
+      "bytes": 148003,
+      "sha256": "add3994556268d55d1462c828afad46ba3bc358f5e94f7c629e9d5f37c78c156"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-skip.jpg",
+      "bytes": 142203,
+      "sha256": "eb367611bf7606be3b770b656aeb83440f5076f2ec824033f72fcb1633c24fe0"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-timer.jpg",
+      "bytes": 151344,
+      "sha256": "cd9acf4eae67d50dc17f5d15dfeaf7922f9fc887663695378d83d0f7256ad5cf"
+    },
+    {
+      "path": "comparisons/chromium-430-light-current-set.jpg",
+      "bytes": 132909,
+      "sha256": "174112cf06d5beccb6d90dab5499bb9a6973827167ead18695b21637e947f240"
+    },
+    {
+      "path": "comparisons/chromium-430-light-skip.jpg",
+      "bytes": 126995,
+      "sha256": "cec6ca9cd7147d5aa1cf7b7f7133fdc28d426a6ea80eabb070ac1983d732d8ff"
+    },
+    {
+      "path": "comparisons/chromium-430-light-timer.jpg",
+      "bytes": 135693,
+      "sha256": "239dd9a603289c2e5ed86929402d0a76f067649209d811a9f6eba6d9da84d8eb"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-current-set.jpg",
+      "bytes": 120619,
+      "sha256": "3400b02f0102584238008e210e8fe3625f29bfa20288db5d9bcf19ea03603835"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-skip.jpg",
+      "bytes": 118070,
+      "sha256": "51eb53d0320d280025cfe048643a0c985ef45f27f7e8d3d636d2ecaad8e9970b"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-timer.jpg",
+      "bytes": 119579,
+      "sha256": "2b43b0f4a6461c5f2d74b6c921631ce786af2750649eba812de986cc2d9f5a4b"
+    },
+    {
+      "path": "comparisons/webkit-320-light-current-set.jpg",
+      "bytes": 111776,
+      "sha256": "d45bc579b13408058d95c835405566726f6e5e162b1643d7eaba29403d0d0e80"
+    },
+    {
+      "path": "comparisons/webkit-320-light-skip.jpg",
+      "bytes": 107420,
+      "sha256": "032b32f4aeb0adadb26c20349a3bad6e92668e682258fe9919a384beac4da57c"
+    },
+    {
+      "path": "comparisons/webkit-320-light-timer.jpg",
+      "bytes": 110446,
+      "sha256": "b02bd4744f04c4f0d20246937329f8c15ba00bf122127bd5457c1fe4439ea7e6"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-current-set.jpg",
+      "bytes": 125302,
+      "sha256": "8a7ec7a8b91cbd4fc2dfb9abb3de66a32ce9cb1fe4e06ac0abfa395f7b1ec3cb"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-skip.jpg",
+      "bytes": 122458,
+      "sha256": "18cbe4dcd5a0553abcda9fbd0d7e4c15c67d69b87a6ef65ff51167937fad703c"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-timer.jpg",
+      "bytes": 122031,
+      "sha256": "15cf5d4038eb2857799f09094ad14ba4bb37ed430632320704b56a63a0557f85"
+    },
+    {
+      "path": "comparisons/webkit-360-light-current-set.jpg",
+      "bytes": 115766,
+      "sha256": "f456d0f3ae75523979246b84f4b862ba325adc2ed8b2f8ab000c6c11f92a78e0"
+    },
+    {
+      "path": "comparisons/webkit-360-light-skip.jpg",
+      "bytes": 111388,
+      "sha256": "c8af45bbd777f290a1636c01f0ce1ab4f783ff9daa58724709d634675029715e"
+    },
+    {
+      "path": "comparisons/webkit-360-light-timer.jpg",
+      "bytes": 110931,
+      "sha256": "342feeb70a38af40156b25f010762e265847e0b64186396e6747d9c045280b37"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-current-set.jpg",
+      "bytes": 140737,
+      "sha256": "7471d8a70877de5d74996fb2823b07f11d9100ad56c2da7aa0fc203d17b39395"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-skip.jpg",
+      "bytes": 139283,
+      "sha256": "12222148588fde611379511757ea3588b82cfce846f3387c0e20ce482c7d1cfe"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-timer.jpg",
+      "bytes": 146354,
+      "sha256": "25afc04c63e7de70078d2f48373ee0171ecd7b8c3e61ecbcd4d3ad41ed199098"
+    },
+    {
+      "path": "comparisons/webkit-393-light-current-set.jpg",
+      "bytes": 126419,
+      "sha256": "9213921390ec2c4d1562114fb19a14442c9c11ce9959ed0f2a0644496c9674b2"
+    },
+    {
+      "path": "comparisons/webkit-393-light-skip.jpg",
+      "bytes": 124453,
+      "sha256": "258051859d70e9a52ac23094917cefe0a38a639f4df611038b62cf811b2dca7a"
+    },
+    {
+      "path": "comparisons/webkit-393-light-timer.jpg",
+      "bytes": 128886,
+      "sha256": "f323b31ca145c6473d0ddbf67288646303f65824bfeff8e36f1f05816ea58cf4"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-current-set.jpg",
+      "bytes": 149407,
+      "sha256": "8484363c87b077e7fb358eca9328bb6e274225652f2fbc44c53143c18311c307"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-skip.jpg",
+      "bytes": 141595,
+      "sha256": "4264b3e7b451ce82e1045bd67867b549e27cd99ab583dbf31f96d564eba9a9f3"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-timer.jpg",
+      "bytes": 149668,
+      "sha256": "853997e7758edc28da122f7886b6a142ccf4c6ff17d578a68f50240f70110ad9"
+    },
+    {
+      "path": "comparisons/webkit-430-light-current-set.jpg",
+      "bytes": 134798,
+      "sha256": "564c94f7b93154e1b615f2976746d8f6b89981405d0be72d13824c5342440e5c"
+    },
+    {
+      "path": "comparisons/webkit-430-light-skip.jpg",
+      "bytes": 127045,
+      "sha256": "1924a5869194c64afab05bdbd82681cfa05bf032146e81ebd9e00d482b5fcfa8"
+    },
+    {
+      "path": "comparisons/webkit-430-light-timer.jpg",
+      "bytes": 137960,
+      "sha256": "a97d36b051909ea911a0ab98ae632a333da1fa17dc5586bbf3f4e8cfbe1f63e0"
+    },
+    {
+      "path": "index.html",
+      "bytes": 74673,
+      "sha256": "d944c68ef2b0ee52d20cc705f9fe655fe2446e34220337896ddb6771c50c73d1"
+    },
+    {
+      "path": "README.md",
+      "bytes": 36062,
+      "sha256": "d6074ab363dcd144cd9261a6fae44f7d4f3803f954934a1c2610d3569065b21c"
+    }
+  ]
+}

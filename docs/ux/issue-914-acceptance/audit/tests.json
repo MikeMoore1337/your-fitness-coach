@@ -1,0 +1,23 @@
+{
+  "runtime": "e120009b2e538951cbdd3c68129bb1f6c22ee73c",
+  "unit": {
+    "passed": 812,
+    "files": 145,
+    "source": "npm run check at 7c9f9513; final change is CSS foreground color and E2E contracts"
+  },
+  "pdf": {
+    "passed": 8,
+    "source": "backend/tests/test_progress_reports.py, isolated SQLite; PDF source unchanged by #914"
+  },
+  "joint_initial": {
+    "passed": 276,
+    "skipped": 2,
+    "failed": 4,
+    "reason": "Two old timer-role assertions; two hard-coded test origins. Fixed and rerun in final-related/final-timer results."
+  },
+  "mobile_webkit_help_keyboard": "Programmatic focus and Enter activation; sequential link Tab cycle is not claimed for mobile WebKit. Chromium retains the Tab assertion.",
+  "capture_cases": 32,
+  "physical_iphone": false,
+  "native_telegram": false,
+  "voiceover": false
+}

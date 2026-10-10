@@ -1,0 +1,101 @@
+{
+  "status": "NEEDS_MANUAL_VALIDATION",
+  "run": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38072118908",
+  "head": "7c9f95133978eaadd459ada637d26e2d536f586d",
+  "previous_green_run": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38068141113",
+  "previous_green_head": "cbc33336968dea1e172d43909fbf30c75facf914",
+  "reason": "CodeQL action could not retrieve the full PR diff because it exceeded 300 changed files. Full analysis exposed seven existing blocking alerts that diff-informed analysis had not emitted.",
+  "source_unchanged_from_previous_green": [
+    {
+      "path": "backend/fitminiapp_api/api/v1/auth.py",
+      "git_blob": "74511aab660c27cd0be2628600d17b1f33538a18"
+    },
+    {
+      "path": "scripts/allure_report.py",
+      "git_blob": "78e4445f856746c855bb032da83bfb5f88fbd8ae"
+    },
+    {
+      "path": "docs/app-experience-v3/stage-0/prototype/app.js",
+      "git_blob": "453897d43c242d8c4d0cb6513329544982525e18"
+    },
+    {
+      "path": "docs/ux/post-release-reset/prototype/app.js",
+      "git_blob": "84e030a0806f828f2d26c3ac58b9244e27010e47"
+    },
+    {
+      "path": "frontend/src/shared/account/AccountIdentity.tsx",
+      "git_blob": "c3934ab880216f8adfff274d40574192d6f62d63"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "git_blob": "38cee6ae01a25bef574fb2aad00ec93c47216760"
+    },
+    {
+      "path": "scripts/codeql_sarif_gate.py",
+      "git_blob": "eb6272577dfb1e32d99e1a7b89cb74d41efe70fa"
+    }
+  ],
+  "findings": [
+    {
+      "rule": "py/clear-text-logging-sensitive-data",
+      "score": 7.5,
+      "level": "error",
+      "path": "backend/fitminiapp_api/api/v1/auth.py",
+      "line": 178,
+      "job": "114271535408"
+    },
+    {
+      "rule": "py/weak-sensitive-data-hashing",
+      "score": 7.5,
+      "level": "warning",
+      "path": "scripts/allure_report.py",
+      "line": 391,
+      "job": "114271535408"
+    },
+    {
+      "rule": "js/xss",
+      "score": 7.8,
+      "level": "error",
+      "path": "docs/app-experience-v3/stage-0/prototype/app.js",
+      "line": 283,
+      "job": "114271535425"
+    },
+    {
+      "rule": "js/xss",
+      "score": 7.8,
+      "level": "error",
+      "path": "docs/ux/post-release-reset/prototype/app.js",
+      "line": 232,
+      "job": "114271535425"
+    },
+    {
+      "rule": "js/xss-through-dom",
+      "score": 7.8,
+      "level": "warning",
+      "path": "docs/ux/post-release-reset/prototype/app.js",
+      "line": 232,
+      "job": "114271535425"
+    },
+    {
+      "rule": "js/xss-through-dom",
+      "score": 7.8,
+      "level": "warning",
+      "path": "frontend/src/shared/account/AccountIdentity.tsx",
+      "line": 72,
+      "job": "114271535425"
+    },
+    {
+      "rule": "js/unvalidated-dynamic-method-call",
+      "score": 7.5,
+      "level": "warning",
+      "path": "docs/ux/post-release-reset/prototype/app.js",
+      "line": 232,
+      "job": "114271535425"
+    }
+  ],
+  "gate_modified": false,
+  "queries_disabled": false,
+  "alerts_suppressed": false,
+  "confirmed_exploitability": false,
+  "release_ready": false
+}

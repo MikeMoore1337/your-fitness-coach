@@ -1,0 +1,27 @@
+{
+  "engine": "webkit",
+  "width": 393,
+  "theme": "dark",
+  "scene": "tma-safe-short-keyboard",
+  "safe": {
+    "x": 12,
+    "y": 24,
+    "width": 369,
+    "height": 110
+  },
+  "timerBox": {
+    "x": 12,
+    "y": 24,
+    "width": 369,
+    "height": 110
+  },
+  "fieldBox": {
+    "x": 31,
+    "y": 150.84375,
+    "width": 160.5,
+    "height": 80
+  },
+  "writes": [],
+  "status": "PASS",
+  "physicalKeyboard": false
+}

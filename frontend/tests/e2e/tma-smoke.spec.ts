@@ -2715,6 +2715,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
 });
 
 test('contextual help covers workout, nutrition and Progress without a TMA library', async ({
+  browserName,
   tma,
   tmaPage,
 }) => {
@@ -2780,13 +2781,15 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   const publicHandoff = tmaPage.getByRole('link', { name: 'Открыть материал на сайте' });
   await expectTouchTargets(tmaPage.locator('.knowledge-handoff__actions a'));
   await expectNoHorizontalOverflow(tmaPage);
-  await tmaPage.keyboard.press('Tab');
+  // This mobile WebKit fixture has no desktop Tab cycle; verify focus and activation there.
+  if (browserName === 'webkit') await publicHandoff.focus();
+  else await tmaPage.keyboard.press('Tab');
   await expect(publicHandoff).toBeFocused();
-  await publicHandoff.click();
+  await tmaPage.keyboard.press('Enter');
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge');
+    .toContain(new URL('/knowledge', tmaPage.url()).href);
   await expect(tmaPage.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
   await expect(tmaPage.getByRole('heading', { name: /База знаний/i })).not.toBeAttached();
 
@@ -2796,7 +2799,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/progress/how-to-read-progress');
+    .toContain(new URL('/knowledge/progress/how-to-read-progress', tmaPage.url()).href);
 });
 
 test('task 72 screenshot packet keeps shared composition across core surfaces', async ({
