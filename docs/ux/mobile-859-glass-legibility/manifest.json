@@ -1,0 +1,5408 @@
+{
+  "before_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "runtime_capture_commit": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581",
+  "screenshots": [
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-320-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-320-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-320-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-320-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-320-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-320-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-320-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-320-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-320-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-320-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-320-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-320-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-360-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-360-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-360-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-360-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-360-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-360-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-360-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-360-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-360-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-360-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-360-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-360-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "before/chromium-393-dark-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "before/chromium-393-dark-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-393-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-393-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-393-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-393-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-393-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-393-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "before/chromium-393-dark-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "before/chromium-393-dark-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "before/chromium-393-dark-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "before/chromium-393-dark-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "before/chromium-393-light-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "before/chromium-393-light-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-393-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-393-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-393-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-393-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-393-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-393-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "before/chromium-393-light-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "before/chromium-393-light-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "before/chromium-393-light-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "before/chromium-393-light-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-430-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-430-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-430-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-430-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-430-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-430-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/chromium-430-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/chromium-430-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/chromium-430-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/chromium-430-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/chromium-430-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/chromium-430-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-320-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-320-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-320-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-320-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-320-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-320-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-320-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-320-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-320-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-320-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-320-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-320-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-360-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-360-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-360-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-360-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-360-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-360-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-360-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-360-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-360-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-360-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-360-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "before/webkit-393-dark-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "before/webkit-393-dark-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-393-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-393-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-393-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-393-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-393-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "before/webkit-393-dark-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "before/webkit-393-dark-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "before/webkit-393-dark-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "before/webkit-393-dark-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "before/webkit-393-light-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "before/webkit-393-light-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-393-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-393-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-393-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-393-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-393-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-393-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "before/webkit-393-light-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "before/webkit-393-light-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "before/webkit-393-light-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "before/webkit-393-light-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-430-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-430-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-430-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-430-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-430-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "before/webkit-430-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "before/webkit-430-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "before/webkit-430-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "before/webkit-430-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "before/webkit-430-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "before",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "before/webkit-430-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "1440",
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/chromium-1440-dark-desktop.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "1440",
+      "theme": "light",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/chromium-1440-light-desktop.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-320-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-320-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-320-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-320-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-320-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-320-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-320-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-320-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-320-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-320-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-320-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-320-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-320-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-320-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-320-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-320-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-360-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-360-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-360-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-360-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-360-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-360-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-360-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-360-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-360-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-360-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-360-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-360-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-360-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-360-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-360-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-360-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "after/chromium-393-dark-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "after/chromium-393-dark-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-393-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-393-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-393-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-393-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-20a",
+      "label": "Стационарная панель · 20%",
+      "path": "after/chromium-393-dark-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-50a",
+      "label": "Стационарная панель · 50%",
+      "path": "after/chromium-393-dark-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-85a",
+      "label": "Стационарная панель · 85%",
+      "path": "after/chromium-393-dark-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-393-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-393-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "after/chromium-393-dark-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "after/chromium-393-dark-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "after/chromium-393-dark-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "after/chromium-393-dark-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-393-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-20a",
+      "label": "TMA · Стационарная панель · 20%",
+      "path": "after/chromium-393-dark-tma-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-50a",
+      "label": "TMA · Стационарная панель · 50%",
+      "path": "after/chromium-393-dark-tma-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-85a",
+      "label": "TMA · Стационарная панель · 85%",
+      "path": "after/chromium-393-dark-tma-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-393-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "after/chromium-393-light-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "after/chromium-393-light-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-393-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-393-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-393-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-393-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-20a",
+      "label": "Стационарная панель · 20%",
+      "path": "after/chromium-393-light-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-50a",
+      "label": "Стационарная панель · 50%",
+      "path": "after/chromium-393-light-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-85a",
+      "label": "Стационарная панель · 85%",
+      "path": "after/chromium-393-light-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-393-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-393-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "after/chromium-393-light-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "after/chromium-393-light-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "after/chromium-393-light-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "after/chromium-393-light-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-393-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-20a",
+      "label": "TMA · Стационарная панель · 20%",
+      "path": "after/chromium-393-light-tma-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-50a",
+      "label": "TMA · Стационарная панель · 50%",
+      "path": "after/chromium-393-light-tma-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-85a",
+      "label": "TMA · Стационарная панель · 85%",
+      "path": "after/chromium-393-light-tma-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-393-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-430-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-430-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-430-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-430-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-430-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-430-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-430-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-430-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/chromium-430-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/chromium-430-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/chromium-430-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/chromium-430-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/chromium-430-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/chromium-430-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/chromium-430-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/chromium-430-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "1440",
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/webkit-1440-dark-desktop.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "1440",
+      "theme": "light",
+      "view": "desktop",
+      "label": "Desktop",
+      "path": "after/webkit-1440-light-desktop.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-320-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-320-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-320-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-320-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-320-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-320-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-320-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-320-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-320-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-320-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-320-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-320-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-320-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-320-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-320-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-320-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-360-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-360-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-360-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-360-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-360-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-360-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-360-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-360-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-360-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-360-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-360-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-360-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-360-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-360-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-360-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "after/webkit-393-dark-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "after/webkit-393-dark-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-393-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-393-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-393-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-20a",
+      "label": "Стационарная панель · 20%",
+      "path": "after/webkit-393-dark-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-50a",
+      "label": "Стационарная панель · 50%",
+      "path": "after/webkit-393-dark-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll-85a",
+      "label": "Стационарная панель · 85%",
+      "path": "after/webkit-393-dark-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-393-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-393-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "after/webkit-393-dark-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "after/webkit-393-dark-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "after/webkit-393-dark-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "after/webkit-393-dark-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-393-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-20a",
+      "label": "TMA · Стационарная панель · 20%",
+      "path": "after/webkit-393-dark-tma-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-50a",
+      "label": "TMA · Стационарная панель · 50%",
+      "path": "after/webkit-393-dark-tma-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-scroll-85a",
+      "label": "TMA · Стационарная панель · 85%",
+      "path": "after/webkit-393-dark-tma-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-393-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-menu",
+      "label": "Меню над реальным графиком",
+      "path": "after/webkit-393-light-chart-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "chart-navigation",
+      "label": "Навигация над реальным графиком",
+      "path": "after/webkit-393-light-chart-navigation.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-393-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-393-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-393-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-393-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-20a",
+      "label": "Стационарная панель · 20%",
+      "path": "after/webkit-393-light-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-50a",
+      "label": "Стационарная панель · 50%",
+      "path": "after/webkit-393-light-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll-85a",
+      "label": "Стационарная панель · 85%",
+      "path": "after/webkit-393-light-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-393-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-393-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-black-menu",
+      "label": "Контрольный фон black · menu · не экран продукта",
+      "path": "after/webkit-393-light-stress-black-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-menu",
+      "label": "Контрольный фон photo · menu · не экран продукта",
+      "path": "after/webkit-393-light-stress-photo-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-photo-navigation",
+      "label": "Контрольный фон photo · navigation · не экран продукта",
+      "path": "after/webkit-393-light-stress-photo-navigation.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "stress-white-menu",
+      "label": "Контрольный фон white · menu · не экран продукта",
+      "path": "after/webkit-393-light-stress-white-menu.png",
+      "kind": "controlled-background"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-393-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-20a",
+      "label": "TMA · Стационарная панель · 20%",
+      "path": "after/webkit-393-light-tma-scroll-20a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-50a",
+      "label": "TMA · Стационарная панель · 50%",
+      "path": "after/webkit-393-light-tma-scroll-50a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-scroll-85a",
+      "label": "TMA · Стационарная панель · 85%",
+      "path": "after/webkit-393-light-tma-scroll-85a.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-393-light-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-430-dark-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-430-dark-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-dark-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-430-dark-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-430-dark-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-430-dark-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-430-dark-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-430-dark-tma-short.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "menu",
+      "label": "Меню + над текстовой карточкой",
+      "path": "after/webkit-430-light-menu.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress-bottom",
+      "label": "Низ страницы и доступное действие",
+      "path": "after/webkit-430-light-progress-bottom.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress",
+      "label": "Прогресс",
+      "path": "after/webkit-430-light-progress.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "period",
+      "label": "Период · фрагмент реального снимка",
+      "path": "after/webkit-430-light-period.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "scroll",
+      "label": "Навигация над прокручиваемым содержимым",
+      "path": "after/webkit-430-light-scroll.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation",
+      "label": "Навигация · фрагмент реального снимка",
+      "path": "after/webkit-430-light-navigation.png",
+      "kind": "application-crop"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "tma-keyboard",
+      "label": "TMA · клавиатурная модель",
+      "path": "after/webkit-430-light-tma-keyboard.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "tma-short",
+      "label": "TMA · высота 480 и safe-area",
+      "path": "after/webkit-430-light-tma-short.png",
+      "kind": "application"
+    }
+  ],
+  "comparisons": [
+    {
+      "path": "comparisons/chromium-menu-320-dark.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 320 · dark",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-320-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 320 · dark",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-320-dark.jpg",
+      "label": "Прогресс · chromium · 320 · dark",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-320-dark.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 320 · dark",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-320-light.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 320 · light",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-320-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 320 · light",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-320-light.jpg",
+      "label": "Прогресс · chromium · 320 · light",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-320-light.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 320 · light",
+      "engine": "chromium",
+      "width": "320",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-360-dark.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 360 · dark",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-360-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 360 · dark",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-360-dark.jpg",
+      "label": "Прогресс · chromium · 360 · dark",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-360-dark.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 360 · dark",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-360-light.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 360 · light",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-360-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 360 · light",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-360-light.jpg",
+      "label": "Прогресс · chromium · 360 · light",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-360-light.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 360 · light",
+      "engine": "chromium",
+      "width": "360",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-393-dark.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 393 · dark",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-393-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 393 · dark",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-393-dark.jpg",
+      "label": "Прогресс · chromium · 393 · dark",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-393-dark.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 393 · dark",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-393-light.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 393 · light",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-393-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 393 · light",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-393-light.jpg",
+      "label": "Прогресс · chromium · 393 · light",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-393-light.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 393 · light",
+      "engine": "chromium",
+      "width": "393",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-430-dark.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 430 · dark",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-430-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 430 · dark",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-430-dark.jpg",
+      "label": "Прогресс · chromium · 430 · dark",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-430-dark.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 430 · dark",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/chromium-menu-430-light.jpg",
+      "label": "Меню + над текстовой карточкой · chromium · 430 · light",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/chromium-navigation-430-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · chromium · 430 · light",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/chromium-progress-430-light.jpg",
+      "label": "Прогресс · chromium · 430 · light",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/chromium-period-430-light.jpg",
+      "label": "Период · фрагмент реального снимка · chromium · 430 · light",
+      "engine": "chromium",
+      "width": "430",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-320-dark.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 320 · dark",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-320-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 320 · dark",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-320-dark.jpg",
+      "label": "Прогресс · webkit · 320 · dark",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-320-dark.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 320 · dark",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-320-light.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 320 · light",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-320-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 320 · light",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-320-light.jpg",
+      "label": "Прогресс · webkit · 320 · light",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-320-light.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 320 · light",
+      "engine": "webkit",
+      "width": "320",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-360-dark.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 360 · dark",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-360-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 360 · dark",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-360-dark.jpg",
+      "label": "Прогресс · webkit · 360 · dark",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-360-dark.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 360 · dark",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-360-light.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 360 · light",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-360-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 360 · light",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-360-light.jpg",
+      "label": "Прогресс · webkit · 360 · light",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-360-light.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 360 · light",
+      "engine": "webkit",
+      "width": "360",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-393-dark.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 393 · dark",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-393-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 393 · dark",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-393-dark.jpg",
+      "label": "Прогресс · webkit · 393 · dark",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-393-dark.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 393 · dark",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-393-light.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 393 · light",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-393-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 393 · light",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-393-light.jpg",
+      "label": "Прогресс · webkit · 393 · light",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-393-light.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 393 · light",
+      "engine": "webkit",
+      "width": "393",
+      "theme": "light",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-430-dark.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 430 · dark",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-430-dark.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 430 · dark",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-430-dark.jpg",
+      "label": "Прогресс · webkit · 430 · dark",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-430-dark.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 430 · dark",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "dark",
+      "view": "period"
+    },
+    {
+      "path": "comparisons/webkit-menu-430-light.jpg",
+      "label": "Меню + над текстовой карточкой · webkit · 430 · light",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "menu"
+    },
+    {
+      "path": "comparisons/webkit-navigation-430-light.jpg",
+      "label": "Навигация · фрагмент реального снимка · webkit · 430 · light",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "navigation"
+    },
+    {
+      "path": "comparisons/webkit-progress-430-light.jpg",
+      "label": "Прогресс · webkit · 430 · light",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "progress"
+    },
+    {
+      "path": "comparisons/webkit-period-430-light.jpg",
+      "label": "Период · фрагмент реального снимка · webkit · 430 · light",
+      "engine": "webkit",
+      "width": "430",
+      "theme": "light",
+      "view": "period"
+    }
+  ],
+  "files": [
+    {
+      "path": "after/chromium-1440-dark-desktop.png",
+      "bytes": 218901,
+      "sha256": "372f130bd3f1f50c452c03c69f44cfabb3bcab1c2763c3dcffe9636e9a506671"
+    },
+    {
+      "path": "after/chromium-1440-light-desktop.png",
+      "bytes": 223240,
+      "sha256": "ff5c11e8940f750776634226c266bd62740c4c7962ae8c1950e5741ff7e8f246"
+    },
+    {
+      "path": "after/chromium-320-dark-menu.png",
+      "bytes": 98754,
+      "sha256": "fe36523930e18f5861401d3be24ec3db3611103276ffdc84b58114420e51db88"
+    },
+    {
+      "path": "after/chromium-320-dark-navigation.png",
+      "bytes": 15754,
+      "sha256": "515d5f15cb13b0f2c0a8fd637d52c58f87488ce60262917310e65b7a19862950"
+    },
+    {
+      "path": "after/chromium-320-dark-period.png",
+      "bytes": 13039,
+      "sha256": "65e7dd18c19ca299c69018c34d6c79f67bc113822da42d7fc1789ef15a0e4027"
+    },
+    {
+      "path": "after/chromium-320-dark-progress-bottom.png",
+      "bytes": 58693,
+      "sha256": "d515d18334b207970c6fb8fea144d64e8ff6f5fb295112c88308c0282004bd27"
+    },
+    {
+      "path": "after/chromium-320-dark-progress.png",
+      "bytes": 80222,
+      "sha256": "73bac2371589cfb92c3a64556d331250c88699f19d4e5a3212f14c91df10a6bf"
+    },
+    {
+      "path": "after/chromium-320-dark-scroll.png",
+      "bytes": 115005,
+      "sha256": "756469d610c79f100ad86316d1a229d754e7f0acdd4b54d477f94ec02b2c40e8"
+    },
+    {
+      "path": "after/chromium-320-dark-tma-keyboard.png",
+      "bytes": 65694,
+      "sha256": "7cc65f96277cece34f999307d35be4f3bca501cc01fcd0a7184ce4c644ec97c4"
+    },
+    {
+      "path": "after/chromium-320-dark-tma-short.png",
+      "bytes": 83487,
+      "sha256": "5569e5349aca2e8e2e84117c86570d9849397d977340fd94ffde97e1ad71c0b8"
+    },
+    {
+      "path": "after/chromium-320-light-menu.png",
+      "bytes": 96867,
+      "sha256": "9c15095eb635b5d96f8be6808211588653f2dbd118e0bac8b06ed1e5b8c478c7"
+    },
+    {
+      "path": "after/chromium-320-light-navigation.png",
+      "bytes": 17062,
+      "sha256": "ec8fb85749d0aba4514263e0b8495db6c8e4394a808c532358691fa68b6eba65"
+    },
+    {
+      "path": "after/chromium-320-light-period.png",
+      "bytes": 14498,
+      "sha256": "34c6e6bcabc92fa7ca13c1536029f2926dc13152a82f5ff6875f8677abcc03d6"
+    },
+    {
+      "path": "after/chromium-320-light-progress-bottom.png",
+      "bytes": 55653,
+      "sha256": "1aa0c97da1830f0a7c306fa07d0e8e5df1ae586944a5fb185f8ea22c90551b1c"
+    },
+    {
+      "path": "after/chromium-320-light-progress.png",
+      "bytes": 77487,
+      "sha256": "21cf85bd9dddb10caf71ad31ff2fbdedb8afaa30e5987a3b3e70fa611fe8a0fa"
+    },
+    {
+      "path": "after/chromium-320-light-scroll.png",
+      "bytes": 112259,
+      "sha256": "19a6e6e1f3e4f89cb5f02a290ee24631bf1d3c69f17ef5afa527474e3f687892"
+    },
+    {
+      "path": "after/chromium-320-light-tma-keyboard.png",
+      "bytes": 63363,
+      "sha256": "aec763469e936e8fbf531a2321cfa2af253d1cff36acc87091eac0c163be11a6"
+    },
+    {
+      "path": "after/chromium-320-light-tma-short.png",
+      "bytes": 78686,
+      "sha256": "a857062eb64e0f95935ee27b226ba6c1acf59a4095245feb458797f628716144"
+    },
+    {
+      "path": "after/chromium-360-dark-menu.png",
+      "bytes": 106474,
+      "sha256": "d253bd68967be5db587d41a77d8b60db5060d0f8ca46a1b0fcdac60ef55b1f84"
+    },
+    {
+      "path": "after/chromium-360-dark-navigation.png",
+      "bytes": 15549,
+      "sha256": "591e3ddd224bff1f92ff63e2ec9ef9871e34f40d6bc5c4cee27224646425d612"
+    },
+    {
+      "path": "after/chromium-360-dark-period.png",
+      "bytes": 13746,
+      "sha256": "d8998812ffd5f2da98dc2233e51c0da4a18b2bce0b1b63abb267206dbd87bea3"
+    },
+    {
+      "path": "after/chromium-360-dark-progress-bottom.png",
+      "bytes": 60429,
+      "sha256": "d29a5adacf3b907715d4d7c653d4c597dc8dfb390d156d4315e18f53747874e1"
+    },
+    {
+      "path": "after/chromium-360-dark-progress.png",
+      "bytes": 84136,
+      "sha256": "209b668331926dc0e310ef197b40da915abca4f84afb7d63b7580262253d06ac"
+    },
+    {
+      "path": "after/chromium-360-dark-scroll.png",
+      "bytes": 63779,
+      "sha256": "ec484db236d3722ea492eaf7308b50bfeaf5078ce9f74ab3c1251228c7c393dd"
+    },
+    {
+      "path": "after/chromium-360-dark-tma-keyboard.png",
+      "bytes": 67484,
+      "sha256": "d5736a274217713f25f799bc5495baf532ff87054771d8b5d20f8131bbd54ca8"
+    },
+    {
+      "path": "after/chromium-360-dark-tma-short.png",
+      "bytes": 90535,
+      "sha256": "498c87baf1ee7f3c913c53efb612f381a2516b37fa5a237125a4ee857f5f01c0"
+    },
+    {
+      "path": "after/chromium-360-light-menu.png",
+      "bytes": 104050,
+      "sha256": "11ee339fc170a4a15bbe6120718c534ab461e85abe5882cdbbf08606c6b1f7de"
+    },
+    {
+      "path": "after/chromium-360-light-navigation.png",
+      "bytes": 19241,
+      "sha256": "11645c6ce097089e77dcbb5ed043fa850f4ff0ea346eb9982e61b43c86fdaf65"
+    },
+    {
+      "path": "after/chromium-360-light-period.png",
+      "bytes": 15484,
+      "sha256": "c73a2f93a851469e5be13acbbb6f98e88d6f16424ead9d4a54f5f002db1d6563"
+    },
+    {
+      "path": "after/chromium-360-light-progress-bottom.png",
+      "bytes": 57526,
+      "sha256": "1bf84a2352b63258e4a7076bda7013abffe24cccf9a3d5a720f9132437c5e994"
+    },
+    {
+      "path": "after/chromium-360-light-progress.png",
+      "bytes": 81120,
+      "sha256": "f8f4dda5f210da7e3d7762b5e140c431249be5022741743e98d34a44c5784bfa"
+    },
+    {
+      "path": "after/chromium-360-light-scroll.png",
+      "bytes": 51856,
+      "sha256": "6fb9ddfbbaadeb274132400692cac23ac9aae1f14c5669e81b974dbb87279d70"
+    },
+    {
+      "path": "after/chromium-360-light-tma-keyboard.png",
+      "bytes": 65254,
+      "sha256": "26515f71a3f95fd677536cc19da5346abaa12fb28dabfa6a95664d4f7287f545"
+    },
+    {
+      "path": "after/chromium-360-light-tma-short.png",
+      "bytes": 84825,
+      "sha256": "7428c284c78fe37a841a22ddc648a8e212e2ffe411bf06948c93918ba1a5bbb5"
+    },
+    {
+      "path": "after/chromium-393-dark-chart-menu.png",
+      "bytes": 95329,
+      "sha256": "3802043baaa4cad2f0fbb9d56398701c5c4ef7f3caf49e984cb44d20851d0f40"
+    },
+    {
+      "path": "after/chromium-393-dark-chart-navigation.png",
+      "bytes": 66842,
+      "sha256": "5c819307ebd43cb08ff257641312b4c8a77d217f2c731ed62b54234d810f6cc1"
+    },
+    {
+      "path": "after/chromium-393-dark-menu.png",
+      "bytes": 111409,
+      "sha256": "e7bf5ac2f2efe1bf157cd28a084f23e109a39ea3ae830eedb8a512f6f97b176d"
+    },
+    {
+      "path": "after/chromium-393-dark-navigation.png",
+      "bytes": 20415,
+      "sha256": "1152427fd951bc303682e39166a9dd664870853445635b925800dcb3111fc41e"
+    },
+    {
+      "path": "after/chromium-393-dark-period.png",
+      "bytes": 14494,
+      "sha256": "1a8be035315e49e60c12988fd6370e40bdb02c71627725d10e37098ad1f7b287"
+    },
+    {
+      "path": "after/chromium-393-dark-progress-bottom.png",
+      "bytes": 61322,
+      "sha256": "c085ea932ec8d5a2d672c71f07bb85883ea4b3e6fa5a2751588ca688f6c18223"
+    },
+    {
+      "path": "after/chromium-393-dark-progress.png",
+      "bytes": 87743,
+      "sha256": "08545aea0a656bf073a7ec2cba9c9e0ca70ffcf05b2b90d8c0714a75697ab3c2"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-20a.png",
+      "bytes": 20593,
+      "sha256": "002175674773327111213a3e8a6ecfc4d8959ba534692f2244d40555e9d05bc0"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-50a.png",
+      "bytes": 20757,
+      "sha256": "f160291c4dd23819175345a090f9305813e01007cd85628b75be7846e521ad0b"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll-85a.png",
+      "bytes": 16204,
+      "sha256": "4e75969725326c146b61e14d9c249c9c1487db4e89d27498bc755acf89925aa4"
+    },
+    {
+      "path": "after/chromium-393-dark-scroll.png",
+      "bytes": 63266,
+      "sha256": "287f2c1ca4d42efd2ef5b21c7b2cba9bd550305ce18ef6e8c15ae2f50c62494b"
+    },
+    {
+      "path": "after/chromium-393-dark-stress-black-menu.png",
+      "bytes": 111859,
+      "sha256": "a8f3da2d9c207ef6ec95636ed21020c6585852ccb83a2b7af5739d10a96d89f8"
+    },
+    {
+      "path": "after/chromium-393-dark-stress-photo-menu.png",
+      "bytes": 111264,
+      "sha256": "dd9efd290fb40f9b31ab831818fe32843dc33b4fe05f39724971641b77971571"
+    },
+    {
+      "path": "after/chromium-393-dark-stress-photo-navigation.png",
+      "bytes": 86652,
+      "sha256": "a126f788d17e2a336d2a190cd65f3593ced7499b6941dec0159d62fb91f1dcc4"
+    },
+    {
+      "path": "after/chromium-393-dark-stress-white-menu.png",
+      "bytes": 109337,
+      "sha256": "91db3c5b8aa184623471f3bebc6a7801df8949261b646c1a88e11a97f89bbf1c"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-keyboard.png",
+      "bytes": 71573,
+      "sha256": "2d3a3b5cc47917e5bef1dbc6d33a84a3555d108c144ed3857f7a1914fd0b1677"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-scroll-20a.png",
+      "bytes": 13158,
+      "sha256": "142a04b85a862ba45eba59cc98f99aaacb0b6505590d00c7235b796187fc3f88"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-scroll-50a.png",
+      "bytes": 15737,
+      "sha256": "794546b3fe410ac6027add7af84bd9bd1761dddec7f6e4ff4c70587fa6d2cf51"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-scroll-85a.png",
+      "bytes": 9010,
+      "sha256": "7e631d70d3c5e320015c735b325b94187765afbfce5fbc25fa621321737d00ee"
+    },
+    {
+      "path": "after/chromium-393-dark-tma-short.png",
+      "bytes": 94478,
+      "sha256": "3a71e703d80c8b9a0dcec3447569415ba1d34e417feca09e3aed494d059eb4b7"
+    },
+    {
+      "path": "after/chromium-393-light-chart-menu.png",
+      "bytes": 90605,
+      "sha256": "e6381224d19c88f1320d448273fe631b5016be0f3f488852aea7ac7b69fc67df"
+    },
+    {
+      "path": "after/chromium-393-light-chart-navigation.png",
+      "bytes": 60955,
+      "sha256": "4c9b62865e781a8bd9a12e3424ac596e4b5fdb7dc339b851ada1532498013adf"
+    },
+    {
+      "path": "after/chromium-393-light-menu.png",
+      "bytes": 108300,
+      "sha256": "31f3d3f954a6691abee7e92bec3d633ee34d5892cf2900d6bc72ecb3c1911b7e"
+    },
+    {
+      "path": "after/chromium-393-light-navigation.png",
+      "bytes": 19815,
+      "sha256": "f0a7e422aa41597d3399c21695706c9b2de5cd50e657a1db9dd05685e4556c4c"
+    },
+    {
+      "path": "after/chromium-393-light-period.png",
+      "bytes": 16243,
+      "sha256": "ab18d9a157e5b5e41a3f436586fa30827fbc42cfddcbd409eb3a50d6c168bc1d"
+    },
+    {
+      "path": "after/chromium-393-light-progress-bottom.png",
+      "bytes": 58526,
+      "sha256": "e816da8db86bf06a13184201b68e6008c27c66c5a1ebf790a6088313ed9ba698"
+    },
+    {
+      "path": "after/chromium-393-light-progress.png",
+      "bytes": 84693,
+      "sha256": "25da2eec866af7443950581f65d0de27676f2637e210346cb819403216bf6ff8"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-20a.png",
+      "bytes": 20116,
+      "sha256": "f1783674151697a618178ddd5764b06ae5314c421d426ab5c418f22a4ee3fa3a"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-50a.png",
+      "bytes": 19794,
+      "sha256": "81c845b9b5ac04a19b20abcc429dd135f91d8bed08999656b598ded8615e0bdf"
+    },
+    {
+      "path": "after/chromium-393-light-scroll-85a.png",
+      "bytes": 16634,
+      "sha256": "4a8bb1201651361be95048d5e9e965a0e63e10e25c35f142d07a5dff34b74eca"
+    },
+    {
+      "path": "after/chromium-393-light-scroll.png",
+      "bytes": 52439,
+      "sha256": "5453a798ffe7ef83cbd61eb589771b5bc1d2b79a03a198b936ee0f0e296dedd4"
+    },
+    {
+      "path": "after/chromium-393-light-stress-black-menu.png",
+      "bytes": 105205,
+      "sha256": "72b14b288bea81594184cc19e6dcb7491de304ca63c781ca60e47742e4fe128b"
+    },
+    {
+      "path": "after/chromium-393-light-stress-photo-menu.png",
+      "bytes": 108272,
+      "sha256": "4adb5b36304ff18cb967d2e5567f30b0f3c37da74c5e7d2e232297a944442f72"
+    },
+    {
+      "path": "after/chromium-393-light-stress-photo-navigation.png",
+      "bytes": 83565,
+      "sha256": "d7f7af1ae07fa5710b0b2cddc34511a587fd4bf7a032175f31af70b0e99a6713"
+    },
+    {
+      "path": "after/chromium-393-light-stress-white-menu.png",
+      "bytes": 109340,
+      "sha256": "2d93f7b70bb32d2320b2170837a3f59ed813abf599435bde348eef9ad2b0b809"
+    },
+    {
+      "path": "after/chromium-393-light-tma-keyboard.png",
+      "bytes": 69129,
+      "sha256": "321c57a7048c16194ac836ab758ea7a9c8788b1e5331dd69002b224cad13bca2"
+    },
+    {
+      "path": "after/chromium-393-light-tma-scroll-20a.png",
+      "bytes": 12673,
+      "sha256": "255bca9a157656c603dd45fe07cc0f3abb5972a83d6ce964d1592c1c610e8f76"
+    },
+    {
+      "path": "after/chromium-393-light-tma-scroll-50a.png",
+      "bytes": 14822,
+      "sha256": "d604324d9d0910ae85970cb48c872300cfc54339d0050458aaf6b0edbe979cb1"
+    },
+    {
+      "path": "after/chromium-393-light-tma-scroll-85a.png",
+      "bytes": 9382,
+      "sha256": "f19541d9ab9ec0214d12c8b0452227ac6a5606106d260a39d2c04927116a076d"
+    },
+    {
+      "path": "after/chromium-393-light-tma-short.png",
+      "bytes": 88836,
+      "sha256": "845de1ec761dce525afd93c3bb866caadcff99e2d9b50dfe3bac860c0da6115a"
+    },
+    {
+      "path": "after/chromium-430-dark-menu.png",
+      "bytes": 114869,
+      "sha256": "3c0b8aed523bc5694d6a2fc54f899687fa4afe97219263d45ca8a450c6ba82b3"
+    },
+    {
+      "path": "after/chromium-430-dark-navigation.png",
+      "bytes": 20173,
+      "sha256": "2908be7c0a396434041342818ae15237c1649521fc2c0d56a1dba906fe7ddc88"
+    },
+    {
+      "path": "after/chromium-430-dark-period.png",
+      "bytes": 14871,
+      "sha256": "6ad4c5892dd16b3a6a15b7946fec2b20659ff3e1e2520ccf025fdeb0de00c04b"
+    },
+    {
+      "path": "after/chromium-430-dark-progress-bottom.png",
+      "bytes": 61436,
+      "sha256": "e3c01a6cc294ece6eae48f284882c0760f0bc4f045bd174fbefd03c788381397"
+    },
+    {
+      "path": "after/chromium-430-dark-progress.png",
+      "bytes": 90185,
+      "sha256": "4eb41b5d9722756158e9c6edce263bb32fc65a279fb30bd667214db26b2a4e20"
+    },
+    {
+      "path": "after/chromium-430-dark-scroll.png",
+      "bytes": 136871,
+      "sha256": "b653a3cc8442ae726ee9690cda4b0ae2650efeb9841080a239bfda7b9a788b6c"
+    },
+    {
+      "path": "after/chromium-430-dark-tma-keyboard.png",
+      "bytes": 74140,
+      "sha256": "6f41d68b3f1bb592bade11e842227587842cc9ab17d4f45cb06c6f079371fed0"
+    },
+    {
+      "path": "after/chromium-430-dark-tma-short.png",
+      "bytes": 99182,
+      "sha256": "b254e47649e46632f5d759a67fe12be73230d61ecdd377f7fc16bc102c3ec12a"
+    },
+    {
+      "path": "after/chromium-430-light-menu.png",
+      "bytes": 113423,
+      "sha256": "dadbeb43baf7b75ee2e9173dcf60cd87d170bd703b8d9b2cdec88e428d9dd7c3"
+    },
+    {
+      "path": "after/chromium-430-light-navigation.png",
+      "bytes": 20223,
+      "sha256": "9d01cfd55fb92e510d7f1491c7174a747de994fc2133ee03619a0c0a2f18be2e"
+    },
+    {
+      "path": "after/chromium-430-light-period.png",
+      "bytes": 17030,
+      "sha256": "baaf9399814c11b6142eb81e63ffde1a71ddf128c5198db8a4f6b115672334de"
+    },
+    {
+      "path": "after/chromium-430-light-progress-bottom.png",
+      "bytes": 58590,
+      "sha256": "c7ae9a2551cae2c7e63f127f9159b73453115a118b7165f8bf9a51b17ca2dbc1"
+    },
+    {
+      "path": "after/chromium-430-light-progress.png",
+      "bytes": 87621,
+      "sha256": "bcc3ffc3e285b384a1518500b888b6d2b40b6f4d467b9917dc0f4d94b466f69a"
+    },
+    {
+      "path": "after/chromium-430-light-scroll.png",
+      "bytes": 52945,
+      "sha256": "8836477d73ca2aac2996ac0ffc8df97deff3d89a3a6d38d3e2576e9dd01684f3"
+    },
+    {
+      "path": "after/chromium-430-light-tma-keyboard.png",
+      "bytes": 71979,
+      "sha256": "a5e885299557e6377c3e48eff3bb53a1905dc3e7f06b697678aac3e5a32f2ca2"
+    },
+    {
+      "path": "after/chromium-430-light-tma-short.png",
+      "bytes": 93520,
+      "sha256": "2c551d307ec1efec7d78ec57a34f15d816c8cdc5483df84b75554dc8869285ad"
+    },
+    {
+      "path": "after/webkit-1440-dark-desktop.png",
+      "bytes": 136621,
+      "sha256": "9eea396f5ebb3108bbf9137088cb796fbefc1b7f6a67b03c9b32d9728ec64130"
+    },
+    {
+      "path": "after/webkit-1440-light-desktop.png",
+      "bytes": 118978,
+      "sha256": "affd2767641ba011ad772ed1e64cc3cd8d807245735fc59748ccaff695a4353e"
+    },
+    {
+      "path": "after/webkit-320-dark-menu.png",
+      "bytes": 73936,
+      "sha256": "541ff3abd34a517b9dbc543fb2a0b200613e9f18d538371d00bdf321f688d256"
+    },
+    {
+      "path": "after/webkit-320-dark-navigation.png",
+      "bytes": 12383,
+      "sha256": "695fca34f826dc82ad4076a147ce0d1b3a04dbc117f7b8b928660eeb11334997"
+    },
+    {
+      "path": "after/webkit-320-dark-period.png",
+      "bytes": 10424,
+      "sha256": "6c7cfce06a387e4e2ec05a0e45e7d0a69c1b3f567d770e6f200f6482672e3926"
+    },
+    {
+      "path": "after/webkit-320-dark-progress-bottom.png",
+      "bytes": 44979,
+      "sha256": "c28ca44dffcd80b3c88ca56e02cd8e34606ee6e2c811e79130747d50d8038f66"
+    },
+    {
+      "path": "after/webkit-320-dark-progress.png",
+      "bytes": 60482,
+      "sha256": "738e987a163610a65124d132220bf5c9d7e26915d83e65699f976f8105d33136"
+    },
+    {
+      "path": "after/webkit-320-dark-scroll.png",
+      "bytes": 47251,
+      "sha256": "dcc3fd12601dee83c2f867ec58d58e0a4449c9e611be6d5390aaec5424f8a49d"
+    },
+    {
+      "path": "after/webkit-320-dark-tma-keyboard.png",
+      "bytes": 49100,
+      "sha256": "f17825d8366415c60787262254db2f26d34f75ca4fbc41db832490a98a3bd6e4"
+    },
+    {
+      "path": "after/webkit-320-dark-tma-short.png",
+      "bytes": 66184,
+      "sha256": "3b6b21930f43ce60bda2fd5d38914324b908ee3f7fe445ad2482c8324ccc26a4"
+    },
+    {
+      "path": "after/webkit-320-light-menu.png",
+      "bytes": 64311,
+      "sha256": "df55776627a16706459904af6b5e23360c802844cbb0aa332a90e06d9d533d19"
+    },
+    {
+      "path": "after/webkit-320-light-navigation.png",
+      "bytes": 12875,
+      "sha256": "213e0e4407ec4f9f4f5ea2bdda69007f0ec0afbd4ae10371414d96a6712ec7d0"
+    },
+    {
+      "path": "after/webkit-320-light-period.png",
+      "bytes": 7529,
+      "sha256": "7076d5a5f08fd17173e5384aac1ed65b9e218b643806586c3a942ba12606165b"
+    },
+    {
+      "path": "after/webkit-320-light-progress-bottom.png",
+      "bytes": 42522,
+      "sha256": "02aa8372230339551f8d1195a5a4d45796b609667d328211418d91190d9d2d07"
+    },
+    {
+      "path": "after/webkit-320-light-progress.png",
+      "bytes": 55062,
+      "sha256": "df8ec69766b8d844dde1decd8b60e326f66e03ed0a1a648cb9055b9e4cabcbd1"
+    },
+    {
+      "path": "after/webkit-320-light-scroll.png",
+      "bytes": 44982,
+      "sha256": "ee3253fb0fff47bd7345159c0c7ee297ec0605c57af2e1febb5d53ec496fe7df"
+    },
+    {
+      "path": "after/webkit-320-light-tma-keyboard.png",
+      "bytes": 46656,
+      "sha256": "c1f0162006e0cd29f136bb1471d8b78867e53b941ad4e8dfeb08a66001881ae2"
+    },
+    {
+      "path": "after/webkit-320-light-tma-short.png",
+      "bytes": 58709,
+      "sha256": "2b9c1126141819d1157ad0ec7ab3cbc24bce60b48d32fec6b2ac6d0e650def59"
+    },
+    {
+      "path": "after/webkit-360-dark-menu.png",
+      "bytes": 77214,
+      "sha256": "25a205aaefa2d1d41e8951f49329fe457ce2c40f3f67918a673b818eaf1139a2"
+    },
+    {
+      "path": "after/webkit-360-dark-navigation.png",
+      "bytes": 12963,
+      "sha256": "876e2b443c192160caf3a1f1b807688e8c6813e894d8ca9909e9d3d5539d030b"
+    },
+    {
+      "path": "after/webkit-360-dark-period.png",
+      "bytes": 10861,
+      "sha256": "4a995734010ce66fa9a9118eddb4d962427f22455bc36dc2add6a9d0dbdd961c"
+    },
+    {
+      "path": "after/webkit-360-dark-progress-bottom.png",
+      "bytes": 46195,
+      "sha256": "f558f1ff698df72497f83eacafc4c4f46d18709820f6d9391fd409d842a2c61f"
+    },
+    {
+      "path": "after/webkit-360-dark-progress.png",
+      "bytes": 63102,
+      "sha256": "925639b667faa2eaceb99a9e9b0ab5e4fa9d11070b4e9e73ddff183e74d32fc8"
+    },
+    {
+      "path": "after/webkit-360-dark-scroll.png",
+      "bytes": 51560,
+      "sha256": "e75a6f1d642d623d9c172456cf70041f1622ca4a3863011bb91ea311635ec12f"
+    },
+    {
+      "path": "after/webkit-360-dark-tma-keyboard.png",
+      "bytes": 53080,
+      "sha256": "9f07d31a7184c091efdb00b079bc9758b32480347ca973dba3e17885945afa9c"
+    },
+    {
+      "path": "after/webkit-360-dark-tma-short.png",
+      "bytes": 69069,
+      "sha256": "eaacafe219bfbbe89d48fd841416180d96076f0feefd74b46fc5821cf6f95a92"
+    },
+    {
+      "path": "after/webkit-360-light-menu.png",
+      "bytes": 66797,
+      "sha256": "3a4fa0d6f018cf64ed8bef24b9d3167efe9e59ae0c5af107a0e8742fa70f21f8"
+    },
+    {
+      "path": "after/webkit-360-light-navigation.png",
+      "bytes": 13277,
+      "sha256": "3662b51683b5e8ca50caae37f59fec5614413f9252609ef18d245a6eb9729b8e"
+    },
+    {
+      "path": "after/webkit-360-light-period.png",
+      "bytes": 7647,
+      "sha256": "e3f07b073ec37c1318a0551552371578bb43c2765a7b731f290b98cb58b9388a"
+    },
+    {
+      "path": "after/webkit-360-light-progress-bottom.png",
+      "bytes": 43642,
+      "sha256": "9cc50c0812d205a83d8053399e0fd32cdd0ef547329364585c06a90bb4f9bdbc"
+    },
+    {
+      "path": "after/webkit-360-light-progress.png",
+      "bytes": 57109,
+      "sha256": "44c34c48016590b08d12190341cd9091dc9ee09163a4c75a5c3cb33e43213551"
+    },
+    {
+      "path": "after/webkit-360-light-scroll.png",
+      "bytes": 49165,
+      "sha256": "cb0f60b876bd70984cf27c5291b6f0d4de76bc1a8291e3d4b6ac8dee063d48ff"
+    },
+    {
+      "path": "after/webkit-360-light-tma-keyboard.png",
+      "bytes": 47267,
+      "sha256": "a5a3f2ed26c85784e70906def43e1505f3f8fd9250a326dbeaa1627cb4be5fd3"
+    },
+    {
+      "path": "after/webkit-360-light-tma-short.png",
+      "bytes": 60997,
+      "sha256": "0d2d0d88cc83a975bd52b50293f096ed7c8da54bb48dcc57cdbf39e478134cbc"
+    },
+    {
+      "path": "after/webkit-393-dark-chart-menu.png",
+      "bytes": 63260,
+      "sha256": "51bde83d64b8f0159f4c3983e01128b932d16498fec10e5104f920a89a5c0742"
+    },
+    {
+      "path": "after/webkit-393-dark-chart-navigation.png",
+      "bytes": 52090,
+      "sha256": "ce7e202a5e6db62964254f48325392afd1e9cdb0a5ec2bc1de3f42cc00312f7b"
+    },
+    {
+      "path": "after/webkit-393-dark-menu.png",
+      "bytes": 79573,
+      "sha256": "559f67cd51201c18a6bc276de1838ec0de2147b542b2a7398021f90d4e5230a9"
+    },
+    {
+      "path": "after/webkit-393-dark-navigation.png",
+      "bytes": 13175,
+      "sha256": "0792323e9fe38cb55c20b1239b2a7d97fb44a817acf0d8dff4c788ab9e83c352"
+    },
+    {
+      "path": "after/webkit-393-dark-period.png",
+      "bytes": 11223,
+      "sha256": "1bb1e8dfcc0aa709230bfbd72f24951dbf17ccbaa9069b56fc16f87d7f23dce4"
+    },
+    {
+      "path": "after/webkit-393-dark-progress-bottom.png",
+      "bytes": 47111,
+      "sha256": "d327bd9f101733951b7df803fdbd59956b597e1e81a982a4179ab27a38ec3bef"
+    },
+    {
+      "path": "after/webkit-393-dark-progress.png",
+      "bytes": 64641,
+      "sha256": "ddc55f836ee79787c66e8dc4eb09e8db15245dab67068e79632b9428b1df588e"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-20a.png",
+      "bytes": 16811,
+      "sha256": "a52f502771850d4fc40bbfd5859c0f691d1edefc698670b01c40edf6fd9ca4a9"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-50a.png",
+      "bytes": 18029,
+      "sha256": "afaefb73ad5287d4608a30e9ac1c47cbb6aadfa03a4608020ad640e0a181ea23"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll-85a.png",
+      "bytes": 12984,
+      "sha256": "c7c420c6ce4eb3712d2d25d8a75ffbac1b30eff70f0144104623736994c7aa53"
+    },
+    {
+      "path": "after/webkit-393-dark-scroll.png",
+      "bytes": 69486,
+      "sha256": "c9b2683b995f146423f1f5f255adb826d7985f16c871a4d588bdd3a223aeddf6"
+    },
+    {
+      "path": "after/webkit-393-dark-stress-black-menu.png",
+      "bytes": 78994,
+      "sha256": "e3e31d34273b83bacc6f51aff2e6618179c671ddb133c9e3457b45b7698e80e6"
+    },
+    {
+      "path": "after/webkit-393-dark-stress-photo-menu.png",
+      "bytes": 78955,
+      "sha256": "fdf0084dda3a07d383def7f4af7131392cfc616fad49c9f78f39e2f1b4a3aac5"
+    },
+    {
+      "path": "after/webkit-393-dark-stress-photo-navigation.png",
+      "bytes": 64079,
+      "sha256": "456a635478dc2d46e2a4e5514b3d8cb9cbd4114e8a8aa27ed0dffff7b2a7fc58"
+    },
+    {
+      "path": "after/webkit-393-dark-stress-white-menu.png",
+      "bytes": 76931,
+      "sha256": "f68c27ec22fd31609489512f3db68410264564fa0f8f5cafd6c153ae7c329621"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-keyboard.png",
+      "bytes": 53163,
+      "sha256": "80d3bb9a7053d2db1682399f7f699c94fa2dabfa2916f2e229d2c6d5f98b017c"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-scroll-20a.png",
+      "bytes": 10832,
+      "sha256": "5e732913be9e7d0e39b547d48e3fe536d2faf2706d5ed0eed76b41b519ad4d5c"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-scroll-50a.png",
+      "bytes": 12472,
+      "sha256": "477a732bdce550849d5fb1edc0acf8e87b65add01ab52ed781434d4020251bf5"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-scroll-85a.png",
+      "bytes": 7140,
+      "sha256": "80fc5c93f672642b80e7c9e68cdb64383523ec630b749e84ebcaa6ea8e341828"
+    },
+    {
+      "path": "after/webkit-393-dark-tma-short.png",
+      "bytes": 70872,
+      "sha256": "c1a9c837a1874e8d2932f2afebebfbdb395a053cb579691fea35c6253f5dfc2c"
+    },
+    {
+      "path": "after/webkit-393-light-chart-menu.png",
+      "bytes": 55113,
+      "sha256": "be881056238a241330470a6daca8f9e5740755a26b3d8eb3a12e11307df1590f"
+    },
+    {
+      "path": "after/webkit-393-light-chart-navigation.png",
+      "bytes": 48514,
+      "sha256": "37f26a9204f1676859cd3997bfff64ac1a23613033e494d19add426d78d73444"
+    },
+    {
+      "path": "after/webkit-393-light-menu.png",
+      "bytes": 68592,
+      "sha256": "3ac9c13af60d074200d5c9284014636687d42de9944f9051b9106aca504c6c83"
+    },
+    {
+      "path": "after/webkit-393-light-navigation.png",
+      "bytes": 13644,
+      "sha256": "2b2b5508f0ff8a5facbaffb0c7f00c0548b1d4c73c7475eca025a9fbc27460d6"
+    },
+    {
+      "path": "after/webkit-393-light-period.png",
+      "bytes": 7923,
+      "sha256": "a8502668f2668a3d721e2e101e9c33b89043ba219bcaf819c6a60d0fadf028f3"
+    },
+    {
+      "path": "after/webkit-393-light-progress-bottom.png",
+      "bytes": 44522,
+      "sha256": "39d92aa8fa6a4cbfa0e42ca0fb1bfca0d9312fd7c689268d582d61bdc1ebf7af"
+    },
+    {
+      "path": "after/webkit-393-light-progress.png",
+      "bytes": 58929,
+      "sha256": "03547c2f58f8ac49f20b263beec169ea87306ac20c087c794424889247506e86"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-20a.png",
+      "bytes": 16477,
+      "sha256": "fe0e02325031cf002520ff3c1af1d2529e53316adea33abcf23713fe46a360b0"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-50a.png",
+      "bytes": 17554,
+      "sha256": "0149d3e93882cca68998041661e51c68208e7743e84ac0207c85b9349fd83424"
+    },
+    {
+      "path": "after/webkit-393-light-scroll-85a.png",
+      "bytes": 13360,
+      "sha256": "050e111fc45b9d03a81d047ae630678fe3b4a88bb9aa1e6b51f947c831805568"
+    },
+    {
+      "path": "after/webkit-393-light-scroll.png",
+      "bytes": 66972,
+      "sha256": "6c8004371ae1154650cd2262adad38fef69ce0797dc9d99c335522fe5cb40b80"
+    },
+    {
+      "path": "after/webkit-393-light-stress-black-menu.png",
+      "bytes": 62599,
+      "sha256": "a4632df557fb56e78d1f562e3460dda5b357b3d8baffc52118616c9bfedb21a3"
+    },
+    {
+      "path": "after/webkit-393-light-stress-photo-menu.png",
+      "bytes": 68030,
+      "sha256": "176ea313bd7fc033335dc217878ec820ff28f129f16147428bc97e3356ec23d5"
+    },
+    {
+      "path": "after/webkit-393-light-stress-photo-navigation.png",
+      "bytes": 58453,
+      "sha256": "ed6e9ca78625fad7bf502205443650f15ad516ad0d542b1398d1ab1ae60c390f"
+    },
+    {
+      "path": "after/webkit-393-light-stress-white-menu.png",
+      "bytes": 67774,
+      "sha256": "6378aa5991ec18ff7b4fe2fa8dfdc19c0ca21b18d8338765713032ad7b2ce6ae"
+    },
+    {
+      "path": "after/webkit-393-light-tma-keyboard.png",
+      "bytes": 50192,
+      "sha256": "343e210ef4b10bac8aa955e9b1eed3542da01e24942a5ba587b00a68bca5c48d"
+    },
+    {
+      "path": "after/webkit-393-light-tma-scroll-20a.png",
+      "bytes": 10640,
+      "sha256": "3671ecae8e8bdf23a10ec5329c63839bc886b392b8e8b33f097df392016acbb2"
+    },
+    {
+      "path": "after/webkit-393-light-tma-scroll-50a.png",
+      "bytes": 12065,
+      "sha256": "71f09f12412f5fa167c94ad7b3148118173b4d3659cda6316a394616ebd7e0a7"
+    },
+    {
+      "path": "after/webkit-393-light-tma-scroll-85a.png",
+      "bytes": 7492,
+      "sha256": "7721cb2277e620b458fbc5a95f5c569ff2236ab9b71f6b11750c5e5d5ba23695"
+    },
+    {
+      "path": "after/webkit-393-light-tma-short.png",
+      "bytes": 62556,
+      "sha256": "e46ebc73e36df5bbaba95419257d2cf28866f0af0a8c595161768937d725ea7c"
+    },
+    {
+      "path": "after/webkit-430-dark-menu.png",
+      "bytes": 82136,
+      "sha256": "b9c4e4cfb1a4f7598abac27bc01e8726efd520900df1d8e7885b46f8b255c56b"
+    },
+    {
+      "path": "after/webkit-430-dark-navigation.png",
+      "bytes": 13280,
+      "sha256": "52af2b5b18cf87c49d27ab31531e51b875360927288dd0b8b8883ea647e4d01a"
+    },
+    {
+      "path": "after/webkit-430-dark-period.png",
+      "bytes": 11463,
+      "sha256": "363906c98c70ab225c319465df9b646e231fc97669b4bc3e3fa21b5337cc80f9"
+    },
+    {
+      "path": "after/webkit-430-dark-progress-bottom.png",
+      "bytes": 48242,
+      "sha256": "0090b285d4d01f70e7c3b5ed2d0650762c24abb9ad8c8b1ce3a53cb69563715e"
+    },
+    {
+      "path": "after/webkit-430-dark-progress.png",
+      "bytes": 66682,
+      "sha256": "233d4ced550e80c46144d312726644dad50910fabd702687d106960e21086c88"
+    },
+    {
+      "path": "after/webkit-430-dark-scroll.png",
+      "bytes": 70335,
+      "sha256": "6c617b09a52fae1d0e801c90c9c321de27ac37d514cc2b5de46386764146d514"
+    },
+    {
+      "path": "after/webkit-430-dark-tma-keyboard.png",
+      "bytes": 57099,
+      "sha256": "0f43b927168ebe88b3e645e8413840b311edd3dc1a2e4608071af92014475604"
+    },
+    {
+      "path": "after/webkit-430-dark-tma-short.png",
+      "bytes": 73358,
+      "sha256": "e37724895f0f16c07f9922f883a0453326b7d759437214da4e8735d859f92a73"
+    },
+    {
+      "path": "after/webkit-430-light-menu.png",
+      "bytes": 70601,
+      "sha256": "c96c7548fd933031bdd047fe685b4eab023e04446e85c9ad711d79cf487c0a93"
+    },
+    {
+      "path": "after/webkit-430-light-navigation.png",
+      "bytes": 13722,
+      "sha256": "542069980991d16d21166f2fec70f47a7ebb946c038e5ed07d7cced0c7f10714"
+    },
+    {
+      "path": "after/webkit-430-light-period.png",
+      "bytes": 7966,
+      "sha256": "3b536848928c0b1e1a09636a9305ae6d47363556ad09d1962301e7e69181c883"
+    },
+    {
+      "path": "after/webkit-430-light-progress-bottom.png",
+      "bytes": 45308,
+      "sha256": "94973c676666346377c8362485e69d5252dc537cd589b0569b647a23c69dd886"
+    },
+    {
+      "path": "after/webkit-430-light-progress.png",
+      "bytes": 60511,
+      "sha256": "b1bd3be2f95c7ba84287157cf5c8b2f4d960bf270f61e4672f6e1af226e162f1"
+    },
+    {
+      "path": "after/webkit-430-light-scroll.png",
+      "bytes": 67599,
+      "sha256": "9b5eb6d38a0848b0704fc11b996d056312a0a42ebc88a1a6c4a70915a0e11e6e"
+    },
+    {
+      "path": "after/webkit-430-light-tma-keyboard.png",
+      "bytes": 50815,
+      "sha256": "a7222532095d3f42d3dd4b69e4e30141454d65cbda4f9a3e4b5ff42b9f9ac530"
+    },
+    {
+      "path": "after/webkit-430-light-tma-short.png",
+      "bytes": 64791,
+      "sha256": "2dcf1c2a8fed3428efb9be268b401f18793871e109d10c73433337874dbe9655"
+    },
+    {
+      "path": "audit/after-geometry.json",
+      "bytes": 400807,
+      "sha256": "42c809b5d199c24d91905d2229d6ebe6c94107b91097d210caebf88bcacd6462"
+    },
+    {
+      "path": "audit/background-checks.json",
+      "bytes": 2483,
+      "sha256": "b010962dbf25a18ecfedd668d6d28f8d6443cbbc91c1860e8776e345531dfd40"
+    },
+    {
+      "path": "audit/before-geometry.json",
+      "bytes": 405247,
+      "sha256": "affe161749fb4e98abf15c453b2f0eeeaf656b3a3c9fadd3f8dabfa58e42665d"
+    },
+    {
+      "path": "audit/changed-files.json",
+      "bytes": 10250,
+      "sha256": "e6bf8cdbe885031d7d34eb7c71417f859815a19c972c380e086a6bbddcbd6bd1"
+    },
+    {
+      "path": "audit/changed-files.md",
+      "bytes": 32266,
+      "sha256": "fc27114b1717bc9cd6105bd2465811a28bf2d3f0c33d2fca99ea0ee57a7c6fdc"
+    },
+    {
+      "path": "audit/ci.json",
+      "bytes": 6645,
+      "sha256": "d3d4f90da48964515d4929b06849df2bc2a875a3b241adeb26fc187ec9a66254"
+    },
+    {
+      "path": "audit/optical-check.json",
+      "bytes": 580,
+      "sha256": "bfdc01d0c431cdbf9f5b8299867fdb3844bdee59cde59a118fb2f52f2b58bc02"
+    },
+    {
+      "path": "audit/performance-tma.json",
+      "bytes": 12631,
+      "sha256": "a0ed64cf5d2636b6a1d8e2cce5f2660b3eddd309d822cbd6918b96c8baec804f"
+    },
+    {
+      "path": "audit/performance.json",
+      "bytes": 12537,
+      "sha256": "1ffa1eaebbdb3bbb6ebeb652c645a4223410c2874815cdf7815e3153ded2bb32"
+    },
+    {
+      "path": "audit/tma-checks.json",
+      "bytes": 5995,
+      "sha256": "fdce6903d247c13b35152162e29453a8cbc9d6734bf6e2dd9ce30d9bda716384"
+    },
+    {
+      "path": "audit/verification.json",
+      "bytes": 1142,
+      "sha256": "82c9da9898fb8365957d3b4182e8a1fdf2849bdf33699fab067d2e0935b409bb"
+    },
+    {
+      "path": "before/chromium-320-dark-menu.png",
+      "bytes": 104214,
+      "sha256": "3761195ee8af87cde0192e66480719aada930bc167e23f4d0bd7684fcd6c9fee"
+    },
+    {
+      "path": "before/chromium-320-dark-navigation.png",
+      "bytes": 18212,
+      "sha256": "c5d66f0a314a15223ae8fbf62ec242e4def7721cbb5a46f62041939e6529858d"
+    },
+    {
+      "path": "before/chromium-320-dark-period.png",
+      "bytes": 13117,
+      "sha256": "044d8d0458b01bae86911d6cb3d4c3372489df570c15042e987c64331a252117"
+    },
+    {
+      "path": "before/chromium-320-dark-progress-bottom.png",
+      "bytes": 58552,
+      "sha256": "e0c300effed8193c124b1b795e71d391aab36b3670b48b32f900110ebcba191e"
+    },
+    {
+      "path": "before/chromium-320-dark-progress.png",
+      "bytes": 80709,
+      "sha256": "f560b4c24007156d3004d0f65ee11797cfa7477e6e5ee61dfb1a147ab4a17ae1"
+    },
+    {
+      "path": "before/chromium-320-dark-scroll.png",
+      "bytes": 60301,
+      "sha256": "5b6d337e2b0f49262d55c52df8553d06cec36e4ec4073300a18aabe1b55abe6d"
+    },
+    {
+      "path": "before/chromium-320-light-menu.png",
+      "bytes": 100506,
+      "sha256": "e1c5b02b05090ff28c7310f844e6520c57bb6aa29e10fdb0975fa637b34ccb95"
+    },
+    {
+      "path": "before/chromium-320-light-navigation.png",
+      "bytes": 18429,
+      "sha256": "4db6148b1ab347aee6313bc68a4b35575e9ae86b17680023eae4996b6dac425d"
+    },
+    {
+      "path": "before/chromium-320-light-period.png",
+      "bytes": 14566,
+      "sha256": "b81c491f5a530f5bf6c700d7552ed3076dbba502845722231e25e8dfcc44ac2c"
+    },
+    {
+      "path": "before/chromium-320-light-progress-bottom.png",
+      "bytes": 56613,
+      "sha256": "8f8911870e95b1ceaf2ffab72d5451d42ec4ec61d6238866cd29d07fc4128e4f"
+    },
+    {
+      "path": "before/chromium-320-light-progress.png",
+      "bytes": 79137,
+      "sha256": "0910b33b88a5bb4cf7842cadf07650715dc1c9d7fd1014f4c52859ce0235b00a"
+    },
+    {
+      "path": "before/chromium-320-light-scroll.png",
+      "bytes": 50480,
+      "sha256": "7846b3bf1fb83bb35049c9497f41c8fd45bd260b5d5a2a5388f906d066d96fde"
+    },
+    {
+      "path": "before/chromium-360-dark-menu.png",
+      "bytes": 109475,
+      "sha256": "6052543ca292ca0f345640841e3136f3e169732c2f64f05adce19128fe353713"
+    },
+    {
+      "path": "before/chromium-360-dark-navigation.png",
+      "bytes": 20668,
+      "sha256": "d4f9a9f751d1dcefd5efa2218768ef810a860bd34d1926f1d6858c4910005ed8"
+    },
+    {
+      "path": "before/chromium-360-dark-period.png",
+      "bytes": 13746,
+      "sha256": "d8998812ffd5f2da98dc2233e51c0da4a18b2bce0b1b63abb267206dbd87bea3"
+    },
+    {
+      "path": "before/chromium-360-dark-progress-bottom.png",
+      "bytes": 60317,
+      "sha256": "b2aa1c63f87eb62fafa1e0dca33526e1710843856b1f5a25450921ca9fd35bf1"
+    },
+    {
+      "path": "before/chromium-360-dark-progress.png",
+      "bytes": 83435,
+      "sha256": "83fc3cd7703b0a324db7ebbdce7622618595977d3df69bbacffe86976a250355"
+    },
+    {
+      "path": "before/chromium-360-dark-scroll.png",
+      "bytes": 63490,
+      "sha256": "1cc077425328ca8e08298debc7e536fb039c0bbb5b6af210fc3f32d8f75ab0bd"
+    },
+    {
+      "path": "before/chromium-360-light-menu.png",
+      "bytes": 106514,
+      "sha256": "cedbcc38f0c3ff9738a3b241ea11bc4f5f30e4cc423f650a95b8645b48d1bfe9"
+    },
+    {
+      "path": "before/chromium-360-light-navigation.png",
+      "bytes": 20896,
+      "sha256": "059d32cd42efad06f5714d568f05ad77a3422880f706faca9ca1608a28b5a2c7"
+    },
+    {
+      "path": "before/chromium-360-light-period.png",
+      "bytes": 15484,
+      "sha256": "c73a2f93a851469e5be13acbbb6f98e88d6f16424ead9d4a54f5f002db1d6563"
+    },
+    {
+      "path": "before/chromium-360-light-progress-bottom.png",
+      "bytes": 58828,
+      "sha256": "4ffe39502821484d5b27d2894340f2e50dea5de343a163ebc50cbb999c352f1b"
+    },
+    {
+      "path": "before/chromium-360-light-progress.png",
+      "bytes": 81884,
+      "sha256": "e7aaeacd2be5d25dc7f7d636408a7f80572c42abea89ebc0599eea150ac6b7b7"
+    },
+    {
+      "path": "before/chromium-360-light-scroll.png",
+      "bytes": 53597,
+      "sha256": "b145a012cdf2eb6841f8ae76570c5e2c46059ca202f14300e57722ef95034d7a"
+    },
+    {
+      "path": "before/chromium-393-dark-chart-menu.png",
+      "bytes": 98825,
+      "sha256": "5b2081548b37b0394c84748dea1cbf13dc1f48cb48543aa3c954f328545d33b9"
+    },
+    {
+      "path": "before/chromium-393-dark-chart-navigation.png",
+      "bytes": 68188,
+      "sha256": "ad4ff6c80599ab0847e968686747df587209fa0ccf08e7b94b2b31a114432420"
+    },
+    {
+      "path": "before/chromium-393-dark-menu.png",
+      "bytes": 114620,
+      "sha256": "41c2c3556e86493242753813318be86de0111e565853815f517981145601e585"
+    },
+    {
+      "path": "before/chromium-393-dark-navigation.png",
+      "bytes": 22718,
+      "sha256": "488d12056e1636385cd89504fee8760399ce012c1c12d54f27ba663c9685dbc7"
+    },
+    {
+      "path": "before/chromium-393-dark-period.png",
+      "bytes": 14494,
+      "sha256": "1a8be035315e49e60c12988fd6370e40bdb02c71627725d10e37098ad1f7b287"
+    },
+    {
+      "path": "before/chromium-393-dark-progress-bottom.png",
+      "bytes": 61308,
+      "sha256": "9d2b709a839911308baed820fb258525c9ea15ef725c6f534b5a828dc7944c86"
+    },
+    {
+      "path": "before/chromium-393-dark-progress.png",
+      "bytes": 87272,
+      "sha256": "00cf54ec6228c4ea269d1eee823f75790be29e6922f6dea9c88ee9052703ebcf"
+    },
+    {
+      "path": "before/chromium-393-dark-scroll.png",
+      "bytes": 135435,
+      "sha256": "fd4ded4ac7d9453ccd39cf2d928365c2b8623898ea33b67bfe6818f11cc6cc2f"
+    },
+    {
+      "path": "before/chromium-393-dark-stress-black-menu.png",
+      "bytes": 115428,
+      "sha256": "741a8ae15cbb3cbf74b007477fe8ca6e272e50ff342ab4ce8c07962a90e3c9b5"
+    },
+    {
+      "path": "before/chromium-393-dark-stress-photo-menu.png",
+      "bytes": 114259,
+      "sha256": "dd5d55102b493ba8561a9b4c2748799363cc54dae106c22ec0a9c892112d2520"
+    },
+    {
+      "path": "before/chromium-393-dark-stress-photo-navigation.png",
+      "bytes": 86177,
+      "sha256": "91e82ec04697d46b544de33e90728d528899c6b2ff6c86618dfe9eb8007b5bd1"
+    },
+    {
+      "path": "before/chromium-393-dark-stress-white-menu.png",
+      "bytes": 112472,
+      "sha256": "864e1666a01822987c404a26239976c2a01c439a21c8f378f603ef6ac756a850"
+    },
+    {
+      "path": "before/chromium-393-light-chart-menu.png",
+      "bytes": 94751,
+      "sha256": "195474d081580b3a3b82bb6f4bccc56a835bbc5e932e479e4f0eebd6c5f6d361"
+    },
+    {
+      "path": "before/chromium-393-light-chart-navigation.png",
+      "bytes": 63352,
+      "sha256": "d94a5df134c106eeec9ed58df613a8cad0a0508fefa4cf14ec93052a9b557854"
+    },
+    {
+      "path": "before/chromium-393-light-menu.png",
+      "bytes": 111755,
+      "sha256": "3de8236ef16202c7bd42437df52969c63dbea97473b389f41665bd67c6369800"
+    },
+    {
+      "path": "before/chromium-393-light-navigation.png",
+      "bytes": 21559,
+      "sha256": "022f52dcc28b560bb283e60aeb39ebc91d7eecd8635898ed4c085bef2d349f19"
+    },
+    {
+      "path": "before/chromium-393-light-period.png",
+      "bytes": 16243,
+      "sha256": "ab18d9a157e5b5e41a3f436586fa30827fbc42cfddcbd409eb3a50d6c168bc1d"
+    },
+    {
+      "path": "before/chromium-393-light-progress-bottom.png",
+      "bytes": 60234,
+      "sha256": "7a7020534932e2ddf2030896c049613b3b06fbee02ccf2f6b5d7e3ab4e784901"
+    },
+    {
+      "path": "before/chromium-393-light-progress.png",
+      "bytes": 85929,
+      "sha256": "8d43d82c31ae1139bfd1046531479fcad8fabe0c6a6f6e32c56799ed101bc4e8"
+    },
+    {
+      "path": "before/chromium-393-light-scroll.png",
+      "bytes": 54344,
+      "sha256": "368935108db16fbdd5f2bf7f82beb5899d4a2bb28c411088a334c013b4ca6d71"
+    },
+    {
+      "path": "before/chromium-393-light-stress-black-menu.png",
+      "bytes": 109916,
+      "sha256": "2c954177bf04c452cc94ba79c42892286d107ec414264b6a2be3ee892728189d"
+    },
+    {
+      "path": "before/chromium-393-light-stress-photo-menu.png",
+      "bytes": 111713,
+      "sha256": "bbd63574769aa56c728b58061f1bd8f274438c63d75e95c1a4ac5280c9ddb0d9"
+    },
+    {
+      "path": "before/chromium-393-light-stress-photo-navigation.png",
+      "bytes": 84792,
+      "sha256": "fb847c866c8bc03598437742f0e9984c8d96ec009c67d3416bc4a5f070e62867"
+    },
+    {
+      "path": "before/chromium-393-light-stress-white-menu.png",
+      "bytes": 112837,
+      "sha256": "2fbed5c5b93454d8a33eab22f802467cee8b84d128dc07cceaf98ed3c844cf82"
+    },
+    {
+      "path": "before/chromium-430-dark-menu.png",
+      "bytes": 118643,
+      "sha256": "d0e966b033c175c973d33e4cb91e3c13224c4fd9fed6901d74b8012b1bcdf992"
+    },
+    {
+      "path": "before/chromium-430-dark-navigation.png",
+      "bytes": 20541,
+      "sha256": "48f49876080387b6368ce1fd3d28da5b3e9215cc1f536c8012dea8c5c3cdd55f"
+    },
+    {
+      "path": "before/chromium-430-dark-period.png",
+      "bytes": 14871,
+      "sha256": "6ad4c5892dd16b3a6a15b7946fec2b20659ff3e1e2520ccf025fdeb0de00c04b"
+    },
+    {
+      "path": "before/chromium-430-dark-progress-bottom.png",
+      "bytes": 61206,
+      "sha256": "eab17aaee47f37a7b365623615db3321656164502049572e5b33a0a708328e7d"
+    },
+    {
+      "path": "before/chromium-430-dark-progress.png",
+      "bytes": 89498,
+      "sha256": "0b8843f8a497607c2c16258017f14a2e179d9ce595aa0f13965a8475f247a458"
+    },
+    {
+      "path": "before/chromium-430-dark-scroll.png",
+      "bytes": 137086,
+      "sha256": "78ea447e0c8b497c3698f7fabdeca29e8e7207a10286ec456c316d4c82fa40fd"
+    },
+    {
+      "path": "before/chromium-430-light-menu.png",
+      "bytes": 116857,
+      "sha256": "710e1e037473b076267c7eaa9f24adc608cd5bb4c2baf53999c6c248ca63afac"
+    },
+    {
+      "path": "before/chromium-430-light-navigation.png",
+      "bytes": 18304,
+      "sha256": "a7236fad153b7e05573b702e0021c2bb667f10f39e918dedf0f14f3e2a41e95a"
+    },
+    {
+      "path": "before/chromium-430-light-period.png",
+      "bytes": 17030,
+      "sha256": "baaf9399814c11b6142eb81e63ffde1a71ddf128c5198db8a4f6b115672334de"
+    },
+    {
+      "path": "before/chromium-430-light-progress-bottom.png",
+      "bytes": 60285,
+      "sha256": "8a3b88a839df8be2cb9725812637790d1a99491bd5eb3c4f363c5c79ff0fb5a7"
+    },
+    {
+      "path": "before/chromium-430-light-progress.png",
+      "bytes": 88597,
+      "sha256": "d8f84c89b84618c804cc52fcb7b9c723c66468335deef992a98f256c01ff2690"
+    },
+    {
+      "path": "before/chromium-430-light-scroll.png",
+      "bytes": 80831,
+      "sha256": "1c68e4d4f8f8f8eee59e1acee71dcc9e351016a53bede1448bdd40d4a4d0e63d"
+    },
+    {
+      "path": "before/webkit-320-dark-menu.png",
+      "bytes": 76910,
+      "sha256": "1cffd982e12794cc1d21a667b9c965c5fee2d1cf13b6ff4d8076aab47a096983"
+    },
+    {
+      "path": "before/webkit-320-dark-navigation.png",
+      "bytes": 12264,
+      "sha256": "e20da9b6ec88d5ff01ba1a68fe9bf0bffa24af274937248f68d95ed98c35f4f7"
+    },
+    {
+      "path": "before/webkit-320-dark-period.png",
+      "bytes": 10573,
+      "sha256": "173871c8f8e4d3e991ee4228ae7ccea4d0fa93730fa524354ec98bf06197815d"
+    },
+    {
+      "path": "before/webkit-320-dark-progress-bottom.png",
+      "bytes": 44898,
+      "sha256": "31ded9ce395a45b68f6cb6f3f56ec23093f6a7b4028f949393b06cb7d4f5b2a2"
+    },
+    {
+      "path": "before/webkit-320-dark-progress.png",
+      "bytes": 60156,
+      "sha256": "9a00ff6ae6f4bce677fed19f0adaf6b9c6c44338c35af59963bf1ea08d519d88"
+    },
+    {
+      "path": "before/webkit-320-dark-scroll.png",
+      "bytes": 47097,
+      "sha256": "486a065a99807b128f152ee124319df7158eac3c7ef9015c03b5161407b90a75"
+    },
+    {
+      "path": "before/webkit-320-light-menu.png",
+      "bytes": 67706,
+      "sha256": "2fc383f82c04654e0200bd133fae79f4de5cd42c94a74d6ea66a6967e177b34a"
+    },
+    {
+      "path": "before/webkit-320-light-navigation.png",
+      "bytes": 13838,
+      "sha256": "5cccb0a10edf4fb9f1f6c22a4e6cb928a42b89e38dbb737843f35fc444b5204b"
+    },
+    {
+      "path": "before/webkit-320-light-period.png",
+      "bytes": 7622,
+      "sha256": "7407c9c06dcb303c5418c984b770e65d9909cd09fc4e3ac7d98971b1a6642f87"
+    },
+    {
+      "path": "before/webkit-320-light-progress-bottom.png",
+      "bytes": 43764,
+      "sha256": "f891037d589d541551fd1528c82e4528b8591f89b3fdf7d712269827f6492b05"
+    },
+    {
+      "path": "before/webkit-320-light-progress.png",
+      "bytes": 56298,
+      "sha256": "8f589aa199908e81ad4593b4e6e9610e5e77d2c3a9d746c25e461c8a63b0c6f0"
+    },
+    {
+      "path": "before/webkit-320-light-scroll.png",
+      "bytes": 46124,
+      "sha256": "fe61254cca10a5371a7042be4aa03721208cf4af43a5906a57dcbd11877e0e95"
+    },
+    {
+      "path": "before/webkit-360-dark-menu.png",
+      "bytes": 79684,
+      "sha256": "f5551c674d64b797da79db22448f63b7602bba5cc044c35967edae70f56b6360"
+    },
+    {
+      "path": "before/webkit-360-dark-navigation.png",
+      "bytes": 12825,
+      "sha256": "0f8516703d0b14e962eb527803925ad108f04b19ffa80afec4aaaa3c3c594ec9"
+    },
+    {
+      "path": "before/webkit-360-dark-period.png",
+      "bytes": 10861,
+      "sha256": "4a995734010ce66fa9a9118eddb4d962427f22455bc36dc2add6a9d0dbdd961c"
+    },
+    {
+      "path": "before/webkit-360-dark-progress-bottom.png",
+      "bytes": 46053,
+      "sha256": "114fca7cea0d2c5a9aadf278a460d603ac9f7f282dc609edd00bbd871f29dc4d"
+    },
+    {
+      "path": "before/webkit-360-dark-progress.png",
+      "bytes": 62239,
+      "sha256": "9d04472828ec0abce634a0c11d63735e54da22c7be9525464be455994a09395d"
+    },
+    {
+      "path": "before/webkit-360-dark-scroll.png",
+      "bytes": 51371,
+      "sha256": "cd7b90a4e7fc2e7059df8ce40367b46d702ccfde18610436f4835b6a2250b2f3"
+    },
+    {
+      "path": "before/webkit-360-light-menu.png",
+      "bytes": 69250,
+      "sha256": "77032060ece2f9081711804b8dfd786823e280a1e29c9252d5a2181fb9301438"
+    },
+    {
+      "path": "before/webkit-360-light-navigation.png",
+      "bytes": 14325,
+      "sha256": "c7c604795f49e18b084b127d411a945781975d66b83c308aed45e595b76d8556"
+    },
+    {
+      "path": "before/webkit-360-light-period.png",
+      "bytes": 7647,
+      "sha256": "e3f07b073ec37c1318a0551552371578bb43c2765a7b731f290b98cb58b9388a"
+    },
+    {
+      "path": "before/webkit-360-light-progress-bottom.png",
+      "bytes": 44856,
+      "sha256": "b12ddbb9bc568014a34cbac476856c95c5b741e6b1a6d27d9c3bf9160a2e5545"
+    },
+    {
+      "path": "before/webkit-360-light-progress.png",
+      "bytes": 57882,
+      "sha256": "05ccffd93822dd9ba6e9f87e571640d455f40d29d211b8ee6c576f944336eb8f"
+    },
+    {
+      "path": "before/webkit-360-light-scroll.png",
+      "bytes": 50359,
+      "sha256": "4a97a0b004a68ad8b73f23711679b0e6bd0029b0cad7454ad4e5642f204e79e4"
+    },
+    {
+      "path": "before/webkit-393-dark-chart-menu.png",
+      "bytes": 65268,
+      "sha256": "ea3732f64249a3098b5f21bc2d0602eb3fa088a609ceaff087372427d9da126b"
+    },
+    {
+      "path": "before/webkit-393-dark-chart-navigation.png",
+      "bytes": 52302,
+      "sha256": "e5a77038c51ed15462f17c771fbee9a26b15874dfd31d99f39e490f605111c3b"
+    },
+    {
+      "path": "before/webkit-393-dark-menu.png",
+      "bytes": 82262,
+      "sha256": "fc739275ebb98a240249c660904492101bc194cfbba756acb4822a8eb5337dd9"
+    },
+    {
+      "path": "before/webkit-393-dark-navigation.png",
+      "bytes": 12981,
+      "sha256": "6ceb8c38a0bebfecca0582e6a934ea01d818a8efcbb4b2644e4fa658e1d5b1f7"
+    },
+    {
+      "path": "before/webkit-393-dark-period.png",
+      "bytes": 11223,
+      "sha256": "1bb1e8dfcc0aa709230bfbd72f24951dbf17ccbaa9069b56fc16f87d7f23dce4"
+    },
+    {
+      "path": "before/webkit-393-dark-progress-bottom.png",
+      "bytes": 46985,
+      "sha256": "3b3a6b4378e1570ee4c71e7a8352e83be4c52cbe702a1ff3978c5feaab73a06a"
+    },
+    {
+      "path": "before/webkit-393-dark-progress.png",
+      "bytes": 64088,
+      "sha256": "05b88d1ee4348709ec03c863cc2893c080e971debc33f799761bbd8ad5e6af53"
+    },
+    {
+      "path": "before/webkit-393-dark-scroll.png",
+      "bytes": 69243,
+      "sha256": "2c5ae443effd246bd6eb3f470332c3fd7a9a4799121cfb2f2c4cb2c216a0a992"
+    },
+    {
+      "path": "before/webkit-393-dark-stress-black-menu.png",
+      "bytes": 81566,
+      "sha256": "2cfa09ca56bab8e7c3e89fa860a37160f30b69e15cb1b6878c5a7b7afe7df151"
+    },
+    {
+      "path": "before/webkit-393-dark-stress-photo-menu.png",
+      "bytes": 81454,
+      "sha256": "092db45fd00b0fdab61e1957e0645d1c279cd2250ff2e178d9cf8c860698fdca"
+    },
+    {
+      "path": "before/webkit-393-dark-stress-photo-navigation.png",
+      "bytes": 63534,
+      "sha256": "fd81cb1d522bcf5e1a3f0edf9256a3bedb18c2a0609cedcfd6646fd12b2db241"
+    },
+    {
+      "path": "before/webkit-393-dark-stress-white-menu.png",
+      "bytes": 78668,
+      "sha256": "abe7b83daa3aedf1ebf8a6969cd96a182bf6bed6ce04d65245b8a4852bb2e82e"
+    },
+    {
+      "path": "before/webkit-393-light-chart-menu.png",
+      "bytes": 58298,
+      "sha256": "0274cff70763b3d318a73a4cb4d7bd3696af1cda9438619747095618c3991044"
+    },
+    {
+      "path": "before/webkit-393-light-chart-navigation.png",
+      "bytes": 50611,
+      "sha256": "188adeb0c31b45310c2a48d128a463522c32e368d7f5120b454b23e3338830cb"
+    },
+    {
+      "path": "before/webkit-393-light-menu.png",
+      "bytes": 71533,
+      "sha256": "62c01c5b1f19419ef6bd438b8d587fa4a6b9573f7133c275be0ba108573b0772"
+    },
+    {
+      "path": "before/webkit-393-light-navigation.png",
+      "bytes": 14908,
+      "sha256": "f6f1ddf801b649e9b39b81420ce0e91ad9b7e6f5d50ec55c92a5e489dd567377"
+    },
+    {
+      "path": "before/webkit-393-light-period.png",
+      "bytes": 7923,
+      "sha256": "a8502668f2668a3d721e2e101e9c33b89043ba219bcaf819c6a60d0fadf028f3"
+    },
+    {
+      "path": "before/webkit-393-light-progress-bottom.png",
+      "bytes": 46000,
+      "sha256": "7b3ed03940c17c7fe6469edc6d7c1a65e6fed3872e7444b9132c3d67c83d5bc7"
+    },
+    {
+      "path": "before/webkit-393-light-progress.png",
+      "bytes": 60039,
+      "sha256": "d08dfcd072eb793190ae0ec77ea06c289e86c4eae78bdf3527ac0560d8ec76e8"
+    },
+    {
+      "path": "before/webkit-393-light-scroll.png",
+      "bytes": 68349,
+      "sha256": "2a1f3bd5357215ba066fc8db2b7ec82c91e00637cba8120d562cc9e88e567273"
+    },
+    {
+      "path": "before/webkit-393-light-stress-black-menu.png",
+      "bytes": 65404,
+      "sha256": "1bee598e5ee716f7fdae91bd3068c68edfd2ee24546a3deacfe17f7b27aa6c8a"
+    },
+    {
+      "path": "before/webkit-393-light-stress-photo-menu.png",
+      "bytes": 70783,
+      "sha256": "67e4cb778a73cc1acce5b75f706a06362d84b7fd22ff6fe567ce35fff6602ebc"
+    },
+    {
+      "path": "before/webkit-393-light-stress-photo-navigation.png",
+      "bytes": 59570,
+      "sha256": "b45a7052c860beb5f7e36736584ce4424e0a0e2985ff03b47eee6cb8be7319b4"
+    },
+    {
+      "path": "before/webkit-393-light-stress-white-menu.png",
+      "bytes": 70919,
+      "sha256": "949741f55b73164af488e99aee5694e7b7a57bf75f45a8fd356a682a5fe34279"
+    },
+    {
+      "path": "before/webkit-430-dark-menu.png",
+      "bytes": 84503,
+      "sha256": "ef9392ed6ba78d9e390aabb74d0249030bc13d6e20e1ce38af3944281294c40a"
+    },
+    {
+      "path": "before/webkit-430-dark-navigation.png",
+      "bytes": 13148,
+      "sha256": "af5fb1e8fb563780ec528c60446339be6d89a9e74da9a6a9c6bca3bbfea3c1c7"
+    },
+    {
+      "path": "before/webkit-430-dark-period.png",
+      "bytes": 11463,
+      "sha256": "363906c98c70ab225c319465df9b646e231fc97669b4bc3e3fa21b5337cc80f9"
+    },
+    {
+      "path": "before/webkit-430-dark-progress-bottom.png",
+      "bytes": 48093,
+      "sha256": "24e5f8c731c473de4925cc573feec6cf497906fdd26d5296fd3c714e4310584e"
+    },
+    {
+      "path": "before/webkit-430-dark-progress.png",
+      "bytes": 65576,
+      "sha256": "4bb775cfa49160cd7f80422e9d68aa64facf35ac8242fc6a7e46e12e1aa149de"
+    },
+    {
+      "path": "before/webkit-430-dark-scroll.png",
+      "bytes": 70086,
+      "sha256": "5bad63d8dd08151b9e1573bead8b001aabb22af996ee08302b1284c35c388225"
+    },
+    {
+      "path": "before/webkit-430-light-menu.png",
+      "bytes": 73340,
+      "sha256": "21cf531b573639b18fb576d77e471813578a15c4deec2c139d65f31dc17b80c3"
+    },
+    {
+      "path": "before/webkit-430-light-navigation.png",
+      "bytes": 14968,
+      "sha256": "41c8a29e6108d19c26cb526b3bdc4939efa8ea282aff4e80b4efd91f5339056a"
+    },
+    {
+      "path": "before/webkit-430-light-period.png",
+      "bytes": 7966,
+      "sha256": "3b536848928c0b1e1a09636a9305ae6d47363556ad09d1962301e7e69181c883"
+    },
+    {
+      "path": "before/webkit-430-light-progress-bottom.png",
+      "bytes": 47026,
+      "sha256": "7d33dc0630b6799901eb95d98b5f3f3268c0d4bb0ad4bf23631146ad89a40f3d"
+    },
+    {
+      "path": "before/webkit-430-light-progress.png",
+      "bytes": 61497,
+      "sha256": "38208eb9268b43362b68588fd593cb2bb8597a78c442a9c386f1bd2f4ad48139"
+    },
+    {
+      "path": "before/webkit-430-light-scroll.png",
+      "bytes": 69058,
+      "sha256": "602da76ab139706f5563e5dd137c20cdfc5cda4244732cdeba8e78f5bbffe49f"
+    },
+    {
+      "path": "comparisons/chromium-menu-320-dark.jpg",
+      "bytes": 116647,
+      "sha256": "436eb240e104129a39f07f902e284d5e19dd7840bea74616fc0bb04b7ac237dc"
+    },
+    {
+      "path": "comparisons/chromium-menu-320-light.jpg",
+      "bytes": 112486,
+      "sha256": "350374abb02a7203a8beaeb39d07b12e70f2336c9f76837658013bffbbf3a370"
+    },
+    {
+      "path": "comparisons/chromium-menu-360-dark.jpg",
+      "bytes": 119911,
+      "sha256": "bdec42167b85d318493a8021810b99eff5e5fd48808ba6e55ae39d6d8e62c2ce"
+    },
+    {
+      "path": "comparisons/chromium-menu-360-light.jpg",
+      "bytes": 115308,
+      "sha256": "bc786a522c19f5a1d71b29e043d368be9eb03feaa23e4e19f43de446e985ce80"
+    },
+    {
+      "path": "comparisons/chromium-menu-393-dark.jpg",
+      "bytes": 132105,
+      "sha256": "b353f05926d8a25eb466118794071ab54146c8ef97d32708a3a7abe4c913b9cc"
+    },
+    {
+      "path": "comparisons/chromium-menu-393-light.jpg",
+      "bytes": 126818,
+      "sha256": "0d177b2cb6db64ea0609aabb7e04f03afb2e1f945cdd8ffa334cafd8dec41abe"
+    },
+    {
+      "path": "comparisons/chromium-menu-430-dark.jpg",
+      "bytes": 134703,
+      "sha256": "206d025c3edb035ae04fc4e6c0510cee8f9022d699ad0d3d427188db92629c60"
+    },
+    {
+      "path": "comparisons/chromium-menu-430-light.jpg",
+      "bytes": 129233,
+      "sha256": "ac6bdd8bad1067e76049434a6a656386ff67bac5c88ace005d0c95906c472ef3"
+    },
+    {
+      "path": "comparisons/chromium-navigation-320-dark.jpg",
+      "bytes": 26105,
+      "sha256": "c2b9a84d7f7faaaa0d81c99f4a67ff3f77a466f8a6923a900dcc8d87876ddf9e"
+    },
+    {
+      "path": "comparisons/chromium-navigation-320-light.jpg",
+      "bytes": 25488,
+      "sha256": "91488d6f86d554ace0abcf1970ba255f536923ce51f94e0b6dbdd7e54d80c71e"
+    },
+    {
+      "path": "comparisons/chromium-navigation-360-dark.jpg",
+      "bytes": 26417,
+      "sha256": "1437f548bc8258141c6d60a82efadcdd10f43e01c70abbb04c60c72ccf1b247d"
+    },
+    {
+      "path": "comparisons/chromium-navigation-360-light.jpg",
+      "bytes": 27169,
+      "sha256": "348873fc557fe074e0d045652fa935a223171eb0529c029399872a2d5297f220"
+    },
+    {
+      "path": "comparisons/chromium-navigation-393-dark.jpg",
+      "bytes": 33722,
+      "sha256": "e7f18f0cca31ea9f3a8fd79f0a0ebc12a15644517e1056be70eabf3231b08693"
+    },
+    {
+      "path": "comparisons/chromium-navigation-393-light.jpg",
+      "bytes": 31306,
+      "sha256": "17748e81798d510fb8f105e8c9e9a03453c200f36ed1d24d93d4ac7ff5ff5085"
+    },
+    {
+      "path": "comparisons/chromium-navigation-430-dark.jpg",
+      "bytes": 31581,
+      "sha256": "5fb1ba8d1272d3780ed17b884f9722a1fa08a0d816812057d6968e9db6343110"
+    },
+    {
+      "path": "comparisons/chromium-navigation-430-light.jpg",
+      "bytes": 28609,
+      "sha256": "cd14346686e35ea98dd24838ce721b58d535c022b34b1d3eac8a7d77febdc632"
+    },
+    {
+      "path": "comparisons/chromium-period-320-dark.jpg",
+      "bytes": 21983,
+      "sha256": "6e7b1701dae0850c0441ada1464176aa1a4a7c347149051e3e431f6381f33325"
+    },
+    {
+      "path": "comparisons/chromium-period-320-light.jpg",
+      "bytes": 20409,
+      "sha256": "fd67f09901ba7453cc1730cd7c8527a06a199f83f6ee5a1003166afcebb69d05"
+    },
+    {
+      "path": "comparisons/chromium-period-360-dark.jpg",
+      "bytes": 22735,
+      "sha256": "96750143fb56ce0445f600ae646ce145c79138eccc1503702afe234178657ef7"
+    },
+    {
+      "path": "comparisons/chromium-period-360-light.jpg",
+      "bytes": 21099,
+      "sha256": "e513a254ab8f7f8335e6be4d8d0b3a450b9cb93b0895ebb504d85d6fe22e2c05"
+    },
+    {
+      "path": "comparisons/chromium-period-393-dark.jpg",
+      "bytes": 24309,
+      "sha256": "64fad16cda295e5e640bd0b03c983b2a775d3ebed1785ac0e4fded6ff98b9813"
+    },
+    {
+      "path": "comparisons/chromium-period-393-light.jpg",
+      "bytes": 22383,
+      "sha256": "4d45dcceff7ce375eb339cb4ae37f66a66b2799a1d45e33d7ead842b7b16464e"
+    },
+    {
+      "path": "comparisons/chromium-period-430-dark.jpg",
+      "bytes": 24851,
+      "sha256": "3a6c7c2d41f2539471ccd0fea549ccbc64b63bd3f4a133969c9f733c16be4af2"
+    },
+    {
+      "path": "comparisons/chromium-period-430-light.jpg",
+      "bytes": 22815,
+      "sha256": "5571afa679d3312b3d3233eb2ef9a885db71e995fd9ae48d848ac42242576c66"
+    },
+    {
+      "path": "comparisons/chromium-progress-320-dark.jpg",
+      "bytes": 152970,
+      "sha256": "a607ddcf0fe3dcc0b1b44cbdc5189d1d095b6ed4d21903afe694998789c28a5e"
+    },
+    {
+      "path": "comparisons/chromium-progress-320-light.jpg",
+      "bytes": 145820,
+      "sha256": "1acaa5da537885e3b3da11f462494b4311ca709ea3dcd55b6fc9789169e0ce47"
+    },
+    {
+      "path": "comparisons/chromium-progress-360-dark.jpg",
+      "bytes": 157594,
+      "sha256": "0928909579415771b00c173bee1e4b814eca096759d484e244c09213af22c8aa"
+    },
+    {
+      "path": "comparisons/chromium-progress-360-light.jpg",
+      "bytes": 150286,
+      "sha256": "3dfe93fbdda9ec86db47c23a204f55a38f3aa67e89e287ea2f9c09f983c92d63"
+    },
+    {
+      "path": "comparisons/chromium-progress-393-dark.jpg",
+      "bytes": 170199,
+      "sha256": "a9e4386ad9b0a47011b092b370bb68e1686a7f064ae967f8e48bc19ac34fd17a"
+    },
+    {
+      "path": "comparisons/chromium-progress-393-light.jpg",
+      "bytes": 161508,
+      "sha256": "3d4c2b73b59f4a5fbf9bbc4b41de2e179a13f61d5e789bcefb21899f372b7ad3"
+    },
+    {
+      "path": "comparisons/chromium-progress-430-dark.jpg",
+      "bytes": 175746,
+      "sha256": "6d22ffddff8d812578897826070722db2c05b77a6ad6deef8300195810d489dc"
+    },
+    {
+      "path": "comparisons/chromium-progress-430-light.jpg",
+      "bytes": 167374,
+      "sha256": "795e1db6e41d01e3ee2366c307d27926c2fca3314f56da065a57524da87ce0c8"
+    },
+    {
+      "path": "comparisons/webkit-menu-320-dark.jpg",
+      "bytes": 120822,
+      "sha256": "8e98f068a29c1dd792a8f704b260c83ac9212057e50b0886d6061f0d3c7648e3"
+    },
+    {
+      "path": "comparisons/webkit-menu-320-light.jpg",
+      "bytes": 114905,
+      "sha256": "cb6b201d313a02bb8205033f3ed917e6ef582bb387af2856ce389a24974f0cbc"
+    },
+    {
+      "path": "comparisons/webkit-menu-360-dark.jpg",
+      "bytes": 124780,
+      "sha256": "1ec0ee0f8f9e1358b67071a034ac7b05d6c1cdbd229fe5857f363a5cb9fe88bb"
+    },
+    {
+      "path": "comparisons/webkit-menu-360-light.jpg",
+      "bytes": 118041,
+      "sha256": "251bb95e6ea0d0c477c766ab3973b724c475643745019c43157ed91afd044cf5"
+    },
+    {
+      "path": "comparisons/webkit-menu-393-dark.jpg",
+      "bytes": 137164,
+      "sha256": "c0af6d6b0b3ff4e75acb7d7d98ccf427e1420deaa8a146a744d627907f673681"
+    },
+    {
+      "path": "comparisons/webkit-menu-393-light.jpg",
+      "bytes": 129571,
+      "sha256": "3363c7f6b7b95ecd4ec1432de1cfc8c6105be04bfb629863e5c1bd26a4e0a4c5"
+    },
+    {
+      "path": "comparisons/webkit-menu-430-dark.jpg",
+      "bytes": 139902,
+      "sha256": "cbf9a89081ec2fc26a3f9446a39a49935956acd29fa90cf9a567e1dac23470a6"
+    },
+    {
+      "path": "comparisons/webkit-menu-430-light.jpg",
+      "bytes": 131934,
+      "sha256": "13c6fb7f2e5f2dff3f702f383f1b3aa8e686338d63167e54ba182e471906b516"
+    },
+    {
+      "path": "comparisons/webkit-navigation-320-dark.jpg",
+      "bytes": 23471,
+      "sha256": "b86447b8a26535543f8693d1f25dda0f4a28f12fdafcb00412f0c2007dc62e8e"
+    },
+    {
+      "path": "comparisons/webkit-navigation-320-light.jpg",
+      "bytes": 23067,
+      "sha256": "ee587d3dd8a902fea8a5900815ba774f183cef262ca157162ab42f5b04e4f41a"
+    },
+    {
+      "path": "comparisons/webkit-navigation-360-dark.jpg",
+      "bytes": 24452,
+      "sha256": "64b1e49c7e6d17a8e15dab5b87498a3609a97433651b94b4b58b40edc115a0e7"
+    },
+    {
+      "path": "comparisons/webkit-navigation-360-light.jpg",
+      "bytes": 24056,
+      "sha256": "48863a1d891c8edc3636c86c9423174f9196a4cebfab948b18d4f4cfac12a562"
+    },
+    {
+      "path": "comparisons/webkit-navigation-393-dark.jpg",
+      "bytes": 26732,
+      "sha256": "89260cb42d222d6ba2c44be21f587fc4a378fb37f4df1d0140dbffa2d06f4b8c"
+    },
+    {
+      "path": "comparisons/webkit-navigation-393-light.jpg",
+      "bytes": 25950,
+      "sha256": "8c00c8631ec8d60446b2355fa9d2602ba45fdccddbae8e2c8b6ae423d07df5c8"
+    },
+    {
+      "path": "comparisons/webkit-navigation-430-dark.jpg",
+      "bytes": 26828,
+      "sha256": "afe84cbc14e4b764895034ec240ee4b7752d21e0cf3f9867a5d5d56d8ae95b69"
+    },
+    {
+      "path": "comparisons/webkit-navigation-430-light.jpg",
+      "bytes": 26092,
+      "sha256": "f51888625809c558bcbed308e79bc3a574c308fd8b35652d61595a674da51293"
+    },
+    {
+      "path": "comparisons/webkit-period-320-dark.jpg",
+      "bytes": 21345,
+      "sha256": "09af74a8ad4a316b5b5c1570958e45cf4884d978f1943982388868d4c6d64d4b"
+    },
+    {
+      "path": "comparisons/webkit-period-320-light.jpg",
+      "bytes": 19628,
+      "sha256": "3c5475683ed0234cd1c56a06c49c814f9d5ebe9f046c91ba1beab70c0b481b20"
+    },
+    {
+      "path": "comparisons/webkit-period-360-dark.jpg",
+      "bytes": 22341,
+      "sha256": "21d11c680b4ba3767d209fdf022440cef7441bd548531ceedd4d98d2c887d215"
+    },
+    {
+      "path": "comparisons/webkit-period-360-light.jpg",
+      "bytes": 20326,
+      "sha256": "bba0b2eca9084103fc0924c7826da3fb13dac26619aa10a9bf5d40a364186ae5"
+    },
+    {
+      "path": "comparisons/webkit-period-393-dark.jpg",
+      "bytes": 23890,
+      "sha256": "667924a3c404b14b02212169a6a5c9f848983b20c4a713a91b4ac173adb4e4f0"
+    },
+    {
+      "path": "comparisons/webkit-period-393-light.jpg",
+      "bytes": 21439,
+      "sha256": "4563420ea1bb21adf0906677cec36c9f28fc67e466eec2d3faa978d3daee98f0"
+    },
+    {
+      "path": "comparisons/webkit-period-430-dark.jpg",
+      "bytes": 24389,
+      "sha256": "f7f1d1f9ee1a9e3431bf1d4d3508a5af4c01466d5c47fc47fef36fdfaeac4caa"
+    },
+    {
+      "path": "comparisons/webkit-period-430-light.jpg",
+      "bytes": 21768,
+      "sha256": "fdd79c224337881431a96c482dc6f672ff96572bfebedd697c1b0b2d65dd0365"
+    },
+    {
+      "path": "comparisons/webkit-progress-320-dark.jpg",
+      "bytes": 151283,
+      "sha256": "6f0f29245118a9ed49a35eaba4822267f7ec692311cf64de62841e187d825e94"
+    },
+    {
+      "path": "comparisons/webkit-progress-320-light.jpg",
+      "bytes": 145916,
+      "sha256": "158ca860d38f15ced5fdebd340480fc063c8dbe1f12abf4c04753c4edcfcf794"
+    },
+    {
+      "path": "comparisons/webkit-progress-360-dark.jpg",
+      "bytes": 156124,
+      "sha256": "067ecb5397c3db24988232c018cc5709393df1d50d63a7f8e1be62465cf0beb8"
+    },
+    {
+      "path": "comparisons/webkit-progress-360-light.jpg",
+      "bytes": 150565,
+      "sha256": "c3216e077bc7f5e25cc6c3ba65ba7d86c5aade25b95049a6fb814f29d17f7a46"
+    },
+    {
+      "path": "comparisons/webkit-progress-393-dark.jpg",
+      "bytes": 170129,
+      "sha256": "b39d8de8cfe50034ec7462361db3c384b3e298ee144c2956d0a6707242d06994"
+    },
+    {
+      "path": "comparisons/webkit-progress-393-light.jpg",
+      "bytes": 162597,
+      "sha256": "515c15cec0ebf9d4da76e3c9572d32b637dd3be374af1f0bb13cb75f434600cc"
+    },
+    {
+      "path": "comparisons/webkit-progress-430-dark.jpg",
+      "bytes": 174007,
+      "sha256": "a89eb6b7ab5d53cf2d481bef1fbbc83f6ce8c8d86f834a89e32fa9a48b106925"
+    },
+    {
+      "path": "comparisons/webkit-progress-430-light.jpg",
+      "bytes": 166486,
+      "sha256": "05db51af8fd210696f89e32638656d9acf3e1239747809670891552b26c1a870"
+    },
+    {
+      "path": "index.html",
+      "bytes": 134139,
+      "sha256": "c772000e667866e4fb48d13befd136acabded981efdcdeef0aea14204f8cda62"
+    },
+    {
+      "path": "README.md",
+      "bytes": 56148,
+      "sha256": "3498e6cf703eb28f3fab0260ad724ba204e110bd490723d1ca6b9bebf963a683"
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+[
+  {
+    "engine": "chromium",
+    "phase": "before",
+    "theme": "dark",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "chromium",
+    "phase": "before",
+    "theme": "light",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "chromium",
+    "phase": "after",
+    "theme": "dark",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "chromium",
+    "phase": "after",
+    "theme": "light",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "webkit",
+    "phase": "before",
+    "theme": "dark",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "webkit",
+    "phase": "before",
+    "theme": "light",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "webkit",
+    "phase": "after",
+    "theme": "dark",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  },
+  {
+    "engine": "webkit",
+    "phase": "after",
+    "theme": "light",
+    "width": 393,
+    "actualCharts": true,
+    "stressPhoto": "Existing local YFC nutrition photo on a controlled card background; not a production screen or personal photo",
+    "stressCards": [
+      "black",
+      "white"
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+[
+  {
+    "engine": "chromium",
+    "filter_enabled_vs_disabled_pixels_differ": true,
+    "note": "Local headless raster evidence only. WebKit reports the filter but does not rasterize its blur in this environment, including a literal filter value. Physical Safari remains unverified."
+  },
+  {
+    "engine": "webkit",
+    "filter_enabled_vs_disabled_pixels_differ": false,
+    "note": "Local headless raster evidence only. WebKit reports the filter but does not rasterize its blur in this environment, including a literal filter value. Physical Safari remains unverified."
+  }
+]

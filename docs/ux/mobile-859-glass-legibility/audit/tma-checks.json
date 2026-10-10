@@ -1,0 +1,290 @@
+[
+  {
+    "engine": "chromium",
+    "width": 320,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 296,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 320,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 296,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 360,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 336,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 360,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 336,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 393,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 369,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 393,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 369,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 430,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 406,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "chromium",
+    "width": 430,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 406,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 320,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 296,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 320,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 296,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 360,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 336,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 360,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 336,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 393,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 369,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 393,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 369,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 430,
+    "theme": "dark",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 406,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  },
+  {
+    "engine": "webkit",
+    "width": 430,
+    "theme": "light",
+    "shortViewportHeight": 480,
+    "safeArea": {
+      "top": 24,
+      "bottom": 34
+    },
+    "sheet": {
+      "x": 12,
+      "y": 36,
+      "width": 406,
+      "height": 322
+    },
+    "keyboardModel": "Editable focus and Telegram viewport events; no physical OS keyboard",
+    "dockHidden": true
+  }
+]
