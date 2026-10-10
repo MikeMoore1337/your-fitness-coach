@@ -568,6 +568,78 @@ def test_network_subnets_tolerate_builtin_networks_without_ipam_config() -> None
     assert hermes._network_subnets({"IPAM": {"Config": None}}) == []
 
 
+def _signed_manifest_with_prompt_version(manifest: dict[str, object], version: str) -> dict:
+    signed = json.loads(json.dumps(manifest))
+    signed["compatibility"]["prompt_version"] = version
+    core = {
+        key: value
+        for key, value in signed.items()
+        if key not in {"release_id", "release_parent", "manifest_sha256"}
+    }
+    canonical = lambda value: json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    digest = hashlib.sha256(canonical(core)).hexdigest()
+    signed["release_id"] = f"hermes-{signed['yfc_sha'][:12]}-{digest[:16]}"
+    unsigned = {key: value for key, value in signed.items() if key != "manifest_sha256"}
+    signed["manifest_sha256"] = hashlib.sha256(canonical(unsigned)).hexdigest()
+    return signed
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["task403-editorial-worker-v1", "task403-editorial-worker-v2-human-writing"],
+)
+def test_signed_historical_release_is_valid_only_as_predecessor(
+    tmp_path: Path, version: str
+) -> None:
+    root = Path(__file__).parents[1]
+    definitions = tmp_path / "definitions.json"
+    definitions.write_text("{}", encoding="utf-8")
+    current = hermes.build_manifest(
+        source_root=root,
+        source_definitions=definitions,
+        worker_env_sha256="f" * 64,
+        yfc_sha="b" * 40,
+        discovery_image="registry.invalid/hermes-discovery@sha256:" + "c" * 64,
+        worker_image="registry.invalid/hermes-worker@sha256:" + "d" * 64,
+        mode="separate-vm",
+        deployment_lock="none",
+    )
+    historical = _signed_manifest_with_prompt_version(current, version)
+    with pytest.raises(hermes.ReleaseManifestError, match="compatibility"):
+        hermes.validate_manifest(historical)
+    assert hermes.validate_manifest(historical, allow_historical_prompt=True) == historical
+
+    release = tmp_path / "releases" / historical["release_id"]
+    release.mkdir(parents=True)
+    (release / "manifest.json").write_text(json.dumps(historical), encoding="utf-8")
+    (tmp_path / "current").symlink_to(release, target_is_directory=True)
+    assert hermes._current_manifest(tmp_path) == historical
+
+    tampered = {**historical, "yfc_sha": "e" * 40}
+    with pytest.raises(hermes.ReleaseManifestError):
+        hermes.validate_manifest(tampered, allow_historical_prompt=True)
+
+
+def test_unknown_signed_historical_prompt_is_rejected(tmp_path: Path) -> None:
+    root = Path(__file__).parents[1]
+    definitions = tmp_path / "definitions.json"
+    definitions.write_text("{}", encoding="utf-8")
+    current = hermes.build_manifest(
+        source_root=root,
+        source_definitions=definitions,
+        worker_env_sha256="f" * 64,
+        yfc_sha="b" * 40,
+        discovery_image="registry.invalid/hermes-discovery@sha256:" + "c" * 64,
+        worker_image="registry.invalid/hermes-worker@sha256:" + "d" * 64,
+        mode="separate-vm",
+        deployment_lock="none",
+    )
+    unsupported = _signed_manifest_with_prompt_version(current, "attacker-controlled-prompt")
+    with pytest.raises(hermes.ReleaseManifestError, match="compatibility"):
+        hermes.validate_manifest(unsupported, allow_historical_prompt=True)
+
 def test_release_manifest_is_immutable_and_self_validating(tmp_path: Path) -> None:
     root = Path(__file__).parents[1]
     definitions = tmp_path / "source-definitions.json"
