@@ -54,13 +54,12 @@ def test_provenance_and_dependency_inventory_are_exact() -> None:
     assert "Clear Voice v1.0.0" in provenance["worker"]["sourceBehaviorPatches"]["clearVoice"]
     assert "humanWriting" not in provenance["worker"]["sourceBehaviorPatches"]
     adapter_bytes = (WORKER_ROOT / "EDITORIAL_STYLE_PROMPT.txt").read_bytes()
-    assert hashlib.sha256(adapter_bytes).hexdigest() == provenance["worker"][
-        "sourceBehaviorPatches"
-    ]["clearVoiceSha256"]
-    assert b"Clear Voice v1.0.0" in adapter_bytes
-    assert "EDITORIAL_STYLE_PROMPT.txt" in (WORKER_ROOT / "Dockerfile").read_text(
-        encoding="utf-8"
+    assert (
+        hashlib.sha256(adapter_bytes).hexdigest()
+        == provenance["worker"]["sourceBehaviorPatches"]["clearVoiceSha256"]
     )
+    assert b"Clear Voice v1.0.0" in adapter_bytes
+    assert "EDITORIAL_STYLE_PROMPT.txt" in (WORKER_ROOT / "Dockerfile").read_text(encoding="utf-8")
     assert "!EDITORIAL_STYLE_PROMPT.txt" in (WORKER_ROOT / ".dockerignore").read_text(
         encoding="utf-8"
     )
