@@ -1367,7 +1367,15 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
   await expectLimeStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);
+  // Period changes move the card through the floating dock; verify its reachable reading position.
+  await stale.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   await expectNoOverlap(stale, tmaPage.locator('#appBottomNav'));
+  await expect(stale).toBeInViewport({ ratio: 1 });
+  await expectTouchTargets(stale.locator('.data-confidence__details > summary'));
+  await stale.locator('.data-confidence__details > summary').click();
+  await expect(stale.locator('.data-confidence__details')).toHaveAttribute('open');
   await stale.screenshot({
     path: '../.artifacts/screenshots/task-61/tma-390x844-dark-stale.png',
   });
