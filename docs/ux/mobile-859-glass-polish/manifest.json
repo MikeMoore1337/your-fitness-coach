@@ -2905,8 +2905,8 @@
     },
     {
       "path": "audit/performance.json",
-      "bytes": 11466,
-      "sha256": "7fe075d4ecb977a78c6ced0978eed3c6cc7e4e9feebf9ac092cb95bcea062348"
+      "bytes": 12718,
+      "sha256": "4d319a5bf97d909a0eeea5d3b87fdacaf8917385b85c408bd190de55e1d0af36"
     },
     {
       "path": "audit/report-fixture.json",
@@ -3675,8 +3675,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 33538,
-      "sha256": "d4c2f690a439ce17ad8c63de41c7d86c80862aa8d42d9293fc4f35662da33fa2"
+      "bytes": 33588,
+      "sha256": "55c6c1233c8d50962098c7ac0b01ab3680d4ae3bfeecb0b92bbea7b070179c88"
     }
   ]
 }

@@ -11,7 +11,8 @@
       "p95": 19,
       "framesOver32": 0,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -23,7 +24,8 @@
       "p95": 32,
       "framesOver32": 1,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -35,7 +37,8 @@
       "p95": 36,
       "framesOver32": 6,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -47,7 +50,8 @@
       "p95": 36,
       "framesOver32": 6,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -59,7 +63,8 @@
       "p95": 35,
       "framesOver32": 7,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -83,7 +88,8 @@
           "area": 17580,
           "filter": "blur(6px) saturate(1.12) brightness(1.03)"
         }
-      ]
+      ],
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -95,7 +101,8 @@
       "p95": 35,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -107,7 +114,8 @@
       "p95": 18,
       "framesOver32": 0,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -119,7 +127,8 @@
       "p95": 35,
       "framesOver32": 5,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -131,7 +140,8 @@
       "p95": 35,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -143,7 +153,8 @@
       "p95": 36,
       "framesOver32": 7,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -155,7 +166,8 @@
       "p95": 35,
       "framesOver32": 7,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -179,7 +191,8 @@
           "area": 17580,
           "filter": "blur(6px) saturate(1.12) brightness(1.03)"
         }
-      ]
+      ],
+      "longTasksSupported": true
     },
     {
       "engine": "chromium",
@@ -191,7 +204,8 @@
       "p95": 34,
       "framesOver32": 6,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": 0,
+      "longTasksSupported": true
     },
     {
       "engine": "webkit",
@@ -203,7 +217,8 @@
       "p95": 46,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -215,7 +230,8 @@
       "p95": 46,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -227,7 +243,8 @@
       "p95": 47,
       "framesOver32": 9,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -239,7 +256,8 @@
       "p95": 46,
       "framesOver32": 9,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -251,7 +269,8 @@
       "p95": 46,
       "framesOver32": 9,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -263,7 +282,7 @@
       "p95": 46,
       "framesOver32": 6,
       "framesOver50": 0,
-      "longTasks": 0,
+      "longTasks": null,
       "visibleBlurPlanes": [
         {
           "className": "app-quick-add-trigger",
@@ -275,7 +294,8 @@
           "area": 17580,
           "filter": "blur(6px) saturate(1.12) brightness(1.03)"
         }
-      ]
+      ],
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -287,7 +307,8 @@
       "p95": 46,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -299,7 +320,8 @@
       "p95": 47,
       "framesOver32": 16,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -311,7 +333,8 @@
       "p95": 46,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -323,7 +346,8 @@
       "p95": 46,
       "framesOver32": 8,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -335,7 +359,8 @@
       "p95": 47,
       "framesOver32": 12,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -347,7 +372,8 @@
       "p95": 46,
       "framesOver32": 11,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -359,7 +385,7 @@
       "p95": 46,
       "framesOver32": 7,
       "framesOver50": 0,
-      "longTasks": 0,
+      "longTasks": null,
       "visibleBlurPlanes": [
         {
           "className": "app-quick-add-trigger",
@@ -371,7 +397,8 @@
           "area": 17580,
           "filter": "blur(6px) saturate(1.12) brightness(1.03)"
         }
-      ]
+      ],
+      "longTasksSupported": false
     },
     {
       "engine": "webkit",
@@ -383,7 +410,8 @@
       "p95": 46,
       "framesOver32": 10,
       "framesOver50": 0,
-      "longTasks": 0
+      "longTasks": null,
+      "longTasksSupported": false
     }
   ],
   "stationaryPairs": [
@@ -473,6 +501,18 @@
     }
   ],
   "runtime_capture_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "capabilities": [
+    {
+      "engine": "chromium",
+      "version": "151.0.7922.34",
+      "longTaskObserverSupported": true
+    },
+    {
+      "engine": "webkit",
+      "version": "26.5",
+      "longTaskObserverSupported": false
+    }
+  ],
   "stationary_frame_comparisons": {
     "pairs": 12,
     "pixel_differences": 0
