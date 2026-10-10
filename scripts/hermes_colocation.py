@@ -411,7 +411,7 @@ def _current_manifest(runtime_root: Path) -> dict[str, Any] | None:
     manifest_path = current.resolve(strict=True) / "manifest.json"
     try:
         document = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return validate_manifest(document)
+        return validate_manifest(document, allow_historical_prompt=True)
     except (OSError, json.JSONDecodeError, ReleaseManifestError) as exc:
         raise ColocationError("current Hermes release manifest is invalid") from exc
 
@@ -822,7 +822,8 @@ def rollback(args: argparse.Namespace) -> dict[str, object]:
         raise ColocationError("no validated Hermes parent release is available")
     parent = args.runtime_root / "releases" / parent_id
     parent_manifest = validate_manifest(
-        json.loads((parent / "manifest.json").read_text(encoding="utf-8"))
+        json.loads((parent / "manifest.json").read_text(encoding="utf-8")),
+        allow_historical_prompt=True,
     )
     _switch_release_links(
         runtime_root=args.runtime_root,
