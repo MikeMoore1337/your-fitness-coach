@@ -14,6 +14,9 @@ IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
 PROMPT_VERSION = "task403-editorial-worker-v3-clear-voice-1.0.0"
+PREVIOUS_PROMPT_VERSIONS = frozenset(
+    {"task403-editorial-worker-v1", "task403-editorial-worker-v2-human-writing"}
+)
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
 
@@ -110,7 +113,9 @@ def build_manifest(
     return {**document, "manifest_sha256": sha256_bytes(_canonical(document))}
 
 
-def validate_manifest(document: object) -> dict[str, Any]:
+def validate_manifest(
+    document: object, *, allow_previous_prompt_version: bool = False
+) -> dict[str, Any]:
     if not isinstance(document, dict):
         raise ReleaseManifestError("release manifest must be an object")
     required = {
@@ -144,13 +149,21 @@ def validate_manifest(document: object) -> dict[str, Any]:
     validate_image_ref(images.get("discovery", ""))
     validate_image_ref(images.get("worker", ""))
     compatibility = document.get("compatibility")
-    if compatibility != {
+    expected_compatibility = {
         "job_schema": JOB_SCHEMA_VERSION,
         "intake_schema": INTAKE_SCHEMA_VERSION,
         "state_schema": STATE_SCHEMA_VERSION,
         "prompt_version": PROMPT_VERSION,
         "skill_version": SKILL_VERSION,
-    }:
+    }
+    allowed_prompts = {PROMPT_VERSION}
+    if allow_previous_prompt_version:
+        allowed_prompts.update(PREVIOUS_PROMPT_VERSIONS)
+    if (
+        not isinstance(compatibility, dict)
+        or compatibility.get("prompt_version") not in allowed_prompts
+        or {**compatibility, "prompt_version": PROMPT_VERSION} != expected_compatibility
+    ):
         raise ReleaseManifestError("release compatibility contract is unsupported")
     components = document.get("components")
     if not isinstance(components, dict) or any(
