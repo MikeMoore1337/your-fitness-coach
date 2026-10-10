@@ -13,7 +13,7 @@ FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
-PROMPT_VERSION = "task403-editorial-worker-v2-human-writing"
+PROMPT_VERSION = "task403-editorial-worker-v3-clear-voice-1.0.0"
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
 
@@ -25,6 +25,7 @@ COMPONENT_PATHS = (
     "deploy/hermes-discovery/hermes_health.py",
     "deploy/hermes-discovery/hermes-discovery-provenance.json",
     "deploy/hermes-editorial-worker/editorial_worker.py",
+    "deploy/hermes-editorial-worker/EDITORIAL_STYLE_PROMPT.txt",
     "deploy/hermes-editorial-worker/hermes-provenance.json",
     "deploy/hermes-discovery/systemd/hermes-network-anchor.service.template",
     "deploy/hermes-discovery/systemd/hermes-discovery.service.template",

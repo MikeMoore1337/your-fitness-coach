@@ -632,6 +632,7 @@ def test_staged_release_components_must_match_manifest(tmp_path: Path) -> None:
         "deploy/hermes-discovery/hermes_health.py": "hermes_health.py",
         "deploy/hermes-discovery/hermes-discovery-provenance.json": "hermes-discovery-provenance.json",
         "deploy/hermes-editorial-worker/editorial_worker.py": "editorial-worker/editorial_worker.py",
+        "deploy/hermes-editorial-worker/EDITORIAL_STYLE_PROMPT.txt": "editorial-worker/EDITORIAL_STYLE_PROMPT.txt",
         "deploy/hermes-editorial-worker/hermes-provenance.json": "editorial-worker/hermes-provenance.json",
     }.items():
         destination = release / target
@@ -643,5 +644,11 @@ def test_staged_release_components_must_match_manifest(tmp_path: Path) -> None:
 
     hermes._validate_staged_release(release, manifest)
     (release / "hermes_health.py").write_text("tampered\n", encoding="utf-8")
+    with pytest.raises(hermes.ColocationError, match="does not match manifest"):
+        hermes._validate_staged_release(release, manifest)
+
+    shutil.copyfile(root / "deploy/hermes-discovery/hermes_health.py", release / "hermes_health.py")
+    prompt_path = release / "editorial-worker" / "EDITORIAL_STYLE_PROMPT.txt"
+    prompt_path.write_text("tampered\n", encoding="utf-8")
     with pytest.raises(hermes.ColocationError, match="does not match manifest"):
         hermes._validate_staged_release(release, manifest)
