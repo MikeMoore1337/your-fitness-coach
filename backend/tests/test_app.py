@@ -3565,7 +3565,7 @@ def test_root_serves_public_landing_spa(client):
 
     assert response.status_code == 200
     assert '<main class="seo-fallback">' in response.text
-    assert "Тренировки, питание и прогресс" in response.text
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in response.text
     assert "no-store" in response.headers["cache-control"]
 
 
@@ -3691,6 +3691,50 @@ def test_landing_host_keeps_public_home_on_landing_domain(client, monkeypatch):
 
     assert response.status_code == 200
     assert '<main class="seo-fallback">' in response.text
+
+
+def test_landing_v10_no_js_fallback_matches_public_audience_copy(client, monkeypatch):
+    from fitminiapp_api.core.config import settings
+
+    monkeypatch.setattr(settings, "landing_domain", "your-fitness-coach.ru")
+    for path, heading, lead, section in (
+        (
+            "/",
+            "СИЛА В ДЕЙСТВИИ.",
+            "Тренируйтесь по плану. Сопоставляйте питание, результаты и самочувствие",
+            "Вошли в ритм. Продолжайте.",
+        ),
+        (
+            "/for-trainers",
+            "ВАШ МЕТОД В ДЕЙСТВИИ.",
+            "Программы, проверки и история клиента",
+            "От внимания к следующему действию",
+        ),
+    ):
+        response = client.get(path, headers={"Host": "your-fitness-coach.ru"})
+
+        assert response.status_code == 200
+        assert response.headers["x-robots-tag"] == "index, follow"
+        assert (
+            f'<link rel="canonical" href="https://your-fitness-coach.ru{path}" />' in response.text
+        )
+        assert f"<h1>{heading}</h1>" in response.text
+        assert lead in response.text
+        assert section in response.text
+        assert '<main class="seo-fallback">' in response.text
+        assert '<a href="/training">' in response.text
+
+    alias = client.get("/for-athletes", headers={"Host": "your-fitness-coach.ru"})
+    assert alias.status_code == 200
+    assert alias.headers["x-robots-tag"] == "noindex, follow"
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in alias.text
+    assert '<link rel="canonical" href="https://your-fitness-coach.ru/" />' in alias.text
+
+    frontend_template = (Path(__file__).resolve().parents[2] / "frontend" / "index.html").read_text(
+        encoding="utf-8"
+    )
+    assert "<h1>СИЛА В ДЕЙСТВИИ.</h1>" in frontend_template
+    assert "Тренировки, питание и прогресс — в одном приложении" not in frontend_template
 
 
 def test_athlete_landing_alias_keeps_root_canonical_without_indexable_duplicate(
@@ -3871,7 +3915,7 @@ def test_public_api_resources_are_fetchable_but_not_indexable(client, path):
         ("/nutrition", "Рассчитать КБЖУ: калории, белки, жиры и углеводы"),
         ("/calculators/1rm", "Калькулятор 1ПМ: оценочный одноповторный максимум"),
         ("/progress", "Прогресс, который можно проверить"),
-        ("/for-trainers", "Рабочий кабинет тренера, который держит день"),
+        ("/for-trainers", "ВАШ МЕТОД В ДЕЙСТВИИ."),
         ("/knowledge", "Материалы, которые помогают понять"),
         (
             "/knowledge/nutrition/glycemic-index",
