@@ -196,7 +196,7 @@ def _cleanup_oauth_artifact(
         _clear_oauth_cookie(response)
 
 
-def _oauth_error_code(provider_error: str) -> str:
+def _oauth_error_category(provider_error: str) -> str:
     return (
         "denied"
         if provider_error in {"access_denied", "cancelled", "user_cancelled", "user_denied"}
@@ -607,8 +607,8 @@ async def _oauth_callback_impl(
     try:
         provider_error = params.get("error")
         if provider_error:
-            code = _oauth_error_code(provider_error)
-            failure_reason = "provider_denied" if code == "denied" else "provider_failure"
+            error_category = _oauth_error_category(provider_error)
+            failure_reason = "provider_denied" if error_category == "denied" else "provider_failure"
             finish_oauth_transaction(db, row, failure_reason=failure_reason)
             _log_oauth_event(
                 "oauth_link_failed" if is_link else "oauth_login_failed",
@@ -620,7 +620,7 @@ async def _oauth_callback_impl(
             )
             response = RedirectResponse(
                 auth_error_redirect(
-                    code,
+                    error_category,
                     next_path=row.next_path,
                     provider=normalized_provider,
                     link=is_link,
@@ -808,24 +808,24 @@ async def _oauth_callback_impl(
         )
         return response
     except OAuthProviderResponseError as exc:
-        code = _oauth_error_code(exc.error)
+        error_category = _oauth_error_category(exc.error)
         db.rollback()
         finish_oauth_transaction(
             db,
             row,
-            failure_reason="provider_denied" if code == "denied" else "provider_failure",
+            failure_reason="provider_denied" if error_category == "denied" else "provider_failure",
         )
         _log_oauth_event(
             "oauth_login_failed",
             request,
             provider=normalized_provider,
             purpose=row.purpose,
-            reason=code,
+            reason=error_category,
             state=state,
         )
         response = RedirectResponse(
             auth_error_redirect(
-                code,
+                error_category,
                 next_path=row.next_path if not is_link else None,
                 provider=normalized_provider,
                 link=is_link,
@@ -868,24 +868,24 @@ async def _oauth_callback_impl(
         return response
     except OAuthError as exc:
         oauth_error = getattr(exc, "error", "")
-        code = _oauth_error_code(oauth_error)
+        error_category = _oauth_error_category(oauth_error)
         db.rollback()
         finish_oauth_transaction(
             db,
             row,
-            failure_reason="provider_denied" if code == "denied" else "provider_failure",
+            failure_reason="provider_denied" if error_category == "denied" else "provider_failure",
         )
         _log_oauth_event(
             "oauth_login_failed",
             request,
             provider=normalized_provider,
             purpose=row.purpose,
-            reason=code,
+            reason=error_category,
             state=state,
         )
         response = RedirectResponse(
             auth_error_redirect(
-                code,
+                error_category,
                 next_path=row.next_path if not is_link else None,
                 provider=normalized_provider,
                 link=is_link,

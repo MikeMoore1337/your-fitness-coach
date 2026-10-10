@@ -393,16 +393,21 @@ describe('AppShell', () => {
       updated_at: '2030-01-02T12:00:00',
     };
     user.photo_url = 'https://provider.example.test/avatar.jpg';
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:private-avatar'),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = vi.fn(() => `blob:${window.location.origin}/private-avatar`);
+        static revokeObjectURL = vi.fn();
+      },
+    );
 
     const { container } = render(<AppShell>Содержимое</AppShell>);
     const avatar = container.querySelector('.app-desktop-account-entry__avatar');
     await waitFor(() =>
-      expect(avatar?.querySelector('img')).toHaveAttribute('src', 'blob:private-avatar'),
+      expect(avatar?.querySelector('img')).toHaveAttribute(
+        'src',
+        `blob:${window.location.origin}/private-avatar`,
+      ),
     );
     const privateImage = avatar?.querySelector('img');
     expect(privateImage).not.toBeNull();

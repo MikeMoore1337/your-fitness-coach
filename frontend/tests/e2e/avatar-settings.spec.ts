@@ -87,7 +87,7 @@ test('deletion requires confirmation and restores the provider avatar', async ({
   await expect(page.getByRole('status')).toContainText('фото из способа входа');
   await expect(page.locator('.app-desktop-account-entry img')).toHaveAttribute(
     'src',
-    /^data:image\/svg\+xml/,
+    'https://provider.example.test/avatar.svg',
   );
   expect(api.avatarDeletes()).toBe(1);
   await context.close();

@@ -388,7 +388,7 @@ def _synthetic_failure(
     timestamp = int(now.timestamp() * 1000)
     return {
         "uuid": str(identifier),
-        "historyId": hashlib.md5(str(identifier).encode("utf-8")).hexdigest(),
+        "historyId": hashlib.sha256(str(identifier).encode("utf-8")).hexdigest(),
         "fullName": f"scheduled report integrity: {issue}",
         "name": "Scheduled report integrity",
         "status": "failed",
