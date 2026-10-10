@@ -1805,6 +1805,13 @@ for (const width of [320, 360, 393, 430]) {
               requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
             ),
         );
+        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
 
         const writes: string[] = [];
         page.on('request', (request) => {
@@ -1819,12 +1826,21 @@ for (const width of [320, 360, 393, 430]) {
           const current = document.querySelector<HTMLElement>('[data-workout-set-id="202"]')!;
           const currentInput = current.querySelector<HTMLElement>('input')!;
           const rest = document.querySelector<HTMLElement>('.active-workout-rest')!;
+          const nextInteractive = Array.from(
+            nextSet.querySelectorAll<HTMLElement>('input, button'),
+          ).filter((element) => {
+            const rect = element.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
           const activeNav =
             nav.querySelector<HTMLElement>('[aria-current="page"]') ??
             nav.querySelector<HTMLElement>('a, button')!;
           const nextDoneRect = nextDone.getBoundingClientRect();
           const navRect = nav.getBoundingClientRect();
           const activeNavRect = activeNav.getBoundingClientRect();
+          const nextInteractiveBottom = Math.max(
+            ...nextInteractive.map((element) => element.getBoundingClientRect().bottom),
+          );
           const overlap = Math.max(
             0,
             Math.min(nextDoneRect.bottom, navRect.bottom) - Math.max(nextDoneRect.top, navRect.top),
@@ -1846,6 +1862,7 @@ for (const width of [320, 360, 393, 430]) {
             currentInput: currentInput.getBoundingClientRect().toJSON(),
             nextSet: nextSet.getBoundingClientRect().toJSON(),
             nextDone: nextDoneRect.toJSON(),
+            nextInteractiveBottom,
             overlap,
             inputRestOverlap,
             hit:
@@ -1886,6 +1903,9 @@ for (const width of [320, 360, 393, 430]) {
           contentType: 'application/json',
         });
         expect(geometry.overlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.nextInteractiveBottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
+          geometry.nav.top - 8,
+        );
         expect(geometry.inputRestOverlap, JSON.stringify(geometry)).toBe(0);
         expect(geometry.navHit).toBe(true);
         expect(geometry.current).toBe('202');
