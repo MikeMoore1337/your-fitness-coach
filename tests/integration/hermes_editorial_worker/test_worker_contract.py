@@ -285,7 +285,9 @@ def test_human_writing_is_applied_to_initial_and_repair_requests(
         assert "</source-content>" in full_prompt
         assert request["response_format"]["json_schema"]["strict"] is True
         assert set(request["response_format"]["json_schema"]["schema"]["required"]) == {
-            "headline", "summary", "why_it_matters"
+            "headline",
+            "summary",
+            "why_it_matters",
         }
         assert "tools" not in request
     repair_prompt = "\\n".join(message["content"] for message in repair["messages"])
@@ -297,7 +299,10 @@ def test_human_writing_is_applied_to_initial_and_repair_requests(
     else:
         assert [message["role"] for message in initial["messages"]] == ["system", "user"]
         assert [message["role"] for message in repair["messages"]] == [
-            "system", "user", "assistant", "user"
+            "system",
+            "user",
+            "assistant",
+            "user",
         ]
 
 
