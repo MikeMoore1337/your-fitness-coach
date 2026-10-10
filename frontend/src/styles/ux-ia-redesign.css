@@ -60,6 +60,7 @@
   outline-offset: 3px;
 }
 
+/* Approved B: one compact list, with only its actions scrolling above the keyboard. */
 .app-quick-add-layer {
   position: fixed;
   inset: 0;
@@ -67,102 +68,101 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  padding: max(16px, var(--yfc-layout-safe-top, 0px)) max(16px, var(--yfc-layout-safe-right, 0px))
-    max(16px, var(--yfc-layout-safe-bottom, 0px)) max(16px, var(--yfc-layout-safe-left, 0px));
+  padding: max(12px, var(--yfc-layout-safe-top, 0px)) max(12px, var(--yfc-layout-safe-right, 0px))
+    calc(12px + var(--yfc-layout-safe-bottom, 0px) + var(--yfc-viewport-bottom, 0px))
+    max(12px, var(--yfc-layout-safe-left, 0px));
   background: rgba(10, 16, 12, 0.54);
 }
-
 .app-quick-add-panel {
-  overflow-y: auto;
-  display: grid;
-  width: min(100%, 520px);
-  max-height: min(720px, calc(100dvh - 32px));
-  gap: 16px;
-  padding: 20px;
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-region-radius) var(--v2-region-radius) 0 0;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 440px);
+  max-height: calc(
+    var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top, 0px) -
+      var(--yfc-layout-safe-bottom, 0px)
+  );
+  overflow: hidden;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 24px;
   background: var(--v2-surface);
   color: var(--v2-text-primary);
   box-shadow: var(--elevation-overlay);
 }
-
 .app-quick-add-panel__header {
   display: flex;
-  align-items: flex-start;
+  flex-shrink: 0;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
 }
-
-.app-quick-add-panel__header h2,
-.app-quick-add-panel__intro {
+.app-quick-add-panel__header h2 {
   margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
-
 .app-quick-add-panel__close {
   display: grid;
   width: 44px;
   min-height: 44px;
   flex: 0 0 44px;
   place-items: center;
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-control-radius);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
   background: var(--v2-surface-secondary);
-  color: var(--v2-text-primary);
+  color: var(--v2-text-secondary);
   cursor: pointer;
 }
-
-.app-quick-add-panel__intro {
-  max-width: 56ch;
-  color: var(--v2-text-secondary);
-  line-height: 1.5;
-}
-
 .app-quick-add-panel__actions {
   display: grid;
-  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
-
 .app-quick-add-action {
+  position: relative;
   display: grid;
-  min-height: 64px;
-  grid-template-columns: 40px minmax(0, 1fr) 20px;
+  min-height: 52px;
+  grid-template-columns: 32px minmax(0, 1fr) 16px;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--v2-border);
-  border-radius: var(--v2-control-radius);
-  background: var(--v2-surface-secondary);
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--v2-text-primary);
   text-decoration: none;
 }
-
-.app-quick-add-action:hover {
-  border-color: var(--v2-border-strong);
-  background: var(--v2-surface-strong);
+.app-quick-add-action + .app-quick-add-action::before {
+  content: '';
+  position: absolute;
+  inset: 0 4px auto 48px;
+  border-top: 1px solid var(--v2-border);
 }
-
+.app-quick-add-action:hover {
+  background: var(--v2-surface-secondary);
+}
 .app-quick-add-action__icon {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   place-items: center;
-  border-left: 3px solid var(--v2-lime);
-  color: var(--v2-text-primary);
-}
-
-.app-quick-add-action__copy {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.app-quick-add-action__copy small {
-  overflow: hidden;
   color: var(--v2-text-secondary);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: 10px;
 }
-
+.app-quick-add-action--primary .app-quick-add-action__icon {
+  background: var(--v2-lime-soft);
+  color: var(--v2-accent-text);
+}
+.app-quick-add-action__copy {
+  min-width: 0;
+}
+.app-quick-add-action__copy strong {
+  font-size: 1rem;
+  font-weight: 500;
+}
 .app-quick-add-action__arrow {
   color: var(--v2-text-secondary);
 }
@@ -875,13 +875,6 @@
     white-space: nowrap;
   }
 
-  .app-quick-add-panel {
-    width: 100%;
-    max-height: calc(100dvh - 16px);
-    padding: 16px max(14px, var(--yfc-layout-safe-right, 0px))
-      max(16px, var(--yfc-layout-safe-bottom, 0px)) max(16px, var(--yfc-layout-safe-left, 0px));
-  }
-
   .app-section--today .today-dashboard__facts,
   .app-section--profile .profile-settings-nav {
     grid-template-columns: minmax(0, 1fr);
@@ -1390,5 +1383,532 @@
   .today-nutrition__food-group .today-summary-card__action {
     justify-self: end;
     margin-right: 0;
+  }
+}
+
+@media (max-width: 899px) {
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav {
+    inset: auto calc(max(12px, var(--yfc-layout-safe-right)) + 66px)
+      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
+      max(12px, var(--yfc-layout-safe-left));
+    min-height: 64px;
+    padding: 4px;
+    border: 0;
+    border-radius: 22px;
+    background: var(--v2-surface);
+    box-shadow: 0 3px 16px #00000018;
+  }
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
+    min-height: 56px;
+    border-radius: 18px;
+    background: transparent;
+    box-shadow: none;
+  }
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active {
+    color: var(--v2-accent-text);
+    background: var(--v2-lime-soft);
+  }
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active::before {
+    content: none;
+  }
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__label {
+    font-size: 0.6875rem;
+  }
+  .app-shell--design-v2 .app-quick-add-trigger {
+    right: max(12px, var(--yfc-layout-safe-right));
+    bottom: calc(16px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+    width: 56px;
+    height: 56px;
+    min-height: 56px;
+    padding: 0;
+    justify-content: center;
+    border: 0;
+    border-radius: 50%;
+    box-shadow: none;
+  }
+  .app-quick-add-trigger__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  body:has(.app-shell--design-v2 #appBottomNav) {
+    padding-bottom: var(--yfc-mobile-dock-clearance);
+  }
+  .app-quick-add-layer {
+    padding-bottom: calc(88px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+  }
+  .app-quick-add-panel {
+    max-height: calc(
+      var(--yfc-viewport-height, 100dvh) - 100px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    );
+  }
+  html[data-yfc-keyboard='visible'] .app-quick-add-layer {
+    padding-bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+  }
+  html[data-yfc-keyboard='visible'] .app-quick-add-panel {
+    max-height: calc(
+      var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    );
+  }
+}
+
+/* Approved B keeps the current section in the URL and reveals complete labels. */
+.app-section--progress .progress-category-nav.section-navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.progress-category-nav__rail {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  gap: 20px;
+  padding: 4px 0;
+}
+.progress-category-nav__rail::-webkit-scrollbar {
+  display: none;
+}
+.app-section--progress .progress-category-nav__rail > a {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  white-space: nowrap;
+}
+.app-section--progress .progress-category-nav__rail > a strong {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+.app-section--progress .progress-category-nav__rail > a :is(small, .section-navigation__chevron) {
+  display: none;
+}
+.app-section--progress .progress-category-nav__rail > a.is-active {
+  color: var(--v2-accent-text);
+  box-shadow: inset 0 -2px var(--v2-lime);
+}
+.app-section--progress .progress-category-nav__rail > a[data-clipped='true'] {
+  opacity: 0;
+  pointer-events: none;
+}
+.progress-category-nav__edge {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--v2-text-secondary);
+}
+.progress-category-nav__edge:disabled {
+  opacity: 0.2;
+}
+@media (max-width: 680px) {
+  .app-section--progress .progress-hero {
+    gap: 10px;
+    padding: 0;
+  }
+  .app-section--progress .progress-hero h1 {
+    font-family: var(--font-sans);
+    font-size: 30px;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+  }
+  .app-section--progress .progress-hero__copy .eyebrow {
+    display: none;
+  }
+  .app-section--progress .progress-overview {
+    padding: 16px;
+    gap: 16px;
+  }
+  .app-section--progress .progress-overview__primary-grid {
+    gap: 16px;
+  }
+  .app-section--progress .progress-overview__metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+  }
+  .app-section--progress .progress-overview__metric {
+    padding: 12px;
+    min-height: 100px;
+    border: 0;
+    border-bottom: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .app-section--progress .progress-overview__metric strong {
+    font-size: 1.5rem;
+  }
+  .app-section--progress .progress-section {
+    padding: 16px;
+    gap: 16px;
+  }
+  .app-section--progress .progress-section__head h2 {
+    font-size: 1.375rem;
+  }
+  .app-section--progress .progress-fact-strip {
+    gap: 12px;
+  }
+}
+
+.exercise-picker__trigger {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.exercise-picker-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 10060;
+  display: flex;
+  align-items: flex-end;
+  padding: 12px max(12px, var(--yfc-layout-safe-right))
+    calc(12px + var(--yfc-viewport-bottom, 0px) + var(--yfc-layout-safe-bottom))
+    max(12px, var(--yfc-layout-safe-left));
+  background: #0009;
+}
+.exercise-picker-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  height: min(
+    640px,
+    calc(
+      var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    )
+  );
+  padding: 16px;
+  border-radius: 24px;
+  background: var(--v2-surface);
+  color: var(--v2-text-primary);
+}
+.exercise-picker-sheet > header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.exercise-picker-sheet h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+.exercise-picker-sheet > header button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--v2-surface-secondary);
+  color: var(--v2-text-secondary);
+}
+.exercise-picker-sheet > input {
+  flex-shrink: 0;
+  min-height: 48px;
+  font-size: 16px;
+}
+.exercise-picker-sheet .exercise-picker__results {
+  position: static;
+  display: block;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+.exercise-picker-sheet .exercise-picker__option {
+  min-height: 64px;
+  padding: 12px 4px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  border-radius: 0;
+  border-bottom: 1px solid var(--v2-border);
+}
+.exercise-picker-sheet .exercise-picker__option-thumb {
+  width: 44px;
+  height: 44px;
+}
+.exercise-picker-sheet .exercise-picker__meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.exercise-picker-sheet .exercise-picker__guides {
+  grid-auto-rows: auto;
+}
+.exercise-picker-sheet .exercise-picker__guide {
+  min-height: 44px;
+  white-space: normal;
+}
+@media (max-width: 680px) {
+  .program-editor-modal {
+    max-height: calc(
+      var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
+        var(--yfc-layout-safe-bottom)
+    );
+    padding: 16px;
+    bottom: var(--yfc-viewport-bottom, 0px);
+  }
+  .program-editor-modal > .section-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
+    gap: 12px;
+  }
+  .program-editor-modal > .section-head > button {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    padding: 0;
+  }
+  .program-editor-modal .program-builder {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .program-builder .program-day {
+    padding: 16px 0;
+    border: 0;
+    border-top: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .program-builder .program-exercise-row {
+    padding: 12px 0;
+    border: 0;
+    border-top: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .program-builder .program-day__head {
+    display: grid;
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+  .program-builder .program-day__head .program-order-controls {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .program-builder .program-order-controls button,
+  .program-builder .program-exercise-row__actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .program-builder .program-exercise-row__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .program-builder .program-exercise-row__metrics input {
+    min-width: 0;
+    font-size: 16px;
+  }
+  .nutrition-experience :is(.meal-planner, .grocery-list) {
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--v2-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) {
+    min-height: 56px;
+    padding: 8px 4px;
+  }
+  .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) .eyebrow {
+    display: none;
+  }
+  .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) h2 {
+    font-size: 1rem;
+  }
+  .nutrition-experience :is(.meal-planner__summary-note, .grocery-list__summary-note) {
+    font-size: 0.75rem;
+  }
+  .training-preferences-exercise-list {
+    max-height: none;
+    overflow: visible;
+  }
+  .training-preferences-choice {
+    min-height: 48px;
+    padding: 12px 8px;
+    gap: 12px;
+  }
+  .app-section--profile .profile-settings-nav.section-navigation {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .app-section--profile .profile-settings-nav__item {
+    min-height: 48px;
+    padding: 10px 4px;
+    border: 0;
+    border-bottom: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .app-section--profile .profile-settings-nav__item small {
+    display: none;
+  }
+}
+
+.exercise-picker-sheet__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--v2-border);
+}
+.exercise-picker-sheet__row .exercise-picker__option {
+  border: 0;
+}
+.exercise-picker-sheet__row .exercise-picker__guide {
+  justify-self: start;
+  margin-left: 52px;
+  font-size: 0.8125rem;
+}
+:is(
+    .workout-schedule-all,
+    .progress-measurement-editor,
+    .progress-overview__review,
+    .program-lifecycle__reason,
+    .program-current-block__actions
+  )
+  > summary {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  padding: 8px 4px;
+  cursor: pointer;
+}
+:is(
+    .workout-schedule-all,
+    .progress-measurement-editor,
+    .progress-overview__review,
+    .program-lifecycle__reason,
+    .program-current-block__actions
+  )
+  > summary::after {
+  content: '+';
+  margin-left: auto;
+  padding-left: 12px;
+}
+:is(
+    .workout-schedule-all,
+    .progress-measurement-editor,
+    .progress-overview__review,
+    .program-lifecycle__reason,
+    .program-current-block__actions
+  )[open]
+  > summary::after {
+  content: '−';
+}
+@media (max-width: 680px) {
+  .app-section--programs .program-history {
+    gap: 16px;
+  }
+  .app-section--programs :is(.program-lifecycle, .program-current-block) {
+    padding: 16px;
+    border: 0;
+    border-radius: 16px;
+  }
+  .app-section--programs .program-lifecycle__summary {
+    gap: 12px;
+  }
+  .app-section--programs .program-lifecycle__next {
+    gap: 4px;
+  }
+  .workout-context-row {
+    padding: 12px 4px;
+    gap: 8px;
+    border: 0;
+    border-bottom: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .workout-context-row .list-row__main {
+    gap: 4px;
+  }
+  .workout-context-row .workout-schedule-actions button {
+    min-height: 44px;
+  }
+  .active-workout-exercise.is-completed {
+    padding: 16px;
+  }
+  .active-workout-exercise.is-completed .active-workout-exercise__head {
+    gap: 12px;
+  }
+  .active-workout-setup-memory--empty {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+  .active-workout-setup-memory--empty button {
+    min-height: 44px;
+    padding: 8px 0;
+    font-size: 0.8125rem;
+    color: var(--v2-text-secondary);
+  }
+  .app-section--progress .progress-body-layout {
+    display: block;
+  }
+  .progress-measurement-editor {
+    margin-top: 16px;
+    border-top: 1px solid var(--v2-border);
+  }
+}
+
+.cardio-session-row__menu > summary,
+.nutrition-report-target-history > summary,
+.progress-review-hub__confidence > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  cursor: pointer;
+}
+.cardio-session-row__menu[open] {
+  display: grid;
+  gap: 8px;
+}
+@media (max-width: 680px) {
+  .progress-subsection {
+    padding: 12px 0;
+  }
+  .progress-section__head p,
+  .progress-subsection__head p {
+    font-size: 0.8125rem;
+    line-height: 1.45;
+  }
+  .cardio-session-row {
+    padding: 12px 0;
+    border: 0;
+    border-bottom: 1px solid var(--v2-border);
+    border-radius: 0;
+  }
+  .cardio-session-row__facts {
+    gap: 8px;
+  }
+  .progress-review-hub {
+    padding: 16px 0 0;
+    gap: 12px;
+    border: 0;
+    border-top: 1px solid var(--v2-border);
   }
 }

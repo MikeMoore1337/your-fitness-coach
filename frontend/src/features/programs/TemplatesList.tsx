@@ -99,6 +99,22 @@ export function TemplatesList({
   const [selectedExample, setSelectedExample] = useState<ProgramTemplate | null>(null);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ProgramTemplate | null>(null);
+  const [editorDirty, setEditorDirty] = useState(false);
+  const closeEditor = async () => {
+    if (
+      editorDirty &&
+      !(await confirm({
+        title: 'Закрыть редактор?',
+        message: 'Изменения ещё не сохранены в программе. Черновик останется на этом устройстве.',
+      }))
+    )
+      return;
+    setEditingTemplate(null);
+    setEditorDirty(false);
+  };
+  const editorPanelRef = useModalA11y<HTMLDivElement>(Boolean(editingTemplate), () => {
+    void closeEditor();
+  });
   const [saveAsCopy, setSaveAsCopy] = useState(false);
   const [assignmentTemplate, setAssignmentTemplate] = useState<ProgramTemplate | null>(null);
   const [recommendationOpen, setRecommendationOpen] = useState(false);
@@ -870,9 +886,9 @@ export function TemplatesList({
             type="button"
             className="modal__backdrop"
             aria-label="Закрыть редактирование"
-            onClick={() => setEditingTemplate(null)}
+            onClick={() => void closeEditor()}
           />
-          <div className="modal__panel program-editor-modal">
+          <div className="modal__panel program-editor-modal" ref={editorPanelRef} tabIndex={-1}>
             <div className="section-head">
               <strong>
                 {saveAsCopy ? 'Редактирование личной копии' : 'Редактирование программы'}
@@ -881,7 +897,7 @@ export function TemplatesList({
                 type="button"
                 className="secondary"
                 aria-label="Закрыть редактирование"
-                onClick={() => setEditingTemplate(null)}
+                onClick={() => void closeEditor()}
               >
                 <CloseIcon />
               </button>
@@ -890,6 +906,7 @@ export function TemplatesList({
               editingTemplate={editingTemplate}
               saveAsCopy={saveAsCopy}
               onSaved={() => setEditingTemplate(null)}
+              onDirtyChange={setEditorDirty}
             />
           </div>
         </div>

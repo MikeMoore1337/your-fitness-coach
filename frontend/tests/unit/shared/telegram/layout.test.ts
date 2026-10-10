@@ -57,6 +57,9 @@ describe('Mobile Web/TMA layout adapter', () => {
     const root = document.documentElement;
     expect(root.dataset.yfcLayoutSurface).toBe('telegram');
     expect(root.style.getPropertyValue('--yfc-viewport-height')).toBe('560px');
+    expect(root.style.getPropertyValue('--yfc-viewport-bottom')).toBe(
+      `${Math.max(0, window.innerHeight - 560)}px`,
+    );
     expect(root.style.getPropertyValue('--yfc-viewport-stable-height')).toBe('844px');
     expect(root.style.getPropertyValue('--yfc-tg-safe-top')).toBe('28px');
     expect(root.style.getPropertyValue('--yfc-tg-content-safe-top')).toBe('44px');

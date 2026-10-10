@@ -11071,3 +11071,212 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     grid-column: auto;
   }
 }
+
+/* #874: compact mobile document; print remains a sequential readable report. */
+.progress-report-toolbar .yfc-lockup__mark {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+.progress-report-toolbar .yfc-lockup__wordmark {
+  font-size: 0.625rem;
+}
+.progress-report-settings {
+  display: grid;
+  gap: 16px;
+  margin-block: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--v2-border);
+}
+.progress-report-settings .progress-report-controls {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.progress-report-settings .progress-report-controls h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.progress-report-settings .ui-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+}
+.progress-report-settings .ui-tab {
+  min-height: 44px;
+  flex: 1 0 auto;
+  padding: 8px 12px;
+  white-space: normal;
+}
+.progress-report-settings .progress-report-exercise-picker {
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+}
+.progress-report-settings .progress-report-exercise-picker label {
+  min-height: 44px;
+}
+.progress-report-subject {
+  font-weight: 600;
+}
+@media screen and (max-width: 680px) {
+  .progress-report-page {
+    width: 100%;
+    min-width: 0;
+    padding: 16px max(12px, var(--yfc-layout-safe-right)) calc(24px + var(--yfc-layout-safe-bottom))
+      max(12px, var(--yfc-layout-safe-left));
+  }
+  .progress-report-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .progress-report-toolbar > .yfc-lockup {
+    margin-left: auto;
+  }
+  .progress-report-toolbar > button {
+    flex-basis: 100%;
+    min-height: 48px;
+  }
+  .progress-report-settings .ui-tab {
+    flex-basis: calc(33.333% - 4px);
+    min-width: 0;
+    font-size: 0.8125rem;
+  }
+  .progress-report-document {
+    margin-top: 20px;
+    padding: 16px;
+    border: 0;
+    border-radius: 20px;
+  }
+  .progress-report-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 0 0 16px;
+    border: 0;
+  }
+  .progress-report-overview h1 {
+    font-family: var(--font-sans);
+    font-size: 30px;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+  }
+  .progress-report-overview p {
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+  .progress-report-overview__adherence {
+    gap: 4px;
+  }
+  .progress-report-overview__adherence strong {
+    font-size: 32px;
+  }
+  .progress-report-confidence {
+    gap: 8px;
+    margin-block: 16px;
+  }
+  .progress-report-confidence .data-confidence {
+    padding: 12px;
+  }
+  .progress-report-section,
+  .progress-report-methodology {
+    padding-block: 16px;
+  }
+  .progress-report-section h2 {
+    font-size: 1.375rem;
+    line-height: 1.25;
+  }
+  .progress-report-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .progress-report-facts > div {
+    min-height: 80px;
+    padding: 12px;
+  }
+  .progress-report-document :is(dt, dd, th, td) {
+    overflow-wrap: anywhere;
+  }
+  .progress-report-document table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+  .progress-report-document :is(th, td) {
+    padding: 8px 4px;
+  }
+  .progress-report-document
+    :is(.progress-report-body-table, .progress-report-wellbeing-days__table-wrap) {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 17mm 16mm 19mm;
+  }
+  .progress-report-document {
+    font-family: var(--font-sans);
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+  .progress-report-print-page-section {
+    break-before: auto;
+  }
+  .progress-report-print-header--continuation {
+    display: none;
+  }
+  .progress-report-print-header {
+    min-height: 0;
+    margin-bottom: 5mm;
+    padding: 0 0 3mm;
+  }
+  .progress-report-print-footer {
+    top: auto;
+    bottom: -13mm;
+    font-size: 9pt;
+  }
+  .progress-report-overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4mm;
+    padding: 0 0 4mm;
+    border: 0;
+  }
+  .progress-report-overview h1 {
+    font-family: var(--font-sans);
+    font-size: 24pt;
+  }
+  .progress-report-overview__adherence strong {
+    font-size: 22pt;
+  }
+  .progress-report-confidence {
+    grid-template-columns: minmax(0, 1fr);
+    margin-block: 4mm;
+    gap: 2mm;
+  }
+  .progress-report-confidence .data-confidence {
+    padding: 2mm;
+    font-size: 10pt;
+  }
+  .progress-report-section,
+  .progress-report-methodology {
+    padding-block: 4mm;
+  }
+  .progress-report-document :is(h2, h3, header) {
+    break-after: avoid;
+  }
+  .progress-report-document :is(tr, .progress-report-facts > div) {
+    break-inside: avoid;
+  }
+  .progress-report-document thead {
+    display: table-header-group;
+  }
+  .progress-report-document :is(table, th, td) {
+    font-size: 10pt;
+  }
+}

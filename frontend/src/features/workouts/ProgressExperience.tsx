@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -338,6 +346,61 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
 }
 
 function ProgressCategoryNav({ search, view }: { search: string; view: ProgressView }) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const [edges, setEdges] = useState({ start: true, end: false });
+  useLayoutEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const reveal = (link: HTMLElement) => {
+      rail.scrollLeft +=
+        link.getBoundingClientRect().left -
+        rail.getBoundingClientRect().left -
+        (rail.clientWidth - link.offsetWidth) / 2;
+    };
+    const update = () => {
+      setEdges({
+        start: rail.scrollLeft < 2,
+        end: rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2,
+      });
+      const bounds = rail.getBoundingClientRect();
+      rail.querySelectorAll<HTMLElement>('a').forEach((link) => {
+        const box = link.getBoundingClientRect();
+        link.dataset.clipped = String(box.left < bounds.left - 1 || box.right > bounds.right + 1);
+      });
+    };
+    const active = rail.querySelector<HTMLElement>('[aria-current="page"]');
+    if (active) reveal(active);
+    update();
+    rail.addEventListener('scroll', update);
+    const revealActive = () => {
+      if (active) reveal(active);
+      update();
+    };
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealActive);
+    observer?.observe(rail);
+    rail.querySelectorAll('a').forEach((link) => observer?.observe(link));
+    let mounted = true;
+    void document.fonts?.ready.then(() => {
+      if (mounted) revealActive();
+    });
+    return () => {
+      mounted = false;
+      rail.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [view]);
+  const move = (direction: number) => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const links = [...rail.querySelectorAll<HTMLAnchorElement>('a')];
+    const bounds = rail.getBoundingClientRect();
+    const next =
+      direction > 0
+        ? links.find((link) => link.getBoundingClientRect().right > bounds.right + 1)
+        : [...links].reverse().find((link) => link.getBoundingClientRect().left < bounds.left - 1);
+    next?.focus({ preventScroll: true });
+  };
   const categories: Array<{ detail: string; label: string; value: ProgressView }> = [
     { detail: 'Обзор периода', label: 'Обзор', value: 'overview' },
     { detail: 'Вес и окружности', label: 'Тело', value: 'body' },
@@ -349,18 +412,68 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
   ];
   return (
     <nav className="progress-category-nav section-navigation" aria-label="Разделы прогресса">
-      {categories.map((category) => (
-        <AppLink
-          aria-current={view === category.value ? 'page' : undefined}
-          className={view === category.value ? 'is-active' : undefined}
-          key={category.value}
-          to={progressViewPath(search, category.value)}
-        >
-          <strong>{category.label}</strong>
-          <small>{category.detail}</small>
-          <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-        </AppLink>
-      ))}
+      <button
+        className="progress-category-nav__edge"
+        type="button"
+        aria-label="Предыдущие разделы прогресса"
+        disabled={edges.start}
+        onClick={() => move(-1)}
+      >
+        <Icon name="arrow-left" size={16} />
+      </button>
+      <div
+        className="progress-category-nav__rail"
+        ref={railRef}
+        onFocus={(event) => {
+          if (event.target instanceof HTMLAnchorElement) {
+            const rail = event.currentTarget;
+            rail.scrollLeft +=
+              event.target.getBoundingClientRect().left -
+              rail.getBoundingClientRect().left -
+              (rail.clientWidth - event.target.offsetWidth) / 2;
+          }
+        }}
+        onKeyDown={(event) => {
+          const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('a')];
+          const index = links.indexOf(document.activeElement as HTMLAnchorElement);
+          const next =
+            event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? links.length - 1
+                : event.key === 'ArrowRight'
+                  ? Math.min(index + 1, links.length - 1)
+                  : event.key === 'ArrowLeft'
+                    ? Math.max(index - 1, 0)
+                    : null;
+          if (next !== null) {
+            event.preventDefault();
+            links[next]?.focus({ preventScroll: true });
+          }
+        }}
+      >
+        {categories.map((category) => (
+          <AppLink
+            aria-current={view === category.value ? 'page' : undefined}
+            className={view === category.value ? 'is-active' : undefined}
+            key={category.value}
+            to={progressViewPath(search, category.value)}
+          >
+            <strong>{category.label}</strong>
+            <small>{category.detail}</small>
+            <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
+          </AppLink>
+        ))}
+      </div>
+      <button
+        className="progress-category-nav__edge"
+        type="button"
+        aria-label="Следующие разделы прогресса"
+        disabled={edges.end}
+        onClick={() => move(1)}
+      >
+        <Icon name="chevron-right" size={16} />
+      </button>
     </nav>
   );
 }
@@ -511,10 +624,11 @@ function WeeklyReviewHub({
           )}
         </div>
       </div>
-      <div className="progress-review-hub__confidence">
+      <details className="progress-review-hub__confidence">
+        <summary>Полнота исходных данных</summary>
         <DataConfidence kind="training" signal={summary.data_sufficiency.working_sets} />
         <DataConfidence kind="weight" signal={summary.data_sufficiency.weight_trend} />
-      </div>
+      </details>
     </section>
   );
 }
@@ -981,7 +1095,17 @@ function BodySection({
               kind="weight"
               signal={summary.data_sufficiency.weight_trend}
               action={
-                measurementDiary ? <a href="#measurement-diary">Добавить замер</a> : undefined
+                measurementDiary ? (
+                  <a
+                    href="#measurement-diary"
+                    onClick={() => {
+                      const editor = document.getElementById('measurement-diary');
+                      if (editor instanceof HTMLDetailsElement) editor.open = true;
+                    }}
+                  >
+                    Добавить замер
+                  </a>
+                ) : undefined
               }
             />
             <DataConfidence
@@ -991,7 +1115,15 @@ function BodySection({
               action={
                 measurementDiary &&
                 summary.data_sufficiency.weight_trend.status === 'sufficient' ? (
-                  <a href="#measurement-diary">Добавить замер</a>
+                  <a
+                    href="#measurement-diary"
+                    onClick={() => {
+                      const editor = document.getElementById('measurement-diary');
+                      if (editor instanceof HTMLDetailsElement) editor.open = true;
+                    }}
+                  >
+                    Добавить замер
+                  </a>
                 ) : undefined
               }
             />
@@ -1030,6 +1162,12 @@ function BodySection({
           </ContextualHelp>
         </div>
       </div>
+      {measurementDiary && (
+        <details id="measurement-diary" className="progress-measurement-editor">
+          <summary>Добавить замер · история и редактирование</summary>
+          {measurementDiary}
+        </details>
+      )}
     </section>
   );
 }
@@ -1376,7 +1514,10 @@ export function ProgressExperience({
   useEffect(() => {
     if (!focusMeasurements || !summary.data) return;
     const frame = window.requestAnimationFrame(() => {
-      document.getElementById('measurement-diary')?.scrollIntoView({ block: 'start' });
+      const editor = document.getElementById('measurement-diary');
+      if (editor instanceof HTMLDetailsElement) editor.open = true;
+      editor?.scrollIntoView({ block: 'start' });
+      editor?.querySelector<HTMLElement>('input, button')?.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [focusMeasurements, summary.data]);
@@ -1408,7 +1549,10 @@ export function ProgressExperience({
         </div>
         <div className="progress-hero__download">
           {canExport ? (
-            <AppLink className="button-link secondary-link" to={progressReportPath(selection)}>
+            <AppLink
+              className="button-link secondary-link"
+              to={progressReportPath(selection, view)}
+            >
               <Icon name="print" size={16} /> Скачать отчёт
             </AppLink>
           ) : (
@@ -1432,15 +1576,14 @@ export function ProgressExperience({
               Обновляем динамику за период…
             </p>
           )}
+          <ProgressCategoryNav search={search} view={view} />
           {view === 'overview' ? (
             <>
               <SummaryOverview current={weeklyReview.data} search={search} summary={summary.data} />
-              <ProgressCategoryNav search={search} view={view} />
             </>
           ) : (
             <>
               <ProgressDetailHeader search={search} view={view} />
-              <ProgressCategoryNav search={search} view={view} />
               <div className="progress-details" aria-label="Подробности прогресса">
                 {view === 'training' && (
                   <TrainingSection analytics={analytics} summary={summary.data} />
@@ -1464,6 +1607,7 @@ export function ProgressExperience({
                         canExport={canExport}
                         controlledPeriod={controlledNutritionPeriod}
                         showSelector={false}
+                        summaryProvided
                       />
                     </div>
                   </>

@@ -10,7 +10,7 @@ import { api } from '../../shared/api/client';
 import { downloadProgressReport } from '../../features/reports/downloadProgressReport';
 import { ReportHandoffPanel } from '../../features/reports/ReportHandoffPanel';
 import { PublicProgressSharePanel } from '../../features/reports/PublicProgressSharePanel';
-import { AppLink, useNavigation } from '../../shared/navigation/router';
+import { AppLink, progressReportReturn, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { TimeSeriesChart } from '../../shared/ui/DataViz';
@@ -96,13 +96,15 @@ function reportDownloadLinkPath(selection: ReportSelection, clientId: number | n
   return `${base}/download-link?${query}`;
 }
 
-function pagePath(selection: ReportSelection, clientId: number | null): string {
+function pagePath(selection: ReportSelection, clientId: number | null, search: string): string {
   const params = new URLSearchParams({ period: selection.period });
   if (selection.period === 'custom') {
     params.set('date_from', selection.dateFrom);
     params.set('date_to', selection.dateTo);
   }
   if (clientId) params.set('client_id', String(clientId));
+  const view = new URLSearchParams(search).get('progress_view');
+  if (view) params.set('progress_view', view);
   return `/app/report?${params}`;
 }
 
@@ -448,8 +450,8 @@ function ReportContent({
 
       <section className="progress-report-overview" aria-labelledby="report-overview-title">
         <div className="progress-report-overview__identity">
-          <span className="eyebrow">Отчёт о прогрессе</span>
-          <h1 id="report-overview-title">{report.subject.name}</h1>
+          <h1 id="report-overview-title">Отчёт о прогрессе</h1>
+          <p className="progress-report-subject">{report.subject.name}</p>
           <p>
             {formatDate(report.period_start)} — {formatDate(report.period_end)} · {report.timezone}
           </p>
@@ -880,7 +882,7 @@ export default function ProgressReportPage() {
     event?.preventDefault();
     if (customError) return;
     setApplied(draft);
-    navigate(pagePath(draft, clientId), true);
+    navigate(pagePath(draft, clientId, search), true);
   };
   const selectPeriod = (value: string) => {
     const period = value as NutritionReportPeriod;
@@ -888,7 +890,7 @@ export default function ProgressReportPage() {
     setDraft(next);
     if (period !== 'custom') {
       setApplied(next);
-      navigate(pagePath(next, clientId), true);
+      navigate(pagePath(next, clientId, search), true);
     }
   };
   const printReport = async () => {
@@ -910,7 +912,7 @@ export default function ProgressReportPage() {
       ? handoffReturnPath(search)
       : clientId
         ? `/coach?client_id=${clientId}`
-        : '/app?section=progress';
+        : progressReportReturn(search);
   const reportKey = displayReport
     ? `${displayReport.subject.name}:${displayReport.period_start}:${displayReport.period_end}`
     : '';
@@ -926,9 +928,7 @@ export default function ProgressReportPage() {
           aria-labelledby="report-period-title"
         >
           <div>
-            <span className="eyebrow">Период отчёта</span>
-            <h2 id="report-period-title">Выберите фактическое окно</h2>
-            <p>Период и субъект сохраняются в адресе отчёта при возврате из печати.</p>
+            <h2 id="report-period-title">Период и состав отчёта</h2>
           </div>
           <SegmentedControl
             ariaLabel="Период отчёта"
@@ -1102,8 +1102,9 @@ export default function ProgressReportPage() {
         />
       ) : displayReport ? (
         <>
+          <div className="progress-report-settings report-screen-only">{controls}</div>
           <ReportContent
-            controls={controls}
+            controls={null}
             report={displayReport}
             selectedExercises={selectedExercises}
           />

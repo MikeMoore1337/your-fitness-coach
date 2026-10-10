@@ -461,7 +461,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps()}
+              {...(mobileNavigation ? {} : glassProps())}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >
@@ -541,7 +541,7 @@ export function AppShell({
                           ? ' app-bottom-nav__btn--mobile-hidden'
                           : ''
                       }`}
-                      {...(active ? glassProps('clear', true) : {})}
+                      {...(active && !mobileNavigation ? glassProps('clear', true) : {})}
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);

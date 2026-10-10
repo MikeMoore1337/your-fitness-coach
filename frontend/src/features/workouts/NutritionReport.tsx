@@ -406,11 +406,13 @@ export function NutritionPeriodReport({
   clientId,
   controlledPeriod,
   showSelector = true,
+  summaryProvided = false,
 }: {
   canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
+  summaryProvided?: boolean;
 }) {
   const initial = useMemo(
     () =>
@@ -609,7 +611,7 @@ export function NutritionPeriodReport({
               retry={() => void report.refetch()}
             />
           )}
-          <CoverageSummary report={report.data} />
+          {!summaryProvided && <CoverageSummary report={report.data} />}
           {report.data.hydration && (
             <section
               className="nutrition-hydration-report"
@@ -668,17 +670,19 @@ export function NutritionPeriodReport({
             />
           )}
           {report.data.summary.logged_days === 0 ? (
-            <div className="nutrition-period-report__empty">
-              <EmptyState
-                title="Нет заполненных дней за период"
-                text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
-              />
-              {clientId == null && (
-                <AppLink className="button-link" to="/app?section=nutrition">
-                  Открыть дневник питания
-                </AppLink>
-              )}
-            </div>
+            summaryProvided ? null : (
+              <div className="nutrition-period-report__empty">
+                <EmptyState
+                  title="Нет заполненных дней за период"
+                  text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
+                />
+                {clientId == null && (
+                  <AppLink className="button-link" to="/app?section=nutrition">
+                    Открыть дневник питания
+                  </AppLink>
+                )}
+              </div>
+            )
           ) : (
             <>
               <ReportMetrics report={report.data} />
@@ -705,7 +709,10 @@ export function NutritionPeriodReport({
               />
             </>
           )}
-          <TargetChanges report={report.data} />
+          <details className="nutrition-report-target-history">
+            <summary>История целей питания</summary>
+            <TargetChanges report={report.data} />
+          </details>
           <DailyTable dayLink={dayLink} report={report.data} />
           <p className="progress-note nutrition-period-report__methodology">
             Отчёт описывает только записи КБЖУ. Он не оценивает качество рациона, витамины, здоровье

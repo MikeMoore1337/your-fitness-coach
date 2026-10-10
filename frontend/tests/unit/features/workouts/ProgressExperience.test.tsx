@@ -493,7 +493,7 @@ describe('ProgressExperience', () => {
     });
     expect(screen.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute(
       'href',
-      '/app/report?period=days_7',
+      '/app/report?period=days_7&progress_view=training',
     );
   });
 

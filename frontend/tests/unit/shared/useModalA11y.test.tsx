@@ -1,10 +1,19 @@
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useDocumentScrollLock } from '../../../src/shared/ui/useModalA11y';
+import { useDocumentScrollLock, useModalA11y } from '../../../src/shared/ui/useModalA11y';
 
 function Lock({ open }: { open: boolean }) {
   useDocumentScrollLock(open);
   return null;
+}
+
+function Modal({ name, onClose }: { name: string; onClose: () => void }) {
+  const ref = useModalA11y<HTMLDivElement>(true, onClose);
+  return (
+    <div ref={ref} role="dialog" aria-label={name} tabIndex={-1}>
+      <button>{name}</button>
+    </div>
+  );
 }
 
 describe('useDocumentScrollLock', () => {
@@ -41,5 +50,26 @@ describe('useDocumentScrollLock', () => {
     expect(document.body.style.overflow).toBe('auto');
     expect(document.body.style.position).toBe('');
     expect(scrollTo).toHaveBeenCalledWith(12, 240);
+  });
+
+  it('sends Escape only to the top dialog and keeps its parent locked', () => {
+    const parentClose = vi.fn();
+    const childClose = vi.fn();
+    const view = render(<Modal name="Редактор" onClose={parentClose} />);
+    screen.getByRole('button', { name: 'Редактор' }).focus();
+    view.rerender(
+      <>
+        <Modal name="Редактор" onClose={parentClose} />
+        <Modal name="Поиск" onClose={childClose} />
+      </>,
+    );
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(childClose).toHaveBeenCalledOnce();
+    expect(parentClose).not.toHaveBeenCalled();
+    view.rerender(<Modal name="Редактор" onClose={parentClose} />);
+    expect(screen.getByRole('button', { name: 'Редактор' })).toHaveFocus();
+    expect(document.body.style.position).toBe('fixed');
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(parentClose).toHaveBeenCalledOnce();
   });
 });

@@ -170,11 +170,11 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
         "YFCBody",
         parent=styles["BodyText"],
         fontName=regular,
-        fontSize=9,
-        leading=12,
+        fontSize=10.5,
+        leading=14,
         textColor=_TEXT,
     )
-    muted = ParagraphStyle("YFCMuted", parent=body, textColor=_MUTED, fontSize=8, leading=10)
+    muted = ParagraphStyle("YFCMuted", parent=body, textColor=_MUTED, fontSize=9, leading=12)
     label = ParagraphStyle("YFCLabel", parent=muted, fontName=bold, textTransform="uppercase")
 
     stream = io.BytesIO()
@@ -189,8 +189,9 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
         author="Your Fitness Coach",
     )
     story: list[Any] = [
-        Paragraph("ОТЧЁТ О ПРОГРЕССЕ", label),
-        Paragraph(_safe(report["subject"]["name"]), title),
+        Paragraph("YFC · Your Fitness Coach", label),
+        Paragraph("Отчёт о прогрессе", title),
+        Paragraph(_safe(report["subject"]["name"]), heading),
         Paragraph(
             f"Период: {_date(report['period_start'])} — {_date(report['period_end'])} · Часовой пояс: {_safe(report['timezone'])}",
             body,
