@@ -1,0 +1,3286 @@
+{
+  "source_head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+  "runtime_capture": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "owner_ui_approval": "PENDING",
+  "screenshots": [
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-dark-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-320-light-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-dark-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-360-light-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-dark-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-393-light-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-dark-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/chromium-430-light-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-dark-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-320-light-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-dark-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-360-light-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-dark-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-393-light-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-dark-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "before",
+      "path": "before/webkit-430-light-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-1440-dark-desktop.png",
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-1440-light-desktop.png",
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-keyboard.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-short.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-dark-tma-safe.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-keyboard.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-plus30.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-plus60.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-short.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-skip.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-timer.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-320-light-tma-safe.png",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-dark-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-dark-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-dark-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-dark-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-light-plus30.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-light-plus60.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-light-skip.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-360-light-timer.png",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-keyboard.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-short.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-dark-tma-safe.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-keyboard.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-plus30.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-plus60.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-short.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-skip.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-timer.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-393-light-tma-safe.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-dark-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-dark-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-dark-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-dark-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-light-plus30.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-light-plus60.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-light-skip.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-430-light-timer.png",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-768-dark-desktop.png",
+      "engine": "chromium",
+      "width": 768,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/chromium-768-light-desktop.png",
+      "engine": "chromium",
+      "width": 768,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-1440-dark-desktop.png",
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-1440-light-desktop.png",
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-keyboard.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-short.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-dark-tma-safe.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-keyboard.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-plus30.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-plus60.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-short.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-skip.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-timer.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-320-light-tma-safe.png",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-dark-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-dark-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-dark-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-dark-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-light-plus30.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-light-plus60.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-light-skip.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-360-light-timer.png",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-keyboard.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-short.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-dark-tma-safe.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-keyboard.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "keyboard",
+      "label": "Модель клавиатуры · поле с подписью приведено в видимую область"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-plus30.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-plus60.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-short.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "short",
+      "label": "TMA · высота 480 px"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-skip.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-timer.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-393-light-tma-safe.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "tma-safe",
+      "label": "TMA · safe-area 24/34"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-dark-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-dark-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-dark-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-dark-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-light-plus30.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-light-plus60.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-light-skip.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-430-light-timer.png",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-768-dark-desktop.png",
+      "engine": "webkit",
+      "width": 768,
+      "theme": "dark",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "proposal",
+      "path": "proposal/webkit-768-light-desktop.png",
+      "engine": "webkit",
+      "width": 768,
+      "theme": "light",
+      "view": "desktop",
+      "label": "Tablet/desktop · клавиатурный фокус"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/chromium-before-hit.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · chromium-before-hit · не production AFTER"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/webkit-before-hit.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · webkit-before-hit · не production AFTER"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/chromium-after-accidental-hit.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · chromium-after-accidental-hit · не production AFTER"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/webkit-after-accidental-hit.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · webkit-after-accidental-hit · не production AFTER"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/chromium-isolated-pointer-fix.png",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · chromium-isolated-pointer-fix · не production AFTER"
+    },
+    {
+      "state": "probe",
+      "path": "diagnosis/webkit-isolated-pointer-fix.png",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "hit-test",
+      "label": "Диагностика · webkit-isolated-pointer-fix · не production AFTER"
+    }
+  ],
+  "comparisons": [
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-plus30.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-plus60.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-timer.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-plus30.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-plus60.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-320-light-skip.jpg",
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-plus30.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-plus60.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-timer.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-plus30.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-plus60.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-360-light-skip.jpg",
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-plus30.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-plus60.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-timer.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-plus30.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-plus60.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-393-light-skip.jpg",
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-timer.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-plus30.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-plus60.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-dark-skip.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-timer.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-plus30.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-plus60.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/chromium-430-light-skip.jpg",
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-plus30.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-plus60.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-timer.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-plus30.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-plus60.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-320-light-skip.jpg",
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-plus30.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-plus60.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-timer.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-plus30.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-plus60.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-360-light-skip.jpg",
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-plus30.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-plus60.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-timer.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-plus30.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-plus60.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-393-light-skip.jpg",
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-timer.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-plus30.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-plus60.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-dark-skip.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-timer.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "timer",
+      "label": "Таймер и текущий подход"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-plus30.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus30",
+      "label": "После +30 сек"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-plus60.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "plus60",
+      "label": "После +60 сек (в BEFORE кнопки нет)"
+    },
+    {
+      "state": "comparison",
+      "path": "comparisons/webkit-430-light-skip.jpg",
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "view": "skip",
+      "label": "После пропуска отдыха"
+    }
+  ],
+  "files": [
+    {
+      "path": "audit/desktop-accessibility.json",
+      "bytes": 5231,
+      "sha256": "a12418651f6e7f464fb6673bb8a8edfd9745e32e9bbf814871f194307452a48e"
+    },
+    {
+      "path": "audit/event-trace.json",
+      "bytes": 23306,
+      "sha256": "585f177b5f17089e7a15e314d65f6aad2479eb20a578e613b4bccde0bfd57212"
+    },
+    {
+      "path": "audit/isolated-hit-proof.json",
+      "bytes": 65297,
+      "sha256": "fb073047f4ea8bbe69b7444a602bf210e5e0d785afc1388af1fe54f8b9f4a381"
+    },
+    {
+      "path": "audit/matrix.json",
+      "bytes": 371999,
+      "sha256": "7492d4e5b0d33a902ee22a5b16569ad8463b0fd2ea7265c379e6a513fbe306f0"
+    },
+    {
+      "path": "audit/skip-event-trace.json",
+      "bytes": 40383,
+      "sha256": "ca60d75806d6edb17e95901d3b2334ccd2526d548dc1bec0943e10723eb3889d"
+    },
+    {
+      "path": "audit/status.json",
+      "bytes": 832,
+      "sha256": "8debbd3b10db0513c376da3f42b6b7513cc6f435443931cf7678fc0537a302ac"
+    },
+    {
+      "path": "audit/tma-keyboard-lifecycle.json",
+      "bytes": 5357,
+      "sha256": "5ad6794529ad57722b82a0fc6e23a37201b1fac319726ae620afa08e30063f0c"
+    },
+    {
+      "path": "before/chromium-320-dark-plus30.png",
+      "bytes": 71090,
+      "sha256": "8b756f6f59efd26c0ea477f5e02c66acca02392e7cfd27657d651bf0d2b20605"
+    },
+    {
+      "path": "before/chromium-320-dark-plus60.png",
+      "bytes": 71090,
+      "sha256": "8b756f6f59efd26c0ea477f5e02c66acca02392e7cfd27657d651bf0d2b20605"
+    },
+    {
+      "path": "before/chromium-320-dark-skip.png",
+      "bytes": 52530,
+      "sha256": "d581552bd2097c07c2b6ba4e7c01af82448af856329d6f825ac9ecc2f05dc088"
+    },
+    {
+      "path": "before/chromium-320-dark-timer.png",
+      "bytes": 61550,
+      "sha256": "005c7a1123e85cc1eaedd29c08563cc8f309fe5e1f24d3b3d302b610b565d5c9"
+    },
+    {
+      "path": "before/chromium-320-light-plus30.png",
+      "bytes": 68036,
+      "sha256": "d6ac7aa6aa355d811a6c20a1b0ad9dfbe57ea8804d0065de9a6577fb4565a531"
+    },
+    {
+      "path": "before/chromium-320-light-plus60.png",
+      "bytes": 68036,
+      "sha256": "d6ac7aa6aa355d811a6c20a1b0ad9dfbe57ea8804d0065de9a6577fb4565a531"
+    },
+    {
+      "path": "before/chromium-320-light-skip.png",
+      "bytes": 48700,
+      "sha256": "9e5af39ee0706a48e3852a6dbc0802855f0c555adaab9068de15f715a537c5b5"
+    },
+    {
+      "path": "before/chromium-320-light-timer.png",
+      "bytes": 59720,
+      "sha256": "07a800446da006c6ba27355e175ae8c65bfb9ee7993cb5716bcb55d2f5ed4538"
+    },
+    {
+      "path": "before/chromium-360-dark-plus30.png",
+      "bytes": 74302,
+      "sha256": "7b77ec70d3ccb112d1fb95cc6a780cbf49a9e0c5dd207dc083c2b1082946fbb6"
+    },
+    {
+      "path": "before/chromium-360-dark-plus60.png",
+      "bytes": 74302,
+      "sha256": "7b77ec70d3ccb112d1fb95cc6a780cbf49a9e0c5dd207dc083c2b1082946fbb6"
+    },
+    {
+      "path": "before/chromium-360-dark-skip.png",
+      "bytes": 54593,
+      "sha256": "00674ac549b66657323f7d202e2004a51dee1abda64a2248d77a85c9ddc25dc8"
+    },
+    {
+      "path": "before/chromium-360-dark-timer.png",
+      "bytes": 63417,
+      "sha256": "ac7dfaa498537bc7107107a7ee2bf686b7f09e67a912efafc59213c96ff2a17a"
+    },
+    {
+      "path": "before/chromium-360-light-plus30.png",
+      "bytes": 71744,
+      "sha256": "1b5b79dae2a1ac92505592ab16bd855dbb8773511142e6ca80f70edee37934f5"
+    },
+    {
+      "path": "before/chromium-360-light-plus60.png",
+      "bytes": 71744,
+      "sha256": "1b5b79dae2a1ac92505592ab16bd855dbb8773511142e6ca80f70edee37934f5"
+    },
+    {
+      "path": "before/chromium-360-light-skip.png",
+      "bytes": 50542,
+      "sha256": "ad51aea41dc52bdea77a96f43feaba754114fa1f965947e36e12067c37c4b2c8"
+    },
+    {
+      "path": "before/chromium-360-light-timer.png",
+      "bytes": 62085,
+      "sha256": "0bfcf13b165778de902e34e324fdcd8bad6620c43eb93841ab5d3af65be72e25"
+    },
+    {
+      "path": "before/chromium-393-dark-plus30.png",
+      "bytes": 80562,
+      "sha256": "b01ee1e53d3071c94f38cd6090c4f6fedeaffc98b089032846014d84e4ae1405"
+    },
+    {
+      "path": "before/chromium-393-dark-plus60.png",
+      "bytes": 80562,
+      "sha256": "b01ee1e53d3071c94f38cd6090c4f6fedeaffc98b089032846014d84e4ae1405"
+    },
+    {
+      "path": "before/chromium-393-dark-skip.png",
+      "bytes": 59281,
+      "sha256": "210dab8cace524fc898585bcb5f31a6bbdb30173f17e206322ad03c3811fae58"
+    },
+    {
+      "path": "before/chromium-393-dark-timer.png",
+      "bytes": 69204,
+      "sha256": "c2d0fa7b082af1995d193a632cf49c5bcffc78f018eb669154f1340a6b2f42db"
+    },
+    {
+      "path": "before/chromium-393-light-plus30.png",
+      "bytes": 78272,
+      "sha256": "839c70cab70e7e96402bfa0f6807a683aeac0379288269d22c13b00b94004865"
+    },
+    {
+      "path": "before/chromium-393-light-plus60.png",
+      "bytes": 78272,
+      "sha256": "839c70cab70e7e96402bfa0f6807a683aeac0379288269d22c13b00b94004865"
+    },
+    {
+      "path": "before/chromium-393-light-skip.png",
+      "bytes": 55624,
+      "sha256": "720e4f0af9bbe425ddd5701bd0800860d05a93301ea0f7f24ce6bb3b8ca6734e"
+    },
+    {
+      "path": "before/chromium-393-light-timer.png",
+      "bytes": 67875,
+      "sha256": "1a4aea4ff47e9d5a61cbd93243314e087fc0d0addf0cb218f2dc5409e3f03f14"
+    },
+    {
+      "path": "before/chromium-430-dark-plus30.png",
+      "bytes": 81388,
+      "sha256": "a473df3f75c432238e366bbe45e66b71965650d832b00aa3b090b2698689a81f"
+    },
+    {
+      "path": "before/chromium-430-dark-plus60.png",
+      "bytes": 81388,
+      "sha256": "a473df3f75c432238e366bbe45e66b71965650d832b00aa3b090b2698689a81f"
+    },
+    {
+      "path": "before/chromium-430-dark-skip.png",
+      "bytes": 59067,
+      "sha256": "226ad9b8c7a88c4d8387f948d3ab057be3d779bc886925d4d3edfd395c3a4720"
+    },
+    {
+      "path": "before/chromium-430-dark-timer.png",
+      "bytes": 69648,
+      "sha256": "77f10a512d1c8f49581c037674e55c488e08f65ffab3af916ab7285cdce9331b"
+    },
+    {
+      "path": "before/chromium-430-light-plus30.png",
+      "bytes": 79454,
+      "sha256": "97fa789a1060e35a3b5c5be3368e841637ab8287c2495b5f6bcb5f9404fb1172"
+    },
+    {
+      "path": "before/chromium-430-light-plus60.png",
+      "bytes": 79454,
+      "sha256": "97fa789a1060e35a3b5c5be3368e841637ab8287c2495b5f6bcb5f9404fb1172"
+    },
+    {
+      "path": "before/chromium-430-light-skip.png",
+      "bytes": 55312,
+      "sha256": "5fdc6c5274ab076f0cd8dc0d3d4df1b2d0e7e7a66e2183262ff34162daac3c8d"
+    },
+    {
+      "path": "before/chromium-430-light-timer.png",
+      "bytes": 68607,
+      "sha256": "1ceae6acb6ad7b24d25a9f3fc18b2b7f96af1015e7e1d412a2c95fe9cabd7e4e"
+    },
+    {
+      "path": "before/webkit-320-dark-plus30.png",
+      "bytes": 44295,
+      "sha256": "7bdd9879d8234334a184381a87eb59c587157982b58b3ca5cab78a0648b81be7"
+    },
+    {
+      "path": "before/webkit-320-dark-plus60.png",
+      "bytes": 51069,
+      "sha256": "04249bc21a89e5cb16886d7fb7888c991c94e4c43db3efedbf28bd9947fa2033"
+    },
+    {
+      "path": "before/webkit-320-dark-skip.png",
+      "bytes": 41055,
+      "sha256": "2f36adfa4b4651d9936b8515c37629d77ad00db28bd4acf325a5df8599e92fb1"
+    },
+    {
+      "path": "before/webkit-320-dark-timer.png",
+      "bytes": 47797,
+      "sha256": "081a30d1bd14f85a179eb9b411285d597ade3aa7807cc42e0b1cfb1c2ec15263"
+    },
+    {
+      "path": "before/webkit-320-light-plus30.png",
+      "bytes": 43181,
+      "sha256": "d874f1fd3aead70f697a5a85230565b7a17214fc40ab0589c9e43886db4ed299"
+    },
+    {
+      "path": "before/webkit-320-light-plus60.png",
+      "bytes": 45949,
+      "sha256": "65cce042071f02a356cf581f275df16967874db33f3ec3ba26c5647934d36ce9"
+    },
+    {
+      "path": "before/webkit-320-light-skip.png",
+      "bytes": 38579,
+      "sha256": "12cb6ead2f0251057ec1a62a339f86a80f27fb96b34aef554c84d95bd5aedaa9"
+    },
+    {
+      "path": "before/webkit-320-light-timer.png",
+      "bytes": 40148,
+      "sha256": "0239ef3904d9cb831f8e4ce6528123b907660b6f391394f7ea1b585d3cc8ce8f"
+    },
+    {
+      "path": "before/webkit-360-dark-plus30.png",
+      "bytes": 50675,
+      "sha256": "563c276dadfa8e3fdb47f0b58f2a92b76b680226b685afbb30b07b20b7b1db3e"
+    },
+    {
+      "path": "before/webkit-360-dark-plus60.png",
+      "bytes": 53762,
+      "sha256": "257a2774f9acc1b0438eb9bef182a1f7ec499b9c38df07bb986b03a0207484ca"
+    },
+    {
+      "path": "before/webkit-360-dark-skip.png",
+      "bytes": 42130,
+      "sha256": "a9d9705742121e95f08ec99e18632798321ed62a5ed75ce26649e815aa72c654"
+    },
+    {
+      "path": "before/webkit-360-dark-timer.png",
+      "bytes": 48653,
+      "sha256": "0609f67d93db862bda8b43a44f34de39af9f21e3a63800428cfa06c0d0a1f965"
+    },
+    {
+      "path": "before/webkit-360-light-plus30.png",
+      "bytes": 44003,
+      "sha256": "e7e529bfc93595dede3e7ea985cf41671bac4b4937e9f2aa2d48f6410ce29e7e"
+    },
+    {
+      "path": "before/webkit-360-light-plus60.png",
+      "bytes": 47018,
+      "sha256": "3ddf7be80a890c5bf9a55907f806e15944ba33cd048668d15264156264292535"
+    },
+    {
+      "path": "before/webkit-360-light-skip.png",
+      "bytes": 39523,
+      "sha256": "d4e0502c933c497ce87c0837bdefa407a89c06982cb3dca72f76e6203521edb7"
+    },
+    {
+      "path": "before/webkit-360-light-timer.png",
+      "bytes": 40867,
+      "sha256": "42cd03be063821e5c3297caf1b13e340cc8cee223644c9a013c32354eaa9d117"
+    },
+    {
+      "path": "before/webkit-393-dark-plus30.png",
+      "bytes": 49688,
+      "sha256": "714d7c2e471c7c2eb1afa9d7d26df97192daf32e36f825583f88bb4da2d635b3"
+    },
+    {
+      "path": "before/webkit-393-dark-plus60.png",
+      "bytes": 57741,
+      "sha256": "62554d260a3978763e6b72da314c2ddbd8bc3778542c06b89b51c48a08556ffb"
+    },
+    {
+      "path": "before/webkit-393-dark-skip.png",
+      "bytes": 47693,
+      "sha256": "883c53dbffb03526a2157840db99af4c763f683b5c3bdb09d8626d553ffbaeb2"
+    },
+    {
+      "path": "before/webkit-393-dark-timer.png",
+      "bytes": 53625,
+      "sha256": "d8fcddfe4eb3db352ce0cd4c50cd1a4cf54d4d0b579c610c303faf690eb6d134"
+    },
+    {
+      "path": "before/webkit-393-light-plus30.png",
+      "bytes": 42239,
+      "sha256": "9123d39e99dd8c38871b2835927d31f74013bfc856226dc8c21375efc3532931"
+    },
+    {
+      "path": "before/webkit-393-light-plus60.png",
+      "bytes": 51968,
+      "sha256": "e3dc67fe0516477ebbb1d8b8a45eff3f276e6c3b5ed30088c89384c0b0e48a82"
+    },
+    {
+      "path": "before/webkit-393-light-skip.png",
+      "bytes": 44562,
+      "sha256": "3c49cd28d31f5fdc55336b9d9463ffc94850b6ad7f19daba3db456b0e9b7e9aa"
+    },
+    {
+      "path": "before/webkit-393-light-timer.png",
+      "bytes": 44592,
+      "sha256": "43b5c5cc3e4ff4972edee8d9e5db684f26b0a7cc64c05631edc174d21bfdcc15"
+    },
+    {
+      "path": "before/webkit-430-dark-plus30.png",
+      "bytes": 48862,
+      "sha256": "d241493e705f5d78b14e29ad14a693ee349fc598bb9ba54399e617853ecb1d0a"
+    },
+    {
+      "path": "before/webkit-430-dark-plus60.png",
+      "bytes": 58752,
+      "sha256": "4539bd3e8cc5ea393291c08240354f024a9ddedc8db33f55e3cde77ead9c95e1"
+    },
+    {
+      "path": "before/webkit-430-dark-skip.png",
+      "bytes": 46420,
+      "sha256": "71089e09f73a420b10b4eefb882d66e8e4006c28e4abc1be817c854f2aa753c0"
+    },
+    {
+      "path": "before/webkit-430-dark-timer.png",
+      "bytes": 52966,
+      "sha256": "2bf36b372948a99c2c775285e5e4e3bdda5702e2f17b213c0056e75256e38c75"
+    },
+    {
+      "path": "before/webkit-430-light-plus30.png",
+      "bytes": 47937,
+      "sha256": "d8a6c75ca158f4630a1e36419cf101c441047cfd1a162e20664fafb796c0b8c6"
+    },
+    {
+      "path": "before/webkit-430-light-plus60.png",
+      "bytes": 51325,
+      "sha256": "8de17fc3532a5bc9ebcce557a8771c5fe89aec43768f4c632486a661b9dd290e"
+    },
+    {
+      "path": "before/webkit-430-light-skip.png",
+      "bytes": 43673,
+      "sha256": "6ae12e115dfd5cc3e5e434f92f34dd035c30c65b1f91088facf1f3f203b7c8da"
+    },
+    {
+      "path": "before/webkit-430-light-timer.png",
+      "bytes": 44249,
+      "sha256": "dd254dff84a81ef9734f35f459058cf1a48029498cf8e216bd4d3b094345dba9"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-plus30.jpg",
+      "bytes": 121969,
+      "sha256": "c537fffe28d5a43ee5710763d1dc28989001580e5c5735fd088f4d8434e17785"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-plus60.jpg",
+      "bytes": 122023,
+      "sha256": "55174c859dea6782d7e26b9faecc72c524a1915fe561085b266f522b8c25c8e6"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-skip.jpg",
+      "bytes": 118980,
+      "sha256": "d1b38a41d50a02e6eb103485f6de9dcb009fa0956cb156658382ef1d5d2eddbb"
+    },
+    {
+      "path": "comparisons/chromium-320-dark-timer.jpg",
+      "bytes": 119674,
+      "sha256": "a9d184d74b57929311f686c97a38d668e34026b649e06e0bd57aaa96d7e30c1d"
+    },
+    {
+      "path": "comparisons/chromium-320-light-plus30.jpg",
+      "bytes": 111940,
+      "sha256": "7fa8f41c4a9f599d1588d9bf4f55374f1cf4bb8b8f73fb375bd34c8604f01d77"
+    },
+    {
+      "path": "comparisons/chromium-320-light-plus60.jpg",
+      "bytes": 111873,
+      "sha256": "2d5a6c2ad78990f3b9af4d1ae179b21806b92d57efe024c91a266adf98882f77"
+    },
+    {
+      "path": "comparisons/chromium-320-light-skip.jpg",
+      "bytes": 108927,
+      "sha256": "6157713fa4fdd162372fb0cdd41a8ac9d5c057cff93517db8fa0d9eaa60a07f4"
+    },
+    {
+      "path": "comparisons/chromium-320-light-timer.jpg",
+      "bytes": 109114,
+      "sha256": "f4de8655c4756cb3b79d9b65bb527dacbbb1465aff1165ada66cae0a1e91087c"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-plus30.jpg",
+      "bytes": 125881,
+      "sha256": "6a66ffd6579ae4737ce974ac4f937b933303b99a769fca454c8632e3f757a9fa"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-plus60.jpg",
+      "bytes": 125911,
+      "sha256": "9bed0eeefd784df4404bdff42bed4dc36f5d85d417038d4566b6dec641d8a563"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-skip.jpg",
+      "bytes": 123312,
+      "sha256": "7072b96dae8c9f9c265dfaf06d42719b9aebb143e169a40d01b1d941109ca7e6"
+    },
+    {
+      "path": "comparisons/chromium-360-dark-timer.jpg",
+      "bytes": 123802,
+      "sha256": "565c62b16d6df6886ea46ce12d0aada1366d36f93af8dab96e8c9adc984fb147"
+    },
+    {
+      "path": "comparisons/chromium-360-light-plus30.jpg",
+      "bytes": 115434,
+      "sha256": "5a1f56570d652e62ce34f0123a8df84a350d7ff939e78d9a317f5784c7569eb5"
+    },
+    {
+      "path": "comparisons/chromium-360-light-plus60.jpg",
+      "bytes": 115501,
+      "sha256": "cbd54fa16eee931c3468bb8e20b6a79fb85ccb797753a0c1dc2c618fbff033fc"
+    },
+    {
+      "path": "comparisons/chromium-360-light-skip.jpg",
+      "bytes": 112613,
+      "sha256": "c71146377d9b3e9931ff1107c20424337d46ed2315d41191a48ddaf7194fa353"
+    },
+    {
+      "path": "comparisons/chromium-360-light-timer.jpg",
+      "bytes": 112766,
+      "sha256": "ba4e9018c8c9659990fec650792de74dc4524db393f0ec5e1cf56c68bc1ab8b1"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-plus30.jpg",
+      "bytes": 147266,
+      "sha256": "b6096a2ed31cabbd075bd0c0623b1476d317444b3b97ee9d39e0281ffab2e4fe"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-plus60.jpg",
+      "bytes": 147261,
+      "sha256": "e1ff1b530ecf4ac9267bff25435ed762b66a6a6de6f929fa192e5eb7c5c36fce"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-skip.jpg",
+      "bytes": 142779,
+      "sha256": "70898e0df3d1c7a5d135095c2e8a81cf5d7d748c080fb68334d08bf783cefcda"
+    },
+    {
+      "path": "comparisons/chromium-393-dark-timer.jpg",
+      "bytes": 146657,
+      "sha256": "0f0800497e568b89ae377423ca4cdcf5730c2e446394d08f3410e4513518454a"
+    },
+    {
+      "path": "comparisons/chromium-393-light-plus30.jpg",
+      "bytes": 132207,
+      "sha256": "f618258399bf11cdaf66cfd0196033eeab72e4562312ebd2b9dd59937056ea79"
+    },
+    {
+      "path": "comparisons/chromium-393-light-plus60.jpg",
+      "bytes": 132357,
+      "sha256": "93caa3801f9c5fb2e671283d7a997ca01c93ea686e2ca69a2a8f4772879566a6"
+    },
+    {
+      "path": "comparisons/chromium-393-light-skip.jpg",
+      "bytes": 128237,
+      "sha256": "c463feb32b76c069f215f8f671da54cada665074d4dd720976ed6cbcb4aa68c8"
+    },
+    {
+      "path": "comparisons/chromium-393-light-timer.jpg",
+      "bytes": 131414,
+      "sha256": "569b7ed12a6e823db35c6c9074fd0756acb297c016ceca1d16ef05c9ead8ac5c"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-plus30.jpg",
+      "bytes": 150694,
+      "sha256": "93d4d766a08e4435a478b180cda090014f929546a2d8844eb136d727c7d8eb14"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-plus60.jpg",
+      "bytes": 150741,
+      "sha256": "43d0aad823e504d66147c5c7c9dc2260dcb4876dc18b8b727274e1e0af9a35c5"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-skip.jpg",
+      "bytes": 144552,
+      "sha256": "bedaa5a8444b5ef9aea4112c006f85e5040bf1d6e83047ecc4f97dc398aab2bd"
+    },
+    {
+      "path": "comparisons/chromium-430-dark-timer.jpg",
+      "bytes": 151086,
+      "sha256": "59adac4945b17cc9d52f96dd2e5cae5ec50803518c764acc3af39754449d6040"
+    },
+    {
+      "path": "comparisons/chromium-430-light-plus30.jpg",
+      "bytes": 135264,
+      "sha256": "ee9f406af9edffa53d9d231a8f76ad8424c5ae97780d48f8b2a5db38ccfefda0"
+    },
+    {
+      "path": "comparisons/chromium-430-light-plus60.jpg",
+      "bytes": 135275,
+      "sha256": "b5d52f4ea0ba7b09c421db6fcd2ba5376aa6f6595d481ccc8c52e9ec33b513ee"
+    },
+    {
+      "path": "comparisons/chromium-430-light-skip.jpg",
+      "bytes": 130025,
+      "sha256": "c04c9a457db296fdebba4157d0d7bf98e49aa7bc29a80bcfc9c158dd1cc4e89a"
+    },
+    {
+      "path": "comparisons/chromium-430-light-timer.jpg",
+      "bytes": 135495,
+      "sha256": "3ef210cd6dcdc57d31fd66f246a42c28675cc4493aed34a3da67c26d7fd66a9e"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-plus30.jpg",
+      "bytes": 117297,
+      "sha256": "6c724c354004ca45b9b7d1c20a7d45330a30e0154f0f03f75eddc19dd10000b7"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-plus60.jpg",
+      "bytes": 119099,
+      "sha256": "dff8ed33f1cd48a27d2dadd484a4b54ff8389b93e197c39cc5e55a53eec8f0f9"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-skip.jpg",
+      "bytes": 119595,
+      "sha256": "ee62b3ec18a6b260751365675a4384d7553d7fedac37c4a3a2d1e51c7139be2e"
+    },
+    {
+      "path": "comparisons/webkit-320-dark-timer.jpg",
+      "bytes": 118138,
+      "sha256": "2f48e1d1b9a214133ecd64a8c2086205a2d826142082bd3b69704e9967ee963f"
+    },
+    {
+      "path": "comparisons/webkit-320-light-plus30.jpg",
+      "bytes": 107123,
+      "sha256": "b7fef8b71ad169e5f9554c437233f18c92728f1ff19c4fddea9d701881c6c256"
+    },
+    {
+      "path": "comparisons/webkit-320-light-plus60.jpg",
+      "bytes": 110606,
+      "sha256": "4e61479416e5f400d85bcb29d9e9636926e120142e245a2fe85eaa3622c26c09"
+    },
+    {
+      "path": "comparisons/webkit-320-light-skip.jpg",
+      "bytes": 110060,
+      "sha256": "e6d19cefeb0c9f736ac5f3b7648b9214f3c74dbaa6780e5066c831ec58006750"
+    },
+    {
+      "path": "comparisons/webkit-320-light-timer.jpg",
+      "bytes": 108385,
+      "sha256": "9b1ea22c315254935175a6a239eeb5b96629c245ca42df803a1205002801bac8"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-plus30.jpg",
+      "bytes": 121680,
+      "sha256": "e130136f3fc5d2ab699de2ecddb340037744c28d7fccd954f53f7e162573a59e"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-plus60.jpg",
+      "bytes": 124737,
+      "sha256": "59a1831afcb647f27e52300f9f157d265151f024348f70a042cea7439e441c56"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-skip.jpg",
+      "bytes": 123542,
+      "sha256": "3ac570a4622be23c514d9d5a1136d917bea6f444bfa74ada62b674df89690b7a"
+    },
+    {
+      "path": "comparisons/webkit-360-dark-timer.jpg",
+      "bytes": 122625,
+      "sha256": "d424aa1dea5c0f13e06512d44c77c6ebb3882a1630d9ed65e3d0716ea8323567"
+    },
+    {
+      "path": "comparisons/webkit-360-light-plus30.jpg",
+      "bytes": 111024,
+      "sha256": "9adf18af94ef2ed13ce09593c121318707d7740c46266775fd80d129c3d3b732"
+    },
+    {
+      "path": "comparisons/webkit-360-light-plus60.jpg",
+      "bytes": 114280,
+      "sha256": "39b1ef26697875ba055af82ed0a4977ba17be85eeb5224bbc577f7425f497861"
+    },
+    {
+      "path": "comparisons/webkit-360-light-skip.jpg",
+      "bytes": 113608,
+      "sha256": "d29dac26329371fa39895fe203b17dd240d161ce66ed02956cbc2e6b06dbe170"
+    },
+    {
+      "path": "comparisons/webkit-360-light-timer.jpg",
+      "bytes": 112169,
+      "sha256": "e1d7c05f16713af958b740266622310ce4e911e01afea7be731e570e9b725dc7"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-plus30.jpg",
+      "bytes": 141940,
+      "sha256": "67f75bf3a6d595b147e26e8b24c6ddc94b128c80b62a10bc67349a0d1796d10f"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-plus60.jpg",
+      "bytes": 143198,
+      "sha256": "fa18f92a9a62d5ecaa664c09dceb8206e4f21584dcbc1f22fb06cdb6bac43a43"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-skip.jpg",
+      "bytes": 141163,
+      "sha256": "b609f5b598b584c71c524c9cc98baf7ff78e4cf6bd5d032e95ae8e3e1cbd0a07"
+    },
+    {
+      "path": "comparisons/webkit-393-dark-timer.jpg",
+      "bytes": 143057,
+      "sha256": "fcb02dcb7beaa4501d7daa0422ba1c162b4e1d48fd9967a2c83a11420925eb93"
+    },
+    {
+      "path": "comparisons/webkit-393-light-plus30.jpg",
+      "bytes": 127595,
+      "sha256": "220c457be5190767f03072154c8af7dbcb2a9471a54baee526d51b20a338a20c"
+    },
+    {
+      "path": "comparisons/webkit-393-light-plus60.jpg",
+      "bytes": 129796,
+      "sha256": "40dee06957e21ff0d61a42be5472a2e20b48eb478afb16cb1faa0dc598b0c4c2"
+    },
+    {
+      "path": "comparisons/webkit-393-light-skip.jpg",
+      "bytes": 127644,
+      "sha256": "9e93a8f8830824b1de48e8f1022b717286607f7dcb87bd7d50df21481196195d"
+    },
+    {
+      "path": "comparisons/webkit-393-light-timer.jpg",
+      "bytes": 129094,
+      "sha256": "8d74847bffe244c98d61c00f3768a478ff2870c2f1fd54655755ea0e83eb31a7"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-plus30.jpg",
+      "bytes": 147643,
+      "sha256": "38c36e28a6e64be872aa85ca14780a9518492c8e96759b37a5535df3753a8d54"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-plus60.jpg",
+      "bytes": 149393,
+      "sha256": "ea1054adbc219492992a1e14381f84edf245dfdc42bfa68ce9d15d478cf9adcc"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-skip.jpg",
+      "bytes": 144107,
+      "sha256": "b1af46582a7a199913c0d7a936ddfee6822bed4d27412ab667be6d8b822f83c6"
+    },
+    {
+      "path": "comparisons/webkit-430-dark-timer.jpg",
+      "bytes": 149598,
+      "sha256": "8fc0c3854303b33bb37d273fbe914982be022a874c92924a0d289eb8ee4711c2"
+    },
+    {
+      "path": "comparisons/webkit-430-light-plus30.jpg",
+      "bytes": 130678,
+      "sha256": "a17a743f8f498922d66ff12cbdc08e52fe8efc56c92c4be6b4ef87a5b9470796"
+    },
+    {
+      "path": "comparisons/webkit-430-light-plus60.jpg",
+      "bytes": 133997,
+      "sha256": "b91b003be56edb20fdfabfc63bdc8f5d8004404fff8dc50f2abbe25fb84f2211"
+    },
+    {
+      "path": "comparisons/webkit-430-light-skip.jpg",
+      "bytes": 130601,
+      "sha256": "3d87f98b9c4f019a61636d0e3d268c5b421a66114076b89f6c70c7cb561c66c5"
+    },
+    {
+      "path": "comparisons/webkit-430-light-timer.jpg",
+      "bytes": 134165,
+      "sha256": "0b01592bef379215ba7245968e7ad9f0d3a9dd06c66a13e57a5b463c36edf3f7"
+    },
+    {
+      "path": "diagnosis/chromium-after-accidental-hit.png",
+      "bytes": 77655,
+      "sha256": "a44b9ceb555916aeed3e73055919e6830d899934af4ae4761fb5b56a5bd1a06e"
+    },
+    {
+      "path": "diagnosis/chromium-before-hit.png",
+      "bytes": 76024,
+      "sha256": "2800f34ee353c04b7c799644b42377d6defb9a9d569f9ceec37337fa5951000e"
+    },
+    {
+      "path": "diagnosis/chromium-isolated-pointer-fix.png",
+      "bytes": 76399,
+      "sha256": "2ce4a3c7aa16f484589711cbb9c39da99b04e89d54a314a5a1dd03dd583478f0"
+    },
+    {
+      "path": "diagnosis/webkit-after-accidental-hit.png",
+      "bytes": 60986,
+      "sha256": "83e45b920745cb23f44c08725963a6faf47054468cb9abf79904ffbb1f76480e"
+    },
+    {
+      "path": "diagnosis/webkit-before-hit.png",
+      "bytes": 58634,
+      "sha256": "a826e921b8dc802e07069c3cce591832ac6ec00e4a2af692d72ddfee19273dba"
+    },
+    {
+      "path": "diagnosis/webkit-isolated-pointer-fix.png",
+      "bytes": 55979,
+      "sha256": "9af1d6b2490f38193016c523a322f5dcf4430d72c949e0e5ccb0c8dd7c3df2df"
+    },
+    {
+      "path": "index.html",
+      "bytes": 70480,
+      "sha256": "fbda32243d435bc5e6a9818d4e18ddd4bc3c73aeca46d4b55b524bcf879b3ae6"
+    },
+    {
+      "path": "proposal/chromium-1440-dark-desktop.png",
+      "bytes": 172538,
+      "sha256": "3c00b37c044cd2231b657e19614c00413578c08b91814c26a09a731e8037e207"
+    },
+    {
+      "path": "proposal/chromium-1440-light-desktop.png",
+      "bytes": 181362,
+      "sha256": "a33b165ca7ea0ebd47e1092bdef32d3c61bdae8a75704d183075c4d8d9a02560"
+    },
+    {
+      "path": "proposal/chromium-320-dark-keyboard.png",
+      "bytes": 43395,
+      "sha256": "898dcacb89e986279b1f26b600140165e81bb3ab866d5aec5405c2722dde5236"
+    },
+    {
+      "path": "proposal/chromium-320-dark-plus30.png",
+      "bytes": 62886,
+      "sha256": "dee85e9618ae8e2485baed50460b14e2548646955ba034b564155388443ee9df"
+    },
+    {
+      "path": "proposal/chromium-320-dark-plus60.png",
+      "bytes": 63039,
+      "sha256": "4209a92b59dccf7472b8a9af8ced696909a70145438df27576eb8556ecbef3a6"
+    },
+    {
+      "path": "proposal/chromium-320-dark-short.png",
+      "bytes": 53771,
+      "sha256": "47dc5849e73b06815f03bf00ee22da4489915ea68f9577ff776f15282205eda2"
+    },
+    {
+      "path": "proposal/chromium-320-dark-skip.png",
+      "bytes": 60863,
+      "sha256": "eefe72f4df4798b91e629db386940bc1bef2b879caacbc98643bd6925dc67a5a"
+    },
+    {
+      "path": "proposal/chromium-320-dark-timer.png",
+      "bytes": 62597,
+      "sha256": "70db10ec123140a84e301fb8a47761fb61e6b1f4b0785156cc3a3da4637a3525"
+    },
+    {
+      "path": "proposal/chromium-320-dark-tma-safe.png",
+      "bytes": 68918,
+      "sha256": "f9dc8a8a60888399c4bb6c60d17853dd62fdc23794bd323addb9a759ed8bcef6"
+    },
+    {
+      "path": "proposal/chromium-320-light-keyboard.png",
+      "bytes": 42765,
+      "sha256": "a1adb58b524a73a7ca3219e5f5e138ebc0340e0736e11db4b34bc414864408b6"
+    },
+    {
+      "path": "proposal/chromium-320-light-plus30.png",
+      "bytes": 61564,
+      "sha256": "15c15d96d6462c367755b6e2048f56e96f7e23862b8c252a4cdbc357f97fced8"
+    },
+    {
+      "path": "proposal/chromium-320-light-plus60.png",
+      "bytes": 61696,
+      "sha256": "6755d64898f24b857cb442b3faf54ff103f502c97c2c5854648abd73d613c525"
+    },
+    {
+      "path": "proposal/chromium-320-light-short.png",
+      "bytes": 53681,
+      "sha256": "d8d4931b327a1e700d8a76aa535c5e4086038036f2582d78f32d9e0f88fceb57"
+    },
+    {
+      "path": "proposal/chromium-320-light-skip.png",
+      "bytes": 58174,
+      "sha256": "9f3149377d9d1defdde04d7d7e3921386cb8d68f40e044f4a481f768a8a45a78"
+    },
+    {
+      "path": "proposal/chromium-320-light-timer.png",
+      "bytes": 61243,
+      "sha256": "7c00fd11ff48e770d479903ed5348c3b0e11afe1d1760f636db65af5053923a4"
+    },
+    {
+      "path": "proposal/chromium-320-light-tma-safe.png",
+      "bytes": 68268,
+      "sha256": "0387c4c07d3757283f4f0d9284d61c819316ef20b8688367e5f84aae49113c3f"
+    },
+    {
+      "path": "proposal/chromium-360-dark-plus30.png",
+      "bytes": 65355,
+      "sha256": "7b7a56a95d644b92a60cdc3d0d8a444c306a4e7c71663b99ab51996ace2133ce"
+    },
+    {
+      "path": "proposal/chromium-360-dark-plus60.png",
+      "bytes": 65444,
+      "sha256": "6d6ffe852eb52ec2781fd931bcac4bd1587afb32b7177f692bb3ace98ebd94eb"
+    },
+    {
+      "path": "proposal/chromium-360-dark-skip.png",
+      "bytes": 63415,
+      "sha256": "c3f68c94e1b177b4c0b7cc2f9901b3ef3c53240c30c79c4f517ff1a40ece078e"
+    },
+    {
+      "path": "proposal/chromium-360-dark-timer.png",
+      "bytes": 65203,
+      "sha256": "abb872500520e40f4f5c2e69d034e71e748ec66dc18433e99ce318b687f5133e"
+    },
+    {
+      "path": "proposal/chromium-360-light-plus30.png",
+      "bytes": 64616,
+      "sha256": "4e4a499e9ca16f3c8346215a2dc95e8b3bedc89ca1a0df787b78bf468819e81c"
+    },
+    {
+      "path": "proposal/chromium-360-light-plus60.png",
+      "bytes": 64463,
+      "sha256": "fba1b2605026670db60e7db6bca4bd05b707f889172fb5cea5cfbebf55bd671a"
+    },
+    {
+      "path": "proposal/chromium-360-light-skip.png",
+      "bytes": 60612,
+      "sha256": "7efd656632f93b86e9a6c9143585702f95f5328cccd32053e60ea6361271b399"
+    },
+    {
+      "path": "proposal/chromium-360-light-timer.png",
+      "bytes": 64563,
+      "sha256": "2e3acf02882c9aefa8c7ed0a107d08ec1e927e7cb62bf589c6e12300e15abc70"
+    },
+    {
+      "path": "proposal/chromium-393-dark-keyboard.png",
+      "bytes": 47074,
+      "sha256": "422bc41f8812f84c4e8e9ca1ebdbe6b5ff56c7eedb573a3f7190bdaf596aa735"
+    },
+    {
+      "path": "proposal/chromium-393-dark-plus30.png",
+      "bytes": 70888,
+      "sha256": "570b845a9b71ea08ce3cba8fbf6ed797d6d9f4fa4128160727265090b8436761"
+    },
+    {
+      "path": "proposal/chromium-393-dark-plus60.png",
+      "bytes": 70966,
+      "sha256": "d73d77b781f4f22a55ceb9288a7f4b4a54fe242aa180f71fb6e384facd21adb1"
+    },
+    {
+      "path": "proposal/chromium-393-dark-short.png",
+      "bytes": 62323,
+      "sha256": "9dc675073b8fc3e0acc6d4578372c51e7e91c25e378763dcd5a85e7565b02fe8"
+    },
+    {
+      "path": "proposal/chromium-393-dark-skip.png",
+      "bytes": 67595,
+      "sha256": "9ae0be7f8f525094fb4f12260ecc3ce22b6ac72bd00049bc7547dafed1e0a210"
+    },
+    {
+      "path": "proposal/chromium-393-dark-timer.png",
+      "bytes": 70590,
+      "sha256": "ddc1b6ae304462d1d16cb57bc7093bfa26fb7f1f37a2a20e9b02970d9695fcd7"
+    },
+    {
+      "path": "proposal/chromium-393-dark-tma-safe.png",
+      "bytes": 79127,
+      "sha256": "d1126dd304cea3f6de86d27c00315d517bbacbf83b31c30a4e44226267442e69"
+    },
+    {
+      "path": "proposal/chromium-393-light-keyboard.png",
+      "bytes": 48120,
+      "sha256": "788820e7f249d20585a4a6ec4c8308b1419bccfcb899b5748e5297c13e6c21e0"
+    },
+    {
+      "path": "proposal/chromium-393-light-plus30.png",
+      "bytes": 70630,
+      "sha256": "9c96bc0ce97b5711cae095534f33c47b36729e1df93b748eaa52839ad98de626"
+    },
+    {
+      "path": "proposal/chromium-393-light-plus60.png",
+      "bytes": 70385,
+      "sha256": "a7c488665e5aa5970da7a9218c4296a8d2c7ed8473d11e684f95826290341088"
+    },
+    {
+      "path": "proposal/chromium-393-light-short.png",
+      "bytes": 63591,
+      "sha256": "379728a5fa617ae4908ffe3422c433ea560365f2af66dc75cc551e47edcb0b3c"
+    },
+    {
+      "path": "proposal/chromium-393-light-skip.png",
+      "bytes": 64876,
+      "sha256": "7f59dcbde78dd9beca042ce471ce89c04b3c5db7e028cdaf8bced907fe739fb3"
+    },
+    {
+      "path": "proposal/chromium-393-light-timer.png",
+      "bytes": 70435,
+      "sha256": "3009ae929383c2e201b1397ed855656fff1a9f2e46e326a9bf846d693545b6f3"
+    },
+    {
+      "path": "proposal/chromium-393-light-tma-safe.png",
+      "bytes": 79640,
+      "sha256": "988338d2184dff65f7a59b1c11e1b6d5d4ad54495d35d0fd6fbb36617a71b5af"
+    },
+    {
+      "path": "proposal/chromium-430-dark-plus30.png",
+      "bytes": 72174,
+      "sha256": "9ba33cff5204e17d25357d4c28461b3b4781ee89f0ebdc5172810089656db8ef"
+    },
+    {
+      "path": "proposal/chromium-430-dark-plus60.png",
+      "bytes": 72257,
+      "sha256": "b073f68387594bdf7e9a21744103df8391e03110c1d7f10bd6c3f5c916709374"
+    },
+    {
+      "path": "proposal/chromium-430-dark-skip.png",
+      "bytes": 67694,
+      "sha256": "2513a3c7094b8a3fc2745538befed1027655ad33ec088f47fd4713c897b65ef6"
+    },
+    {
+      "path": "proposal/chromium-430-dark-timer.png",
+      "bytes": 71875,
+      "sha256": "28c40bc029d5198c381085eacaccf873c6a47abf1cd80279fc4cfb4d704b999a"
+    },
+    {
+      "path": "proposal/chromium-430-light-plus30.png",
+      "bytes": 71943,
+      "sha256": "bb384fd69edbc149c7e8c24b0c9ab36c5f8c4554d48ee1bb88646a79a0600cb3"
+    },
+    {
+      "path": "proposal/chromium-430-light-plus60.png",
+      "bytes": 71790,
+      "sha256": "5c899974cbc2c7aed0ef40b7eb1c3ad65b403a337cbaf816540394048d9e6158"
+    },
+    {
+      "path": "proposal/chromium-430-light-skip.png",
+      "bytes": 65360,
+      "sha256": "e29be1446ab5a468e538774413b059b075e44c7f0b60827329cc1c8a03cb2ddf"
+    },
+    {
+      "path": "proposal/chromium-430-light-timer.png",
+      "bytes": 71903,
+      "sha256": "d6186cb5e6733e798bda1e3fd37dfc044845864f10bb30dd7036b8491efaac58"
+    },
+    {
+      "path": "proposal/chromium-768-dark-desktop.png",
+      "bytes": 101833,
+      "sha256": "f38585ad900fd6297adad18ba6ac9cde22b8b06994ff9c5d0109cf900797c5d6"
+    },
+    {
+      "path": "proposal/chromium-768-light-desktop.png",
+      "bytes": 103295,
+      "sha256": "92d45f187187fc552bb9bd1136b4bfb91c7d814642be1b9d10ad6669d31086f1"
+    },
+    {
+      "path": "proposal/webkit-1440-dark-desktop.png",
+      "bytes": 116648,
+      "sha256": "30eb3713dd15b330ea8f0ef98253f7ffd4a2008e4e2947c7e5956093ac8766ca"
+    },
+    {
+      "path": "proposal/webkit-1440-light-desktop.png",
+      "bytes": 104497,
+      "sha256": "c08420658ad6b2e8354da234d6eacc9941e61c1da169ab103847be54caea8359"
+    },
+    {
+      "path": "proposal/webkit-320-dark-keyboard.png",
+      "bytes": 35497,
+      "sha256": "8d77b239bfc66661835fb302d06ec99a53b5f1b213a2408291fc984ec6ab7692"
+    },
+    {
+      "path": "proposal/webkit-320-dark-plus30.png",
+      "bytes": 48067,
+      "sha256": "15256868d86725fae482c7b669ddea19bb354d3f3c26fad8a4ab7f1759efcba9"
+    },
+    {
+      "path": "proposal/webkit-320-dark-plus60.png",
+      "bytes": 48413,
+      "sha256": "9bff0d906685192c4e82ef4e4e673749243ceeb1db3850028e0951febffab2c7"
+    },
+    {
+      "path": "proposal/webkit-320-dark-short.png",
+      "bytes": 44982,
+      "sha256": "f7f39fa1d61bdf2b1d72a47c2313942af759558c869404b5b967110d2e71654a"
+    },
+    {
+      "path": "proposal/webkit-320-dark-skip.png",
+      "bytes": 47443,
+      "sha256": "0992d158d5e07f0b971a629fb23d003b4f03c728be4f1ecf935b07fe500f05b6"
+    },
+    {
+      "path": "proposal/webkit-320-dark-timer.png",
+      "bytes": 49272,
+      "sha256": "efc749f7b76c7c83ed7f05f2a282b59a27ab2576b85d57b04bd14d9b76de2abd"
+    },
+    {
+      "path": "proposal/webkit-320-dark-tma-safe.png",
+      "bytes": 55016,
+      "sha256": "1676fbaa3d1e477f1e66ee08217c7b51c5749e599ca9ffd9e175b231df9fffcc"
+    },
+    {
+      "path": "proposal/webkit-320-light-keyboard.png",
+      "bytes": 30504,
+      "sha256": "96c4afcce12b614052a685c328bb46ca4176fbd3041087695f433065e6f7b945"
+    },
+    {
+      "path": "proposal/webkit-320-light-plus30.png",
+      "bytes": 43160,
+      "sha256": "89d0cba4b3474f957b352562947f748800d4e321126d9561b59d51c0e04b68c9"
+    },
+    {
+      "path": "proposal/webkit-320-light-plus60.png",
+      "bytes": 43537,
+      "sha256": "b42a97c2738358168db1d28329aa78d33707c4fd3893bb8e9d2ba9d45641d4e2"
+    },
+    {
+      "path": "proposal/webkit-320-light-short.png",
+      "bytes": 40447,
+      "sha256": "5df4f4e7d16da63a716d2d0500c2926386e1f649b5e8ed18c0c420e3ed1f64a6"
+    },
+    {
+      "path": "proposal/webkit-320-light-skip.png",
+      "bytes": 44753,
+      "sha256": "9ee3383e63893226b1f519638610c1b463ce9dc1a3fe34c237ea7a0cd70578cf"
+    },
+    {
+      "path": "proposal/webkit-320-light-timer.png",
+      "bytes": 43876,
+      "sha256": "19849133619dfb6bc0a243e00223bce770def8419a18a800fbf8df023587d836"
+    },
+    {
+      "path": "proposal/webkit-320-light-tma-safe.png",
+      "bytes": 50258,
+      "sha256": "1dfad26307daab57369858d9e73104b0de865f952933e5a16a1e1f7fdb45ebdf"
+    },
+    {
+      "path": "proposal/webkit-360-dark-plus30.png",
+      "bytes": 49595,
+      "sha256": "d8fe00a41e301514ea028aa0fc93279b94a9ab20dd9f67ab39f57d52367f0254"
+    },
+    {
+      "path": "proposal/webkit-360-dark-plus60.png",
+      "bytes": 49852,
+      "sha256": "4b38c4ccaf26456978930fa75bf483cb482b06f419376d03bd698524b51c5921"
+    },
+    {
+      "path": "proposal/webkit-360-dark-skip.png",
+      "bytes": 48829,
+      "sha256": "87e6e943c14802b7e2dcda4cb6fdb49701d9c899b2c7459db7a34dc1462d2266"
+    },
+    {
+      "path": "proposal/webkit-360-dark-timer.png",
+      "bytes": 51213,
+      "sha256": "8802f5d8e07fbbcd737a23d7fb08679a5acb77bcd6419646319151bff364f33c"
+    },
+    {
+      "path": "proposal/webkit-360-light-plus30.png",
+      "bytes": 44102,
+      "sha256": "4d2d9b753c4e96d468cfc280caa799f6d833355f60f0e3c177ebd8e59cfba14b"
+    },
+    {
+      "path": "proposal/webkit-360-light-plus60.png",
+      "bytes": 44455,
+      "sha256": "73ee23fbf6e24cd947c8507ba4755c0c6fdc7e14b71fa1691d8c1cb9f6e183d4"
+    },
+    {
+      "path": "proposal/webkit-360-light-skip.png",
+      "bytes": 46087,
+      "sha256": "a44ed8b357d97b22e74f9fbc5cf6b76d34700a79f6de96deb4646b6421f88090"
+    },
+    {
+      "path": "proposal/webkit-360-light-timer.png",
+      "bytes": 45035,
+      "sha256": "39b6d398104361d2d35878d53f9fc045a8f8968248732c9d7a0498cfba88ec5b"
+    },
+    {
+      "path": "proposal/webkit-393-dark-keyboard.png",
+      "bytes": 37991,
+      "sha256": "ee8aea84a63fc3d71445911d48fa191d92fb98a0eaceb0add735ff9b103661af"
+    },
+    {
+      "path": "proposal/webkit-393-dark-plus30.png",
+      "bytes": 54299,
+      "sha256": "69584db633747ce5260b4235986054a0f79330b5dfd4f774de9542c6530453a5"
+    },
+    {
+      "path": "proposal/webkit-393-dark-plus60.png",
+      "bytes": 54544,
+      "sha256": "aa22d42f695e7f580be22ca2cf5dbb4371fe678fe301dd9313e127f4cb9379b8"
+    },
+    {
+      "path": "proposal/webkit-393-dark-short.png",
+      "bytes": 49307,
+      "sha256": "afca94ced1a1d37dc26cffec5ff99e9847b737a303384d2843de7804455181ab"
+    },
+    {
+      "path": "proposal/webkit-393-dark-skip.png",
+      "bytes": 51091,
+      "sha256": "ee09a79eca752f4f31fad2a545e4cd19d9f98014531445b6d3101ba845131e10"
+    },
+    {
+      "path": "proposal/webkit-393-dark-timer.png",
+      "bytes": 56108,
+      "sha256": "c6e40d694874af171944e3567c0d6f69a2245a9fed173d85868107fd9c126ca8"
+    },
+    {
+      "path": "proposal/webkit-393-dark-tma-safe.png",
+      "bytes": 62660,
+      "sha256": "aecf86ceab380b5df11c2810a0bad914e57e8f17a54fe3d63b380acceb50d364"
+    },
+    {
+      "path": "proposal/webkit-393-light-keyboard.png",
+      "bytes": 32172,
+      "sha256": "6eec1d0c06943c7d354c013a8244dc6b85cc2c9a12da1ab485fe66c3de350026"
+    },
+    {
+      "path": "proposal/webkit-393-light-plus30.png",
+      "bytes": 47999,
+      "sha256": "5eade705d77f6d5aa73ad744684bd2a0237bca8727957d6d5fde57993bade1be"
+    },
+    {
+      "path": "proposal/webkit-393-light-plus60.png",
+      "bytes": 48387,
+      "sha256": "8dcf64593d795c2853f8269a57b99c632dc70e3f5f125c5be318abacf03e5031"
+    },
+    {
+      "path": "proposal/webkit-393-light-short.png",
+      "bytes": 43830,
+      "sha256": "50dd5cb403b2ca84c1a66c36d873e5131063285511cdd2b4e4042da7b5f8fca3"
+    },
+    {
+      "path": "proposal/webkit-393-light-skip.png",
+      "bytes": 48212,
+      "sha256": "7936af934c4fba31a964108198be63dcf0c062060408382781d17a67cc19ffc1"
+    },
+    {
+      "path": "proposal/webkit-393-light-timer.png",
+      "bytes": 49038,
+      "sha256": "75bb4e38c4c2d1dee2435478b723c262605068503668ce84fe34f1deb33a9261"
+    },
+    {
+      "path": "proposal/webkit-393-light-tma-safe.png",
+      "bytes": 56776,
+      "sha256": "45ab3b559ba738a45730f48acf1684f9111b1c74951f8072f0164fcb7e10aecf"
+    },
+    {
+      "path": "proposal/webkit-430-dark-plus30.png",
+      "bytes": 53569,
+      "sha256": "be4b8940d9910320a21e42b0769b893e4c55bb39f82249948f10179d43a9b039"
+    },
+    {
+      "path": "proposal/webkit-430-dark-plus60.png",
+      "bytes": 53920,
+      "sha256": "081ba5afac1b097d64d4d2a9349e6278fd4d469778d7cc89f853ca75a8a076e0"
+    },
+    {
+      "path": "proposal/webkit-430-dark-skip.png",
+      "bytes": 51687,
+      "sha256": "e671d79ae38fe52bcf965276407ae7ec21e35d4d02535566a4e453a50a292b9d"
+    },
+    {
+      "path": "proposal/webkit-430-dark-timer.png",
+      "bytes": 55405,
+      "sha256": "40526b3f32488e4ae3e0ae7bcc00f8702c0a6e0e5b72691a867b2c7537215001"
+    },
+    {
+      "path": "proposal/webkit-430-light-plus30.png",
+      "bytes": 47881,
+      "sha256": "2801fa533b0d37bdea0f606f2bf390d03b7ada55ad165a084f23e78111fdf601"
+    },
+    {
+      "path": "proposal/webkit-430-light-plus60.png",
+      "bytes": 48244,
+      "sha256": "5b9d7153fdb13c33a6e04e6d53b012833ae424c4244d633429e871ca33ae7be0"
+    },
+    {
+      "path": "proposal/webkit-430-light-skip.png",
+      "bytes": 48809,
+      "sha256": "7611544fe51daf30460d6cc052c5953080c73ead82c8d9a61c2563b13ca6a9f3"
+    },
+    {
+      "path": "proposal/webkit-430-light-timer.png",
+      "bytes": 48838,
+      "sha256": "85ab7d2008065d61b9488dc8991382f4af27a165d768311e8bc8ac4f2a0bf4dc"
+    },
+    {
+      "path": "proposal/webkit-768-dark-desktop.png",
+      "bytes": 79402,
+      "sha256": "664c99fd74ecf5231aee1830e6d0d1e24a5d17dc0dd41cff1e97979441cf5e43"
+    },
+    {
+      "path": "proposal/webkit-768-light-desktop.png",
+      "bytes": 72811,
+      "sha256": "102fc5ff297347a4950e4361e358d9d2a0f405cba580a8115f511ca0411928a3"
+    },
+    {
+      "path": "prototype/install-proposal.mjs",
+      "bytes": 4735,
+      "sha256": "533d0e4b44d8953383cba1d6198a750dc5e65d6875183eae8f913f5a96f06a21"
+    },
+    {
+      "path": "prototype/proposal.css",
+      "bytes": 2627,
+      "sha256": "c07c8a1af4dada3b92c38990b85793a31b98a2c5c89cb1e68ee6a63582043404"
+    },
+    {
+      "path": "README.md",
+      "bytes": 36811,
+      "sha256": "47529324d7c566d7faaa8d7c4a1b3eb7a9a7b9156cc3e1359f4bf1fc441a8a21"
+    }
+  ]
+}

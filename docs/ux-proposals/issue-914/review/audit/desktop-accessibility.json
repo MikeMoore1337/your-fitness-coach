@@ -1,0 +1,130 @@
+[
+  {
+    "engine": "chromium",
+    "width": 768,
+    "theme": "dark",
+    "box": {
+      "x": 14,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "width": 768,
+    "theme": "light",
+    "box": {
+      "x": 14,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "width": 1440,
+    "theme": "dark",
+    "box": {
+      "x": 380,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "width": 1440,
+    "theme": "light",
+    "box": {
+      "x": 380,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "width": 768,
+    "theme": "dark",
+    "box": {
+      "x": 14,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "width": 768,
+    "theme": "light",
+    "box": {
+      "x": 14,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "width": 1440,
+    "theme": "dark",
+    "box": {
+      "x": 380,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "width": 1440,
+    "theme": "light",
+    "box": {
+      "x": 380,
+      "y": 0,
+      "width": 680,
+      "height": 64
+    },
+    "outline": "2px",
+    "writes": [],
+    "keyboard": "Tab/Shift+Tab/Enter PASS",
+    "semantics": "- complementary \"Отдых между подходами\":\n  - text: Отдых\n  - timer: 2:24\n  - strong: \"Далее: Жим штанги лёжа\"\n  - text: Подход 2 из 3\n  - button \"+30 сек\"\n  - button \"+60 сек\"\n  - button \"Пропустить\"\n  - status: К отдыху добавлено 60 секунд",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  }
+]
