@@ -176,4 +176,3 @@ Existing requirements for security, factual accuracy, Russian localization,
 legal review, data schemas, review processes and owner approval take precedence.
 Clear Voice does not replace domain-specific expertise or grant permission to
 publish content, write data or bypass the Hermes manual review process.
-
