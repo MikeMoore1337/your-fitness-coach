@@ -1,0 +1,90 @@
+@import url('navigation-variants.css');
+
+/* B is the selected direction. This stylesheet is confined to the review artifact. */
+.capture{--app-height:100dvh;--safe-bottom:env(safe-area-inset-bottom,0px);--safe-top:env(safe-area-inset-top,0px)}
+.variant-b .app-shell{height:calc(var(--app-height) - 88px - var(--safe-bottom));scroll-padding-block:12px 24px}
+.variant-b .context-title{font:600 30px/1.15 Oswald,sans-serif;letter-spacing:-.01em}
+.variant-b .page-context{min-height:44px}
+.variant-b .section-rail{display:flex;align-items:center;gap:4px;margin:8px -8px 20px;padding:4px 0;top:var(--safe-top);min-height:56px;isolation:isolate}
+.app-shell:has(.section-rail){scroll-padding-top:calc(64px + var(--safe-top))}
+.variant-b .rail-scroll{flex:1;min-width:0;gap:20px;padding:4px;scroll-padding-inline:4px;scroll-behavior:auto}
+.variant-b .rail-scroll button{font-size:14px;min-height:44px;padding:8px 0 11px;scroll-margin-inline:4px}
+.rail-edge{display:grid;place-items:center;flex:0 0 44px;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted)}
+.rail-edge svg{width:17px;height:17px}
+.rail-edge:disabled{display:none}
+.rail-edge:active{background:var(--soft)}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.variant-b .content .section-heading>h2{font-size:27px}
+.dock-b{left:12px;right:12px;gap:10px}
+.dock-b .main-nav{border-radius:22px;box-shadow:0 3px 16px #00000010}
+.dock-b .nav-item{min-height:56px}
+.dock-b .nav-item[aria-current='page']{font-weight:650}
+.dock-b .add-trigger{box-shadow:none}
+.light .rail-scroll button[aria-selected='true']::after,.light .dock-b .nav-item[aria-current='page']::after{background:var(--accent)}
+.quick-primary .quick-action{min-height:94px}
+.quick-primary .quick-action strong{font-size:16px}
+.quick-secondary .quick-action{min-height:80px;padding:10px 2px;gap:9px;text-align:center}
+.quick-secondary .quick-action>div{flex:0}
+.quick-secondary .quick-action strong{font-size:12px;line-height:1.4;overflow-wrap:normal}
+.quick-secondary .quick-action svg{width:23px;height:23px}
+.variant-b dialog.quick-panel{bottom:calc(88px + var(--safe-bottom));max-height:calc(var(--app-height) - 112px - var(--safe-bottom));padding:12px 16px 16px}
+.quick-panel [autofocus]:focus:not(:focus-visible){outline:none}
+.keyboard-open .dock{display:none}
+.keyboard-open .app-shell{height:var(--app-height);padding-bottom:24px}
+.keyboard-open dialog.quick-panel{bottom:12px;max-height:calc(var(--app-height) - 24px)}
+.report-owner{font-size:14px;color:var(--text)}
+.report-back{font-size:13px}
+.variant-b .report-shell .document-section{break-inside:auto}
+
+/* The paper follows A's sequential structure, with readable type and natural pagination. */
+.variant-b .print-shell{font:14px/1.55 Inter,sans-serif}
+.variant-b .print-shell h1{font:650 29px/1.18 Inter,sans-serif;letter-spacing:-.025em;margin:0}
+.variant-b .print-shell .print-heading{align-items:start;border-bottom:1px solid var(--line);gap:24px;padding-bottom:16px;margin-bottom:18px;flex-wrap:nowrap}
+.print-heading .brand-small{flex-shrink:0;padding-top:4px}
+.print-heading .print-owner{font-size:14px;color:var(--text);margin-top:9px}
+.print-heading .print-period{font-size:12px;margin-top:5px}
+.variant-b .print-shell .metrics-grid{margin:20px 0 24px;padding:0 0 20px;gap:18px 24px;border-bottom:1px solid var(--line)}
+.variant-b .print-shell .metric dd{font:600 25px/1.2 Inter,sans-serif;letter-spacing:-.03em}
+.variant-b .print-shell .metric dt,.variant-b .print-shell .metric p{font-size:12px}
+.variant-b .print-shell .print-columns{display:block}
+.variant-b .print-shell .document-section{break-inside:auto;margin:22px 0 0;padding-top:18px}
+.variant-b .print-shell .document-section h2{font:650 21px/1.25 Inter,sans-serif;letter-spacing:-.02em;margin-bottom:14px}
+.print-shell .document-section h3{font:600 15px/1.45 Inter,sans-serif;margin:18px 0 10px;break-after:avoid}
+.variant-b .print-shell .document-section p{font-size:14px;line-height:1.55}
+.variant-b .print-shell .trend{padding:8px 0 12px;background:transparent;border-radius:0;max-width:490px}
+.print-shell .chart-axis{font-size:12px}
+.print-shell .trend svg{height:110px}
+.print-shell .paper-table{font-size:14px;table-layout:fixed;margin:10px 0 18px}
+.paper-table caption{text-align:left;font-weight:600;padding:4px 0 7px;caption-side:top;break-after:avoid}
+.print-shell .paper-table th,.print-shell .paper-table td{padding:8px 0;vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.paper-table th{width:66%;font-weight:450;color:var(--muted);padding-right:20px!important}
+.paper-table td{text-align:right;font-variant-numeric:tabular-nums}
+.paper-table tr{break-inside:avoid}
+.paper-note{break-inside:avoid}
+.variant-b .print-shell .paper-note{font-size:12px;line-height:1.5;margin-top:24px}
+.print-shell .stress-table thead th{background:#f3f5ef;font-size:12px;color:var(--text);font-weight:600}
+.print-shell .stress-table th:first-child{width:75%}
+.print-shell .stress-table th:last-child{width:25%;text-align:right;padding-right:0!important}
+.print-shell .stress-table td:last-child{width:25%}
+.print-shell .stress-table td:first-child{text-align:left;padding-right:20px}
+
+@media(max-width:460px){
+ .variant-b .print-shell{padding:20px}
+ .variant-b .print-shell .print-heading{display:block}
+ .print-heading .brand-small{margin-bottom:16px;padding-top:0}
+ .variant-b .print-shell .metrics-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .print-shell .chart-axis{font-size:10px}
+}
+@media print{
+ @page{size:A4;margin:17mm 16mm 19mm}
+ .variant-b .print-shell{padding:0;font-size:14px}
+ .variant-b .print-shell .print-heading{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:start}
+ .print-heading .brand-small{margin-bottom:0}
+ .variant-b .print-shell .metrics-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+ .variant-b .print-shell .document-section{break-inside:auto}
+ .print-heading,.metric,.trend,.paper-note{break-inside:avoid}
+ .print-shell h2,.print-shell h3,.paper-table caption{break-after:avoid}
+ .paper-table thead{display:table-header-group}
+ .paper-table tr{break-inside:avoid}
+ .print-shell .chart-axis{font-size:12px}
+}

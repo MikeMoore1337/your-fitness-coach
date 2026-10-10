@@ -1,0 +1,5008 @@
+{
+  "geometry": [
+    {
+      "name": "chromium/360/dark/844/safe0",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 832
+      },
+      "close": {
+        "x": 288,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/dark/844/safe34",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 798
+      },
+      "close": {
+        "x": 288,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/dark/480/safe0",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 468
+      },
+      "close": {
+        "x": 288,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/dark/480/safe34",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 434
+      },
+      "close": {
+        "x": 288,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/dark/400/safe0",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 300,
+        "right": 348,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 226,
+        "right": 332,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 388
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/dark/400/safe34",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 266,
+        "right": 348,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 192,
+        "right": 332,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 354
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/844/safe0",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 832
+      },
+      "close": {
+        "x": 288,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/844/safe34",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 798
+      },
+      "close": {
+        "x": 288,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/480/safe0",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 468
+      },
+      "close": {
+        "x": 288,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/480/safe34",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 434
+      },
+      "close": {
+        "x": 288,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/400/safe0",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 300,
+        "right": 348,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 226,
+        "right": 332,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 388
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/360/light/400/safe34",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 266,
+        "right": 348,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 192,
+        "right": 332,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 354
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/844/safe0",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 832
+      },
+      "close": {
+        "x": 321,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/844/safe34",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 798
+      },
+      "close": {
+        "x": 321,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/480/safe0",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 468
+      },
+      "close": {
+        "x": 321,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/480/safe34",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 434
+      },
+      "close": {
+        "x": 321,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/400/safe0",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 300,
+        "right": 381,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 226,
+        "right": 365,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 388
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/dark/400/safe34",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 266,
+        "right": 381,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 192,
+        "right": 365,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 354
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/844/safe0",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 832
+      },
+      "close": {
+        "x": 321,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/844/safe34",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 798
+      },
+      "close": {
+        "x": 321,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/480/safe0",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 468
+      },
+      "close": {
+        "x": 321,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/480/safe34",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 434
+      },
+      "close": {
+        "x": 321,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/400/safe0",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 300,
+        "right": 381,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 226,
+        "right": 365,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 388
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "chromium/393/light/400/safe34",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 266,
+        "right": 381,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 192,
+        "right": 365,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 354
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/844/safe0",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 832
+      },
+      "close": {
+        "x": 288,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/844/safe34",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 798
+      },
+      "close": {
+        "x": 288,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/480/safe0",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 468
+      },
+      "close": {
+        "x": 288,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/480/safe34",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 434
+      },
+      "close": {
+        "x": 288,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/400/safe0",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 300,
+        "right": 348,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 226,
+        "right": 332,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 388
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/dark/400/safe34",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 266,
+        "right": 348,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 192,
+        "right": 332,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 354
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/844/safe0",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 832
+      },
+      "close": {
+        "x": 288,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/844/safe34",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 798
+      },
+      "close": {
+        "x": 288,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/480/safe0",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 468
+      },
+      "close": {
+        "x": 288,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/480/safe34",
+      "width": 360,
+      "height": 480,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 336,
+        "height": 334,
+        "right": 348,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 304,
+        "height": 260,
+        "right": 332,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 434
+      },
+      "close": {
+        "x": 288,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/400/safe0",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 300,
+        "right": 348,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 226,
+        "right": 332,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 388
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/360/light/400/safe34",
+      "width": 360,
+      "height": 400,
+      "scrollWidth": 360,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 336,
+        "height": 266,
+        "right": 348,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 304,
+        "height": 192,
+        "right": 332,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 336,
+        "height": 64,
+        "right": 348,
+        "bottom": 354
+      },
+      "close": {
+        "x": 288,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 332,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 304,
+          "height": 52,
+          "right": 332,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/844/safe0",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 832
+      },
+      "close": {
+        "x": 321,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/844/safe34",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 798
+      },
+      "close": {
+        "x": 321,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/480/safe0",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 468
+      },
+      "close": {
+        "x": 321,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/480/safe34",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 434
+      },
+      "close": {
+        "x": 321,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/400/safe0",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 300,
+        "right": 381,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 226,
+        "right": 365,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 388
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/dark/400/safe34",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 266,
+        "right": 381,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 192,
+        "right": 365,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 354
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/844/safe0",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 422,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 756
+      },
+      "nav": {
+        "x": 28,
+        "y": 484,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 744
+      },
+      "dock": {
+        "x": 12,
+        "y": 768,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 832
+      },
+      "close": {
+        "x": 321,
+        "y": 434,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 478
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 484,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 536
+        },
+        {
+          "x": 28,
+          "y": 536,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 588
+        },
+        {
+          "x": 28,
+          "y": 588,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 640
+        },
+        {
+          "x": 28,
+          "y": 640,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 692
+        },
+        {
+          "x": 28,
+          "y": 692,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 744
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/844/safe34",
+      "width": 393,
+      "height": 844,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 388,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 722
+      },
+      "nav": {
+        "x": 28,
+        "y": 450,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 710
+      },
+      "dock": {
+        "x": 12,
+        "y": 734,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 798
+      },
+      "close": {
+        "x": 321,
+        "y": 400,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 444
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 450,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 502
+        },
+        {
+          "x": 28,
+          "y": 502,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 554
+        },
+        {
+          "x": 28,
+          "y": 554,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 606
+        },
+        {
+          "x": 28,
+          "y": 606,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 658
+        },
+        {
+          "x": 28,
+          "y": 658,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 710
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/480/safe0",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 58,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 392
+      },
+      "nav": {
+        "x": 28,
+        "y": 120,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 380
+      },
+      "dock": {
+        "x": 12,
+        "y": 404,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 468
+      },
+      "close": {
+        "x": 321,
+        "y": 70,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 114
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 120,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 172
+        },
+        {
+          "x": 28,
+          "y": 172,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 224
+        },
+        {
+          "x": 28,
+          "y": 224,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 276
+        },
+        {
+          "x": 28,
+          "y": 276,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 328
+        },
+        {
+          "x": 28,
+          "y": 328,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 380
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/480/safe34",
+      "width": 393,
+      "height": 480,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 24,
+        "width": 369,
+        "height": 334,
+        "right": 381,
+        "bottom": 358
+      },
+      "nav": {
+        "x": 28,
+        "y": 86,
+        "width": 337,
+        "height": 260,
+        "right": 365,
+        "bottom": 346
+      },
+      "dock": {
+        "x": 12,
+        "y": 370,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 434
+      },
+      "close": {
+        "x": 321,
+        "y": 36,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 80
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 86,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 138
+        },
+        {
+          "x": 28,
+          "y": 138,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 190
+        },
+        {
+          "x": 28,
+          "y": 190,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 242
+        },
+        {
+          "x": 28,
+          "y": 242,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 294
+        },
+        {
+          "x": 28,
+          "y": 294,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 346
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 260,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/400/safe0",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 300,
+        "right": 381,
+        "bottom": 312
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 226,
+        "right": 365,
+        "bottom": 300
+      },
+      "dock": {
+        "x": 12,
+        "y": 324,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 388
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 226,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    },
+    {
+      "name": "webkit/393/light/400/safe34",
+      "width": 393,
+      "height": 400,
+      "scrollWidth": 393,
+      "menu": {
+        "x": 12,
+        "y": 12,
+        "width": 369,
+        "height": 266,
+        "right": 381,
+        "bottom": 278
+      },
+      "nav": {
+        "x": 28,
+        "y": 74,
+        "width": 337,
+        "height": 192,
+        "right": 365,
+        "bottom": 266
+      },
+      "dock": {
+        "x": 12,
+        "y": 290,
+        "width": 369,
+        "height": 64,
+        "right": 381,
+        "bottom": 354
+      },
+      "close": {
+        "x": 321,
+        "y": 24,
+        "width": 44,
+        "height": 44,
+        "right": 365,
+        "bottom": 68
+      },
+      "rows": [
+        {
+          "x": 28,
+          "y": 74,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 126
+        },
+        {
+          "x": 28,
+          "y": 126,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 178
+        },
+        {
+          "x": 28,
+          "y": 178,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 230
+        },
+        {
+          "x": 28,
+          "y": 230,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 282
+        },
+        {
+          "x": 28,
+          "y": 282,
+          "width": 337,
+          "height": 52,
+          "right": 365,
+          "bottom": 334
+        }
+      ],
+      "labels": [
+        "Еда",
+        "Вода",
+        "Кардио",
+        "Замер",
+        "Самочувствие"
+      ],
+      "textSizes": [
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "routes": [
+        "/app?section=nutrition&quick_add=food",
+        "/app?section=nutrition&hydration=quick",
+        "/app?section=today&cardio=1",
+        "/app?section=progress&focus=measurements",
+        "/app?section=today&wellbeing=1"
+      ],
+      "navClient": 192,
+      "navScroll": 260,
+      "initialFocus": "Закрыть быстрое добавление"
+    }
+  ],
+  "keyboard": "PASS",
+  "closeAndRestore": "PASS",
+  "waterRoute": "PASS",
+  "reducedViewport": "PASS",
+  "visualViewportMock": "PASS",
+  "textScale200": "PASS",
+  "semantics": "PASS",
+  "engines": [
+    "chromium",
+    "webkit"
+  ],
+  "actualHardware": "NOT_CHECKED"
+}

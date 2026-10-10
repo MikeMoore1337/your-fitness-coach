@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>YFC · мобильный пакет #859</title><link rel="stylesheet" href="assets/fonts.css"><link rel="stylesheet" href="proposal.css"></head>
+<body>
+<div id="review">
+  <header class="review-header"><p class="eyebrow">Your Fitness Coach · аудит #859</p><h1>Меньше прокрутки. Все функции на месте.</h1><p>Один пакет для согласования. Это изолированный макет с синтетическими данными; изменения ещё не внедрены в приложение.</p></header>
+  <div class="review-controls">
+    <label>Экран<select id="screen"></select></label>
+    <label>Состояние<select id="state"><option value="populated">Основное · есть записи</option><option value="expanded">Дополнительные блоки раскрыты</option><option value="sparse">Мало данных</option></select></label>
+    <label>Тема<select id="theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label>
+    <label>Ширина<select id="width"><option>360</option><option selected>393</option><option>430</option></select></label>
+  </div>
+  <div class="review-grid"><aside id="explanation"></aside><div class="frame"><iframe id="preview" title="Предлагаемый мобильный экран"></iframe><p class="caption">Предложение, не AFTER. Формы и раскрытия демонстрируют компоновку; серверные операции отсутствуют.</p></div><aside><h2>Текущий экран</h2><img id="before" alt="BEFORE на текущем master, синтетические данные"><p class="caption" id="before-caption"></p></aside></div>
+  <section class="review-footer"><h2>Что согласовывается одним решением</h2><p>Компоновки #861–#867, вторичные блоки #869–#870, подробности #873 и отчёт #874. Сохраняются существующие токены, Inter/Oswald, компоненты и бизнес-правила. Навигация подробных разделов «Прогресса» уже находится сверху: меняются её плотность и повторяемость.</p><p>Отдельно остаются исходный XLSX для #872 и поведение прошедшего времени личного напоминания #871. Merge/deploy требуют отдельного явного разрешения.</p><a href="audit-report.md">Фактический аудит, DAG и статусы всех Issues</a></section>
+</div>
+<div id="capture" hidden></div>
+<script src="proposal.js"></script><script src="quick-add-water.js"></script></body></html>

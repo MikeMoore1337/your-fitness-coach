@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YFC · #867 · финальное меню «+»</title>
+<link rel="stylesheet" href="assets/fonts.css"><link rel="stylesheet" href="quick-add-final.css">
+</head><body>
+<div id="review">
+<header class="review-header">
+<p class="review-kicker">Your Fitness Coach · #867 · уточнение выбранного B</p>
+<h1>Что добавить? Пять действий, один ритм.</h1>
+<p>Компактный bottom sheet поверх «Прогресса». Одинаковые строки 52 px, небольшие иконки и спокойная кнопка закрытия. Еда и вода выделены только цветом иконки.</p>
+<p class="review-note">Предложение для визуального согласования. Синтетические данные, серверные операции отсутствуют. Остальное направление B сохранено; приложение и PR #907–#911 не меняются.</p>
+</header>
+<div class="review-controls">
+<label>Состояние<select id="screen"><option value="quick-add">Меню открыто поверх «Прогресса»</option><option value="progress">Прогресс · открыть по «+»</option></select></label>
+<label>Тема<select id="theme"><option value="dark">Тёмная</option><option value="light">Светлая</option></select></label>
+<label>Ширина<select id="width"><option value="360">360 px</option><option value="393" selected>393 px</option></select></label>
+<label>Доступная высота<select id="height"><option value="844">844 px</option><option value="480">480 px · сокращённая</option><option value="400">400 px · проверка прокрутки</option></select></label>
+<label>Безопасная область<select id="safe"><option value="34" selected>Верх 24 / низ 34 px</option><option value="0">Web · 0 px</option></select></label>
+<label hidden>Данные<select id="data"><option value="populated">Есть записи</option><option value="sparse">Мало данных</option></select></label>
+</div>
+<main class="comparison"><article class="direction"><header><span class="direction-letter">B</span><div><h2>Ритм YFC · меню «+»</h2><p>Еда · Вода · Кардио · Замер · Самочувствие</p></div></header><iframe id="preview-b" title="Меню быстрого добавления — финальное предложение"></iframe><p class="frame-caption">«+» открывает меню; крестик, фон и Escape закрывают. Tab остаётся внутри меню, после закрытия фокус возвращается на «+». При 400 px список прокручивается.</p></article></main>
+<section class="review-details">
+<h2>Отдельные скриншоты</h2>
+<div class="artifact-links">
+<a href="quick-add-final/menu-360-dark.png">360 px · тёмная · Прогресс + меню</a>
+<a href="quick-add-final/menu-393-dark.png">393 px · тёмная · Прогресс + меню</a>
+<a href="quick-add-final/menu-360-light.png">360 px · светлая · Прогресс + меню</a>
+<a href="quick-add-final/menu-393-light.png">393 px · светлая · Прогресс + меню</a>
+<a href="quick-add-final/menu-short-360-dark.png">360 × 480 px · тёмная</a>
+<a href="quick-add-final/menu-short-393-dark.png">393 × 480 px · тёмная</a>
+<a href="quick-add-final/menu-short-360-light.png">360 × 480 px · светлая</a>
+<a href="quick-add-final/menu-short-393-light.png">393 × 480 px · светлая</a>
+</div>
+<h2>BEFORE / PROPOSAL</h2>
+<p>В предыдущем B две крупные плитки и три меньших действия задавали разный вес и размер выбора. Теперь все пять действий читаются сверху вниз и имеют одинаковую область нажатия. У вторичных действий полноценная подпись 16 px; меню воспринимается как единый список.</p>
+<a href="quick-add-final/before-proposal.png">Открыть сравнительное изображение в полном размере</a>
+<img class="comparison-image" src="quick-add-final/before-proposal.png" alt="Предыдущий B с плитками и предложение B с пятью одинаковыми строками, тёмная и светлая темы">
+<p>«Вода» сразу показывает гидратацию; остальные действия сохраняют свои назначения. В макете переходы демонстрационные. Жест закрытия не добавлен: в текущем QuickAddSheet такого поведения нет.</p>
+<div class="review-links"><a href="quick-add-final/review.md">Проверки и ограничения</a><a href="quick-add-final/before-393-dark.png">Предыдущее меню B · поверх «Прогресса»</a></div>
+<p class="review-note">Сокращённая высота — имитация доступного viewport. Реальные VoiceOver, iOS-клавиатура и Telegram на устройстве не проверены. MERGE=false · DEPLOY=false · STOP_OWNER_UI_APPROVAL.</p>
+</section></div>
+<div id="app" hidden></div>
+<script src="navigation-final.js"></script><script src="quick-add-final.js"></script>
+</body></html>

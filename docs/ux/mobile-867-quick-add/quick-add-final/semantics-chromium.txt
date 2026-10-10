@@ -1,0 +1,20 @@
+- dialog "Что добавить?":
+  - banner:
+    - heading "Что добавить?" [level=2]
+    - button "Закрыть быстрое добавление"
+  - navigation "Быстрые действия":
+    - link "Добавить еду":
+      - /url: proposal-v1.html?capture=1&screen=nutrition&theme=light
+      - strong: Еда
+    - link "Добавить воду":
+      - /url: quick-add-water.html?capture=1&screen=nutrition&theme=light&hydration=quick
+      - strong: Вода
+    - link "Добавить кардио":
+      - /url: proposal-v1.html?capture=1&screen=cardio&theme=light
+      - strong: Кардио
+    - link "Добавить замер":
+      - /url: http://127.0.0.1:4188/deliverables/quick-add-final.html?capture=1&screen=body&theme=light&safe=34&section=body&entry=measurement
+      - strong: Замер
+    - link "Отметить самочувствие":
+      - /url: proposal-v1.html?capture=1&screen=wellbeing&theme=light
+      - strong: Самочувствие

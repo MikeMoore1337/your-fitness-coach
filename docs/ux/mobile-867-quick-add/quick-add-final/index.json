@@ -1,0 +1,72 @@
+{
+  "issue": 867,
+  "direction": "B",
+  "status": "STOP_OWNER_UI_APPROVAL",
+  "merge": false,
+  "deploy": false,
+  "productionSourceChanged": false,
+  "widths": [
+    360,
+    393
+  ],
+  "themes": [
+    "dark",
+    "light"
+  ],
+  "screenshotHeights": [
+    844,
+    480
+  ],
+  "safeArea": {
+    "top": 24,
+    "bottom": 34
+  },
+  "geometryCases": 48,
+  "sha256": {
+    ".gitattributes": "8b9c3028d6467ff3be7c793141927841d70f47f52d0590677438f488ca154992",
+    "assets/brand/yfc-logo-dark.svg": "ae84c0d461a4dd7141cbfa7e6f44cd9d1c412e95d9c85d9659a505485789e63c",
+    "assets/brand/yfc-logo-light.svg": "d71f02b7863df18503a4c4bff8188797fb98977a9e3a5d30f28170de03cc0804",
+    "assets/fonts/inter-cyrillic.woff2": "71d5ee93cc1e9f1d520a3a8b66456de18c7879d8df09d57fcd2eaff75fef0075",
+    "assets/fonts/inter-latin.woff2": "3100e775e8616cd2611beecfa23a4263d7037586789b43f035236a2e6fbd4c62",
+    "assets/fonts/inter-OFL.txt": "5dd548d31a85f756e01d63e00d7faf1e324103ed3e9102fcbbabf2cc2db6dd39",
+    "assets/fonts/oswald-cyrillic.woff2": "95c3d8d1db01b5ecd85b0d90aa81d39d24231f74de28c7418cfd8c08261fe929",
+    "assets/fonts/oswald-latin.woff2": "571f3457dab507b6f2ce5394d593ca015251b69fea81ab7a546bd2368e9fc3ed",
+    "assets/fonts/oswald-OFL.txt": "0b2472b17e950b9967818f169f2618b091c0c259d250d2dd8208961c7f5700e1",
+    "assets/fonts.css": "10d64782027ba16ae86f4cb541b7b2f1a00566604dfcf75a5b421e63f0412ae0",
+    "assets/lucide-LICENSE.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+    "assets/phosphor-LICENSE.txt": "b5b1f1da112d18ea2147decfd48ddc1bf2b5aeb6c265381579340e95b15a2bb2",
+    "index.html": "664a457fecf05e15a96700e40b659e8824ffae85bd7bf1a834b5a05fc7831ca5",
+    "navigation-final/report.pdf": "ebded94bfb40e2f1aaf81bfa89403aa89abd57e86d31691d5d199fd73a93617c",
+    "navigation-final.css": "83cc32d74082bec15b56e3419482992248c41ab38a744887693e1cf8e5f8168d",
+    "navigation-final.js": "b01e55b77d8f5458bc139a557a03134b4a819b3c72511c46133a60718301d4ef",
+    "navigation-variants.css": "97c54db553e3f3939932be623a72ff6b3ff039a563b38192359788df776f7576",
+    "proposal-v1.html": "774ca1644c35fd40d210a194f9a8927b5ec803ca9cf8ae7da4d3c648fe55db1e",
+    "proposal.css": "29704535d3df74d312e26bb4a8e5322eb0c72453df51d0f9d31743daf16efd73",
+    "proposal.js": "a0ff5ed02fdb7f9ae27ea694531c1607f1509b3123d92c477eff613bc4a14799",
+    "quick-add-final/before-393-dark.png": "5036c70ab59186b0eed5b9847dff835af54f664cca85a56cd2b38df0b0aabebd",
+    "quick-add-final/before-393-light.png": "7ca75820d70aca82928c9ac6f75b4f7f4942a446763b1cd07b7a9bd0f7aa70c9",
+    "quick-add-final/before-menu-393-dark.png": "9f0d3bbdf83517c240b8a26874676cf4e199e000607858fc0c5ae2bccf9138ee",
+    "quick-add-final/before-menu-393-light.png": "893449fd1aafbaa03f5972f54b0a60e223e51a3781004ffd81026d4d713faa16",
+    "quick-add-final/before-proposal.png": "85fba5e556091f21327f295fba886cc4736d1a7b33b121768d89eeab3d77aa55",
+    "quick-add-final/checks.json": "dcd3bc087460150bcb2182ed23b3974cc6667bd24628571b8274c20442921902",
+    "quick-add-final/menu-360-dark.png": "fa86e522fba43de8bcfce7b9697d680fbd2e09dd633296ad13a5f6dca1acad41",
+    "quick-add-final/menu-360-light.png": "9b31828a1e3360210d0f019b91eb6b4f8b7a1b661760e7adb11a9f58e79e7c19",
+    "quick-add-final/menu-393-dark.png": "d18642fc1020e4efab2a4919bc61197cef05f8c5729fc4f0955b1ebec51cd26b",
+    "quick-add-final/menu-393-light.png": "d2b4c2481ebc4d739dd653ac7cc3e306fddb88dabac2f63fc824bfaf626006ef",
+    "quick-add-final/menu-short-360-dark.png": "cf4476dfcc5b2cb93c375a82dcbfd9cac860627c08f86bf05a7a0c69cc097161",
+    "quick-add-final/menu-short-360-light.png": "348dad11fd9f474d1126d38d4ce0a786f7a82a1e6f253e37b0fe0998661a2783",
+    "quick-add-final/menu-short-393-dark.png": "ef62323464393eac3f4ff873cf6cf14e9617c10d47a54c8d4b32fe78397e945a",
+    "quick-add-final/menu-short-393-light.png": "0e8cdd094128a113f1bb4a8f2045fb5a4942d530d8e61303ba24ccc3ee177949",
+    "quick-add-final/proposal-menu-393-dark.png": "ee86a9b0375908f75951dee568f53b65de99d1c92709ac9c98d84a3a796e4b10",
+    "quick-add-final/proposal-menu-393-light.png": "2d0e71ee0a3a78f53fed07f782dbac4b62d48e8491b1a5dd428c4530953974df",
+    "quick-add-final/review.md": "eed93a5c8a67f085f0b6434ccc9dbdc24d316ed6905f7df91d2dfb931292526a",
+    "quick-add-final/semantics-chromium.txt": "d92916c6a3e7ae087a9634011c39d5bab423df7cbec65cec3b47fa59f2ef36bb",
+    "quick-add-final/semantics-webkit.txt": "d92916c6a3e7ae087a9634011c39d5bab423df7cbec65cec3b47fa59f2ef36bb",
+    "quick-add-final.css": "17248bcb6d3e25bf1846720f9e77f961ace8131731031a08b3a6aeccd174b2ff",
+    "quick-add-final.html": "664a457fecf05e15a96700e40b659e8824ffae85bd7bf1a834b5a05fc7831ca5",
+    "quick-add-final.js": "e79d542108cfcf473149d006bf8eed7dce91dd653b15ee39b5de7dcb5f6cd99b",
+    "quick-add-water.html": "bb7073b01ec1ae5e0a8ede33b0ab9dfe68fbf16b6068bd2f7e437c05ebe0b296",
+    "quick-add-water.js": "c61646fa931a6a6eba1e2aeed76862dd0d6c9bed65d85100e0841ab68cd9168a",
+    "README.md": "b17e27dbbdfe695b4133fa17d61ed766c61a1df1f36b0e880d09e6f44205c867"
+  }
+}
