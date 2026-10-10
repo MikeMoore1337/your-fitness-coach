@@ -576,10 +576,12 @@ def _signed_manifest_with_prompt_version(manifest: dict[str, object], version: s
         for key, value in signed.items()
         if key not in {"release_id", "release_parent", "manifest_sha256"}
     }
+
     def canonical(value: dict[str, object]) -> bytes:
-        return json.dumps(
-            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+
     digest = hashlib.sha256(canonical(core)).hexdigest()
     signed["release_id"] = f"hermes-{signed['yfc_sha'][:12]}-{digest[:16]}"
     unsigned = {key: value for key, value in signed.items() if key != "manifest_sha256"}
@@ -640,6 +642,7 @@ def test_unknown_signed_historical_prompt_is_rejected(tmp_path: Path) -> None:
     unsupported = _signed_manifest_with_prompt_version(current, "attacker-controlled-prompt")
     with pytest.raises(hermes.ReleaseManifestError, match="compatibility"):
         hermes.validate_manifest(unsupported, allow_historical_prompt=True)
+
 
 def test_release_manifest_is_immutable_and_self_validating(tmp_path: Path) -> None:
     root = Path(__file__).parents[1]
