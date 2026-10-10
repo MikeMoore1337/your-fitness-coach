@@ -576,9 +576,10 @@ def _signed_manifest_with_prompt_version(manifest: dict[str, object], version: s
         for key, value in signed.items()
         if key not in {"release_id", "release_parent", "manifest_sha256"}
     }
-    canonical = lambda value: json.dumps(
-        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    def canonical(value: dict[str, object]) -> bytes:
+        return json.dumps(
+            value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
     digest = hashlib.sha256(canonical(core)).hexdigest()
     signed["release_id"] = f"hermes-{signed['yfc_sha'][:12]}-{digest[:16]}"
     unsigned = {key: value for key, value in signed.items() if key != "manifest_sha256"}
