@@ -202,16 +202,21 @@ describe('AppShell', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Что добавить?' });
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: /Добавить еду/ })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'Еда' })).toHaveAttribute(
       'href',
       '/app?section=nutrition&quick_add=food',
     );
-    expect(within(dialog).getAllByRole('link')).toHaveLength(5);
+    expect(
+      within(dialog)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Еда', 'Вода', 'Кардио', 'Замер', 'Самочувствие']);
+    expect(document.getElementById('appContent')?.inert).toBe(true);
     expect(
       within(dialog).queryByRole('link', { name: /Открыть AI Coach/ }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('link', { name: /Добавить еду/ }));
+    fireEvent.click(within(dialog).getByRole('link', { name: 'Еда' }));
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });

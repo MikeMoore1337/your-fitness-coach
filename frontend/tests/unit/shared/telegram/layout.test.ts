@@ -57,6 +57,9 @@ describe('Mobile Web/TMA layout adapter', () => {
     const root = document.documentElement;
     expect(root.dataset.yfcLayoutSurface).toBe('telegram');
     expect(root.style.getPropertyValue('--yfc-viewport-height')).toBe('560px');
+    expect(root.style.getPropertyValue('--yfc-viewport-bottom')).toBe(
+      `${Math.max(0, window.innerHeight - 560)}px`,
+    );
     expect(root.style.getPropertyValue('--yfc-viewport-stable-height')).toBe('844px');
     expect(root.style.getPropertyValue('--yfc-tg-safe-top')).toBe('28px');
     expect(root.style.getPropertyValue('--yfc-tg-content-safe-top')).toBe('44px');
@@ -100,6 +103,29 @@ describe('Mobile Web/TMA layout adapter', () => {
       '900px',
     );
 
+    cleanup();
+  });
+
+  it('keeps the dock hidden through the pointer that blurs an input', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const input = document.createElement('input');
+    const button = document.createElement('button');
+    document.body.append(input, button);
+    const cleanup = installMobileLayoutAdapter(null);
+    input.focus();
+    button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    button.focus();
+    window.dispatchEvent(new Event('resize'));
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
+    button.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
+    frames.at(-1)?.(0);
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
     cleanup();
   });
 

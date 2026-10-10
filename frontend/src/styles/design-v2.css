@@ -428,7 +428,6 @@ body:has(.app-shell--design-v2) {
   overflow-wrap: anywhere;
   font-size: clamp(28px, 4vw, 44px);
   line-height: 1.04;
-  font-family: var(--font-display);
 }
 
 .progress-report-overview p,
@@ -865,7 +864,6 @@ body:has(.app-shell--design-v2) {
 
   .progress-report-overview h1 {
     font-size: 27pt;
-    font-family: var(--font-display);
   }
 
   .progress-report-overview__adherence strong {
@@ -1140,10 +1138,8 @@ body:has(.app-shell--design-v2) {
 .today-dashboard--design-v2 .today-dashboard__header h1 {
   color: var(--v2-text-primary);
   font-size: clamp(3rem, 7vw, 4.5rem);
-  font-weight: 800;
   letter-spacing: -0.025em;
   line-height: 1.35;
-  font-family: var(--font-display);
 }
 
 /* Shared week context/date-picker used by Today, Nutrition and future weekly surfaces. */
@@ -1625,7 +1621,7 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-primary);
   font-size: 0.75rem;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   text-decoration: none;
 }
 
@@ -1786,11 +1782,8 @@ body:has(.app-shell--design-v2) {
   margin-top: var(--v2-space-1);
   color: var(--v2-text-primary);
   font-size: clamp(2.7rem, 5vw, 4rem);
-  font-weight: 700;
-  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
-  font-family: var(--font-display);
 }
 
 .nutrition-diary--design-v2 .nutrition-diary__intro p {
@@ -2072,7 +2065,7 @@ body:has(.app-shell--design-v2) {
   padding: 0;
   font-size: 1.125rem;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   line-height: 1.2;
 }
 
@@ -2927,11 +2920,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   max-width: 640px;
   color: var(--v2-text-primary);
   font-size: clamp(3rem, 5.3vw, 4.6rem);
-  font-weight: 700;
-  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
-  font-family: var(--font-display);
 }
 
 .auth-public-shell--design-v2 .login-intro > p:not(.login-kicker) {
@@ -3397,7 +3387,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     font-size: clamp(3rem, 7vw, 4.5rem);
     color: var(--v2-text-primary);
     letter-spacing: -0.025em;
-    font-family: var(--font-display);
   }
 
   .today-dashboard--design-v2 .today-workout-spotlight {
@@ -3470,7 +3459,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .nutrition-diary--design-v2 .nutrition-diary__intro h1 {
     font-size: clamp(2.55rem, 13vw, 3.25rem);
-    font-family: var(--font-display);
   }
 
   .nutrition-diary--design-v2 .nutrition-day-summary {
@@ -3655,7 +3643,6 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .auth-public-shell--design-v2 .login-intro h1 {
     font-size: clamp(2.65rem, 13vw, 3.6rem);
-    font-family: var(--font-display);
   }
 
   .auth-public-shell--design-v2 .login-card {
@@ -3721,7 +3708,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-hero__help .contextual-help > summary {
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100%, 140px);
   justify-content: flex-start;
 }
 
@@ -4315,7 +4302,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   padding: 0;
   color: var(--v2-text-primary);
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
 }
 
 .daily-wellbeing__options legend small,
@@ -4837,7 +4824,6 @@ body:has(.standalone-page--design-v2) {
   font-size: clamp(2.25rem, 4vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
-  font-family: var(--font-display);
 }
 
 .app-section--design-v2 .eyebrow,
@@ -4995,7 +4981,6 @@ body:has(.standalone-page--design-v2) {
 /* Profile and account: calm settings hierarchy with rare actions kept out of the main flow. */
 .app-section--profile .hero-card h1 {
   max-width: 12ch;
-  font-family: var(--font-display);
 }
 
 .profile-settings {
@@ -5378,7 +5363,7 @@ body:has(.standalone-page--design-v2) {
   color: var(--v2-text-primary);
   font-size: 0.82rem;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   line-height: 1.25;
   text-decoration: none;
   gap: var(--v2-space-2);
@@ -5523,7 +5508,7 @@ body:has(.standalone-page--design-v2) {
 .training-preferences-locations legend {
   margin-bottom: var(--v2-space-2);
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
 }
 
 .training-preferences-weekdays > div,
@@ -6685,7 +6670,6 @@ button.notification-row__main:focus-visible {
   font-size: clamp(2.65rem, 5vw, 4.4rem);
   line-height: 0.96;
   letter-spacing: -0.05em;
-  font-family: var(--font-display);
 }
 
 .app-section--progress .progress-summary {
@@ -7892,7 +7876,7 @@ button.notification-row__main:focus-visible {
 .app-section--progress .program-history-workout__facts dd {
   margin: 0;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
 }
 
 .app-section--progress .program-history-workout__plan {
@@ -8220,7 +8204,6 @@ button.notification-row__main:focus-visible {
   font-size: clamp(2.2rem, 5vw, 3.8rem);
   line-height: 0.98;
   letter-spacing: -0.045em;
-  font-family: var(--font-display);
 }
 
 .onboarding-page--design-v2 .onboarding-goal,
@@ -8915,7 +8898,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .app-section--design-v2 .hero-card h1,
   .app-section--progress .progress-hero h1 {
     font-size: clamp(2.2rem, 12vw, 3.1rem);
-    font-family: var(--font-display);
   }
 
   .app-section--design-v2 .metric-grid {
@@ -9010,7 +8992,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 
   .onboarding-page--design-v2 .onboarding-intro h1 {
     font-size: clamp(2.1rem, 12vw, 3rem);
-    font-family: var(--font-display);
   }
 
   .public-page--design-v2 .public-hero,
@@ -9226,11 +9207,8 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   max-width: 780px;
   margin: 0;
   font-size: clamp(2.55rem, 5vw, 4.35rem);
-  font-weight: 700;
-  font-family: var(--font-display);
   letter-spacing: -0.055em;
   line-height: 0.95;
-  font-family: var(--font-display);
 }
 
 .coach-workspace-header p {
@@ -9426,7 +9404,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   margin: 0;
   font-size: 2rem;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   letter-spacing: -0.04em;
 }
 
@@ -9716,7 +9694,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   color: var(--v2-text-primary);
   font-size: 0.82rem;
   font-weight: 700;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   text-decoration-color: var(--v2-lime);
   text-underline-offset: 5px;
 }
@@ -10153,7 +10131,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .coach-workspace-header h1 {
     font-size: clamp(2.1rem, 10vw, 2.75rem);
     line-height: 0.98;
-    font-family: var(--font-display);
   }
 
   .coach-workspace-header p {
@@ -10479,7 +10456,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   margin: 0;
 }
 .today-nutrition__values strong {
-  font: 700 1.5rem var(--font-display);
+  font: 700 1.5rem var(--font-body);
 }
 .today-nutrition progress {
   display: block;
@@ -10600,7 +10577,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   gap: 3px;
 }
 .meal-planner__summary strong {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 22px;
 }
 .meal-planner__summary-note,
@@ -10865,7 +10842,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   gap: 3px;
 }
 .grocery-list__summary strong {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 22px;
 }
 .grocery-list__summary-note,
@@ -11069,5 +11046,335 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
   .grocery-list__edit-actions {
     grid-column: auto;
+  }
+}
+
+/* #859 approved mobile hierarchy: shared display headlines must not override it. */
+@media (max-width: 680px) {
+  .app-section--progress .progress-hero .progress-hero__copy h1 {
+    font-size: 30px;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+  }
+  .app-section--progress .progress-experience .progress-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'copy help'
+      'period period'
+      'download download';
+    gap: 12px;
+    align-items: center;
+  }
+  .app-section--progress .progress-hero__copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .app-section--progress .progress-hero__help {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .app-section--progress .progress-hero__help .contextual-help > summary {
+    max-width: 164px;
+    min-height: 44px;
+  }
+  .app-section--progress .progress-experience--bento {
+    /* The category rail adds its own 4px focus gutter around the 44px targets. */
+    gap: var(--v2-space-1);
+  }
+  .app-section--progress .progress-hero__period {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .app-section--progress .progress-hero__download {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .app-section--progress .progress-hero__download a {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 359px) {
+  .app-section--progress .progress-period-controls .ui-tab {
+    padding-inline: 3px;
+  }
+}
+
+@media (max-width: 899px) {
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav .app-bottom-nav__btn.is-active {
+    background: color-mix(in srgb, var(--v2-lime) 12%, var(--v2-surface));
+  }
+}
+.progress-report-brand .yfc-lockup__mark {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+.progress-report-brand .yfc-lockup__wordmark {
+  font-size: 0.625rem;
+}
+.progress-report-brand {
+  margin-bottom: 12px;
+}
+.progress-report-options > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 12px;
+}
+.progress-report-options > summary::after {
+  content: '+';
+  margin-left: auto;
+}
+.progress-report-options[open] > summary::after {
+  content: '−';
+}
+.progress-report-options[open] {
+  display: grid;
+  gap: 16px;
+}
+
+/* #874: compact mobile document; print remains a sequential readable report. */
+.progress-report-toolbar .yfc-lockup__mark {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+.progress-report-toolbar .yfc-lockup__wordmark {
+  font-size: 0.625rem;
+}
+.progress-report-settings {
+  display: grid;
+  gap: 16px;
+  margin-block: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--v2-border);
+}
+.progress-report-settings .progress-report-controls {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.progress-report-settings .progress-report-controls h2 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.progress-report-settings .ui-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: 4px;
+  background: transparent;
+  border: 0;
+}
+.progress-report-settings .ui-tab {
+  min-height: 44px;
+  flex: 1 0 auto;
+  padding: 8px 12px;
+  white-space: normal;
+}
+.progress-report-settings .progress-report-exercise-picker {
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+}
+.progress-report-settings .progress-report-exercise-picker label {
+  min-height: 44px;
+}
+.progress-report-subject {
+  font-weight: 600;
+}
+@media screen and (max-width: 680px) {
+  .progress-report-page {
+    width: 100%;
+    min-width: 0;
+    padding: 16px max(12px, var(--yfc-layout-safe-right)) calc(24px + var(--yfc-layout-safe-bottom))
+      max(12px, var(--yfc-layout-safe-left));
+  }
+  .progress-report-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .progress-report-toolbar > .yfc-lockup {
+    margin-left: auto;
+  }
+  .progress-report-toolbar > button {
+    flex-basis: 100%;
+    min-height: 48px;
+  }
+  .progress-report-settings .ui-tab {
+    flex-basis: calc(33.333% - 4px);
+    min-width: 0;
+    font-size: 0.8125rem;
+  }
+  .progress-report-document {
+    margin-top: 20px;
+    padding: 16px;
+    border: 0;
+    border-radius: 20px;
+  }
+  .progress-report-overview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    padding: 0 0 16px;
+    border: 0;
+  }
+  .progress-report-overview h1 {
+    font-size: 30px;
+    line-height: 1.12;
+    letter-spacing: -0.035em;
+  }
+  .progress-report-overview p {
+    font-size: 0.8125rem;
+    overflow-wrap: anywhere;
+  }
+  .progress-report-overview__adherence {
+    gap: 4px;
+  }
+  .progress-report-overview__adherence strong {
+    font-size: 32px;
+  }
+  .progress-report-confidence {
+    gap: 8px;
+    margin-block: 16px;
+  }
+  .progress-report-confidence .data-confidence {
+    padding: 12px;
+  }
+  .progress-report-factual-summary {
+    margin-block: 16px;
+    padding: 12px;
+    gap: 12px;
+  }
+  .progress-report-factual-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .progress-report-factual-summary dl > div {
+    padding: 8px;
+  }
+  .progress-report-section,
+  .progress-report-methodology {
+    padding-block: 16px;
+  }
+  .progress-report-section h2 {
+    font-size: 1.375rem;
+    line-height: 1.25;
+  }
+  .progress-report-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .progress-report-facts > div {
+    min-height: 80px;
+    padding: 12px;
+  }
+  .progress-report-document :is(dt, dd, th, td) {
+    overflow-wrap: anywhere;
+  }
+  .progress-report-document table {
+    width: 100%;
+    table-layout: fixed;
+    font-size: 0.75rem;
+  }
+  .progress-report-document :is(th, td) {
+    padding: 8px 4px;
+  }
+  .progress-report-document
+    :is(.progress-report-body-table, .progress-report-wellbeing-days__table-wrap) {
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 17mm 16mm 19mm;
+  }
+  .progress-report-document {
+    font-family: var(--font-sans);
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+  .progress-report-print-page-section {
+    break-before: auto;
+  }
+  .progress-report-print-header--continuation {
+    display: none;
+  }
+  .progress-report-print-header {
+    min-height: 0;
+    margin-bottom: 5mm;
+    padding: 0 0 3mm;
+  }
+  .progress-report-print-footer {
+    position: static;
+    top: auto;
+    bottom: auto;
+    margin-top: 4mm;
+    break-inside: avoid;
+    font-size: 9pt;
+  }
+  .progress-report-factual-summary {
+    display: block;
+    margin-block: 4mm;
+    padding: 3mm;
+  }
+  .progress-report-factual-summary dl {
+    display: block;
+    margin-top: 3mm;
+  }
+  .progress-report-factual-summary dl > div {
+    grid-template-columns: 32mm minmax(0, 1fr);
+    padding: 2mm;
+    break-inside: avoid;
+  }
+  .progress-report-exercises article,
+  .progress-report-checkin,
+  .progress-report-document .data-viz-chart {
+    break-inside: avoid;
+  }
+  .progress-report-overview {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4mm;
+    padding: 0 0 4mm;
+    border: 0;
+  }
+  .progress-report-overview h1 {
+    font-size: 24pt;
+  }
+  .progress-report-overview__adherence strong {
+    font-size: 22pt;
+  }
+  .progress-report-confidence {
+    grid-template-columns: minmax(0, 1fr);
+    margin-block: 4mm;
+    gap: 2mm;
+  }
+  .progress-report-confidence .data-confidence {
+    padding: 2mm;
+    font-size: 10pt;
+  }
+  .progress-report-section,
+  .progress-report-methodology {
+    display: block;
+    padding-block: 4mm;
+  }
+  .progress-report-facts {
+    break-inside: avoid;
+  }
+  .progress-report-document :is(h2, h3, header) {
+    break-after: avoid;
+  }
+  .progress-report-document :is(tr, .progress-report-facts > div) {
+    break-inside: avoid;
+  }
+  .progress-report-document thead {
+    display: table-header-group;
+  }
+  .progress-report-document :is(table, th, td) {
+    font-size: 10pt;
   }
 }

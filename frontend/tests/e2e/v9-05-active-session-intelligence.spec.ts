@@ -32,7 +32,7 @@ test('V9-05 composes the active session summary and focuses the current set', as
   await expect(summary).toContainText('Отдых');
   await expect(summary).toContainText('Можно рассмотреть небольшое увеличение веса');
   await expect(summary.getByText('Серверное назначение')).toBeVisible();
-  await expect(summary.getByText('Личная настройка')).toBeVisible();
+  await expect(summary.getByRole('button', { name: 'Добавить настройку' })).toBeVisible();
   await expectTouchTargets(summary.locator('button'));
 
   const weight = page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });

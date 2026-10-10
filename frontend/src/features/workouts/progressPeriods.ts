@@ -116,7 +116,10 @@ export function progressViewPath(search: string, view: ProgressView, hash = ''):
   return `${url.pathname}${url.search}`;
 }
 
-export function progressReportPath(selection: ProgressSelection): string {
+export function progressReportPath(
+  selection: ProgressSelection,
+  view: ProgressView = 'overview',
+): string {
   const params = new URLSearchParams({
     period: selection.kind === 'custom' ? 'custom' : `days_${selection.days}`,
   });
@@ -124,6 +127,7 @@ export function progressReportPath(selection: ProgressSelection): string {
     params.set('date_from', selection.dateFrom);
     params.set('date_to', selection.dateTo);
   }
+  if (view !== 'overview') params.set('progress_view', view);
   return `/app/report?${params.toString()}`;
 }
 

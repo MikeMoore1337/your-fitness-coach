@@ -2511,8 +2511,9 @@ test('поля адаптируются к разным iPhone, а пример 
   await openAppDestination(page, 'Прогресс');
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тело Вес и окружности$/ })
+    .getByRole('link', { name: /^Тело$/ })
     .click();
+  await page.locator('.progress-measurement-editor > summary').click();
   const measurementForm = page.locator('.measurement-diary__form');
   const dateField = measurementForm.locator('input[type="date"]');
   const weightField = measurementForm.getByLabel('Вес, кг');
@@ -2909,30 +2910,33 @@ test('клиент собирает и переупорядочивает лич
   await settings.locator('summary').click();
   await expect(goal).toBeHidden();
 
-  const exercisePicker = builder.getByRole('combobox', { name: 'Поиск упражнения' }).first();
-  await exercisePicker.fill('Тяга');
-  await builder.getByRole('button', { name: 'Техника: Тяга блока' }).click();
+  const exercisePicker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await exercisePicker.click();
+  const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
+  const exerciseSearch = pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' });
+  await exerciseSearch.fill('Тяга');
+  await pickerSheet.getByRole('button', { name: 'Техника: Тяга блока' }).click();
   await expect(page.getByRole('dialog', { name: /Тяга блока/ })).toBeVisible();
   const closeGuide = page.getByRole('button', { name: 'Закрыть карточку упражнения' });
   await expect(closeGuide).toBeInViewport();
   await closeGuide.click();
-  await expect(exercisePicker).toHaveValue('Тяга');
-  await exercisePicker.focus();
+  await exercisePicker.click();
+  await expect(exerciseSearch).toHaveValue('Тяга');
   await expect(
-    builder.locator('.exercise-picker__option img[data-media-mode="static-poster"]'),
+    pickerSheet.locator('.exercise-picker__option img[data-media-mode="static-poster"]'),
   ).toHaveCount(1);
   await page.screenshot({
     path: '../.artifacts/tasks/390/evidence/screenshots/program-builder-mobile-390x844-picker.png',
     fullPage: true,
   });
-  await builder.getByRole('option', { name: /Тяга блока/ }).click();
-  await expect(exercisePicker).toHaveValue('Тяга блока');
+  await pickerSheet.getByRole('button', { name: /^Тяга блока/ }).click();
+  await expect(exercisePicker).toContainText('Тяга блока');
   await expect(builder.getByText('1 тренировка · 1 упр.', { exact: true })).toBeVisible();
 
   await builder.getByRole('button', { name: 'Добавить упражнение' }).first().click();
-  const exercisePickers = builder.getByRole('combobox', { name: 'Поиск упражнения' });
-  await expect(exercisePickers.nth(0)).toHaveValue('Тяга блока');
-  await expect(exercisePickers.nth(1)).toHaveValue('');
+  const exercisePickers = builder.getByRole('button', { name: 'Поиск упражнения' });
+  await expect(exercisePickers.nth(0)).toContainText('Тяга блока');
+  await expect(exercisePickers.nth(1)).toContainText('Выбрать упражнение');
   const moveExerciseDown = builder.getByRole('button', {
     name: 'Переместить упражнение 1 ниже',
   });
@@ -2943,8 +2947,8 @@ test('клиент собирает и переупорядочивает лич
     0,
   );
   await expect(exerciseRows.nth(1).getByRole('button', { name: 'Техника и детали' })).toBeVisible();
-  await expect(exercisePickers.nth(0)).toHaveValue('');
-  await expect(exercisePickers.nth(1)).toHaveValue('Тяга блока');
+  await expect(exercisePickers.nth(0)).toContainText('Выбрать упражнение');
+  await expect(exercisePickers.nth(1)).toContainText('Тяга блока');
   await builder.getByRole('button', { name: 'Удалить упражнение 1 из дня 1' }).click();
 
   await builder.getByRole('button', { name: 'Добавить день' }).click();
@@ -2986,7 +2990,7 @@ test('сенсорное поле даты сохраняет нативный �
   browser,
 }) => {
   const context = await browser.newContext({
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: process.env.PW_BASE_URL ?? 'http://127.0.0.1:4173',
     viewport: { width: 390, height: 844 },
     hasTouch: true,
     isMobile: true,
@@ -3000,8 +3004,9 @@ test('сенсорное поле даты сохраняет нативный �
     await openAppDestination(page, 'Прогресс');
     await page
       .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('link', { name: /^Тело Вес и окружности$/ })
+      .getByRole('link', { name: /^Тело$/ })
       .click();
+    await page.locator('.progress-measurement-editor > summary').click();
     const dateField = page.getByLabel('Дата');
     const dateControl = page.locator('.diary-date-control');
     await expect(dateField).toHaveAttribute('type', 'date');
