@@ -1,8 +1,8 @@
 # PR #915 · адресная визуальная полировка
 
-BEFORE `27eec7d1787dedff6719dee9121eb0772ec00029` → AFTER `b9c81ae85cf8cec0c54b089e50201c0162973102`. Реальная локальная production-сборка приложения, синтетические API-данные. Поля данных, маршруты, типографика и PDF не изменялись.
+BEFORE `27eec7d1787dedff6719dee9121eb0772ec00029` → runtime AFTER `b9c81ae85cf8cec0c54b089e50201c0162973102`; финальный HEAD `e88ba039ec02794c1ec983d3355cf1a46fa9fb06`. После съёмки изменился только TMA-тест, diff runtime пуст. Реальная локальная production-сборка приложения, синтетические API-данные. Поля данных, маршруты, типографика и PDF не изменялись.
 
-[Галерея](index.html) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) · [CI](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581) · [Полный список файлов](audit/changed-files.md) · [Manifest SHA-256](manifest.json).
+[Галерея](index.html) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) · [CI](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673) · [Полный список файлов](audit/changed-files.md) · [Manifest SHA-256](manifest.json).
 
 | Замечание | Статус | Изменение и прямые доказательства |
 | --- | --- | --- |
@@ -13,7 +13,7 @@ BEFORE `27eec7d1787dedff6719dee9121eb0772ec00029` → AFTER `b9c81ae85cf8cec0c54
 | Наложения / горизонтальный скролл страницы | NOT_REPRODUCED | 320/360/393/430, обе темы, оба движка; нижнее действие доступно после полного скролла. [Низ](after/webkit-360-dark-progress-bottom.png), [замеры](audit/after-geometry.json). |
 | WebKit / физический Safari | BLOCKED для физической калибровки | Реальный WebKit проходит геометрию, фокус и fallback. В доступном headless raster WebKit blur визуально не рисуется даже с literal значением; computed styles недостаточно для подтверждения размытия. Chromium raster подтверждает blur. Тонирование обеспечивает контраст и без blur. [Оптическая проверка](audit/optical-check.json). Физический iPhone, VoiceOver и нативный Telegram недоступны. |
 
-30 unit, 30 адресных Chromium/WebKit, 16 общих glass-сценариев. Typecheck, lint/Russian UI guard, форматирование и build прошли. [CI текущего SHA](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581) имеет статус `in_progress` / ``; источник истины — Actions.
+30 unit, 30 адресных Chromium/WebKit, 16 общих glass-сценариев, 2 проверки достижимости stale TMA и desktop header. Финальное сравнение 10 Windows critical visual случаев прошло без обновления baseline; нативный Linux Chromium/WebKit CI проверяет все 10 отдельно. Typecheck, lint/Russian UI guard, форматирование и build прошли. [CI текущего SHA](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673) имеет статус `completed` / `success`; источник истины — Actions.
 
 [Прокрутка Mobile Web](audit/performance.json) и [TMA-модель](audit/performance-tma.json): парные пробы BEFORE/AFTER, три прохода, одинаковые данные; это лабораторные измерения Windows, а не FPS физического телефона или field INP. WebKit не поддерживает Long Tasks API: null означает отсутствие измерения. Контрольные фото/белый/чёрный фон в галерее отделены подписями от реальных экранов продукта. Используется существующее локальное фото YFC, личные данные и исходные журналы не публикуются.
 
@@ -267,6 +267,7 @@ MERGE=false · DEPLOY=false · FINAL_STATUS=STOP_OWNER_RELEASE_APPROVAL.
 - [after · webkit · 360 · light · Навигация · фрагмент реального снимка](after/webkit-360-light-navigation.png)
 - [after · webkit · 360 · light · TMA · клавиатурная модель](after/webkit-360-light-tma-keyboard.png)
 - [after · webkit · 360 · light · TMA · высота 480 и safe-area](after/webkit-360-light-tma-short.png)
+- [after · webkit · 390 · dark · TMA · stale-карточка доступна прокруткой](after/webkit-390-dark-tma-stale-reachable.png)
 - [after · webkit · 393 · dark · Меню над реальным графиком](after/webkit-393-dark-chart-menu.png)
 - [after · webkit · 393 · dark · Навигация над реальным графиком](after/webkit-393-dark-chart-navigation.png)
 - [after · webkit · 393 · dark · Меню + над текстовой карточкой](after/webkit-393-dark-menu.png)

@@ -1,11 +1,13 @@
 {
   "before": "27eec7d1787dedff6719dee9121eb0772ec00029",
-  "head": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
   "unit_tests": 30,
+  "stale_tma_browser_cases": 2,
+  "desktop_header_cases": 1,
   "addressed_browser_cases": 30,
   "shared_glass_browser_cases": 16,
   "critical_visual_cases": 10,
-  "windows_visual": "PASS after reviewed Progress baseline updates; final non-update rerun recorded separately",
+  "windows_visual": "PASS: 10 cases; final comparison without snapshot update",
   "linux_visual": "Docker native font raster differs in four existing nutrition baselines and one WebKit workout baseline; these unrelated files are preserved. Required native CI is authoritative, not an updated-snapshot run.",
   "engines": [
     "Chromium",
@@ -28,5 +30,7 @@
   "merge": false,
   "deploy": false,
   "env_change_required": false,
-  "final_status": "STOP_OWNER_RELEASE_APPROVAL"
+  "final_status": "STOP_OWNER_RELEASE_APPROVAL",
+  "runtime_capture_commit": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "runtime_diff_after_capture": "EMPTY"
 }

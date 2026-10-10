@@ -1,7 +1,8 @@
 {
   "before_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
   "runtime_capture_commit": "b9c81ae85cf8cec0c54b089e50201c0162973102",
-  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581",
+  "acceptance_head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+  "ci": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673",
   "screenshots": [
     {
       "state": "before",
@@ -2446,6 +2447,16 @@
     {
       "state": "after",
       "engine": "webkit",
+      "width": "390",
+      "theme": "dark",
+      "view": "tma-stale-reachable",
+      "label": "TMA · stale-карточка доступна прокруткой",
+      "path": "after/webkit-390-dark-tma-stale-reachable.png",
+      "kind": "application"
+    },
+    {
+      "state": "after",
+      "engine": "webkit",
       "width": "393",
       "theme": "dark",
       "view": "chart-menu",
@@ -4140,6 +4151,11 @@
       "sha256": "0d2d0d88cc83a975bd52b50293f096ed7c8da54bb48dcc57cdbf39e478134cbc"
     },
     {
+      "path": "after/webkit-390-dark-tma-stale-reachable.png",
+      "bytes": 56582,
+      "sha256": "288e15d06fbc5328128a49cd9a6b07e15bb144e868aba48f22d4a4dd6c43b538"
+    },
+    {
       "path": "after/webkit-393-dark-chart-menu.png",
       "bytes": 63260,
       "sha256": "51bde83d64b8f0159f4c3983e01128b932d16498fec10e5104f920a89a5c0742"
@@ -4436,18 +4452,28 @@
     },
     {
       "path": "audit/changed-files.json",
-      "bytes": 10250,
-      "sha256": "e6bf8cdbe885031d7d34eb7c71417f859815a19c972c380e086a6bbddcbd6bd1"
+      "bytes": 10294,
+      "sha256": "37b35de6433a8db247551ca4b181cb4609e470ca07c56b5c34069e7de4ad622d"
     },
     {
       "path": "audit/changed-files.md",
-      "bytes": 32266,
-      "sha256": "fc27114b1717bc9cd6105bd2465811a28bf2d3f0c33d2fca99ea0ee57a7c6fdc"
+      "bytes": 32443,
+      "sha256": "56b89a2e1b58ba68c90bf021e370eed46136d422e54c56762ca97a1b96d6b70a"
+    },
+    {
+      "path": "audit/ci-triage.json",
+      "bytes": 637,
+      "sha256": "5894bb4cf88a3e1d79ea7072ad05f0e6a70f5204da0d6af77b0c0312af5521c9"
     },
     {
       "path": "audit/ci.json",
-      "bytes": 6645,
-      "sha256": "d3d4f90da48964515d4929b06849df2bc2a875a3b241adeb26fc187ec9a66254"
+      "bytes": 7117,
+      "sha256": "9901b07a6b7942b69333f57cb32a5bd0d1161c57a3f296eccf63ca24d4d68eb1"
+    },
+    {
+      "path": "audit/linux-existing-raster-differences.json",
+      "bytes": 2104,
+      "sha256": "96cb4534c191d7294f123135bda8efe794dc4238fb40cca531d8509c740a06df"
     },
     {
       "path": "audit/optical-check.json",
@@ -4456,13 +4482,13 @@
     },
     {
       "path": "audit/performance-tma.json",
-      "bytes": 12631,
-      "sha256": "a0ed64cf5d2636b6a1d8e2cce5f2660b3eddd309d822cbd6918b96c8baec804f"
+      "bytes": 12696,
+      "sha256": "891f08682e6e5d74d09761690a4a3aa3945a7f4a9ba6aca82d2a6e0056ffe236"
     },
     {
       "path": "audit/performance.json",
-      "bytes": 12537,
-      "sha256": "1ffa1eaebbdb3bbb6ebeb652c645a4223410c2874815cdf7815e3153ded2bb32"
+      "bytes": 12602,
+      "sha256": "063f13fa7604977fee18e20958fba28fb745d41270bbf2914ffc1d4908d8f0a3"
     },
     {
       "path": "audit/tma-checks.json",
@@ -4471,8 +4497,8 @@
     },
     {
       "path": "audit/verification.json",
-      "bytes": 1142,
-      "sha256": "82c9da9898fb8365957d3b4182e8a1fdf2849bdf33699fab067d2e0935b409bb"
+      "bytes": 1283,
+      "sha256": "5209c2b57b831561fae9560bf4945b544a3e530d90696ecf4af0180f4124b05a"
     },
     {
       "path": "before/chromium-320-dark-menu.png",
@@ -5396,13 +5422,13 @@
     },
     {
       "path": "index.html",
-      "bytes": 134139,
-      "sha256": "c772000e667866e4fb48d13befd136acabded981efdcdeef0aea14204f8cda62"
+      "bytes": 134664,
+      "sha256": "6945c3ae848eae5902e3d4122df626f5e21a3f5faf5d75f487167ded4a7d7745"
     },
     {
       "path": "README.md",
-      "bytes": 56148,
-      "sha256": "3498e6cf703eb28f3fab0260ad724ba204e110bd490723d1ca6b9bebf963a683"
+      "bytes": 56768,
+      "sha256": "82a1615bda8db59511020ec4560ae7e6e16f897827e24419901827e28f5bf5fc"
     }
   ]
 }

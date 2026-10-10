@@ -1,0 +1,16 @@
+{
+  "initial_run": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581",
+  "final_run": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673",
+  "classification": "test position assumption",
+  "before_original_test": "PASS",
+  "after_original_test": "FAIL at static overlap without scrolling",
+  "after_revised_test": "PASS Chromium and WebKit",
+  "original_no_overlap_assertion_preserved": true,
+  "added_checks": [
+    "scroll to reading position",
+    "full viewport visibility",
+    "44px touch target",
+    "successful details click"
+  ],
+  "runtime_change_after_capture": false
+}

@@ -1,0 +1,87 @@
+{
+  "before_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
+  "after_runtime_commit": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "classification": "Existing Docker/native runner font raster mismatch regions are identical BEFORE/AFTER. Expected tint changes are confined to navigation. Unrelated repository baselines preserved; native CI passes.",
+  "files": [
+    {
+      "engine": "chromium",
+      "file": "nutrition-390x844-dark.png",
+      "existing_raster_difference_region": [
+        290,
+        1730,
+        340,
+        1763
+      ],
+      "existing_region_before_after_identical": true,
+      "expected_navigation_material_change_region": [
+        0,
+        762,
+        290,
+        822
+      ]
+    },
+    {
+      "engine": "chromium",
+      "file": "nutrition-390x844-light.png",
+      "existing_raster_difference_region": [
+        295,
+        1736,
+        335,
+        1758
+      ],
+      "existing_region_before_after_identical": true,
+      "expected_navigation_material_change_region": [
+        0,
+        762,
+        290,
+        822
+      ]
+    },
+    {
+      "engine": "webkit",
+      "file": "active-workout-390x844-dark.png",
+      "existing_raster_difference_region": [
+        19,
+        1786,
+        149,
+        1855
+      ],
+      "existing_region_before_after_identical": true,
+      "expected_navigation_material_change_region": null
+    },
+    {
+      "engine": "webkit",
+      "file": "nutrition-390x844-dark.png",
+      "existing_raster_difference_region": [
+        292,
+        1733,
+        337,
+        1761
+      ],
+      "existing_region_before_after_identical": true,
+      "expected_navigation_material_change_region": [
+        1,
+        773,
+        289,
+        831
+      ]
+    },
+    {
+      "engine": "webkit",
+      "file": "nutrition-390x844-light.png",
+      "existing_raster_difference_region": [
+        293,
+        1734,
+        336,
+        1759
+      ],
+      "existing_region_before_after_identical": true,
+      "expected_navigation_material_change_region": [
+        1,
+        773,
+        289,
+        831
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "before": "27eec7d1787dedff6719dee9121eb0772ec00029",
-  "head": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
   "polish_files": [
     "frontend/src/styles/design-v2.css",
     "frontend/src/styles/liquid-glass.css",
@@ -15,7 +15,8 @@
     "frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/progress-390x844-light.png",
     "frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-dark.png",
     "frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-light.png",
-    "frontend/tests/e2e/soft-glass.spec.ts"
+    "frontend/tests/e2e/soft-glass.spec.ts",
+    "frontend/tests/e2e/tma-smoke.spec.ts"
   ],
   "all_pr_files": [
     "backend/fitminiapp_api/assets/fonts/Inter-Bold.ttf",

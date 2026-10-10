@@ -502,6 +502,7 @@
   ],
   "before_commit": "27eec7d1787dedff6719dee9121eb0772ec00029",
   "after_commit": "b9c81ae85cf8cec0c54b089e50201c0162973102",
+  "acceptance_head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
   "medians": [
     {
       "engine": "chromium",

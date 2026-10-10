@@ -1,182 +1,194 @@
 {
-  "head": "b9c81ae85cf8cec0c54b089e50201c0162973102",
-  "status": "in_progress",
-  "conclusion": "",
-  "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581",
+  "head": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+  "status": "completed",
+  "conclusion": "success",
+  "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673",
   "jobs": [
     {
       "name": "CI scope router",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233422283"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235806326"
     },
     {
       "name": "Frontend (checks)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467829"
-    },
-    {
-      "name": "Delivery policy",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467857"
-    },
-    {
-      "name": "Workflow contracts",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467862"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850319"
     },
     {
       "name": "Migrated PostgreSQL stack",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467865"
-    },
-    {
-      "name": "Mobile regression (Chromium + WebKit)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467867"
-    },
-    {
-      "name": "Frontend smoke (4/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467876"
-    },
-    {
-      "name": "CodeQL security (javascript-typescript)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467894"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850349"
     },
     {
       "name": "Python quality",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467901"
-    },
-    {
-      "name": "Frontend smoke (1/5)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467903"
-    },
-    {
-      "name": "Critical application smoke",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467905"
-    },
-    {
-      "name": "Frontend smoke (2/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467937"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850352"
     },
     {
       "name": "Frontend smoke (3/5)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467938"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850353"
+    },
+    {
+      "name": "Delivery policy",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850366"
+    },
+    {
+      "name": "Workflow contracts",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850369"
     },
     {
       "name": "Frontend (unit)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467946"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850381"
     },
     {
-      "name": "CodeQL security (python)",
+      "name": "Mobile regression (Chromium + WebKit)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467954"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850391"
+    },
+    {
+      "name": "Frontend smoke (4/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850392"
+    },
+    {
+      "name": "Python tests (3/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850395"
+    },
+    {
+      "name": "Python tests (4/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850405"
+    },
+    {
+      "name": "Frontend smoke (2/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850411"
     },
     {
       "name": "Free PR security audit",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467959"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850426"
     },
     {
-      "name": "Python tests (5/5)",
+      "name": "Frontend smoke (1/5)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467975"
-    },
-    {
-      "name": "Frontend smoke (5/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233467977"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850427"
     },
     {
       "name": "Python tests (2/5)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468012"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850434"
     },
     {
-      "name": "Python tests (4/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468014"
+      "name": "Frontend smoke (5/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850438"
+    },
+    {
+      "name": "Critical application smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850439"
+    },
+    {
+      "name": "CodeQL security (javascript-typescript)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850451"
+    },
+    {
+      "name": "Python tests (5/5)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850452"
     },
     {
       "name": "Python tests (1/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468019"
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850476"
     },
     {
-      "name": "Python tests (3/5)",
-      "status": "in_progress",
-      "conclusion": "",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468037"
+      "name": "CodeQL security (python)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235850529"
     },
     {
       "name": "Extended mobile regression (Firefox + WebKit)",
       "status": "completed",
       "conclusion": "skipped",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468758"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235851693"
     },
     {
       "name": "Weekly cross-browser regression (Chromium + Firefox + WebKit)",
       "status": "completed",
       "conclusion": "skipped",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233468793"
-    },
-    {
-      "name": "Container (backend)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233608649"
-    },
-    {
-      "name": "Container (hermes-discovery)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233608670"
-    },
-    {
-      "name": "Dependency audit",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233608677"
-    },
-    {
-      "name": "Container (hermes-worker)",
-      "status": "completed",
-      "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233608695"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114235851726"
     },
     {
       "name": "Container (bot)",
       "status": "completed",
       "conclusion": "success",
-      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059065581/job/114233608699"
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236026817"
+    },
+    {
+      "name": "Dependency audit",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236026823"
+    },
+    {
+      "name": "Container (hermes-worker)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236026848"
+    },
+    {
+      "name": "Container (hermes-discovery)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236026856"
+    },
+    {
+      "name": "Container (backend)",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236026863"
+    },
+    {
+      "name": "checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236909161"
+    },
+    {
+      "name": "Private scheduled Allure report",
+      "status": "completed",
+      "conclusion": "skipped",
+      "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38059888673/job/114236909373"
     }
   ]
 }
