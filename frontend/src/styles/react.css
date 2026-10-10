@@ -6515,10 +6515,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-presets .ui-button span {
-  overflow: hidden;
   max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
 }
 
 .hydration-presets .ui-button strong {
