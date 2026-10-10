@@ -1400,6 +1400,7 @@
     box-shadow: 0 3px 16px #00000018;
   }
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
+    min-width: 44px;
     min-height: 56px;
     border-radius: 18px;
     background: transparent;
@@ -1455,6 +1456,12 @@
       var(--yfc-viewport-height, 100dvh) - 24px - var(--yfc-layout-safe-top) -
         var(--yfc-layout-safe-bottom)
     );
+  }
+}
+
+@media (max-width: 359px) {
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav--demo {
+    right: calc(max(12px, var(--yfc-layout-safe-right)) + 60px);
   }
 }
 
@@ -1855,18 +1862,23 @@
   .workout-context-row .workout-schedule-actions button {
     min-height: 44px;
   }
-  .active-workout-exercise.is-completed {
+  .active-workout--design-v2 .active-workout-exercise.is-completed {
     padding: 16px;
   }
   .active-workout-exercise.is-completed .active-workout-exercise__head {
     gap: 12px;
   }
-  .active-workout-setup-memory--empty {
+  .active-workout--design-v2
+    .active-workout-exercise.is-completed
+    .active-workout-setup-memory--empty {
     padding: 0;
     border: 0;
     background: transparent;
   }
-  .active-workout-setup-memory--empty button {
+  .active-workout--design-v2
+    .active-workout-exercise.is-completed
+    .active-workout-setup-memory--empty
+    button {
     min-height: 44px;
     padding: 8px 0;
     font-size: 0.8125rem;

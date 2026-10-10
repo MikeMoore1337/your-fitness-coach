@@ -134,6 +134,7 @@ test('approved B mobile picker preserves editor draft and supports keyboard sear
     longExerciseName: true,
   });
   await page.goto('/app?section=programs&view=manage&start=templates');
+  await expect(page.locator('.program-current-block h4')).toBeVisible();
   await page.getByRole('button', { name: 'Редактировать шаблон', exact: true }).click();
   const editor = page.locator('.program-editor-modal');
   const title = editor.getByLabel('Название', { exact: true });
@@ -157,4 +158,55 @@ test('approved B mobile picker preserves editor draft and supports keyboard sear
   await expect(dialog).toHaveCount(0);
   await expect(title).toHaveValue('Мой сохранённый черновик');
   await expectNoHorizontalOverflow(page);
+});
+
+test('approved B completed exercise keeps inset content and a compact empty setup', async ({
+  page,
+}) => {
+  await installPlatformApi(page, {
+    browserSession: true,
+    workoutStatus: 'in_progress',
+    longExerciseName: true,
+  });
+  const response = page.waitForResponse('**/api/v1/workouts/today');
+  await page.goto('/app?section=today');
+  const workout = await (await response).json();
+  const completed = workout.exercises[0];
+  completed.sets.forEach(
+    (set: { is_completed: boolean; actual_reps: number; actual_weight: number }) => {
+      set.is_completed = true;
+      set.actual_reps = 12;
+      set.actual_weight = 40;
+    },
+  );
+  completed.setup_memory = null;
+  const next = structuredClone(completed);
+  next.id += 1;
+  next.exercise_id += 1;
+  next.sets.forEach((set: { id: number; is_completed: boolean }) => {
+    set.id += 10;
+    set.is_completed = false;
+  });
+  workout.exercises.push(next);
+  await page.route(/\/api\/v1\/workouts\/(?:today|42)(?:\?|$)/, (route) =>
+    route.fulfill({ json: workout }),
+  );
+  await page.goto('/app?section=today');
+  await page.getByRole('button', { name: 'Продолжить тренировку', exact: true }).click();
+  const card = page.locator('.active-workout-exercise.is-completed');
+  await expect(card).toHaveCount(1);
+  for (const width of [360, 393, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(card).toHaveCSS('padding-left', '16px');
+    await expect(card).toHaveCSS('padding-right', '16px');
+    const setup = card.locator('.active-workout-setup-memory--empty');
+    await expect(setup).toHaveCSS('border-width', '0px');
+    await expect(setup).toHaveCSS('padding', '0px');
+    expect(
+      (await setup.getByRole('button', { name: 'Добавить настройку' }).boundingBox())!.height,
+    ).toBeGreaterThanOrEqual(44);
+    await expectNoHorizontalOverflow(page);
+  }
+  await card.getByRole('button', { name: /сохранено/ }).click();
+  await expect(card.locator('.active-workout-exercise__sets')).toBeVisible();
 });

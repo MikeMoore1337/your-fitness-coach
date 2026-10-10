@@ -11254,6 +11254,17 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .progress-report-confidence .data-confidence {
     padding: 12px;
   }
+  .progress-report-factual-summary {
+    margin-block: 16px;
+    padding: 12px;
+    gap: 12px;
+  }
+  .progress-report-factual-summary dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .progress-report-factual-summary dl > div {
+    padding: 8px;
+  }
   .progress-report-section,
   .progress-report-methodology {
     padding-block: 16px;

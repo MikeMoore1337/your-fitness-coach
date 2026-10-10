@@ -466,14 +466,6 @@ function ReportContent({
         </div>
       </section>
 
-      {controls}
-
-      <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
-        <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
-        <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
-        <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
-      </section>
-
       <section
         className="progress-report-factual-summary"
         aria-labelledby="report-factual-summary-title"
@@ -495,6 +487,14 @@ function ReportContent({
         ) : (
           <p>За выбранный период пока нет заполненных фактов.</p>
         )}
+      </section>
+
+      {controls}
+
+      <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
+        <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
+        <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
+        <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
       </section>
 
       <section className="progress-report-section" aria-labelledby="report-training-title">

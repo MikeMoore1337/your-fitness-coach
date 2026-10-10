@@ -30,7 +30,7 @@ test('serves the install manifest, canonical icons and service worker contract',
         url: '/app?section=today&source=pwa-shortcut',
       }),
       expect.objectContaining({
-        name: 'Еда',
+        name: 'Добавить еду',
         url: '/app?section=nutrition&quick_add=food&source=pwa-shortcut',
       }),
     ]),

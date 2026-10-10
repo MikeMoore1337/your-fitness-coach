@@ -165,6 +165,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
         textColor=_TEXT,
         spaceBefore=3 * mm,
         spaceAfter=1.5 * mm,
+        keepWithNext=True,
     )
     body = ParagraphStyle(
         "YFCBody",

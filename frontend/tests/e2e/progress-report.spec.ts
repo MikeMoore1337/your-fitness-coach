@@ -91,6 +91,11 @@ test('full report keeps a mobile-first preview and print layout', async ({
   await expect(page.locator('.progress-report-document .progress-report-controls')).toHaveCount(1);
   await expect(page.locator('.progress-report-settings .progress-report-controls')).toBeVisible();
   await expect(
+    page.locator(
+      '.progress-report-overview + .progress-report-factual-summary + .progress-report-settings',
+    ),
+  ).toHaveCount(1);
+  await expect(
     page.locator('.progress-report-document > .progress-report-section #report-training-title'),
   ).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
