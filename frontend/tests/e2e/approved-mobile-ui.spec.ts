@@ -9,7 +9,7 @@ import { makeProgressReportFixture } from '../fixtures/progress-report';
 
 test.use({ serviceWorkers: 'block' });
 
-for (const width of [360, 393, 430])
+for (const width of [320, 360, 393, 430])
   for (const theme of ['dark', 'light'] as const) {
     test(`approved B navigation and quick add ${width} ${theme}`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
@@ -27,6 +27,23 @@ for (const width of [360, 393, 430])
       );
       await page.goto('/app?section=progress');
       const trigger = page.getByRole('button', { name: 'Быстро добавить', exact: true });
+      const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
+      const tabs = navigation.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
+      await expect(tabs).toHaveCount(4);
+      const navigationBox = (await navigation.boundingBox())!;
+      const triggerBox = (await trigger.boundingBox())!;
+      expect(triggerBox.x - navigationBox.x - navigationBox.width).toBeGreaterThanOrEqual(16);
+      for (const tab of await tabs.all()) {
+        const box = (await tab.boundingBox())!;
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+        const labelFits = await tab.locator('.app-bottom-nav__label').evaluate((label) => {
+          const bounds = label.getBoundingClientRect();
+          const parent = label.parentElement!.getBoundingClientRect();
+          return bounds.left >= parent.left && bounds.right <= parent.right;
+        });
+        expect(labelFits).toBe(true);
+      }
       await trigger.click();
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
       await expect(sheet.getByRole('link')).toHaveText([

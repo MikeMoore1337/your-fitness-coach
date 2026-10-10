@@ -247,7 +247,7 @@
   border-right: 1px solid var(--v2-border);
   border-bottom: 1px solid var(--v2-border);
   color: var(--v2-text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 750;
   line-height: 1.2;
@@ -944,7 +944,7 @@
 .app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
   grid-template-columns: 20px minmax(0, 1fr) 16px;
   grid-template-rows: auto auto;
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-size: 0.82rem;
   font-weight: 750;
   line-height: 1.2;
@@ -1388,12 +1388,12 @@
 
 @media (max-width: 899px) {
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav {
-    inset: auto calc(max(12px, var(--yfc-layout-safe-right)) + 66px)
+    inset: auto calc(max(12px, var(--yfc-layout-safe-right)) + 56px + var(--space-4))
       calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
       max(12px, var(--yfc-layout-safe-left));
     min-height: 64px;
     padding: 4px;
-    border: 0;
+    border: 1px solid var(--v2-border);
     border-radius: 22px;
     background: var(--v2-surface);
     backdrop-filter: none;
@@ -1402,6 +1402,7 @@
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
     min-width: 44px;
     min-height: 56px;
+    padding: 6px 2px;
     border-radius: 18px;
     background: transparent;
     box-shadow: none;
@@ -1409,6 +1410,10 @@
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active {
     color: var(--v2-accent-text);
     background: var(--v2-lime-soft);
+    box-shadow: inset 0 -2px var(--v2-lime);
+  }
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__primary {
+    gap: 0;
   }
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active::before {
     content: none;
@@ -1538,7 +1543,6 @@
     padding: 0;
   }
   .app-section--progress .progress-hero h1 {
-    font-family: var(--font-sans);
     font-size: 30px;
     line-height: 1.15;
     letter-spacing: -0.035em;
