@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
@@ -1105,14 +1105,18 @@ function CardioWorkoutRow({
   );
 }
 
-function RestTimer({
+export function RestTimer({
   userId,
   workoutId,
   nextLabel,
+  nextExercise,
+  nextPosition,
 }: {
   userId: number;
   workoutId: number;
   nextLabel: string;
+  nextExercise: string;
+  nextPosition: string;
 }) {
   const storageKey = activeWorkoutRestKey(userId, workoutId);
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
@@ -1126,6 +1130,12 @@ function RestTimer({
   });
   const [now, setNow] = useState(() => Date.now());
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  const [compact, setCompact] = useState(false);
+  const [dismissRequested, setDismissRequested] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const panel = useRef<HTMLElement>(null);
+  const pressedPointers = useRef(new Set<number>());
+  const layoutAnchor = useRef<{ element: Element; top: number } | null>(null);
   const wasBackgrounded = useRef(
     typeof document !== 'undefined' && document.visibilityState === 'hidden',
   );
@@ -1138,6 +1148,9 @@ function RestTimer({
       setNow(Date.now());
       setDeadline(nextDeadline);
       setCompletedNotice(null);
+      setCompact(false);
+      setDismissRequested(false);
+      setAnnouncement('');
       wasBackgrounded.current = document.visibilityState === 'hidden';
       writeStorage(storageKey, nextDeadline);
     };
@@ -1146,19 +1159,31 @@ function RestTimer({
   }, [storageKey, workoutId]);
   useEffect(() => {
     const markBackgrounded = () => {
-      if (document.visibilityState === 'hidden') wasBackgrounded.current = true;
+      if (document.visibilityState === 'hidden') {
+        wasBackgrounded.current = true;
+        pressedPointers.current.clear();
+      }
       setNow(Date.now());
     };
     const markPageHidden = () => {
       wasBackgrounded.current = true;
+      pressedPointers.current.clear();
     };
+    const startPointer = (event: PointerEvent) => pressedPointers.current.add(event.pointerId);
+    const endPointer = (event: PointerEvent) => pressedPointers.current.delete(event.pointerId);
     window.addEventListener('pageshow', markBackgrounded);
     window.addEventListener('pagehide', markPageHidden);
     document.addEventListener('visibilitychange', markBackgrounded);
+    document.addEventListener('pointerdown', startPointer, true);
+    document.addEventListener('pointerup', endPointer, true);
+    document.addEventListener('pointercancel', endPointer, true);
     return () => {
       window.removeEventListener('pageshow', markBackgrounded);
       window.removeEventListener('pagehide', markPageHidden);
       document.removeEventListener('visibilitychange', markBackgrounded);
+      document.removeEventListener('pointerdown', startPointer, true);
+      document.removeEventListener('pointerup', endPointer, true);
+      document.removeEventListener('pointercancel', endPointer, true);
     };
   }, []);
   useEffect(() => {
@@ -1171,6 +1196,8 @@ function RestTimer({
         removeStorage(storageKey);
         setDeadline(0);
         setCompletedNotice(`Отдых завершён · дальше: ${nextLabel}`);
+        setCompact(false);
+        setDismissRequested(false);
         if (
           wasHidden &&
           typeof Notification !== 'undefined' &&
@@ -1194,69 +1221,127 @@ function RestTimer({
       window.removeEventListener('pageshow', update);
     };
   }, [deadline, nextLabel, storageKey, workoutId]);
-  if (!seconds && !completedNotice) return null;
-  if (!seconds && completedNotice) {
-    return (
-      <aside
-        {...glassProps('tinted')}
-        className="active-workout-rest active-workout-rest--complete"
-        role="status"
-        aria-live="polite"
-      >
-        <span className="active-workout-rest__complete-copy">{completedNotice}</span>
-        <div className="active-workout-rest__actions app-action-group">
-          <button
-            {...glassProps('clear', true)}
-            type="button"
-            className="secondary"
-            onClick={() => setCompletedNotice(null)}
-          >
-            Скрыть
-          </button>
-        </div>
-      </aside>
-    );
-  }
+
+  useEffect(() => {
+    if (!completedNotice || (compact && !dismissRequested)) return;
+    const outside = (target: EventTarget | null) =>
+      target instanceof Node && !panel.current?.contains(target);
+    const settle = () => {
+      if (pressedPointers.current.size) return;
+      const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
+      if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
+      if (dismissRequested) setCompletedNotice(null);
+      else setCompact(true);
+    };
+    const click = (event: MouseEvent) => {
+      if (outside(event.target)) settle();
+    };
+    const focus = (event: FocusEvent) => {
+      if (outside(event.target)) settle();
+    };
+    // Keep the old hit surface until a separate outside action or a cancelled scroll gesture.
+    document.addEventListener('click', click);
+    document.addEventListener('focusin', focus);
+    document.addEventListener('pointercancel', settle);
+    document.addEventListener('wheel', settle, { passive: true });
+    return () => {
+      document.removeEventListener('click', click);
+      document.removeEventListener('focusin', focus);
+      document.removeEventListener('pointercancel', settle);
+      document.removeEventListener('wheel', settle);
+    };
+  }, [compact, completedNotice, dismissRequested]);
+  useLayoutEffect(() => {
+    const anchor = layoutAnchor.current;
+    layoutAnchor.current = null;
+    if (anchor?.element.isConnected) {
+      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+    }
+  }, [compact, completedNotice]);
+
+  if (!deadline && !completedNotice) return null;
   return (
     <aside
+      ref={panel}
       {...glassProps('tinted')}
-      className="active-workout-rest"
-      role="timer"
-      aria-live="polite"
+      className={`active-workout-rest${completedNotice ? ' active-workout-rest--complete' : ''}${compact ? ' is-compact' : ''}`}
+      aria-label="Отдых между подходами"
+      onMouseDown={(event) => {
+        if (event.target instanceof Element && event.target.closest('button'))
+          event.preventDefault();
+      }}
+      onClick={(event) => event.stopPropagation()}
     >
-      <div className="active-workout-rest__time">
+      <div className="active-workout-rest__time" hidden={compact}>
         <span>Отдых</span>
-        <strong>
+        <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
         </strong>
       </div>
-      <span className="active-workout-rest__next">Дальше: {nextLabel}</span>
-      <div className="active-workout-rest__actions app-action-group">
-        <button
-          {...glassProps('clear', true)}
+      <div className="active-workout-rest__next" hidden={compact}>
+        <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
+        <span>{nextPosition}</span>
+      </div>
+      <div className="active-workout-rest__actions" hidden={compact}>
+        {[30, 60].map((extraSeconds) => (
+          <Button
+            key={extraSeconds}
+            type="button"
+            glass="clear"
+            variant="secondary"
+            aria-disabled={Boolean(completedNotice)}
+            tabIndex={completedNotice ? -1 : undefined}
+            onClick={() => {
+              if (!deadline || completedNotice) return;
+              const currentTime = Date.now();
+              const nextDeadline = Math.max(deadline, currentTime) + extraSeconds * 1000;
+              setNow(currentTime);
+              setDeadline(nextDeadline);
+              writeStorage(storageKey, nextDeadline);
+              setAnnouncement(`К отдыху добавлено ${extraSeconds} секунд`);
+            }}
+          >
+            +{extraSeconds} сек
+          </Button>
+        ))}
+        <Button
           type="button"
-          className="secondary"
+          glass="clear"
+          variant="secondary"
+          aria-disabled={Boolean(completedNotice)}
+          tabIndex={completedNotice ? -1 : undefined}
           onClick={() => {
-            const nextDeadline = deadline + 30_000;
-            setDeadline(nextDeadline);
-            writeStorage(storageKey, nextDeadline);
-          }}
-        >
-          +30 сек
-        </button>
-        <button
-          {...glassProps('clear', true)}
-          type="button"
-          className="secondary"
-          onClick={() => {
+            if (completedNotice) return;
             removeStorage(storageKey);
             setDeadline(0);
-            setCompletedNotice(null);
+            setNow(Date.now());
+            setCompletedNotice(`Отдых пропущен · ${nextPosition}`);
+            setCompact(false);
           }}
         >
           Пропустить
-        </button>
+        </Button>
       </div>
+      {compact && (
+        <>
+          <span className="active-workout-rest__complete-copy">
+            {dismissRequested ? 'Сообщение скрыто' : completedNotice}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            glass="clear"
+            aria-disabled={dismissRequested}
+            onClick={() => setDismissRequested(true)}
+          >
+            {dismissRequested ? 'Скрыто' : 'Скрыть'}
+          </Button>
+        </>
+      )}
+      <span className="sr-only" role="status" aria-atomic="true">
+        {completedNotice ?? announcement}
+      </span>
     </aside>
   );
 }
@@ -1380,8 +1465,30 @@ export function TodayWorkout({
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     currentElement.scrollIntoView?.({
       behavior: reducedMotion ? 'auto' : 'smooth',
-      block: 'nearest',
+      // Keep the newly active set away from the fixed mobile dock while the rest panel is present.
+      block: 'center',
     });
+
+    const settleDockClearance = () => {
+      const navigation = document.getElementById('appBottomNav');
+      if (!navigation || window.matchMedia?.('(min-width: 900px)').matches) return;
+      const doneControls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
+      );
+      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
+      const nextControl = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
+      if (!nextControl) return;
+      const navigationTop = navigation.getBoundingClientRect().top;
+      const nextBottom = nextControl.getBoundingClientRect().bottom;
+      const overlap = nextBottom - navigationTop;
+      if (overlap <= 0) return;
+      window.scrollBy({
+        top: overlap + 8,
+        behavior: reducedMotion ? 'auto' : 'smooth',
+      });
+    };
+    const frameId = window.requestAnimationFrame(settleDockClearance);
+    return () => window.cancelAnimationFrame(frameId);
   }, [completed, currentSetId]);
 
   if (workout.isLoading)
@@ -1546,6 +1653,20 @@ export function TodayWorkout({
         />
 
         {!currentSet && adaptationEntry}
+
+        {user && started && (
+          <RestTimer
+            userId={user.id}
+            workoutId={data.id}
+            nextLabel={nextLabel}
+            nextExercise={currentSet?.exercise.exercise_title ?? 'Завершите тренировку'}
+            nextPosition={
+              currentSet
+                ? `Подход ${currentSet.set.set_number} из ${currentSet.exercise.sets.length}`
+                : 'Все подходы отмечены'
+            }
+          />
+        )}
 
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
@@ -1900,7 +2021,6 @@ export function TodayWorkout({
         )}
       </section>
 
-      {user && started && <RestTimer userId={user.id} workoutId={data.id} nextLabel={nextLabel} />}
       {guide && (
         <ExerciseGuideDialog
           exerciseId={guide.id}

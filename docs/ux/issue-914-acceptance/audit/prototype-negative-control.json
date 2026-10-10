@@ -1,0 +1,24 @@
+[
+  {
+    "engine": "chromium",
+    "commit": "aef7c2edaf07c077177130e302fbc32b4bb7367e",
+    "input": "?screen=__proto__",
+    "errors": [
+      "renderers[screen] is not a function"
+    ],
+    "headingCount": 0,
+    "reproduced": true,
+    "productionImpact": false
+  },
+  {
+    "engine": "webkit",
+    "commit": "aef7c2edaf07c077177130e302fbc32b4bb7367e",
+    "input": "?screen=__proto__",
+    "errors": [
+      "renderers[screen] is not a function. (In 'renderers[screen]()', 'renderers[screen]' is an instance of Object)"
+    ],
+    "headingCount": 0,
+    "reproduced": true,
+    "productionImpact": false
+  }
+]

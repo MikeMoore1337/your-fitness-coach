@@ -565,7 +565,6 @@ export default function MiniAppPage({
                 nutritionDate,
                 nutritionMeal,
                 nutritionQuickAdd,
-                nutritionHydrationOpen,
               ])}
               initial={user?.profile?.kbju}
               initialDate={nutritionDate}

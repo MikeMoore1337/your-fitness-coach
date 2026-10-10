@@ -55,7 +55,7 @@ function restingHeartRateInput(): HTMLInputElement {
   return input;
 }
 
-describe('ProfileForm avatar setting', () => {
+describe('ProfileForm personal data', () => {
   beforeEach(() => {
     localStorage.clear();
     apiMock.mockReset();
@@ -63,6 +63,21 @@ describe('ProfileForm avatar setting', () => {
   });
 
   afterEach(cleanup);
+
+  it('keeps the full selected goal readable and connected to its native select', () => {
+    renderForm();
+    fireEvent.click(screen.getByText('Личные данные и фитнес-профиль'));
+    const goal = screen.getByRole('combobox', { name: 'Цель' });
+    expect(goal).toHaveAccessibleDescription('Выберите цель из списка.');
+
+    fireEvent.change(goal, { target: { value: 'recomposition' } });
+    expect(goal).toHaveValue('recomposition');
+    expect(goal).toHaveAccessibleDescription('Улучшить форму без фокуса на вес');
+    expect(document.getElementById('profile-goal-value')).toBeVisible();
+
+    fireEvent.change(goal, { target: { value: 'muscle_gain' } });
+    expect(goal).toHaveAccessibleDescription('Набрать мышечную массу');
+  });
 
   it('opens the avatar editor from Personal data and restores focus to its trigger', async () => {
     renderForm();

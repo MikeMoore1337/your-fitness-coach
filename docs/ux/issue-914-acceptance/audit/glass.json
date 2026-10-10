@@ -1,0 +1,198 @@
+[
+  {
+    "engine": "chromium",
+    "theme": "dark",
+    "material": {
+      "background": "rgba(28, 33, 33, 0.95)",
+      "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+      "opacity": 0.95,
+      "text": [
+        {
+          "text": "Отдых",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "1:28",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "Далее: Жим штанги лёжа",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "Подход 2 из 3",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "+30 сек",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        },
+        {
+          "text": "+60 сек",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        },
+        {
+          "text": "Пропустить",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        }
+      ]
+    },
+    "fallback": "rgb(32, 37, 37)",
+    "preferenceRule": "Existing CSS media rule activated for browser probe, not native device setting",
+    "writes": []
+  },
+  {
+    "engine": "chromium",
+    "theme": "light",
+    "material": {
+      "background": "rgba(248, 250, 250, 0.96)",
+      "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+      "opacity": 0.96,
+      "text": [
+        {
+          "text": "Отдых",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "1:28",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "Далее: Жим штанги лёжа",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "Подход 2 из 3",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "+30 сек",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        },
+        {
+          "text": "+60 сек",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        },
+        {
+          "text": "Пропустить",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        }
+      ]
+    },
+    "fallback": "rgb(243, 245, 245)",
+    "preferenceRule": "Existing CSS media rule activated for browser probe, not native device setting",
+    "writes": []
+  },
+  {
+    "engine": "webkit",
+    "theme": "dark",
+    "material": {
+      "background": "rgba(28, 33, 33, 0.95)",
+      "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+      "opacity": 0.95,
+      "text": [
+        {
+          "text": "Отдых",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "1:28",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "Далее: Жим штанги лёжа",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "Подход 2 из 3",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 7.213293521951918
+        },
+        {
+          "text": "+30 сек",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        },
+        {
+          "text": "+60 сек",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        },
+        {
+          "text": "Пропустить",
+          "color": "rgb(245, 245, 245)",
+          "minimum": 11.786719149160797
+        }
+      ]
+    },
+    "fallback": "rgb(32, 37, 37)",
+    "preferenceRule": "Existing CSS media rule activated for browser probe, not native device setting",
+    "writes": []
+  },
+  {
+    "engine": "webkit",
+    "theme": "light",
+    "material": {
+      "background": "rgba(248, 250, 250, 0.96)",
+      "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+      "opacity": 0.96,
+      "text": [
+        {
+          "text": "Отдых",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "1:28",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "Далее: Жим штанги лёжа",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "Подход 2 из 3",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.170244067497606
+        },
+        {
+          "text": "+30 сек",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        },
+        {
+          "text": "+60 сек",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        },
+        {
+          "text": "Пропустить",
+          "color": "rgb(21, 21, 21)",
+          "minimum": 17.33719035370027
+        }
+      ]
+    },
+    "fallback": "rgb(243, 245, 245)",
+    "preferenceRule": "Existing CSS media rule activated for browser probe, not native device setting",
+    "writes": []
+  }
+]

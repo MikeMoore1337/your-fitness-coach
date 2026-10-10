@@ -21,6 +21,14 @@ from fitminiapp_api.services import progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
 
 
+def test_report_fonts_use_packaged_inter_and_oswald_with_cyrillic() -> None:
+    regular, bold, display = progress_report_pdf._register_fonts()
+    for name, family in [(regular, b"Inter"), (bold, b"Inter"), (display, b"Oswald")]:
+        face = progress_report_pdf.pdfmetrics.getFont(name).face
+        assert face.familyName == family
+        assert all(face.charToGlyph.get(ord(char)) for char in "ПрогрессЁёABC123№—−")
+
+
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/dev-login",

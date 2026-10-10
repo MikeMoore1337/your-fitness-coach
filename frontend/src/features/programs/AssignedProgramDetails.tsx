@@ -630,21 +630,6 @@ export function AssignedProgramDetails({
         />
       ) : lifecycle.data ? (
         <>
-          <div className="program-lifecycle__reason">
-            <Field
-              label="Причина для истории"
-              labelFor={`program-lifecycle-reason-${programId}`}
-              hint="Причина сохранится вместе с изменением программы или этапа."
-            >
-              <Input
-                id={`program-lifecycle-reason-${programId}`}
-                maxLength={500}
-                value={historyReason}
-                onChange={(event) => setHistoryReason(event.target.value)}
-                required
-              />
-            </Field>
-          </div>
           <article className="program-lifecycle" aria-label="Жизненный цикл программы">
             <div className="program-lifecycle__summary">
               <div className="program-lifecycle__status">
@@ -800,13 +785,34 @@ export function AssignedProgramDetails({
             <p className="program-current-block__note">{primaryBlock.notes}</p>
           )}
           {primaryBlock.is_deload && <Badge tone="warning">Облегчённый период</Badge>}
-          {blockActions(primaryBlock)}
+          <details className="program-current-block__actions">
+            <summary>Действия с этапом</summary>
+            {blockActions(primaryBlock)}
+          </details>
         </article>
       ) : (
         <EmptyState
           title="Тренировочные блоки ещё не настроены"
           text="Программа продолжает работать. Добавьте первый этап, чтобы зафиксировать его цель и период."
         />
+      )}
+
+      {lifecycle.data && (
+        <div className="program-lifecycle__reason">
+          <Field
+            label="Причина для истории"
+            labelFor={`program-lifecycle-reason-${programId}`}
+            hint="Причина сохранится вместе с изменением программы или этапа."
+          >
+            <Input
+              id={`program-lifecycle-reason-${programId}`}
+              maxLength={500}
+              value={historyReason}
+              onChange={(event) => setHistoryReason(event.target.value)}
+              required
+            />
+          </Field>
+        </div>
       )}
 
       {showAiAdaptation && canManageProgram && (

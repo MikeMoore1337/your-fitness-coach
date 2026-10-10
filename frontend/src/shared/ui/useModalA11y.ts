@@ -5,6 +5,7 @@ let openModalCount = 0;
 let originalScrollPosition = { x: 0, y: 0 };
 let originalBodyStyles: Partial<CSSStyleDeclaration> = {};
 let originalHtmlOverflow = '';
+const modalStack: Array<RefObject<HTMLElement | null>> = [];
 
 function lockDocumentScroll() {
   if (openModalCount === 0) {
@@ -74,6 +75,7 @@ export function useModalA11y<T extends HTMLElement>(
 
   useEffect(() => {
     if (!open) return;
+    modalStack.push(panelRef);
     const previousFocus =
       document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const frame = window.requestAnimationFrame(() => {
@@ -85,6 +87,7 @@ export function useModalA11y<T extends HTMLElement>(
       (preferred ?? first ?? panel)?.focus();
     });
     const onKeyDown = (event: KeyboardEvent) => {
+      if (modalStack.at(-1) !== panelRef) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         closeRef.current();
@@ -114,6 +117,8 @@ export function useModalA11y<T extends HTMLElement>(
     return () => {
       window.cancelAnimationFrame(frame);
       document.removeEventListener('keydown', onKeyDown);
+      const index = modalStack.indexOf(panelRef);
+      if (index >= 0) modalStack.splice(index, 1);
       previousFocus?.focus();
     };
   }, [initialFocusSelector, open]);

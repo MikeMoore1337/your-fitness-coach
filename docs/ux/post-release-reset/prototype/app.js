@@ -220,6 +220,13 @@ function syncUrl() {
 }
 
 function render() {
+  const [screenName, renderScreen] = Object.entries(renderers).find(
+    ([name]) => name === screen,
+  ) || ["today-workout", todayWorkout];
+  screen = screenName;
+  if (!Object.hasOwn(directions, variant)) variant = "a";
+  if (!["mobile", "tma", "desktop"].includes(frame)) frame = "mobile";
+  if (!["light", "dark"].includes(theme)) theme = "light";
   root.dataset.variant = variant;
   root.dataset.frame = frame;
   root.dataset.theme = theme;
@@ -229,7 +236,7 @@ function render() {
   frameSelect.value = frame;
   directionLabel.textContent = directions[variant];
   themeButton.textContent = theme === "light" ? "Тёмная тема" : "Светлая тема";
-  app.innerHTML = `<section class="screen" data-screen-state="${screen}">${renderers[screen]()}</section>`;
+  app.innerHTML = `<section class="screen" data-screen-state="${screenName}">${renderScreen()}</section>`;
   const currentNavigation = app.querySelector(".bottom-nav");
   if (currentNavigation) app.append(currentNavigation);
   app.scrollTop = 0;
@@ -269,8 +276,4 @@ app.addEventListener("click", (event) => {
   render();
 });
 
-if (!directions[variant]) variant = "a";
-if (!renderers[screen]) screen = "today-workout";
-if (!["mobile", "tma", "desktop"].includes(frame)) frame = "mobile";
-if (!["light", "dark"].includes(theme)) theme = "light";
 render();

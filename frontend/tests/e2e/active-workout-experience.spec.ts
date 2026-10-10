@@ -1,5 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { expectTouchTargets } from './fixtures/mobile-tma';
+import {
+  expectTouchTargets,
+  installTelegramHarness,
+  setDocumentVisibility,
+  setNetworkOffline,
+  TelegramHarness,
+} from './fixtures/mobile-tma';
 
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
@@ -864,6 +870,113 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
 });
 
+for (const width of [360, 393, 430]) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const platform of ['browser', 'telegram'] as const) {
+      test(`#860 replacement feedback stays visible at ${width}px ${theme} ${platform}`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        if (platform === 'telegram') await installMockedTelegram(page);
+        await page.addInitScript((selectedTheme) => {
+          localStorage.setItem('app-theme', selectedTheme);
+          if (window.Telegram?.WebApp) window.Telegram.WebApp.colorScheme = selectedTheme;
+        }, theme);
+        await mockActiveWorkout(page);
+        await page.route('**/workouts/42/exercises/101/alternatives?*', async (route) => {
+          if (route.request().url().includes('dumbbell')) return route.fallback();
+          await route.fulfill({ json: [] });
+        });
+        let failPreview = true;
+        await page.route('**/workouts/42/adaptations/preview', async (route) => {
+          if (!failPreview) return route.fallback();
+          failPreview = false;
+          await route.fulfill({ status: 503, json: { detail: 'Временная ошибка сервера' } });
+        });
+        let failApply = true;
+        await page.route('**/workouts/42/adaptations/apply', async (route) => {
+          if (!failApply) return route.fallback();
+          failApply = false;
+          await route.fulfill({ status: 409, json: { detail: 'Тренировка изменилась' } });
+        });
+        const writes: Array<{ path: string; body: Record<string, unknown> }> = [];
+        page.on('request', (request) => {
+          if (request.method() === 'POST' && /\/(adaptations|programs)\//.test(request.url())) {
+            writes.push({ path: new URL(request.url()).pathname, body: request.postDataJSON() });
+          }
+        });
+        await page.goto(platform === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
+        if (platform === 'browser') await page.getByRole('button', { name: 'Клиент' }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        await page
+          .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
+          .first()
+          .click();
+        const dialog = page.getByRole('dialog', {
+          name: 'Заменить только в этой тренировке',
+          exact: true,
+        });
+        await dialog.getByRole('checkbox', { name: 'Тросовый блок', exact: true }).check();
+        await dialog.getByRole('checkbox', { name: 'Тренажёры', exact: true }).check();
+        await expect(
+          dialog.getByText(/Для выбранного оборудования нет проверенной замены/),
+        ).toBeVisible();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        const error = dialog.getByRole('alert');
+        await expect(error).toContainText('Для выбранного оборудования нет проверенной замены.');
+        await expect(error).toBeFocused();
+        await expect(error).toBeInViewport();
+        expect(writes).toHaveLength(0);
+        await page.screenshot({ path: testInfo.outputPath('no-compatible-visible.png') });
+
+        await dialog.getByRole('checkbox', { name: 'Гантели', exact: true }).check();
+        await dialog.getByRole('checkbox', { name: 'Скамья', exact: true }).check();
+        await dialog.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        await expect(error).toContainText('Временная ошибка сервера');
+        await expect(error).toBeFocused();
+        await expect(error).toBeInViewport();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        const previewHeading = dialog.getByRole('heading', { name: 'Что изменится', exact: true });
+        await expect(previewHeading).toBeFocused();
+        await expect(previewHeading).toBeInViewport();
+        expect(writes.every((request) => request.path.endsWith('/adaptations/preview'))).toBe(true);
+        expect(writes.at(-1)?.body).toEqual({
+          reason: 'replace_exercise',
+          target_workout_exercise_id: 101,
+          replacement_exercise_id: 13,
+          available_equipment_ids: ['cable', 'machine', 'dumbbell', 'bench'],
+        });
+        await page.screenshot({ path: testInfo.outputPath('preview-visible.png') });
+        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await expect(error).toContainText('Состав тренировки изменился');
+        await expect(error).toBeInViewport();
+        await expect(dialog.getByRole('button', { name: 'Применить', exact: true })).toHaveCount(0);
+        await dialog.getByRole('button', { name: 'Обновить изменения', exact: true }).click();
+        await expect(previewHeading).toBeFocused();
+        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await expect(
+          page.getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+        ).toBeVisible();
+        expect(
+          writes.filter((request) => request.path.endsWith('/adaptations/apply')),
+        ).toHaveLength(2);
+        expect(writes.some((request) => request.path.includes('/programs/'))).toBe(false);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+          ),
+        ).toBe(true);
+        await testInfo.attach('synthetic-network.json', {
+          body: JSON.stringify(writes, null, 2),
+          contentType: 'application/json',
+        });
+      });
+    }
+  }
+}
+
 test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installMockedTelegram(page);
@@ -1100,7 +1213,12 @@ test('V9-03 calculates exact and nearest local loads without network or workout 
     window.dispatchEvent(new Event('offline'));
   });
   await calculator.getByLabel('Целевой вес, кг').fill('80');
-  await calculator.getByRole('button', { name: 'Сбросить' }).click();
+  const resetInventory = calculator.getByRole('button', { name: 'Сбросить' });
+  // Stop the ongoing smooth scroll before targeting a control moved by the result reflow.
+  await resetInventory.evaluate((element) =>
+    element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' }),
+  );
+  await resetInventory.click();
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
   await expect(currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('');
   await expect(currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('');
@@ -1190,7 +1308,7 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
-  await expect(setupMemory.getByText('Личная настройка')).toBeVisible();
+  await expect(setupMemory.getByRole('button', { name: 'Добавить настройку' })).toBeVisible();
   await setupMemory.getByRole('button', { name: 'Добавить настройку' }).click();
   await setupMemory.getByRole('textbox', { name: 'Что важно настроить' }).fill('Сиденье 4');
   await setupMemory.getByRole('button', { name: 'Сохранить настройку' }).click();
@@ -1365,8 +1483,12 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(
     secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }),
   ).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toContainText(
-    'Дальше: Жим штанги лёжа, подход 2',
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
+    'Далее: Жим штанги лёжа',
+  );
+  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
+    'Подход 2 из 3',
   );
 
   await secondSet.getByText('Дополнительно').click();
@@ -1642,6 +1764,159 @@ test('active workout actionable controls clear the mobile bottom dock', async ({
     }
   }
 });
+
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`resting active workout keeps the next set clear of the dock at ${width}px ${theme}`, async ({
+      browser,
+      baseURL,
+    }, testInfo) => {
+      const context = await browser.newContext({
+        baseURL,
+        viewport: { width, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        serviceWorkers: 'block',
+      });
+      const page = await context.newPage();
+      try {
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockActiveWorkout(page);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const firstSet = page.locator('[data-workout-set-id="201"]');
+        await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
+        await firstSet.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
+        await Promise.all([
+          waitForCompletedSetPatch(page, 201),
+          firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click(),
+        ]);
+        const currentSet = page.locator('[data-workout-set-id="202"]');
+        await currentSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
+        await currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
+        await currentSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+        await expect(page.locator('.active-workout-rest')).toBeVisible();
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+
+        const writes: string[] = [];
+        page.on('request', (request) => {
+          if (/\/workouts\/sets\//.test(request.url()) && request.method() !== 'GET') {
+            writes.push(`${request.method()} ${new URL(request.url()).pathname}`);
+          }
+        });
+        const geometry = await page.evaluate(() => {
+          const nav = document.querySelector<HTMLElement>('#appBottomNav')!;
+          const nextSet = document.querySelector<HTMLElement>('[data-workout-set-id="203"]')!;
+          const nextDone = nextSet.querySelector<HTMLElement>('[data-workout-field="done"]')!;
+          const current = document.querySelector<HTMLElement>('[data-workout-set-id="202"]')!;
+          const currentInput = current.querySelector<HTMLElement>('input')!;
+          const rest = document.querySelector<HTMLElement>('.active-workout-rest')!;
+          const nextInteractive = Array.from(
+            nextSet.querySelectorAll<HTMLElement>('input, button'),
+          ).filter((element) => {
+            const rect = element.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          });
+          const activeNav =
+            nav.querySelector<HTMLElement>('[aria-current="page"]') ??
+            nav.querySelector<HTMLElement>('a, button')!;
+          const nextDoneRect = nextDone.getBoundingClientRect();
+          const navRect = nav.getBoundingClientRect();
+          const activeNavRect = activeNav.getBoundingClientRect();
+          const nextInteractiveBottom = Math.max(
+            ...nextInteractive.map((element) => element.getBoundingClientRect().bottom),
+          );
+          const overlap = Math.max(
+            0,
+            Math.min(nextDoneRect.bottom, navRect.bottom) - Math.max(nextDoneRect.top, navRect.top),
+          );
+          const inputRestOverlap = Math.max(
+            0,
+            Math.min(
+              currentInput.getBoundingClientRect().bottom,
+              rest.getBoundingClientRect().bottom,
+            ) -
+              Math.max(currentInput.getBoundingClientRect().top, rest.getBoundingClientRect().top),
+          );
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            scrollY,
+            nav: navRect.toJSON(),
+            rest: rest.getBoundingClientRect().toJSON(),
+            currentSet: current.getBoundingClientRect().toJSON(),
+            currentInput: currentInput.getBoundingClientRect().toJSON(),
+            nextSet: nextSet.getBoundingClientRect().toJSON(),
+            nextDone: nextDoneRect.toJSON(),
+            nextInteractiveBottom,
+            overlap,
+            inputRestOverlap,
+            hit:
+              document
+                .elementFromPoint(
+                  nextDoneRect.left + nextDoneRect.width / 2,
+                  Math.min(nextDoneRect.bottom - 2, innerHeight - 2),
+                )
+                ?.getAttribute('data-workout-field') ?? null,
+            navHit: nav.contains(
+              document.elementFromPoint(
+                activeNavRect.left + activeNavRect.width / 2,
+                activeNavRect.top + activeNavRect.height / 2,
+              ),
+            ),
+            activeNav: activeNavRect.toJSON(),
+            current: document
+              .querySelector('[aria-current="step"]')
+              ?.getAttribute('data-workout-set-id'),
+          };
+        });
+        await page.screenshot({
+          path: testInfo.outputPath(`resting-dock-${width}-${theme}.png`),
+          animations: 'disabled',
+        });
+        const beforeUrl = page.url();
+        const beforeSection = new URL(beforeUrl).searchParams.get('section') ?? 'today';
+        await page.touchscreen.tap(
+          geometry.activeNav.left + geometry.activeNav.width / 2,
+          geometry.activeNav.top + geometry.activeNav.height / 2,
+        );
+        await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+          'data-workout-set-id',
+          '202',
+        );
+        await testInfo.attach(`resting-dock-${width}-${theme}.json`, {
+          body: JSON.stringify({ geometry, writes }),
+          contentType: 'application/json',
+        });
+        expect(geometry.overlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.nextInteractiveBottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
+          geometry.nav.top - 8,
+        );
+        expect(geometry.inputRestOverlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.navHit).toBe(true);
+        expect(geometry.current).toBe('202');
+        expect(new URL(page.url()).searchParams.get('section') ?? 'today').toBe(beforeSection);
+        expect(writes).toEqual([]);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
 
 test('active workout has touch-size controls and no horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -1972,7 +2247,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
-  const timer = page.getByRole('timer').filter({ hasText: 'Отдых' });
+  const timer = page.getByRole('timer', { name: 'Отдых' });
   await expect(timer).toContainText('1:30');
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
@@ -1999,6 +2274,375 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
       ),
     )
     .toBe(1);
+});
+
+test.describe('#914 rest timer pointer lifecycle', () => {
+  test.use({
+    hasTouch: true,
+    isMobile: async ({ browserName }, run) => run(browserName !== 'firefox'),
+  });
+
+  async function prepare(page: Page, width: number, theme: 'dark' | 'light', telegram = false) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.clock.setFixedTime(new Date('2026-10-10T12:00:00Z'));
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    if (telegram) {
+      await installTelegramHarness(page, {
+        platform: 'ios',
+        colorScheme: theme,
+        viewportHeight: 844,
+        viewportStableHeight: 844,
+        safeAreaInset: { top: 24, right: 0, bottom: 34, left: 0 },
+      });
+    }
+    await mockActiveWorkout(page);
+    await page.goto(telegram ? '/app?tgWebAppPlatform=ios' : '/app');
+    if (!telegram) await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const previous = page.locator('[data-workout-set-id="201"]');
+    await previous.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
+    await previous.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
+    await Promise.all([
+      waitForCompletedSetPatch(page, 201),
+      previous.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click(),
+    ]);
+    const current = page.locator('[data-workout-set-id="202"]');
+    await expect(current).toHaveAttribute('aria-current', 'step');
+    await current.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
+    await current.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
+    await current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+    await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    await page.clock.setFixedTime(new Date('2026-10-10T12:00:02Z'));
+    const writes: Array<{ method: string; path: string; completed: unknown }> = [];
+    page.on('request', (request) => {
+      if (/\/workouts\/sets\//.test(request.url()) && request.method() !== 'GET') {
+        writes.push({
+          method: request.method(),
+          path: new URL(request.url()).pathname,
+          completed: request.postDataJSON()?.is_completed,
+        });
+      }
+    });
+    await page.evaluate(() => {
+      const events: unknown[] = [];
+      Object.assign(window, { __restPointerEvidence: events });
+      for (const type of [
+        'pointerdown',
+        'pointerup',
+        'pointercancel',
+        'touchstart',
+        'touchend',
+        'click',
+      ]) {
+        document.addEventListener(
+          type,
+          (event) => {
+            const pointer = event as PointerEvent;
+            const point = (event as TouchEvent).changedTouches?.[0] ?? pointer;
+            const target = event.target instanceof Element ? event.target : null;
+            events.push({
+              type,
+              pointerType: pointer.pointerType,
+              target: target?.tagName,
+              set: target?.closest('[data-workout-set-id]')?.getAttribute('data-workout-set-id'),
+              hit: document.elementFromPoint(point.clientX, point.clientY)?.tagName,
+              path: event
+                .composedPath()
+                .slice(0, 5)
+                .map((item) => (item as Element).tagName),
+              active: document
+                .querySelector('[aria-current="step"]')
+                ?.getAttribute('data-workout-set-id'),
+            });
+          },
+          true,
+        );
+      }
+    });
+    return { current, previous, writes, panel: page.locator('.active-workout-rest') };
+  }
+
+  async function alignPrevious(page: Page, skip: boolean) {
+    return page.evaluate((atSkip) => {
+      const panel = document.querySelector<HTMLElement>('.active-workout-rest')!;
+      const button = atSkip
+        ? [...panel.querySelectorAll('button')].find(
+            (control) => control.textContent === 'Пропустить',
+          )!
+        : panel.querySelector('button')!;
+      const previous = document.querySelector<HTMLElement>(
+        '[data-workout-set-id="201"] [data-workout-field="done"]',
+      )!;
+      const control = button.getBoundingClientRect();
+      const targetY = atSkip ? control.y + control.height / 2 : control.bottom + 3;
+      const old = previous.getBoundingClientRect();
+      window.scrollBy({ top: old.y + old.height / 2 - targetY, behavior: 'instant' });
+      const finalControl = button.getBoundingClientRect();
+      const previousBox = previous.getBoundingClientRect();
+      const x = Math.min(finalControl.x + finalControl.width / 2, previousBox.right - 2);
+      const y = atSkip ? finalControl.y + finalControl.height / 2 : finalControl.bottom + 3;
+      return {
+        x,
+        y,
+        panel: panel.getBoundingClientRect().toJSON(),
+        previous: previousBox.toJSON(),
+      };
+    }, skip);
+  }
+
+  async function unchanged(page: Page, context: Awaited<ReturnType<typeof prepare>>) {
+    await expect(context.current).toHaveAttribute('aria-current', 'step');
+    await expect(
+      context.previous.getByRole('button', {
+        name: 'Отметить невыполненным: Жим штанги лёжа, подход 1',
+      }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
+    await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
+    await expect(
+      context.current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    const stored = await page.evaluate(async () => (await fetch('/api/v1/workouts/today')).json());
+    const sets = stored.exercises.flatMap((exercise: { sets: SetState[] }) => exercise.sets);
+    expect(sets.find((set: SetState & { id: number }) => set.id === 201)?.is_completed).toBe(true);
+    expect(context.writes).toEqual([]);
+  }
+
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`painted padding blocks the 202→201 PATCH regression at ${width}px ${theme}`, async ({
+        page,
+      }, testInfo) => {
+        const context = await prepare(page, width, theme);
+        const point = await alignPrevious(page, false);
+        expect(point.y).toBeLessThan(point.panel.bottom);
+        expect(point.y).toBeGreaterThan(point.previous.top);
+        expect(point.y).toBeLessThan(point.previous.bottom);
+        await page.touchscreen.tap(point.x, point.y);
+        await page.touchscreen.tap(point.x, point.y);
+        await unchanged(page, context);
+        await testInfo.attach('hit-testing.json', {
+          body: JSON.stringify({
+            point,
+            writes: context.writes,
+            events: await page.evaluate(
+              () =>
+                (window as typeof window & { __restPointerEvidence: unknown[] })
+                  .__restPointerEvidence,
+            ),
+          }),
+          contentType: 'application/json',
+        });
+      });
+
+      test(`actions and skip preserve the current set at ${width}px ${theme}`, async ({
+        page,
+      }, testInfo) => {
+        const context = await prepare(page, width, theme);
+        await page.evaluate(() => {
+          const row = document.querySelector('[data-workout-set-id="202"]')!;
+          const panel = document.querySelector('.active-workout-rest')!;
+          row.scrollIntoView({ block: 'start', behavior: 'instant' });
+          window.scrollBy({ top: -panel.getBoundingClientRect().height - 16, behavior: 'instant' });
+        });
+        const field = context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2');
+        await field.evaluate((element) => (element as HTMLElement).focus({ preventScroll: true }));
+        const beforeScroll = await page.evaluate(() => scrollY);
+        await page.screenshot({ path: testInfo.outputPath('timer.png') });
+        const deadline = () =>
+          page.evaluate(() =>
+            JSON.parse(
+              localStorage.getItem(
+                Object.keys(localStorage).find(
+                  (key) => key.includes('rest') && key.endsWith('42'),
+                )!,
+              )!,
+            ),
+          );
+        let expectedDeadline = await deadline();
+        for (const extra of [30, 60]) {
+          const button = context.panel.getByRole('button', { name: `+${extra} сек` });
+          const box = (await button.boundingBox())!;
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+          const points: Array<[number, number]> = [
+            [box.x + box.width / 2, box.y + box.height / 2],
+            [box.x + 2, box.y + box.height / 2],
+            [box.x + box.width - 2, box.y + box.height / 2],
+            [box.x + box.width / 2, box.y + 2],
+            [box.x + box.width / 2, box.y + box.height - 2],
+          ];
+          for (const [x, y] of points) {
+            expect(
+              await button.evaluate(
+                (element, point) => element.contains(document.elementFromPoint(point.x, point.y)),
+                { x, y },
+              ),
+            ).toBe(true);
+            await page.touchscreen.tap(x, y);
+            expectedDeadline += extra * 1000;
+            expect(await deadline()).toBe(expectedDeadline);
+          }
+          await expect(field).toBeFocused();
+          expect(await page.evaluate(() => scrollY)).toBe(beforeScroll);
+          await unchanged(page, context);
+          await page.screenshot({ path: testInfo.outputPath(`plus${extra}.png`) });
+        }
+        const point = await alignPrevious(page, true);
+        const skip = context.panel.getByRole('button', { name: 'Пропустить' });
+        const skipScroll = await page.evaluate(() => scrollY);
+        await page.touchscreen.tap(point.x, point.y);
+        await page.touchscreen.tap(point.x, point.y);
+        await page.clock.setFixedTime(new Date('2026-10-10T12:00:12Z'));
+        await page.touchscreen.tap(point.x, point.y);
+        await expect(skip).toHaveAttribute('aria-disabled', 'true');
+        expect(await page.evaluate(() => scrollY)).toBe(skipScroll);
+        await expect(field).toBeFocused();
+        await unchanged(page, context);
+        await page.screenshot({ path: testInfo.outputPath('skip-pending.png') });
+        await field.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        await field.tap();
+        await expect(context.panel).toHaveClass(/is-compact/);
+        await unchanged(page, context);
+        await page.screenshot({ path: testInfo.outputPath('skip.png') });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+          true,
+        );
+        await testInfo.attach('timer-mutations.json', {
+          body: JSON.stringify({
+            writes: context.writes,
+            active: 202,
+            previousCompleted: true,
+            weight: 42.5,
+            reps: 9,
+            rir: '2',
+            expectedDeadline,
+            beforeScroll,
+            skipScroll,
+            events: await page.evaluate(
+              () =>
+                (window as typeof window & { __restPointerEvidence: unknown[] })
+                  .__restPointerEvidence,
+            ),
+          }),
+          contentType: 'application/json',
+        });
+      });
+    }
+  }
+
+  for (const width of [320, 393]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`TMA resume offline and keyboard retain the set at ${width}px ${theme}`, async ({
+        page,
+      }, testInfo) => {
+        const context = await prepare(page, width, theme, true);
+        const telegram = new TelegramHarness(page);
+        await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
+        await setDocumentVisibility(page, 'hidden');
+        await telegram.setActive(false);
+        await page.clock.setFixedTime(new Date('2026-10-10T12:01:07Z'));
+        await setDocumentVisibility(page, 'visible');
+        await telegram.setActive(true);
+        await expect(context.panel.getByRole('timer')).toHaveText('0:23');
+        await setNetworkOffline(page, true);
+        const add60 = context.panel.getByRole('button', { name: '+60 сек' });
+        await add60.scrollIntoViewIfNeeded();
+        await add60.tap();
+        await expect(context.panel.getByRole('timer')).toHaveText('1:23');
+        await page.setViewportSize({ width, height: 480 });
+        await telegram.setViewport(480, 844);
+        const field = context.current.getByLabel('Вес, Жим штанги лёжа, подход 2');
+        await field.evaluate((element) => {
+          element.closest('label')!.scrollIntoView({ block: 'center', behavior: 'instant' });
+          (element as HTMLElement).focus({ preventScroll: true });
+        });
+        const panelBox = (await context.panel.boundingBox())!;
+        const fieldBox = (await field.boundingBox())!;
+        expect(panelBox.y).toBeGreaterThanOrEqual(24);
+        expect(fieldBox.y).toBeGreaterThanOrEqual(panelBox.y + panelBox.height);
+        expect(fieldBox.y + fieldBox.height).toBeLessThanOrEqual(480 - 34);
+        await expect(field).toBeFocused();
+        await page.screenshot({ path: testInfo.outputPath('tma-keyboard.png') });
+        await setNetworkOffline(page, false);
+        await page.setViewportSize({ width, height: 844 });
+        await telegram.setViewport(844, 844);
+        await unchanged(page, context);
+        await testInfo.attach('lifecycle-mutations.json', {
+          body: JSON.stringify({
+            writes: context.writes,
+            backgroundSeconds: 65,
+            offlineAdded: 60,
+            remaining: '1:23',
+            input: 'Browser touch and modeled Telegram/keyboard, not a physical iPhone',
+          }),
+          contentType: 'application/json',
+        });
+      });
+
+      test(`Web reload restores the scoped timer and current set at ${width}px ${theme}`, async ({
+        page,
+      }) => {
+        const context = await prepare(page, width, theme);
+        await context.panel.getByRole('button', { name: '+60 сек' }).tap();
+        await expect(context.panel.getByRole('timer')).toHaveText('2:28');
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        const resume = page.getByRole('button', { name: 'Продолжить тренировку' });
+        await Promise.race([
+          resume.waitFor({ state: 'visible' }),
+          context.current.waitFor({ state: 'visible' }),
+        ]);
+        if (await resume.isVisible()) await resume.click();
+        await expect(context.panel.getByRole('timer')).toHaveText('2:28');
+        await unchanged(page, context);
+      });
+    }
+  }
+
+  test('rapid skip alone blocks the 202→201 PATCH regression after the panel closes', async ({
+    page,
+  }, testInfo) => {
+    const context = await prepare(page, 393, 'dark');
+    const point = await alignPrevious(page, true);
+    await page.touchscreen.tap(point.x, point.y);
+    await page.touchscreen.tap(point.x, point.y);
+    await page.clock.setFixedTime(new Date('2026-10-10T12:00:12Z'));
+    await page.touchscreen.tap(point.x, point.y);
+    await testInfo.attach('skip-alone-mutations.json', {
+      body: JSON.stringify({ writes: context.writes, point }),
+      contentType: 'application/json',
+    });
+    await unchanged(page, context);
+  });
+
+  test('expiry retains a pressed control and its hit surface until another gesture', async ({
+    page,
+  }) => {
+    const context = await prepare(page, 360, 'dark');
+    const point = await alignPrevious(page, true);
+    await page.mouse.move(point.x, point.y);
+    await page.mouse.down();
+    await page.clock.setFixedTime(new Date('2026-10-10T12:01:40Z'));
+    await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+    await expect(context.panel.getByRole('button', { name: 'Пропустить' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await page.mouse.up();
+    await page.touchscreen.tap(point.x, point.y);
+    await unchanged(page, context);
+    await page.getByRole('button', { name: 'К сводке' }).focus();
+    await expect(context.panel).toHaveClass(/is-compact/);
+    const hide = context.panel.getByRole('button', { name: 'Скрыть' });
+    const box = (await hide.boundingBox())!;
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await expect(context.panel).toBeVisible();
+    await unchanged(page, context);
+  });
 });
 
 test('Task 520 owner visual package covers friction-reduction states', async ({ page }) => {
@@ -2049,7 +2693,7 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toBeVisible();
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
   await page.screenshot({ path: `${packagePath}/mobile-light-rest.png`, fullPage: true });
 
   const secondSet = page.locator('[data-workout-set-id="202"]');

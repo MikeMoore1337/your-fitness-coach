@@ -36,7 +36,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
       await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
       await expect(nav).toHaveCSS('box-shadow', /inset/);
-      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(6px\)/ : 'none');
+      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(12px\)/ : 'none');
       await expectNoHorizontalOverflow(page);
       // Content containers remain ordinary surfaces; navigation alone carries this material.
       await expect(
@@ -54,6 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
       await expect(sheet).toBeVisible();
       await expect(sheet).toHaveAttribute('data-glass-variant', 'tinted');
+      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       await page.screenshot({ path: testInfo.outputPath(`quick-add-${width}-${theme}.png`) });
       await page.keyboard.press('Escape');
       await expect(sheet).toBeHidden();
@@ -70,7 +71,7 @@ for (const theme of ['light', 'dark'] as const) {
         .toMatchObject({ actualWeight: 18, actualReps: 10 });
       await page.getByRole('button', { name: /^Завершить:.*подход 1/ }).click();
       await expect.poll(() => api.workoutValues().completed).toBe(true);
-      const rest = page.getByRole('timer').filter({ hasText: 'Отдых' });
+      const rest = page.getByRole('complementary', { name: 'Отдых между подходами' });
       await expect(rest).toBeVisible();
       const remaining = async () => {
         const value = await rest.locator('.active-workout-rest__time strong').innerText();
@@ -84,7 +85,12 @@ for (const theme of ['light', 'dark'] as const) {
       await expectNoHorizontalOverflow(page);
       await page.screenshot({ path: testInfo.outputPath(`rest-${width}-${theme}.png`) });
       await rest.getByRole('button', { name: 'Пропустить', exact: true }).click();
-      await expect(rest).toBeHidden();
+      await expect(rest.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+      await expect(rest).toContainText('Отдых пропущен');
+      await expect(rest.getByRole('button', { name: 'Пропустить' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
 
       await page.goto('/app?section=progress');
       const tabs = page.getByRole('tablist').first();

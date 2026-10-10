@@ -10,7 +10,7 @@ import { api } from '../../shared/api/client';
 import { downloadProgressReport } from '../../features/reports/downloadProgressReport';
 import { ReportHandoffPanel } from '../../features/reports/ReportHandoffPanel';
 import { PublicProgressSharePanel } from '../../features/reports/PublicProgressSharePanel';
-import { AppLink, useNavigation } from '../../shared/navigation/router';
+import { AppLink, progressReportReturn, useNavigation } from '../../shared/navigation/router';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { TimeSeriesChart } from '../../shared/ui/DataViz';
@@ -96,13 +96,15 @@ function reportDownloadLinkPath(selection: ReportSelection, clientId: number | n
   return `${base}/download-link?${query}`;
 }
 
-function pagePath(selection: ReportSelection, clientId: number | null): string {
+function pagePath(selection: ReportSelection, clientId: number | null, search: string): string {
   const params = new URLSearchParams({ period: selection.period });
   if (selection.period === 'custom') {
     params.set('date_from', selection.dateFrom);
     params.set('date_to', selection.dateTo);
   }
   if (clientId) params.set('client_id', String(clientId));
+  const view = new URLSearchParams(search).get('progress_view');
+  if (view) params.set('progress_view', view);
   return `/app/report?${params}`;
 }
 
@@ -441,15 +443,14 @@ function ReportContent({
   return (
     <div className="progress-report-document">
       <PrintPageHeader report={report} />
-      <footer className="progress-report-print-footer" aria-hidden="true">
-        <span>Сформировано {formatDateTime(report.generated_at, report.timezone)}</span>
-        <span>Your Fitness Coach</span>
-      </footer>
 
       <section className="progress-report-overview" aria-labelledby="report-overview-title">
         <div className="progress-report-overview__identity">
-          <span className="eyebrow">Отчёт о прогрессе</span>
-          <h1 id="report-overview-title">{report.subject.name}</h1>
+          <div className="progress-report-brand report-screen-only">
+            <BrandLockup />
+          </div>
+          <h1 id="report-overview-title">Отчёт о прогрессе</h1>
+          <p className="progress-report-subject">{report.subject.name}</p>
           <p>
             {formatDate(report.period_start)} — {formatDate(report.period_end)} · {report.timezone}
           </p>
@@ -464,14 +465,6 @@ function ReportContent({
           <small>Только по доступным компонентам расчёта</small>
         </div>
       </section>
-
-      <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
-        <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
-        <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
-        <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
-      </section>
-
-      {controls}
 
       <section
         className="progress-report-factual-summary"
@@ -494,6 +487,14 @@ function ReportContent({
         ) : (
           <p>За выбранный период пока нет заполненных фактов.</p>
         )}
+      </section>
+
+      {controls}
+
+      <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
+        <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
+        <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
+        <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
       </section>
 
       <section className="progress-report-section" aria-labelledby="report-training-title">
@@ -821,6 +822,10 @@ function ReportContent({
           </p>
         </section>
       </div>
+      <footer className="progress-report-print-footer" aria-hidden="true">
+        <span>Сформировано {formatDateTime(report.generated_at, report.timezone)}</span>
+        <span>Your Fitness Coach</span>
+      </footer>
     </div>
   );
 }
@@ -880,7 +885,7 @@ export default function ProgressReportPage() {
     event?.preventDefault();
     if (customError) return;
     setApplied(draft);
-    navigate(pagePath(draft, clientId), true);
+    navigate(pagePath(draft, clientId, search), true);
   };
   const selectPeriod = (value: string) => {
     const period = value as NutritionReportPeriod;
@@ -888,7 +893,7 @@ export default function ProgressReportPage() {
     setDraft(next);
     if (period !== 'custom') {
       setApplied(next);
-      navigate(pagePath(next, clientId), true);
+      navigate(pagePath(next, clientId, search), true);
     }
   };
   const printReport = async () => {
@@ -910,7 +915,7 @@ export default function ProgressReportPage() {
       ? handoffReturnPath(search)
       : clientId
         ? `/coach?client_id=${clientId}`
-        : '/app?section=progress';
+        : progressReportReturn(search);
   const reportKey = displayReport
     ? `${displayReport.subject.name}:${displayReport.period_start}:${displayReport.period_end}`
     : '';
@@ -926,9 +931,7 @@ export default function ProgressReportPage() {
           aria-labelledby="report-period-title"
         >
           <div>
-            <span className="eyebrow">Период отчёта</span>
-            <h2 id="report-period-title">Выберите фактическое окно</h2>
-            <p>Период и субъект сохраняются в адресе отчёта при возврате из печати.</p>
+            <h2 id="report-period-title">Период и состав отчёта</h2>
           </div>
           <SegmentedControl
             ariaLabel="Период отчёта"
@@ -1018,52 +1021,58 @@ export default function ProgressReportPage() {
         </section>
       )}
 
-      {handoffId === null && auth?.user?.trainer && !clientId && (
-        <ReportHandoffPanel
-          dateFrom={applied.dateFrom}
-          dateTo={applied.dateTo}
-          loading={displayFetching}
-          period={applied.period}
-          report={displayReport}
-          trainer={auth.user.trainer}
-        />
-      )}
+      <details
+        className="progress-report-options report-screen-only"
+        open={window.innerWidth > 680}
+      >
+        <summary>Состав и отправка отчёта</summary>
+        {handoffId === null && auth?.user?.trainer && !clientId && (
+          <ReportHandoffPanel
+            dateFrom={applied.dateFrom}
+            dateTo={applied.dateTo}
+            loading={displayFetching}
+            period={applied.period}
+            report={displayReport}
+            trainer={auth.user.trainer}
+          />
+        )}
 
-      {handoffId === null && !clientId && (
-        <PublicProgressSharePanel
-          dateFrom={applied.dateFrom}
-          dateTo={applied.dateTo}
-          period={applied.period}
-        />
-      )}
+        {handoffId === null && !clientId && (
+          <PublicProgressSharePanel
+            dateFrom={applied.dateFrom}
+            dateTo={applied.dateTo}
+            period={applied.period}
+          />
+        )}
 
-      {handoffId === null && displayReport.training.exercises.length > 0 && (
-        <fieldset className="progress-report-exercise-picker report-screen-only">
-          <legend>Упражнения в печатном отчёте</legend>
-          <p>Выберите до четырёх. Значения показывают только записанные рабочие подходы.</p>
-          {displayReport.training.exercises.slice(0, 8).map((exercise) => {
-            const selected = selectedExercises.includes(exercise.exercise_title);
-            return (
-              <label key={exercise.exercise_title}>
-                <input
-                  checked={selected}
-                  disabled={!selected && selectedExercises.length >= 4}
-                  onChange={() =>
-                    setExerciseSelections((current) => ({
-                      ...current,
-                      [reportKey]: selected
-                        ? selectedExercises.filter((item) => item !== exercise.exercise_title)
-                        : [...selectedExercises, exercise.exercise_title],
-                    }))
-                  }
-                  type="checkbox"
-                />
-                <span>{exercise.exercise_title}</span>
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
+        {handoffId === null && displayReport.training.exercises.length > 0 && (
+          <fieldset className="progress-report-exercise-picker report-screen-only">
+            <legend>Упражнения в печатном отчёте</legend>
+            <p>Выберите до четырёх. Значения показывают только записанные рабочие подходы.</p>
+            {displayReport.training.exercises.slice(0, 8).map((exercise) => {
+              const selected = selectedExercises.includes(exercise.exercise_title);
+              return (
+                <label key={exercise.exercise_title}>
+                  <input
+                    checked={selected}
+                    disabled={!selected && selectedExercises.length >= 4}
+                    onChange={() =>
+                      setExerciseSelections((current) => ({
+                        ...current,
+                        [reportKey]: selected
+                          ? selectedExercises.filter((item) => item !== exercise.exercise_title)
+                          : [...selectedExercises, exercise.exercise_title],
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  <span>{exercise.exercise_title}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+        )}
+      </details>
     </>
   ) : null;
 
@@ -1103,7 +1112,7 @@ export default function ProgressReportPage() {
       ) : displayReport ? (
         <>
           <ReportContent
-            controls={controls}
+            controls={<div className="progress-report-settings report-screen-only">{controls}</div>}
             report={displayReport}
             selectedExercises={selectedExercises}
           />

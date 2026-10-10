@@ -5574,24 +5574,27 @@ button.today-text-link {
   font-size: 0.8rem;
 }
 .active-workout-rest {
-  position: fixed;
+  position: sticky;
+  top: var(--yfc-layout-safe-top, 0px);
   z-index: 30;
-  pointer-events: none;
-  right: max(12px, env(safe-area-inset-right, 0px));
-  bottom: max(88px, calc(env(safe-area-inset-bottom, 0px) + 76px));
-  left: max(12px, env(safe-area-inset-left, 0px));
+  pointer-events: auto;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
-  width: min(680px, calc(100% - 24px));
-  margin-inline: auto;
-  padding: 10px 12px;
-  border: 1px solid var(--accent-line);
+  align-self: start;
+  gap: 8px 12px;
+  width: 100%;
+  min-height: 110px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--glass-edge);
   border-radius: var(--radius-control);
-  background: var(--nav-bg);
-  box-shadow: var(--elevation-overlay);
-  animation: active-workout-rest-enter var(--motion-state) var(--motion-ease);
+}
+.active-workout-rest [hidden] {
+  display: none;
+}
+.active-workout:has(.active-workout-rest) :is(input, [data-workout-field='done']) {
+  scroll-margin-block-start: calc(var(--yfc-layout-safe-top, 0px) + 124px);
 }
 
 @keyframes active-workout-set-confirm {
@@ -5608,46 +5611,56 @@ button.today-text-link {
   }
 }
 
-@keyframes active-workout-rest-enter {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
 .active-workout-rest__time {
   display: grid;
   gap: 1px;
 }
 .active-workout-rest__time span {
-  color: var(--muted);
+  color: var(--v2-text-primary);
   font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 .active-workout-rest__time strong {
-  font-size: 1.2rem;
+  font: 700 1.5rem/1 var(--font-body);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
 .active-workout-rest__next {
-  overflow: hidden;
-  color: var(--muted);
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--v2-text-primary);
   font-size: 0.75rem;
-  font-weight: 700;
+  line-height: 1.25;
+}
+.active-workout-rest__next strong {
+  overflow: hidden;
+  color: var(--v2-text-primary);
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .active-workout-rest__actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-2, 8px);
+}
+.active-workout-rest__actions .ui-button {
+  min-width: var(--touch-target, 44px);
+  min-height: var(--touch-target, 44px);
+  padding: 7px 4px;
+  font: 700 0.75rem/1.25 var(--font-body);
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+.active-workout-rest.is-compact {
   display: flex;
-  pointer-events: auto;
-}
-.active-workout-rest__actions button {
-  min-height: 44px;
-  padding: 7px 10px;
-  font-size: 0.72rem;
-}
-.active-workout-rest--complete {
-  pointer-events: auto;
+  justify-content: space-between;
+  min-height: var(--touch-target, 44px);
+  gap: 8px;
+  padding-block: 8px;
 }
 .active-workout-rest__complete-copy {
   grid-column: 1 / -1;
@@ -5655,14 +5668,22 @@ button.today-text-link {
   font-size: 0.82rem;
   font-weight: 800;
 }
+@media (min-width: 681px) {
+  .active-workout-rest {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: min(680px, 100%);
+    min-height: 64px;
+  }
+  .active-workout-rest__actions {
+    grid-column: auto;
+    grid-template-columns: repeat(3, minmax(88px, 1fr));
+  }
+}
 
 @media (min-width: 1000px) {
   .active-workout.is-embedded {
     width: min(900px, 100%);
     margin-inline: auto;
-  }
-  .active-workout-rest {
-    bottom: 22px;
   }
 }
 
@@ -5777,19 +5798,6 @@ button.today-text-link {
   }
   .workout-completion__feedback-footer .ui-button {
     width: 100%;
-  }
-  .active-workout-rest {
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 8px 10px;
-    padding: 9px 10px;
-  }
-  .active-workout-rest__actions {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .active-workout-rest__next {
-    white-space: normal;
   }
 }
 
@@ -6515,10 +6523,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-presets .ui-button span {
-  overflow: hidden;
   max-width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: center;
 }
 
 .hydration-presets .ui-button strong {

@@ -184,7 +184,8 @@ test('progress report starts native PDF download and keeps BackButton contract',
   );
   await tmaPage.goto('/app/report?period=days_90');
 
-  await expect(tmaPage.getByRole('heading', { name: 'Александр Петров' })).toBeVisible();
+  await expect(tmaPage.getByRole('heading', { name: 'Отчёт о прогрессе', level: 1 })).toBeVisible();
+  await expect(tmaPage.getByText('Александр Петров', { exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);
   await tmaPage.getByRole('button', { name: 'Скачать PDF' }).click();
   await expect(tmaPage.getByText('Telegram открыл сохранение PDF.')).toBeVisible();
@@ -198,7 +199,7 @@ test('progress report starts native PDF download and keeps BackButton contract',
     ]);
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
   await tma.clickBack();
-  await expect(tmaPage).toHaveURL('/app?section=progress');
+  await expect(tmaPage).toHaveURL('/app?section=progress&progress_period=90');
 });
 
 test('an unplanned day keeps the first factual cardio entry compact but available in Today', async ({
@@ -308,6 +309,7 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   ]);
   await expect(tmaCardio.getByText('2 сегодня')).toBeVisible();
   await expect(tmaCardio.getByRole('button', { name: 'Добавить ещё кардио' })).toBeVisible();
+  await savedTmaRow.getByText('Действия с записью', { exact: true }).click();
   await savedTmaRow.getByRole('button', { name: 'Изменить' }).click();
   const editForm = tmaCardio.locator('.cardio-session-row--editing');
   await editForm.getByLabel('Длительность, мин').fill('40');
@@ -315,6 +317,7 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   await expect.poll(() => tmaApi.cardioSaveCalls()).toBe(3);
   const finalTmaRow = tmaCardio.locator('.cardio-session-row').filter({ hasText: '40 мин' });
   await expect(finalTmaRow).toBeVisible();
+  await finalTmaRow.getByText('Действия с записью', { exact: true }).click();
   await expect(finalTmaRow.getByText('Завершено')).toHaveCSS('white-space', 'nowrap');
   await tmaCardio.screenshot({
     path: '../.artifacts/screenshots/task-113A-round-2/tma-cardio-completed-result-first-390x844-light.png',
@@ -332,7 +335,11 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
     await expectNoHorizontalOverflow(tmaPage);
-    await expectTouchTargets(tmaCardio.locator('.cardio-session-row__actions .ui-button'));
+    await expectTouchTargets(
+      tmaCardio.locator(
+        '.cardio-session-row__actions > summary:visible, .cardio-session-row__actions .ui-button:visible',
+      ),
+    );
   }
   await tmaPage.setViewportSize(MOBILE_CONTEXTS.baseline);
   await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
@@ -797,9 +804,14 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
     path: '../.artifacts/screenshots/task-118/mobile-web-390x844-light.png',
     fullPage: true,
   });
-  const mobileSearch = mobilePage
+  await mobilePage
     .locator('#program-builder')
-    .getByRole('combobox', { name: 'Поиск упражнения' });
+    .getByRole('button', { name: 'Поиск упражнения' })
+    .first()
+    .click();
+  const mobileSearch = mobilePage
+    .getByRole('dialog', { name: 'Выбор упражнения' })
+    .getByRole('searchbox', { name: 'Поиск упражнения' });
   await mobileSearch.fill('Тяга');
   await expect(mobilePage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(mobilePage.locator('#appBottomNav')).toBeHidden();
@@ -808,6 +820,7 @@ test('simple program builder stays lightweight across Mobile Web, mocked TMA and
   await expect(mobileSearch).toHaveValue('Тяга');
   await mobileSearch.fill('');
   await mobileSearch.evaluate((element) => element.blur());
+  await mobilePage.getByRole('button', { name: 'Закрыть выбор упражнения' }).click();
 
   await tma.setTheme('dark');
   await tmaPage.setViewportSize({ width: 430, height: 932 });
@@ -905,6 +918,7 @@ test('program history visual evidence covers compact Mobile Web, dark TMA and de
       });
     }
     if (current.viewport.width < 900) {
+      await history.getByText('Действия с этапом', { exact: true }).click();
       const lastCurrentAction = history.getByRole('button', { name: 'В архив' });
       await expect
         .poll(async () => {
@@ -1041,6 +1055,7 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
     const report = currentPage.locator('#nutrition-period-report');
     await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
     await expect(report.getByText('Заполнено 3 из 7 дней')).toBeVisible();
+    await report.getByText('История целей питания', { exact: true }).click();
     await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
     await expect(
       report.getByRole('table', {
@@ -1142,6 +1157,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
       .getByRole('link', { name: /^Тело/ })
       .click();
     const body = currentPage.locator('#progress-body');
+    await body.locator('.progress-measurement-editor > summary').click();
     await expect(body.getByText('Сбалансированное развитие')).toBeVisible();
     await expect(body.getByText('Мало данных для динамики')).toBeVisible();
     await expect(body.getByText('Замеров пока нет')).toBeVisible();
@@ -1180,7 +1196,9 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
 
   for (const currentPage of [tmaPage, mobilePage]) {
     const body = currentPage.locator('#progress-body');
-    await expect(body.getByText(/Вес: 74\.2 кг · Окружность плеча: 31\.6 см/)).toBeVisible();
+    await expect(
+      body.locator('.measurement-diary').getByText(/Вес: 74\.2 кг · Окружность плеча: 31\.6 см/),
+    ).toBeVisible();
     const singlePointHints = body.getByText(
       'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
     );
@@ -1349,7 +1367,15 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
   await expectLimeStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);
+  // Period changes move the card through the floating dock; verify its reachable reading position.
+  await stale.evaluate((element) =>
+    element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   await expectNoOverlap(stale, tmaPage.locator('#appBottomNav'));
+  await expect(stale).toBeInViewport({ ratio: 1 });
+  await expectTouchTargets(stale.locator('.data-confidence__details > summary'));
+  await stale.locator('.data-confidence__details > summary').click();
+  await expect(stale.locator('.data-confidence__details')).toHaveAttribute('open');
   await stale.screenshot({
     path: '../.artifacts/screenshots/task-61/tma-390x844-dark-stale.png',
   });
@@ -1385,6 +1411,34 @@ test('weekly review focus exposes a predictable TMA BackButton return path', asy
   await expect(tmaPage).toHaveURL('/app');
   await expect(tmaPage.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(false);
+});
+
+test('late weekly review data preserves focus on the profile action', async ({ tmaPage }) => {
+  await installPlatformApi(tmaPage, {
+    workoutStatus: 'none',
+    weeklyReviewAvailable: true,
+  });
+  let releaseReview!: () => void;
+  const reviewGate = new Promise<void>((resolve) => {
+    releaseReview = resolve;
+  });
+  await tmaPage.route('**/api/v1/check-ins/weekly/current', async (route) => {
+    await reviewGate;
+    await route.fallback();
+  });
+  await tmaPage.goto('/app?section=progress&weekly_review=1');
+  await expect(tmaPage.getByText('Собираем итоги недели…', { exact: true })).toBeVisible();
+  await expect(tmaPage).toHaveURL('/app?section=progress&weekly_review=1');
+
+  const profile = tmaPage.getByRole('button', { name: 'Открыть профиль и настройки', exact: true });
+  await profile.focus();
+  const reviewResponse = tmaPage.waitForResponse('**/api/v1/check-ins/weekly/current');
+  releaseReview();
+  await reviewResponse;
+  await expect(tmaPage.getByRole('heading', { name: 'Итоги недели', exact: true })).toBeVisible();
+  await expect(profile).toBeFocused();
+  await profile.click();
+  await expect(tmaPage.getByRole('dialog')).toBeVisible();
 });
 
 test('direct Trainer activation keeps client context focused in mocked TMA', async ({
@@ -2491,7 +2545,9 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   await fat.fill('100');
   await carbs.fill('200');
   const save = tmaPage.getByRole('button', { name: 'Сохранить ручные ориентиры' });
-  await expect(tmaPage.getByRole('alert')).toContainText('Проверьте разницу: 1300 ккал');
+  await expect(tmaPage.locator('.nutrition-energy-warning')).toContainText(
+    'Проверьте разницу: 1300 ккал',
+  );
   await expect(save).toBeDisabled();
   await tmaPage.getByRole('checkbox', { name: /Сохранить значения/ }).check();
 
@@ -2659,6 +2715,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
 });
 
 test('contextual help covers workout, nutrition and Progress without a TMA library', async ({
+  browserName,
   tma,
   tmaPage,
 }) => {
@@ -2683,7 +2740,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await rirArticleLink.click();
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/training/repetitions-in-reserve');
+    .toContain(new URL('/knowledge/training/repetitions-in-reserve', tmaPage.url()).href);
   await expect(tmaPage).toHaveURL(/\/app$/);
   await expect(rirDetails).toHaveAttribute('open', '');
   await tma.setTheme('dark');
@@ -2706,7 +2763,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   ).toHaveAttribute('href', '/knowledge/nutrition/kbju-as-a-reference');
 
   await tmaPage.getByRole('link', { name: 'Прогресс', exact: true }).click();
-  await tmaPage.locator('.progress-hero').getByText('Что это?', { exact: true }).click();
+  await tmaPage.locator('.progress-hero').getByText('О показателях', { exact: true }).click();
   await expect(
     tmaPage.locator('.progress-hero').getByRole('link', { name: /Подробнее на сайте/ }),
   ).toHaveAttribute('href', '/knowledge/progress/how-to-read-progress');
@@ -2724,13 +2781,15 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   const publicHandoff = tmaPage.getByRole('link', { name: 'Открыть материал на сайте' });
   await expectTouchTargets(tmaPage.locator('.knowledge-handoff__actions a'));
   await expectNoHorizontalOverflow(tmaPage);
-  await tmaPage.keyboard.press('Tab');
+  // This mobile WebKit fixture has no desktop Tab cycle; verify focus and activation there.
+  if (browserName === 'webkit') await publicHandoff.focus();
+  else await tmaPage.keyboard.press('Tab');
   await expect(publicHandoff).toBeFocused();
-  await publicHandoff.click();
+  await tmaPage.keyboard.press('Enter');
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge');
+    .toContain(new URL('/knowledge', tmaPage.url()).href);
   await expect(tmaPage.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
   await expect(tmaPage.getByRole('heading', { name: /База знаний/i })).not.toBeAttached();
 
@@ -2740,7 +2799,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await expect(tmaPage).toHaveURL('/app');
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/progress/how-to-read-progress');
+    .toContain(new URL('/knowledge/progress/how-to-read-progress', tmaPage.url()).href);
 });
 
 test('task 72 screenshot packet keeps shared composition across core surfaces', async ({

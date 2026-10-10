@@ -1,0 +1,12 @@
+{
+  "stats": {
+    "startTime": "2026-10-10T17:47:02.091Z",
+    "duration": 107152.515,
+    "expected": 56,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "runtime": "e120009b2e538951cbdd3c68129bb1f6c22ee73c",
+  "source": "Canonical @playwright/test, Chromium and WebKit, retries=0"
+}

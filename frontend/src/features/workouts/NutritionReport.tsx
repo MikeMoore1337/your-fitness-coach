@@ -705,7 +705,10 @@ export function NutritionPeriodReport({
               />
             </>
           )}
-          <TargetChanges report={report.data} />
+          <details className="nutrition-report-target-history">
+            <summary>История целей питания</summary>
+            <TargetChanges report={report.data} />
+          </details>
           <DailyTable dayLink={dayLink} report={report.data} />
           <p className="progress-note nutrition-period-report__methodology">
             Отчёт описывает только записи КБЖУ. Он не оценивает качество рациона, витамины, здоровье

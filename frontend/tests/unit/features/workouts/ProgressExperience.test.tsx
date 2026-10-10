@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ReactNode } from 'react';
 import { ProgressExperience } from '../../../../src/features/workouts/ProgressExperience';
 import type {
   NutritionReport,
@@ -371,7 +372,7 @@ function installApi({
   });
 }
 
-function renderExperience(search = '') {
+function renderExperience(search = '', measurementDiary?: ReactNode) {
   window.history.replaceState({}, '', `/app${search}`);
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -379,7 +380,7 @@ function renderExperience(search = '') {
   return render(
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
-        <ProgressExperience />
+        <ProgressExperience measurementDiary={measurementDiary} />
       </QueryClientProvider>
     </NavigationProvider>,
   );
@@ -405,7 +406,7 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_30',
     );
-    const helpControl = screen.getByText('Что это?', { exact: true });
+    const helpControl = screen.getByText('О показателях', { exact: true });
     const helpDisclosure = helpControl.closest('details');
     expect(helpDisclosure).not.toBeNull();
     fireEvent.click(helpControl);
@@ -438,6 +439,18 @@ describe('ProgressExperience', () => {
       'href',
       '/app?section=progress&progress_view=wellbeing',
     );
+  });
+
+  it('mounts one measurement editor inside its disclosure', async () => {
+    installApi();
+    renderExperience(
+      '?section=progress&progress_view=body',
+      <div data-testid="measurement-editor" />,
+    );
+    const editor = await screen.findByTestId('measurement-editor');
+    expect(screen.getAllByTestId('measurement-editor')).toHaveLength(1);
+    expect(editor.closest('details')).toHaveClass('progress-measurement-editor');
+    expect(editor.closest('details')).not.toHaveAttribute('open');
   });
 
   it('shows selected priorities as preferences without treating circumference as muscle analytics', async () => {
@@ -493,7 +506,7 @@ describe('ProgressExperience', () => {
     });
     expect(screen.getByRole('link', { name: 'Скачать отчёт' })).toHaveAttribute(
       'href',
-      '/app/report?period=days_7',
+      '/app/report?period=days_7&progress_view=training',
     );
   });
 
@@ -594,7 +607,8 @@ describe('ProgressExperience', () => {
         name: /^Питание/,
       }),
     );
-    expect(await screen.findByText('Нет подтверждённых дней питания')).toBeVisible();
+    expect(await screen.findByText('Нет заполненных дней за период')).toBeVisible();
+    expect(screen.getAllByText('Нет заполненных дней за период')).toHaveLength(1);
     expect(
       screen.getByText('0 частичных и 29 отсутствующих дней не входят в средние значения.'),
     ).toBeVisible();

@@ -194,6 +194,8 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await expect(page.locator('#appBottomNav')).toBeVisible();
   await reps.evaluate((element) => (element as HTMLElement).blur());
   await expectDockWithinViewport(page);
+  // Focus-driven scrolling can leave the pointer hovering over a different button.
+  await page.mouse.move(0, 0);
 
   const activeWorkout = page.locator('.active-workout');
   const activeWorkoutClip = await activeWorkout.evaluate((element) => {
