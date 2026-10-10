@@ -71,7 +71,7 @@ for (const theme of ['light', 'dark'] as const) {
         .toMatchObject({ actualWeight: 18, actualReps: 10 });
       await page.getByRole('button', { name: /^Завершить:.*подход 1/ }).click();
       await expect.poll(() => api.workoutValues().completed).toBe(true);
-      const rest = page.getByRole('timer').filter({ hasText: 'Отдых' });
+      const rest = page.getByRole('complementary', { name: 'Отдых между подходами' });
       await expect(rest).toBeVisible();
       const remaining = async () => {
         const value = await rest.locator('.active-workout-rest__time strong').innerText();
@@ -85,7 +85,12 @@ for (const theme of ['light', 'dark'] as const) {
       await expectNoHorizontalOverflow(page);
       await page.screenshot({ path: testInfo.outputPath(`rest-${width}-${theme}.png`) });
       await rest.getByRole('button', { name: 'Пропустить', exact: true }).click();
-      await expect(rest).toBeHidden();
+      await expect(rest.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+      await expect(rest).toContainText('Отдых пропущен');
+      await expect(rest.getByRole('button', { name: 'Пропустить' })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+      );
 
       await page.goto('/app?section=progress');
       const tabs = page.getByRole('tablist').first();

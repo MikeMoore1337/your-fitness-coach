@@ -2739,7 +2739,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await rirArticleLink.click();
   await expect
     .poll(async () => (await tma.state()).openedLinks)
-    .toContain('http://127.0.0.1:4173/knowledge/training/repetitions-in-reserve');
+    .toContain(new URL('/knowledge/training/repetitions-in-reserve', tmaPage.url()).href);
   await expect(tmaPage).toHaveURL(/\/app$/);
   await expect(rirDetails).toHaveAttribute('open', '');
   await tma.setTheme('dark');

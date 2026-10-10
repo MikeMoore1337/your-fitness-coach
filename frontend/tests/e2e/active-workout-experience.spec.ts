@@ -1483,8 +1483,12 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(
     secondSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 2' }),
   ).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toContainText(
-    'Дальше: Жим штанги лёжа, подход 2',
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
+    'Далее: Жим штанги лёжа',
+  );
+  await expect(page.getByRole('complementary', { name: 'Отдых между подходами' })).toContainText(
+    'Подход 2 из 3',
   );
 
   await secondSet.getByText('Дополнительно').click();
@@ -2536,7 +2540,7 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toBeVisible();
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
   await page.screenshot({ path: `${packagePath}/mobile-light-rest.png`, fullPage: true });
 
   const secondSet = page.locator('[data-workout-set-id="202"]');
