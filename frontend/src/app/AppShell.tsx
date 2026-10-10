@@ -461,7 +461,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...(mobileNavigation ? {} : glassProps())}
+              {...glassProps()}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >

@@ -30,8 +30,26 @@ for (const width of [320, 360, 393, 430])
       const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
       const tabs = navigation.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
       await expect(tabs).toHaveCount(4);
+      await expect(page.locator('.progress-overview')).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      const calorieLines = await page
+        .locator('.progress-overview__metric strong')
+        .filter({ hasText: 'ккал' })
+        .evaluateAll((values) =>
+          values.map((element) => {
+            const range = document.createRange();
+            range.selectNodeContents(element);
+            return range.getClientRects().length;
+          }),
+        );
+      expect(calorieLines).toEqual([1]);
       const navigationBox = (await navigation.boundingBox())!;
       const triggerBox = (await trigger.boundingBox())!;
+      expect(navigationBox.height).toBe(60);
+      expect(triggerBox.height).toBe(navigationBox.height);
+      expect(triggerBox.y).toBe(navigationBox.y);
+      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(6px\)/);
+      await expect(trigger).toHaveCSS('backdrop-filter', /blur\(8px\)/);
       expect(triggerBox.x - navigationBox.x - navigationBox.width).toBeGreaterThanOrEqual(16);
       for (const tab of await tabs.all()) {
         const box = (await tab.boundingBox())!;
@@ -40,12 +58,35 @@ for (const width of [320, 360, 393, 430])
         const labelFits = await tab.locator('.app-bottom-nav__label').evaluate((label) => {
           const bounds = label.getBoundingClientRect();
           const parent = label.parentElement!.getBoundingClientRect();
-          return bounds.left >= parent.left && bounds.right <= parent.right;
+          const text = document.createRange();
+          text.selectNodeContents(label);
+          return (
+            bounds.left >= parent.left &&
+            bounds.right <= parent.right &&
+            text.getBoundingClientRect().width <= bounds.width + 1
+          );
         });
         expect(labelFits).toBe(true);
       }
       await trigger.click();
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
+      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(8px\)/);
+      const icons = await sheet.locator('.app-quick-add-action__icon').evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          const icon = element.querySelector('svg')!;
+          return {
+            color: style.color,
+            background: style.backgroundColor,
+            width: icon.getBoundingClientRect().width,
+            height: icon.getBoundingClientRect().height,
+            stroke: icon.getAttribute('stroke-width'),
+          };
+        }),
+      );
+      expect(icons).toHaveLength(5);
+      expect(icons.every((icon) => JSON.stringify(icon) === JSON.stringify(icons[0]))).toBe(true);
+      expect(icons[0]).toMatchObject({ width: 20, height: 20, stroke: '1.8' });
       await expect(sheet.getByRole('link')).toHaveText([
         'Еда',
         'Вода',
@@ -83,6 +124,7 @@ for (const width of [320, 360, 393, 430])
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
       const rail = page.locator('.progress-category-nav__rail');
+      await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toBeHidden();
       await rail.getByRole('link', { name: /^Тело/ }).click();
       await expect(page).toHaveURL(/progress_view=body/);
       await rail.getByRole('link', { name: /^Тренировки/ }).click();

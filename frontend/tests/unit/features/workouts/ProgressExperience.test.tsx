@@ -406,7 +406,7 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_30',
     );
-    const helpControl = screen.getByText('Что это?', { exact: true });
+    const helpControl = screen.getByText('О показателях', { exact: true });
     const helpDisclosure = helpControl.closest('details');
     expect(helpDisclosure).not.toBeNull();
     fireEvent.click(helpControl);

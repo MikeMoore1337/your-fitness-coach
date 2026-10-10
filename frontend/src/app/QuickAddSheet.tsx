@@ -118,6 +118,7 @@ export function QuickAddSheet({
       }}
     >
       <div
+        {...glassProps('tinted')}
         aria-labelledby="quick-add-title"
         aria-modal="true"
         className="app-quick-add-panel"
@@ -140,7 +141,7 @@ export function QuickAddSheet({
         <nav aria-label="Быстрые действия" className="app-quick-add-panel__actions">
           {actions.map((action) => (
             <AppLink
-              className={`app-quick-add-action${action.key === 'food' || action.key === 'water' ? ' app-quick-add-action--primary' : ''}`}
+              className="app-quick-add-action"
               key={action.key}
               to={action.to}
               onClick={() => {

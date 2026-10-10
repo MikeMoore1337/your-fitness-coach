@@ -2754,7 +2754,7 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   ).toHaveAttribute('href', '/knowledge/nutrition/kbju-as-a-reference');
 
   await tmaPage.getByRole('link', { name: 'Прогресс', exact: true }).click();
-  await tmaPage.locator('.progress-hero').getByText('Что это?', { exact: true }).click();
+  await tmaPage.locator('.progress-hero').getByText('О показателях', { exact: true }).click();
   await expect(
     tmaPage.locator('.progress-hero').getByRole('link', { name: /Подробнее на сайте/ }),
   ).toHaveAttribute('href', '/knowledge/progress/how-to-read-progress');

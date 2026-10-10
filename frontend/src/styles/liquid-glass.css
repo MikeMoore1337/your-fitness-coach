@@ -89,6 +89,9 @@
     --glass-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation))
       brightness(var(--glass-brightness));
   }
+  :root [data-glass][data-glass-accent='lime'] {
+    --glass-fill: color-mix(in srgb, var(--v2-lime) calc(var(--glass-opacity) * 100%), transparent);
+  }
 }
 
 /* Unknown media features must not disable an otherwise supported material. */
@@ -124,8 +127,7 @@
 }
 
 :root [data-glass][data-glass-accent='lime'] {
-  --glass-fill: var(--v2-lime);
-  --glass-filter: none;
+  --glass-solid: var(--v2-lime);
   --glass-highlight-opacity: 0.14;
   color: #151515;
 }

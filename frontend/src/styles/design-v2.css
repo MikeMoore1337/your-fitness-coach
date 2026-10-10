@@ -11058,6 +11058,10 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
   .app-section--progress .progress-experience .progress-hero {
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'copy help'
+      'period period'
+      'download download';
     gap: 12px;
     align-items: center;
   }
@@ -11068,6 +11072,13 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .app-section--progress .progress-hero__help {
     grid-column: 2;
     grid-row: 1;
+  }
+  .app-section--progress .progress-hero__help .contextual-help > summary {
+    max-width: 164px;
+    min-height: 44px;
+  }
+  .app-section--progress .progress-experience--bento {
+    gap: var(--v2-space-4);
   }
   .app-section--progress .progress-hero__period {
     grid-column: 1 / -1;

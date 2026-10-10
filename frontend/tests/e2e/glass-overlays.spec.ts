@@ -48,7 +48,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=nutrition');
       await page.getByRole('button', { name: 'Быстро добавить', exact: true }).tap();
       const panel = page.getByRole('dialog', { name: 'Что добавить?' });
-      await expectReadableGlass(panel, true);
+      await expectReadableGlass(panel);
       await expectNoHorizontalOverflow(page);
       await page.getByRole('button', { name: 'Закрыть быстрые действия' }).tap();
       await expect(panel).toBeHidden();
@@ -114,7 +114,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
       const quickAdd = page.getByRole('dialog', { name: 'Что добавить?' });
-      await expectReadableGlass(quickAdd, true);
+      await expectReadableGlass(quickAdd);
       await page.keyboard.press('Escape');
       await expect(quickAdd).toBeHidden();
 

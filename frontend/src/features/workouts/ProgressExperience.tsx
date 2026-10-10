@@ -21,7 +21,12 @@ import { AppLink, useNavigation } from '../../shared/navigation/router';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { QuantitativeProgress, TimeSeriesChart } from '../../shared/ui/DataViz';
-import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
+import {
+  dateInputValue,
+  detectedTimeZone,
+  formatCalendarDate,
+  formatTimeZoneLabel,
+} from '../../shared/dateTime';
 import {
   Badge,
   Button,
@@ -373,7 +378,9 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
     update();
     rail.addEventListener('scroll', update);
     const revealActive = () => {
-      if (active) reveal(active);
+      const focused = rail.querySelector<HTMLElement>('a:focus');
+      const target = focused ?? active;
+      if (target) reveal(target);
       update();
     };
     const observer =
@@ -1353,7 +1360,7 @@ function ProgressPeriodControls({
       </div>
       <div className="progress-period-controls__meta" aria-live="polite">
         <strong>Период: {periodDateLabel(range.dateFrom, range.dateTo)}</strong>
-        <span>Часовой пояс: {timeZone}</span>
+        <span data-time-zone={timeZone}>Часовой пояс: {formatTimeZoneLabel(timeZone)}</span>
       </div>
       {customOpen && (
         <form
@@ -1538,7 +1545,10 @@ export function ProgressExperience({
           />
         </div>
         <div className="progress-hero__help">
-          <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
+          <ContextualHelp
+            articlePath="/knowledge/progress/how-to-read-progress"
+            summary="О показателях"
+          >
             <p>
               Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
               пропущенная запись не равна нулевому результату.

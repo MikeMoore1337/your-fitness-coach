@@ -33,15 +33,10 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(page.locator('.app-mobile-header')).toHaveCount(0);
       }
       const nav = page.getByRole('navigation', { name: 'Основная навигация' });
-      if (width < 900) {
-        await expect(nav).not.toHaveAttribute('data-glass');
-        await expect(nav).toHaveCSS('background-image', 'none');
-      } else {
-        await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
-        await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
-        await expect(nav).toHaveCSS('box-shadow', /inset/);
-      }
-      await expect(nav).toHaveCSS('backdrop-filter', 'none');
+      await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
+      await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
+      await expect(nav).toHaveCSS('box-shadow', /inset/);
+      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(6px\)/ : 'none');
       await expectNoHorizontalOverflow(page);
       // Content containers remain ordinary surfaces; navigation alone carries this material.
       await expect(
@@ -58,7 +53,8 @@ for (const theme of ['light', 'dark'] as const) {
       await page.keyboard.press('Enter');
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
       await expect(sheet).toBeVisible();
-      await expect(sheet).not.toHaveAttribute('data-glass');
+      await expect(sheet).toHaveAttribute('data-glass-variant', 'tinted');
+      await expect(sheet).toHaveCSS('backdrop-filter', /blur\(8px\)/);
       await page.screenshot({ path: testInfo.outputPath(`quick-add-${width}-${theme}.png`) });
       await page.keyboard.press('Escape');
       await expect(sheet).toBeHidden();

@@ -1684,7 +1684,7 @@ test('progress header aligns help and report without clipping the period selecto
 
     for (const width of [768, 1280, 1440, 390]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
-      const help = page.locator('.progress-hero__help').getByText('Что это?', { exact: true });
+      const help = page.locator('.progress-hero__help').getByText('О показателях', { exact: true });
       const report = page.getByRole('link', { name: 'Скачать отчёт' });
       const period = page.locator('.progress-hero__period');
       const tabs = period.getByRole('tablist', { name: 'Период прогресса' });

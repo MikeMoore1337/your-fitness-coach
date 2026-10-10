@@ -14,6 +14,18 @@ export function formatCalendarDate(
   return new Intl.DateTimeFormat(locale, options).format(new Date(`${value}T12:00:00`));
 }
 
+export function formatTimeZoneLabel(timeZone: string): string {
+  try {
+    return (
+      new Intl.DateTimeFormat('ru-RU', { timeZone, timeZoneName: 'longGeneric' })
+        .formatToParts()
+        .find((part) => part.type === 'timeZoneName')?.value ?? 'Часовой пояс профиля'
+    );
+  } catch {
+    return 'Часовой пояс профиля';
+  }
+}
+
 export function dateInputValue(date: Date, timeZone = detectedTimeZone()): string {
   try {
     const parts = new Intl.DateTimeFormat('en-CA', {
