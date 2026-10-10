@@ -22,6 +22,7 @@ def test_docs_governance_tests_and_ci_only_do_not_deploy() -> None:
     decision = classify_paths(
         [
             "AGENTS.md",
+            ".codex/config.toml",
             ".github/workflows/deploy.yml",
             "codex-backlog/GLOBAL_RULES.md",
             "docs/deployment.md",
