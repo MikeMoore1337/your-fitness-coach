@@ -3708,7 +3708,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-hero__help .contextual-help > summary {
   width: fit-content;
-  max-width: 100%;
+  max-width: min(100%, 140px);
   justify-content: flex-start;
 }
 
