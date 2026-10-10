@@ -243,6 +243,64 @@ def _provider_request_with_sequence(
         server.server_close()
 
 
+@pytest.mark.parametrize(
+    "provider_mode",
+    [editorial_worker.LOCAL_MOCK_MODE, editorial_worker.EXTERNAL_MODE],
+)
+def test_human_writing_is_applied_to_initial_and_repair_requests(
+    provider_mode: str,
+) -> None:
+    source = valid_job().source
+    model = (
+        editorial_worker.EXTERNAL_PROVIDER_MODEL
+        if provider_mode == editorial_worker.EXTERNAL_MODE
+        else "mock-editorial-v1"
+    )
+    initial = editorial_worker._provider_request_body(
+        source, provider_mode=provider_mode, model=model
+    )
+    previous = editorial_worker.DraftProposal(
+        headline="Исследование о восстановлении",
+        summary="Авторы описали результаты с ограничениями.",
+        why_it_matters="Нужна проверка первичной публикации.",
+    )
+    repair = editorial_worker._provider_request_body(
+        source,
+        provider_mode=provider_mode,
+        model=model,
+        repair_warnings=("ai_meta_or_template_language",),
+        previous_proposal=previous,
+    )
+
+    assert editorial_worker.PROMPT_VERSION == "task403-editorial-worker-v2-human-writing"
+    for request in (initial, repair):
+        messages = request["messages"]
+        full_prompt = "\\n".join(message["content"] for message in messages)
+        assert "human-writing v1.3.1" in full_prompt
+        assert "natural, precise Russian" in full_prompt
+        assert "Never add facts, numerical claims" in full_prompt
+        assert "uncertainty, limitations, and conditions" in full_prompt
+        assert "source grounding, editorial safety checks" in full_prompt
+        assert "<source-content>" in full_prompt
+        assert "</source-content>" in full_prompt
+        assert request["response_format"]["json_schema"]["strict"] is True
+        assert set(request["response_format"]["json_schema"]["schema"]["required"]) == {
+            "headline", "summary", "why_it_matters"
+        }
+        assert "tools" not in request
+    repair_prompt = "\\n".join(message["content"] for message in repair["messages"])
+    assert "REPAIR_REQUEST" in repair_prompt
+    assert "ai_meta_or_template_language" in repair_prompt
+    if provider_mode == editorial_worker.EXTERNAL_MODE:
+        assert [message["role"] for message in initial["messages"]] == ["user"]
+        assert [message["role"] for message in repair["messages"]] == ["user"]
+    else:
+        assert [message["role"] for message in initial["messages"]] == ["system", "user"]
+        assert [message["role"] for message in repair["messages"]] == [
+            "system", "user", "assistant", "user"
+        ]
+
+
 def test_preflight_uses_source_packet_numbers_and_trusted_url_budget() -> None:
     source = valid_job().source.model_copy(
         update={
