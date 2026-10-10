@@ -519,7 +519,11 @@ def _stage_release(
         ):
             _atomic_copy(discovery_root / name, temporary / name, mode=0o444, uid=0, gid=0)
         editorial_root = source_root / "deploy" / "hermes-editorial-worker"
-        for name in ("editorial_worker.py", "EDITORIAL_STYLE_PROMPT.txt", "hermes-provenance.json"):
+        for name in (
+            "editorial_worker.py",
+            "EDITORIAL_STYLE_PROMPT.txt",
+            "hermes-provenance.json",
+        ):
             _atomic_copy(
                 editorial_root / name,
                 temporary / "editorial-worker" / name,
