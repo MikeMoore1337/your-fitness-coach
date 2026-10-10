@@ -247,7 +247,7 @@ def _provider_request_with_sequence(
     "provider_mode",
     [editorial_worker.LOCAL_MOCK_MODE, editorial_worker.EXTERNAL_MODE],
 )
-def test_human_writing_is_applied_to_initial_and_repair_requests(
+def test_clear_voice_is_applied_to_initial_and_repair_requests(
     provider_mode: str,
 ) -> None:
     source = valid_job().source
@@ -272,15 +272,17 @@ def test_human_writing_is_applied_to_initial_and_repair_requests(
         previous_proposal=previous,
     )
 
-    assert editorial_worker.PROMPT_VERSION == "task403-editorial-worker-v2-human-writing"
+    assert editorial_worker.PROMPT_VERSION == "task403-editorial-worker-v3-clear-voice-1.0.0"
     for request in (initial, repair):
         messages = request["messages"]
         full_prompt = "\\n".join(message["content"] for message in messages)
-        assert "human-writing v1.3.1" in full_prompt
-        assert "natural, precise Russian" in full_prompt
-        assert "Never add facts, numerical claims" in full_prompt
-        assert "uncertainty, limitations, and conditions" in full_prompt
-        assert "source grounding, editorial safety checks" in full_prompt
+        assert editorial_worker.CLEAR_VOICE_EDITORIAL_RULES in full_prompt
+        assert "Clear Voice v1.0.0" in full_prompt
+        assert "Write concise, natural, precise Russian" in full_prompt
+        assert "Keep negations, uncertainties, population, design" in full_prompt
+        assert "Do not infer efficacy, medical safety" in full_prompt
+        assert "Existing trusted source, exact output schema" in full_prompt
+        assert "human-writing v1.3.1" not in full_prompt
         assert "<source-content>" in full_prompt
         assert "</source-content>" in full_prompt
         assert request["response_format"]["json_schema"]["strict"] is True
