@@ -864,6 +864,113 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
 });
 
+for (const width of [360, 393, 430]) {
+  for (const theme of ['light', 'dark'] as const) {
+    for (const platform of ['browser', 'telegram'] as const) {
+      test(`#860 replacement feedback stays visible at ${width}px ${theme} ${platform}`, async ({
+        page,
+      }, testInfo) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        if (platform === 'telegram') await installMockedTelegram(page);
+        await page.addInitScript((selectedTheme) => {
+          localStorage.setItem('app-theme', selectedTheme);
+          if (window.Telegram?.WebApp) window.Telegram.WebApp.colorScheme = selectedTheme;
+        }, theme);
+        await mockActiveWorkout(page);
+        await page.route('**/workouts/42/exercises/101/alternatives?*', async (route) => {
+          if (route.request().url().includes('dumbbell')) return route.fallback();
+          await route.fulfill({ json: [] });
+        });
+        let failPreview = true;
+        await page.route('**/workouts/42/adaptations/preview', async (route) => {
+          if (!failPreview) return route.fallback();
+          failPreview = false;
+          await route.fulfill({ status: 503, json: { detail: 'Временная ошибка сервера' } });
+        });
+        let failApply = true;
+        await page.route('**/workouts/42/adaptations/apply', async (route) => {
+          if (!failApply) return route.fallback();
+          failApply = false;
+          await route.fulfill({ status: 409, json: { detail: 'Тренировка изменилась' } });
+        });
+        const writes: Array<{ path: string; body: Record<string, unknown> }> = [];
+        page.on('request', (request) => {
+          if (request.method() === 'POST' && /\/(adaptations|programs)\//.test(request.url())) {
+            writes.push({ path: new URL(request.url()).pathname, body: request.postDataJSON() });
+          }
+        });
+        await page.goto(platform === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
+        if (platform === 'browser') await page.getByRole('button', { name: 'Клиент' }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        await page
+          .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
+          .first()
+          .click();
+        const dialog = page.getByRole('dialog', {
+          name: 'Заменить только в этой тренировке',
+          exact: true,
+        });
+        await dialog.getByRole('checkbox', { name: 'Тросовый блок', exact: true }).check();
+        await dialog.getByRole('checkbox', { name: 'Тренажёры', exact: true }).check();
+        await expect(
+          dialog.getByText(/Для выбранного оборудования нет проверенной замены/),
+        ).toBeVisible();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        const error = dialog.getByRole('alert');
+        await expect(error).toContainText('Для выбранного оборудования нет проверенной замены.');
+        await expect(error).toBeFocused();
+        await expect(error).toBeInViewport();
+        expect(writes).toHaveLength(0);
+        await page.screenshot({ path: testInfo.outputPath('no-compatible-visible.png') });
+
+        await dialog.getByRole('checkbox', { name: 'Гантели', exact: true }).check();
+        await dialog.getByRole('checkbox', { name: 'Скамья', exact: true }).check();
+        await dialog.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        await expect(error).toContainText('Временная ошибка сервера');
+        await expect(error).toBeFocused();
+        await expect(error).toBeInViewport();
+        await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+        const previewHeading = dialog.getByRole('heading', { name: 'Что изменится', exact: true });
+        await expect(previewHeading).toBeFocused();
+        await expect(previewHeading).toBeInViewport();
+        expect(writes.every((request) => request.path.endsWith('/adaptations/preview'))).toBe(true);
+        expect(writes.at(-1)?.body).toEqual({
+          reason: 'replace_exercise',
+          target_workout_exercise_id: 101,
+          replacement_exercise_id: 13,
+          available_equipment_ids: ['cable', 'machine', 'dumbbell', 'bench'],
+        });
+        await page.screenshot({ path: testInfo.outputPath('preview-visible.png') });
+        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await expect(error).toContainText('Состав тренировки изменился');
+        await expect(error).toBeInViewport();
+        await expect(dialog.getByRole('button', { name: 'Применить', exact: true })).toHaveCount(0);
+        await dialog.getByRole('button', { name: 'Обновить изменения', exact: true }).click();
+        await expect(previewHeading).toBeFocused();
+        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await expect(
+          page.getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+        ).toBeVisible();
+        expect(
+          writes.filter((request) => request.path.endsWith('/adaptations/apply')),
+        ).toHaveLength(2);
+        expect(writes.some((request) => request.path.includes('/programs/'))).toBe(false);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1,
+          ),
+        ).toBe(true);
+        await testInfo.attach('synthetic-network.json', {
+          body: JSON.stringify(writes, null, 2),
+          contentType: 'application/json',
+        });
+      });
+    }
+  }
+}
+
 test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await installMockedTelegram(page);
