@@ -255,6 +255,7 @@ docs/ux-proposals/issue-914/review/prototype/proposal.css
 docs/ux/issue-914-acceptance/README.md
 docs/ux/issue-914-acceptance/after/chromium-1440-dark-desktop.png
 docs/ux/issue-914-acceptance/after/chromium-1440-light-desktop.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-keyboard.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-overview.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-plus30.png
@@ -265,6 +266,7 @@ docs/ux/issue-914-acceptance/after/chromium-320-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-skip.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-timer.png
 docs/ux/issue-914-acceptance/after/chromium-320-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-keyboard.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-overview.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-plus30.png
@@ -275,6 +277,7 @@ docs/ux/issue-914-acceptance/after/chromium-320-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-skip.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-timer.png
 docs/ux/issue-914-acceptance/after/chromium-320-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-overview.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-plus30.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-plus60.png
@@ -282,6 +285,7 @@ docs/ux/issue-914-acceptance/after/chromium-360-dark-skip-before.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-skip.png
 docs/ux/issue-914-acceptance/after/chromium-360-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-overview.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-plus30.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-plus60.png
@@ -289,6 +293,7 @@ docs/ux/issue-914-acceptance/after/chromium-360-light-skip-before.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-skip.png
 docs/ux/issue-914-acceptance/after/chromium-360-light-timer.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-keyboard.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-overview.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-plus30.png
@@ -299,6 +304,7 @@ docs/ux/issue-914-acceptance/after/chromium-393-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-skip.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-timer.png
 docs/ux/issue-914-acceptance/after/chromium-393-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-keyboard.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-overview.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-plus30.png
@@ -309,6 +315,7 @@ docs/ux/issue-914-acceptance/after/chromium-393-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-skip.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-timer.png
 docs/ux/issue-914-acceptance/after/chromium-393-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-overview.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-plus30.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-plus60.png
@@ -316,6 +323,7 @@ docs/ux/issue-914-acceptance/after/chromium-430-dark-skip-before.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-skip.png
 docs/ux/issue-914-acceptance/after/chromium-430-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/chromium-430-light-overview.png
 docs/ux/issue-914-acceptance/after/chromium-430-light-plus30.png
 docs/ux/issue-914-acceptance/after/chromium-430-light-plus60.png
@@ -327,6 +335,7 @@ docs/ux/issue-914-acceptance/after/chromium-768-dark-desktop.png
 docs/ux/issue-914-acceptance/after/chromium-768-light-desktop.png
 docs/ux/issue-914-acceptance/after/webkit-1440-dark-desktop.png
 docs/ux/issue-914-acceptance/after/webkit-1440-light-desktop.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-keyboard.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-overview.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-plus30.png
@@ -337,6 +346,7 @@ docs/ux/issue-914-acceptance/after/webkit-320-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-skip.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-timer.png
 docs/ux/issue-914-acceptance/after/webkit-320-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-keyboard.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-overview.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-plus30.png
@@ -347,6 +357,7 @@ docs/ux/issue-914-acceptance/after/webkit-320-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-skip.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-timer.png
 docs/ux/issue-914-acceptance/after/webkit-320-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-overview.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-plus30.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-plus60.png
@@ -354,6 +365,7 @@ docs/ux/issue-914-acceptance/after/webkit-360-dark-skip-before.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-skip.png
 docs/ux/issue-914-acceptance/after/webkit-360-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-overview.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-plus30.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-plus60.png
@@ -361,6 +373,7 @@ docs/ux/issue-914-acceptance/after/webkit-360-light-skip-before.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-skip.png
 docs/ux/issue-914-acceptance/after/webkit-360-light-timer.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-keyboard.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-overview.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-plus30.png
@@ -371,6 +384,7 @@ docs/ux/issue-914-acceptance/after/webkit-393-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-skip.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-timer.png
 docs/ux/issue-914-acceptance/after/webkit-393-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-keyboard.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-overview.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-plus30.png
@@ -381,6 +395,7 @@ docs/ux/issue-914-acceptance/after/webkit-393-light-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-skip.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-timer.png
 docs/ux/issue-914-acceptance/after/webkit-393-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-overview.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-plus30.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-plus60.png
@@ -388,6 +403,7 @@ docs/ux/issue-914-acceptance/after/webkit-430-dark-skip-before.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-skip-pending.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-skip.png
 docs/ux/issue-914-acceptance/after/webkit-430-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-dock-clearance.png
 docs/ux/issue-914-acceptance/after/webkit-430-light-overview.png
 docs/ux/issue-914-acceptance/after/webkit-430-light-plus30.png
 docs/ux/issue-914-acceptance/after/webkit-430-light-plus60.png

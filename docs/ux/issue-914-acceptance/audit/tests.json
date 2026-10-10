@@ -1,9 +1,9 @@
 {
-  "runtime": "20d800b530cdb2cc5bec7cebd0c9b5f1eaa70afc",
+  "runtime": "5c8f4743a1afe6559a7db4e8797a96ef9d44053b",
   "unit": {
     "passed": 823,
     "files": 145,
-    "source": "CI 38079120219 Frontend (unit); local 822 passed then one invalid URL-constructor mock fixed and 31 targeted tests passed"
+    "source": "CI 38079120219 Frontend (unit); local 823 passed"
   },
   "pdf": {
     "passed": 8,
@@ -31,12 +31,13 @@
     "skip_reason": "PostgreSQL row locking required; local SQLite"
   },
   "final_timer": {
-    "passed": 54,
+    "passed": 70,
     "engines": [
       "chromium",
       "webkit"
     ],
-    "retries": 0
+    "retries": 0,
+    "scope": "Existing 54 timer cases plus 16 mobile dock geometry/touch cases"
   },
   "security_browser": {
     "passed": 24,
