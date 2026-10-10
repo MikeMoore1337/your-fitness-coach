@@ -13,7 +13,7 @@ FULL_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 IMAGE_REF_PATTERN = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
-PROMPT_VERSION = "task403-editorial-worker-v1"
+PROMPT_VERSION = "task403-editorial-worker-v2-human-writing"
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 STATE_SCHEMA_VERSION = "hermes-discovery-state-v1"
 
