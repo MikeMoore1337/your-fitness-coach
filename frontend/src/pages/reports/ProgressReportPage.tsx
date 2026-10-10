@@ -443,13 +443,12 @@ function ReportContent({
   return (
     <div className="progress-report-document">
       <PrintPageHeader report={report} />
-      <footer className="progress-report-print-footer" aria-hidden="true">
-        <span>Сформировано {formatDateTime(report.generated_at, report.timezone)}</span>
-        <span>Your Fitness Coach</span>
-      </footer>
 
       <section className="progress-report-overview" aria-labelledby="report-overview-title">
         <div className="progress-report-overview__identity">
+          <div className="progress-report-brand report-screen-only">
+            <BrandLockup />
+          </div>
           <h1 id="report-overview-title">Отчёт о прогрессе</h1>
           <p className="progress-report-subject">{report.subject.name}</p>
           <p>
@@ -467,13 +466,13 @@ function ReportContent({
         </div>
       </section>
 
+      {controls}
+
       <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
         <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
         <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
         <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
       </section>
-
-      {controls}
 
       <section
         className="progress-report-factual-summary"
@@ -823,6 +822,10 @@ function ReportContent({
           </p>
         </section>
       </div>
+      <footer className="progress-report-print-footer" aria-hidden="true">
+        <span>Сформировано {formatDateTime(report.generated_at, report.timezone)}</span>
+        <span>Your Fitness Coach</span>
+      </footer>
     </div>
   );
 }
@@ -1018,52 +1021,58 @@ export default function ProgressReportPage() {
         </section>
       )}
 
-      {handoffId === null && auth?.user?.trainer && !clientId && (
-        <ReportHandoffPanel
-          dateFrom={applied.dateFrom}
-          dateTo={applied.dateTo}
-          loading={displayFetching}
-          period={applied.period}
-          report={displayReport}
-          trainer={auth.user.trainer}
-        />
-      )}
+      <details
+        className="progress-report-options report-screen-only"
+        open={window.innerWidth > 680}
+      >
+        <summary>Состав и отправка отчёта</summary>
+        {handoffId === null && auth?.user?.trainer && !clientId && (
+          <ReportHandoffPanel
+            dateFrom={applied.dateFrom}
+            dateTo={applied.dateTo}
+            loading={displayFetching}
+            period={applied.period}
+            report={displayReport}
+            trainer={auth.user.trainer}
+          />
+        )}
 
-      {handoffId === null && !clientId && (
-        <PublicProgressSharePanel
-          dateFrom={applied.dateFrom}
-          dateTo={applied.dateTo}
-          period={applied.period}
-        />
-      )}
+        {handoffId === null && !clientId && (
+          <PublicProgressSharePanel
+            dateFrom={applied.dateFrom}
+            dateTo={applied.dateTo}
+            period={applied.period}
+          />
+        )}
 
-      {handoffId === null && displayReport.training.exercises.length > 0 && (
-        <fieldset className="progress-report-exercise-picker report-screen-only">
-          <legend>Упражнения в печатном отчёте</legend>
-          <p>Выберите до четырёх. Значения показывают только записанные рабочие подходы.</p>
-          {displayReport.training.exercises.slice(0, 8).map((exercise) => {
-            const selected = selectedExercises.includes(exercise.exercise_title);
-            return (
-              <label key={exercise.exercise_title}>
-                <input
-                  checked={selected}
-                  disabled={!selected && selectedExercises.length >= 4}
-                  onChange={() =>
-                    setExerciseSelections((current) => ({
-                      ...current,
-                      [reportKey]: selected
-                        ? selectedExercises.filter((item) => item !== exercise.exercise_title)
-                        : [...selectedExercises, exercise.exercise_title],
-                    }))
-                  }
-                  type="checkbox"
-                />
-                <span>{exercise.exercise_title}</span>
-              </label>
-            );
-          })}
-        </fieldset>
-      )}
+        {handoffId === null && displayReport.training.exercises.length > 0 && (
+          <fieldset className="progress-report-exercise-picker report-screen-only">
+            <legend>Упражнения в печатном отчёте</legend>
+            <p>Выберите до четырёх. Значения показывают только записанные рабочие подходы.</p>
+            {displayReport.training.exercises.slice(0, 8).map((exercise) => {
+              const selected = selectedExercises.includes(exercise.exercise_title);
+              return (
+                <label key={exercise.exercise_title}>
+                  <input
+                    checked={selected}
+                    disabled={!selected && selectedExercises.length >= 4}
+                    onChange={() =>
+                      setExerciseSelections((current) => ({
+                        ...current,
+                        [reportKey]: selected
+                          ? selectedExercises.filter((item) => item !== exercise.exercise_title)
+                          : [...selectedExercises, exercise.exercise_title],
+                      }))
+                    }
+                    type="checkbox"
+                  />
+                  <span>{exercise.exercise_title}</span>
+                </label>
+              );
+            })}
+          </fieldset>
+        )}
+      </details>
     </>
   ) : null;
 
@@ -1102,9 +1111,8 @@ export default function ProgressReportPage() {
         />
       ) : displayReport ? (
         <>
-          <div className="progress-report-settings report-screen-only">{controls}</div>
           <ReportContent
-            controls={null}
+            controls={<div className="progress-report-settings report-screen-only">{controls}</div>}
             report={displayReport}
             selectedExercises={selectedExercises}
           />

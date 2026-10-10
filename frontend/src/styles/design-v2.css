@@ -11072,6 +11072,78 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
 }
 
+/* #859 approved mobile hierarchy: shared display headlines must not override it. */
+@media (max-width: 680px) {
+  .app-section--progress .progress-hero .progress-hero__copy h1 {
+    font-family: var(--font-body, Inter, system-ui, sans-serif);
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.035em;
+  }
+  .app-section--progress .progress-experience .progress-hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+  }
+  .app-section--progress .progress-hero__copy {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .app-section--progress .progress-hero__help {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .app-section--progress .progress-hero__period {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .app-section--progress .progress-hero__download {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  .app-section--progress .progress-hero__download a {
+    min-height: 44px;
+  }
+}
+@media (max-width: 899px) {
+  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav .app-bottom-nav__btn.is-active {
+    background: color-mix(in srgb, var(--v2-lime) 12%, var(--v2-surface));
+  }
+}
+.progress-report-brand .yfc-lockup__mark {
+  width: 24px;
+  height: 24px;
+  flex-basis: 24px;
+}
+.progress-report-brand .yfc-lockup__wordmark {
+  font-size: 0.625rem;
+}
+.progress-report-brand {
+  margin-bottom: 12px;
+}
+.progress-report-options > summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  gap: 12px;
+}
+.progress-report-options > summary::after {
+  content: '+';
+  margin-left: auto;
+}
+.progress-report-options[open] > summary::after {
+  content: '−';
+}
+.progress-report-options[open] {
+  display: grid;
+  gap: 16px;
+}
+.progress-report-document .progress-report-overview h1 {
+  font-family: var(--font-body, Inter, system-ui, sans-serif);
+}
+
 /* #874: compact mobile document; print remains a sequential readable report. */
 .progress-report-toolbar .yfc-lockup__mark {
   width: 24px;
@@ -11237,9 +11309,31 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     padding: 0 0 3mm;
   }
   .progress-report-print-footer {
+    position: static;
     top: auto;
-    bottom: -13mm;
+    bottom: auto;
+    margin-top: 4mm;
+    break-inside: avoid;
     font-size: 9pt;
+  }
+  .progress-report-factual-summary {
+    display: block;
+    margin-block: 4mm;
+    padding: 3mm;
+  }
+  .progress-report-factual-summary dl {
+    display: block;
+    margin-top: 3mm;
+  }
+  .progress-report-factual-summary dl > div {
+    grid-template-columns: 32mm minmax(0, 1fr);
+    padding: 2mm;
+    break-inside: avoid;
+  }
+  .progress-report-exercises article,
+  .progress-report-checkin,
+  .progress-report-document .data-viz-chart {
+    break-inside: avoid;
   }
   .progress-report-overview {
     grid-template-columns: minmax(0, 1fr);
@@ -11265,7 +11359,11 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
   .progress-report-section,
   .progress-report-methodology {
+    display: block;
     padding-block: 4mm;
+  }
+  .progress-report-facts {
+    break-inside: avoid;
   }
   .progress-report-document :is(h2, h3, header) {
     break-after: avoid;

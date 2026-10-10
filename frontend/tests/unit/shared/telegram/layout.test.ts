@@ -106,6 +106,29 @@ describe('Mobile Web/TMA layout adapter', () => {
     cleanup();
   });
 
+  it('keeps the dock hidden through the pointer that blurs an input', () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const input = document.createElement('input');
+    const button = document.createElement('button');
+    document.body.append(input, button);
+    const cleanup = installMobileLayoutAdapter(null);
+    input.focus();
+    button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    button.focus();
+    window.dispatchEvent(new Event('resize'));
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
+    button.dispatchEvent(new Event('pointerup', { bubbles: true }));
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
+    frames.at(-1)?.(0);
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
+    cleanup();
+  });
+
   it('falls back from invalid zero heights and emits one recovery event on activation', () => {
     const controller = telegramLayoutMock();
     controller.webApp.viewportHeight = 0;

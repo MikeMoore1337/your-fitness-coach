@@ -131,18 +131,7 @@ export function SearchableExercisePicker({
                 aria-selected={exercise.id === value}
                 className="exercise-picker__option"
                 key={exercise.id}
-                tabIndex={compact ? 0 : undefined}
-                onClick={() => {
-                  if (compact) chooseExercise(exercise);
-                }}
-                onKeyDown={(event) => {
-                  if (compact && (event.key === 'Enter' || event.key === ' ')) {
-                    event.preventDefault();
-                    chooseExercise(exercise);
-                  }
-                }}
                 onPointerDown={(event) => {
-                  if (compact) return;
                   event.preventDefault();
                   chooseExercise(exercise);
                 }}

@@ -54,10 +54,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
       const nav = page.locator('.app-bottom-nav');
-      await expect(nav).toHaveCSS(
-        'backdrop-filter',
-        width < 900 ? 'blur(6px) saturate(1.12) brightness(1.03)' : 'none',
-      );
+      await expect(nav).toHaveCSS('backdrop-filter', 'none');
       await expect(nav).toHaveCSS('filter', 'none');
       await expect(nav).toHaveCSS(
         'background-color',
@@ -66,8 +63,8 @@ for (const theme of ['light', 'dark'] as const) {
             ? 'rgb(32, 37, 37)'
             : 'rgb(243, 245, 245)'
           : theme === 'dark'
-            ? 'rgba(28, 33, 33, 0.78)'
-            : 'rgba(248, 250, 250, 0.8)',
+            ? 'rgb(20, 23, 23)'
+            : 'rgb(255, 255, 255)',
       );
       const actionContrast = await page
         .getByRole('button', { name: 'Посмотреть упражнения', exact: true })
@@ -148,7 +145,13 @@ for (const theme of ['light', 'dark'] as const) {
         await expect(nav).toHaveCSS('backdrop-filter', 'none');
         await expect(nav).toHaveCSS(
           'background-color',
-          theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
+          width >= 900
+            ? theme === 'dark'
+              ? 'rgb(32, 37, 37)'
+              : 'rgb(243, 245, 245)'
+            : theme === 'dark'
+              ? 'rgb(20, 23, 23)'
+              : 'rgb(255, 255, 255)',
         );
         await session.detach();
       }
@@ -173,10 +176,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=today');
       await expect(page.locator('.today-dashboard')).toBeVisible();
       await settle(page);
-      await expect(page.locator('.app-bottom-nav')).toHaveCSS(
-        'backdrop-filter',
-        'blur(6px) saturate(1.12) brightness(1.03)',
-      );
+      await expect(page.locator('.app-bottom-nav')).toHaveCSS('backdrop-filter', 'none');
       await page.screenshot({ path: testInfo.outputPath(`today-tma-${theme}.png`) });
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();

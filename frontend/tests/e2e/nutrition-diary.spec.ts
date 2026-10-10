@@ -1111,11 +1111,11 @@ test('Task 748 grocery list derives recipe items and keeps manual changes usable
   await page.goto('/app?section=nutrition&date=2026-08-19');
 
   await expect(
-    page.getByTestId('meal-planner').getByText('Планирование питания', { exact: true }),
+    page.getByTestId('meal-planner').getByText('План питания', { exact: true }),
   ).toBeVisible();
   const grocery = page.getByTestId('grocery-list');
   await expect(grocery).toBeVisible();
-  await expect(grocery.getByText('Планирование питания', { exact: true })).toBeVisible();
+  await expect(grocery.getByText('Список покупок', { exact: true })).toBeVisible();
   await expect(page.getByText('Nutrition Planning', { exact: true })).toHaveCount(0);
   await grocery.locator('summary').click();
   await expect(grocery.getByText('Список ещё не сформирован', { exact: true })).toBeVisible();
@@ -1766,10 +1766,10 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   await expect(
     page.getByRole('progressbar', { name: /Калории:/ }).locator(':scope > span'),
   ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
-  await expect(page.getByRole('link', { name: 'Питание', exact: true })).toHaveCSS(
-    'background-color',
-    'rgb(27, 31, 31)',
-  );
+  const activeNutrition = page.getByRole('link', { name: 'Питание', exact: true });
+  await expect(activeNutrition).toHaveAttribute('aria-current', 'page');
+  await expect(activeNutrition).toHaveCSS('color', 'rgb(185, 234, 114)');
+  await expect(activeNutrition).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
     'aria-expanded',
@@ -1854,7 +1854,7 @@ for (const width of [360, 393, 430]) {
         await page.goto('/app?section=today');
         const water = async () => {
           await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
-          await page.getByRole('link', { name: /Добавить воду/ }).click();
+          await page.getByRole('link', { name: 'Вода', exact: true }).click();
         };
         await water();
         await expect(page).toHaveURL(/hydration=quick/);

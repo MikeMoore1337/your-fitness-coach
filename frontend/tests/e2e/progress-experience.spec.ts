@@ -1022,7 +1022,11 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   await expect(body.getByText('Мышцы спины')).toBeVisible();
   await expect(body.getByText('Задняя поверхность тела и ягодичные мышцы')).toBeVisible();
   await expect(body.getByText(/не оценивает тело/)).toBeVisible();
-  await expect(body.getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/)).toBeVisible();
+  await expect(body.locator('.progress-measurement-editor')).not.toHaveAttribute('open');
+  await body.locator('.progress-measurement-editor > summary').click();
+  await expect(
+    body.locator('.measurement-diary').getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/),
+  ).toBeVisible();
   await expect(body.getByText(/разовое изменение не считаем трендом/)).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -1041,7 +1045,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .poll(async () => {
       const mobileTrend = await body.locator('.progress-body-trends').boundingBox();
       const mobileDiary = await body.locator('.progress-body-diary').boundingBox();
-      return Boolean(mobileTrend && mobileDiary && mobileDiary.y < mobileTrend.y);
+      return Boolean(mobileTrend && mobileDiary && mobileDiary.y > mobileTrend.y);
     })
     .toBe(true);
   await expect(body.getByLabel('Вес, кг')).toHaveAttribute('inputmode', 'decimal');
@@ -1126,6 +1130,8 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     report.getByText('Средние значения рассчитаны только по заполненным дням.'),
   ).toBeVisible();
   await expect(report.getByRole('img', { name: /Калории по дням/ })).toBeVisible();
+  await expect(report.getByText('Изменения цели в периоде')).toBeHidden();
+  await report.getByText('История целей питания', { exact: true }).click();
   await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
   await expect(
     report.getByRole('table', {
@@ -1327,7 +1333,10 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   const report = page.locator('#nutrition-period-report');
   await expect(report.getByText('Заполнено 0 из 30 дней')).toBeVisible();
   await expect(report.getByText('Нет заполненных дней за период')).toBeVisible();
-  await expect(report.getByRole('link', { name: 'Открыть дневник питания' })).toBeVisible();
+  await expect(report.getByRole('link', { name: 'Открыть дневник питания' })).toHaveAttribute(
+    'href',
+    '/app?section=nutrition',
+  );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
   await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');

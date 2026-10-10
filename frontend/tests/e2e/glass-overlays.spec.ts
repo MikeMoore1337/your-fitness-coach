@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { installPlatformApi } from './fixtures/platform-api';
 import { expectNoHorizontalOverflow, installTelegramHarness } from './fixtures/mobile-tma';
 
-async function expectReadableGlass(panel: Locator) {
+async function expectReadableGlass(panel: Locator, opaque = false) {
   await expect(panel).toBeVisible();
   const contrast = await panel.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -27,7 +27,8 @@ async function expectReadableGlass(panel: Locator) {
     return { alpha, minimum: Math.min(...ratios) };
   });
   expect(contrast.alpha).toBeGreaterThan(0.5);
-  expect(contrast.alpha).toBeLessThan(1);
+  if (opaque) expect(contrast.alpha).toBe(1);
+  else expect(contrast.alpha).toBeLessThan(1);
   expect(contrast.minimum).toBeGreaterThanOrEqual(4.5);
 }
 
@@ -47,7 +48,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.goto('/app?section=nutrition');
       await page.getByRole('button', { name: 'Быстро добавить', exact: true }).tap();
       const panel = page.getByRole('dialog', { name: 'Что добавить?' });
-      await expectReadableGlass(panel);
+      await expectReadableGlass(panel, true);
       await expectNoHorizontalOverflow(page);
       await page.getByRole('button', { name: 'Закрыть быстрые действия' }).tap();
       await expect(panel).toBeHidden();
@@ -113,7 +114,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
       const quickAdd = page.getByRole('dialog', { name: 'Что добавить?' });
-      await expectReadableGlass(quickAdd);
+      await expectReadableGlass(quickAdd, true);
       await page.keyboard.press('Escape');
       await expect(quickAdd).toBeHidden();
 

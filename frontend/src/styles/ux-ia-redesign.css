@@ -1396,6 +1396,7 @@
     border: 0;
     border-radius: 22px;
     background: var(--v2-surface);
+    backdrop-filter: none;
     box-shadow: 0 3px 16px #00000018;
   }
   .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
@@ -1480,9 +1481,14 @@
 .progress-category-nav__rail::-webkit-scrollbar {
   display: none;
 }
-.app-section--progress .progress-category-nav__rail > a {
+.app-shell--design-v2
+  .app-section--progress
+  .progress-category-nav.section-navigation
+  .progress-category-nav__rail
+  > a {
   display: flex;
   flex: 0 0 auto;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
   padding: 8px 0;

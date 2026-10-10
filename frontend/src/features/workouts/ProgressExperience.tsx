@@ -427,10 +427,10 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
         onFocus={(event) => {
           if (event.target instanceof HTMLAnchorElement) {
             const rail = event.currentTarget;
-            rail.scrollLeft +=
-              event.target.getBoundingClientRect().left -
-              rail.getBoundingClientRect().left -
-              (rail.clientWidth - event.target.offsetWidth) / 2;
+            const bounds = rail.getBoundingClientRect();
+            const link = event.target.getBoundingClientRect();
+            if (link.left < bounds.left) rail.scrollLeft += link.left - bounds.left;
+            else if (link.right > bounds.right) rail.scrollLeft += link.right - bounds.right;
           }
         }}
         onKeyDown={(event) => {
@@ -1087,7 +1087,6 @@ function BodySection({
         </div>
       </details>
       <div className="progress-body-flow">
-        {measurementDiary && <div className="progress-body-diary">{measurementDiary}</div>}
         <div className="progress-body-trends" aria-label="Динамика замеров">
           <div className="progress-confidence-grid">
             <DataConfidence
@@ -1163,7 +1162,7 @@ function BodySection({
         </div>
       </div>
       {measurementDiary && (
-        <details id="measurement-diary" className="progress-measurement-editor">
+        <details id="measurement-diary" className="progress-measurement-editor progress-body-diary">
           <summary>Добавить замер · история и редактирование</summary>
           {measurementDiary}
         </details>
@@ -1201,12 +1200,11 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
             isStale={isStale}
             kind="nutrition"
             signal={summary.data_sufficiency.nutrition_coverage}
-            action={<AppLink to="/app?section=nutrition">Заполнить дневник</AppLink>}
           />
-          <EmptyState
-            title="Нет подтверждённых дней питания"
-            text={`${nutrition.incomplete_days} частичных и ${nutrition.unlogged_days} отсутствующих дней не входят в средние значения.`}
-          />
+          <p className="progress-note">
+            {nutrition.incomplete_days} частичных и {nutrition.unlogged_days} отсутствующих дней не
+            входят в средние значения.
+          </p>
         </>
       ) : (
         <>
@@ -1607,7 +1605,6 @@ export function ProgressExperience({
                         canExport={canExport}
                         controlledPeriod={controlledNutritionPeriod}
                         showSelector={false}
-                        summaryProvided
                       />
                     </div>
                   </>

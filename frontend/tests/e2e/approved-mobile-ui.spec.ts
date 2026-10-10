@@ -66,6 +66,12 @@ for (const width of [360, 393, 430])
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
       const rail = page.locator('.progress-category-nav__rail');
+      await rail.getByRole('link', { name: /^Тело/ }).click();
+      await expect(page).toHaveURL(/progress_view=body/);
+      await rail.getByRole('link', { name: /^Тренировки/ }).click();
+      await expect(page).toHaveURL(/progress_view=training/);
+      await rail.getByRole('link', { name: /^Тело/ }).click();
+      await expect(page).toHaveURL(/progress_view=body/);
       await rail.getByRole('link', { name: /^Обзор/ }).focus();
       await page.keyboard.press('End');
       const history = rail.getByRole('link', { name: /^История/ });

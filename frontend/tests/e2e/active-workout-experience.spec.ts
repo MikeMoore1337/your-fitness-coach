@@ -1297,7 +1297,7 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
-  await expect(setupMemory.getByText('Личная настройка')).toBeVisible();
+  await expect(setupMemory.getByRole('button', { name: 'Добавить настройку' })).toBeVisible();
   await setupMemory.getByRole('button', { name: 'Добавить настройку' }).click();
   await setupMemory.getByRole('textbox', { name: 'Что важно настроить' }).fill('Сиденье 4');
   await setupMemory.getByRole('button', { name: 'Сохранить настройку' }).click();

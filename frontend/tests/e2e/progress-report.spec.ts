@@ -78,7 +78,8 @@ test('full report keeps a mobile-first preview and print layout', async ({
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/app/report?period=days_30');
-  await expect(page.getByRole('heading', { name: /Александр Константинович/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true })).toBeVisible();
+  await expect(page.locator('.progress-report-document')).toContainText('Александр Константинович');
   await expect(page.getByRole('table', { name: 'Таблица замеров массы' })).toBeVisible();
   await expect(page.getByText('Тренер', { exact: true })).toBeVisible();
   await expect(page.getByText('Рекомендация:', { exact: true })).toBeVisible();
@@ -87,15 +88,10 @@ test('full report keeps a mobile-first preview and print layout', async ({
   expect(reportText).not.toContain('adherence-v1');
   expect(reportText).not.toContain('trainer');
   await expect(page.locator('.progress-report-confidence .data-confidence')).toHaveCount(3);
+  await expect(page.locator('.progress-report-document .progress-report-controls')).toHaveCount(1);
+  await expect(page.locator('.progress-report-settings .progress-report-controls')).toBeVisible();
   await expect(
-    page.locator(
-      '.progress-report-document > .progress-report-overview + .progress-report-confidence + .progress-report-controls',
-    ),
-  ).toHaveCount(1);
-  await expect(
-    page.locator(
-      '.progress-report-document > .progress-report-controls ~ .progress-report-section #report-training-title',
-    ),
+    page.locator('.progress-report-document > .progress-report-section #report-training-title'),
   ).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
@@ -136,6 +132,7 @@ test('full report keeps a mobile-first preview and print layout', async ({
     'align-items',
     'center',
   );
+  await expect(page.locator('.progress-report-print-footer')).toHaveCSS('position', 'static');
   await expect(page.locator('.progress-report-print-footer')).toHaveCSS(
     'border-top-style',
     'solid',
@@ -165,7 +162,10 @@ for (const state of ['partial', 'empty'] as const) {
     await installReportApi(page, state);
     await page.goto('/app/report?period=days_90');
 
-    await expect(page.getByRole('heading', { name: 'Александр Петров' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('.progress-report-subject')).toHaveText('Александр Петров');
     await expect(page.getByText(/не медицинская оценка/)).toBeVisible();
     await expect(page.getByText(/не заполняет пропуски/)).toBeVisible();
     await expectNoHorizontalOverflow(page);
@@ -189,7 +189,8 @@ test('dark TMA hands an exact short-lived PDF to native download', async ({ page
 
   await page.goto('/app/report?period=custom&date_from=2026-08-01&date_to=2026-08-20&client_id=73');
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
-  await expect(page.getByRole('heading', { name: /Александр Константинович/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true })).toBeVisible();
+  await expect(page.locator('.progress-report-document')).toContainText('Александр Константинович');
   await page.getByRole('button', { name: 'Скачать PDF' }).click();
   await expect(page.getByText('Telegram открыл сохранение PDF.')).toBeVisible();
   await expect

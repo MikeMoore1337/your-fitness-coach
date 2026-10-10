@@ -321,6 +321,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
     )
     trends = body_report.get("trends", [])
     if trends:
+        story.append(Paragraph("Замеры тела", heading))
         trend_rows = [
             [
                 Paragraph("Метрика", label),
@@ -339,11 +340,11 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
                 [
                     Paragraph(_safe(metric_name), body),
                     Paragraph(
-                        f"{_number(trend['first_value'], unit)}<br/><font size=7>{_date(trend['first_measured_on'])}</font>",
+                        f"{_number(trend['first_value'], unit)}<br/><font size=8.5>{_date(trend['first_measured_on'])}</font>",
                         body,
                     ),
                     Paragraph(
-                        f"{_number(trend['latest_value'], unit)}<br/><font size=7>{_date(trend['latest_measured_on'])}</font>",
+                        f"{_number(trend['latest_value'], unit)}<br/><font size=8.5>{_date(trend['latest_measured_on'])}</font>",
                         body,
                     ),
                     Paragraph(_number(trend.get("change"), unit), body),

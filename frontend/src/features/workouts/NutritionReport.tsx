@@ -406,13 +406,11 @@ export function NutritionPeriodReport({
   clientId,
   controlledPeriod,
   showSelector = true,
-  summaryProvided = false,
 }: {
   canExport?: boolean;
   clientId?: number;
   controlledPeriod?: ControlledNutritionPeriod;
   showSelector?: boolean;
-  summaryProvided?: boolean;
 }) {
   const initial = useMemo(
     () =>
@@ -611,7 +609,7 @@ export function NutritionPeriodReport({
               retry={() => void report.refetch()}
             />
           )}
-          {!summaryProvided && <CoverageSummary report={report.data} />}
+          <CoverageSummary report={report.data} />
           {report.data.hydration && (
             <section
               className="nutrition-hydration-report"
@@ -670,19 +668,17 @@ export function NutritionPeriodReport({
             />
           )}
           {report.data.summary.logged_days === 0 ? (
-            summaryProvided ? null : (
-              <div className="nutrition-period-report__empty">
-                <EmptyState
-                  title="Нет заполненных дней за период"
-                  text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
-                />
-                {clientId == null && (
-                  <AppLink className="button-link" to="/app?section=nutrition">
-                    Открыть дневник питания
-                  </AppLink>
-                )}
-              </div>
-            )
+            <div className="nutrition-period-report__empty">
+              <EmptyState
+                title="Нет заполненных дней за период"
+                text="Неполные дни и отсутствие записей не превращаются в нулевые значения."
+              />
+              {clientId == null && (
+                <AppLink className="button-link" to="/app?section=nutrition">
+                  Открыть дневник питания
+                </AppLink>
+              )}
+            </div>
           ) : (
             <>
               <ReportMetrics report={report.data} />

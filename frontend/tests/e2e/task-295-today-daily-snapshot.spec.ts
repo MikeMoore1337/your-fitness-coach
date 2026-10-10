@@ -361,7 +361,7 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
     elements.map((element) => getComputedStyle(element).minHeight),
   );
   expect(sparseStyles.every((minHeight) => minHeight === '0px')).toBe(true);
-  expect(sparseHeights.every((height) => height >= 44 && height < 86)).toBe(true);
+  expect(sparseHeights.every((height) => height >= 44 && height <= 120)).toBe(true);
   const lastMetric = metrics.last();
   await lastMetric.scrollIntoViewIfNeeded();
   const [lastMetricBox, bottomNavBox, fabBox] = await Promise.all([

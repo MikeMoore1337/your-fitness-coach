@@ -102,9 +102,14 @@ export function applyMobileViewportSnapshot(
 
 export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () => void {
   let previousActive: boolean | null = null;
+  let editablePointerInFlight = false;
   const update = () => {
+    const keepDockHidden =
+      editablePointerInFlight && document.documentElement.dataset.yfcKeyboard === 'visible';
     const snapshot = readMobileViewportSnapshot(telegram);
     applyMobileViewportSnapshot(snapshot, telegram);
+    // Keep the dock out of the pointer path until the input-blurring click completes.
+    if (keepDockHidden) document.documentElement.dataset.yfcKeyboard = 'visible';
     if (previousActive === false && snapshot.active) {
       window.dispatchEvent(new Event(YFC_PLATFORM_ACTIVATED_EVENT));
     }
@@ -118,6 +123,13 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
       update();
     });
   };
+  const onPointerDown = () => {
+    editablePointerInFlight = editableTarget(document.activeElement);
+  };
+  const onPointerEnd = () => {
+    editablePointerInFlight = false;
+    updateAfterFocus();
+  };
 
   update();
   LAYOUT_EVENTS.forEach((event) => telegram?.onEvent?.(event, update));
@@ -127,6 +139,9 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
   document.addEventListener('visibilitychange', update);
   document.addEventListener('focusin', update);
   document.addEventListener('focusout', updateAfterFocus);
+  document.addEventListener('pointerdown', onPointerDown, true);
+  document.addEventListener('pointerup', onPointerEnd, true);
+  document.addEventListener('pointercancel', onPointerEnd, true);
 
   return () => {
     if (focusFrame !== null) window.cancelAnimationFrame(focusFrame);
@@ -137,5 +152,8 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
     document.removeEventListener('visibilitychange', update);
     document.removeEventListener('focusin', update);
     document.removeEventListener('focusout', updateAfterFocus);
+    document.removeEventListener('pointerdown', onPointerDown, true);
+    document.removeEventListener('pointerup', onPointerEnd, true);
+    document.removeEventListener('pointercancel', onPointerEnd, true);
   };
 }
