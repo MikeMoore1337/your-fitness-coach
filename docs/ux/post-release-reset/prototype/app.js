@@ -236,7 +236,7 @@ function render() {
   frameSelect.value = frame;
   directionLabel.textContent = directions[variant];
   themeButton.textContent = theme === "light" ? "Тёмная тема" : "Светлая тема";
-  app.innerHTML = `<section class="screen" data-screen-state="${screen}">${renderScreen()}</section>`;
+  app.innerHTML = `<section class="screen" data-screen-state="${screenName}">${renderScreen()}</section>`;
   const currentNavigation = app.querySelector(".bottom-nav");
   if (currentNavigation) app.append(currentNavigation);
   app.scrollTop = 0;

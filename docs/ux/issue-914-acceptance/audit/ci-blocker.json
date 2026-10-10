@@ -97,5 +97,7 @@
   "queries_disabled": false,
   "alerts_suppressed": false,
   "confirmed_exploitability": false,
-  "release_ready": false
+  "release_ready": false,
+  "historical": true,
+  "follow_up": "codeql-remediation.md"
 }

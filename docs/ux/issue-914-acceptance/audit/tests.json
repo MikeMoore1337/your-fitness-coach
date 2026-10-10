@@ -1,9 +1,9 @@
 {
-  "runtime": "e120009b2e538951cbdd3c68129bb1f6c22ee73c",
+  "runtime": "20d800b530cdb2cc5bec7cebd0c9b5f1eaa70afc",
   "unit": {
-    "passed": 812,
+    "passed": 823,
     "files": 145,
-    "source": "npm run check at 7c9f9513; final change is CSS foreground color and E2E contracts"
+    "source": "CI 38079120219 Frontend (unit); local 822 passed then one invalid URL-constructor mock fixed and 31 targeted tests passed"
   },
   "pdf": {
     "passed": 8,
@@ -19,5 +19,28 @@
   "capture_cases": 32,
   "physical_iphone": false,
   "native_telegram": false,
-  "voiceover": false
+  "voiceover": false,
+  "security_python": {
+    "passed": 107,
+    "skipped": 5,
+    "source": "OAuth hardening/providers/session recovery/proxy and scheduled Allure reports"
+  },
+  "final_auth": {
+    "passed": 64,
+    "skipped": 1,
+    "skip_reason": "PostgreSQL row locking required; local SQLite"
+  },
+  "final_timer": {
+    "passed": 54,
+    "engines": [
+      "chromium",
+      "webkit"
+    ],
+    "retries": 0
+  },
+  "security_browser": {
+    "passed": 24,
+    "prototype_rerun": 4,
+    "retries": 0
+  }
 }

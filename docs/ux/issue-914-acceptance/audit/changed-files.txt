@@ -1,365 +1,650 @@
-A	backend/fitminiapp_api/assets/fonts/Inter-Bold.ttf
-A	backend/fitminiapp_api/assets/fonts/Inter-Regular.ttf
-A	backend/fitminiapp_api/assets/fonts/Oswald-Bold.ttf
-A	backend/fitminiapp_api/assets/fonts/README.md
-A	backend/fitminiapp_api/assets/fonts/inter-OFL.txt
-A	backend/fitminiapp_api/assets/fonts/oswald-OFL.txt
-M	backend/fitminiapp_api/services/progress_report_pdf.py
-M	backend/tests/test_progress_reports.py
-M	codex-backlog/ACTIVE_DESIGN_SOURCE.md
-A	docs/ux-proposals/issue-914/review/README.md
-A	docs/ux-proposals/issue-914/review/audit/desktop-accessibility.json
-A	docs/ux-proposals/issue-914/review/audit/event-trace.json
-A	docs/ux-proposals/issue-914/review/audit/isolated-hit-proof.json
-A	docs/ux-proposals/issue-914/review/audit/matrix.json
-A	docs/ux-proposals/issue-914/review/audit/skip-event-trace.json
-A	docs/ux-proposals/issue-914/review/audit/status.json
-A	docs/ux-proposals/issue-914/review/audit/tma-keyboard-lifecycle.json
-A	docs/ux-proposals/issue-914/review/before/chromium-320-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-320-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-360-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-393-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/chromium-430-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-320-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-360-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-393-light-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-dark-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-dark-timer.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-light-plus30.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-light-plus60.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-light-skip.png
-A	docs/ux-proposals/issue-914/review/before/webkit-430-light-timer.png
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-timer.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-plus30.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-plus60.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-skip.jpg
-A	docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-timer.jpg
-A	docs/ux-proposals/issue-914/review/diagnosis/chromium-after-accidental-hit.png
-A	docs/ux-proposals/issue-914/review/diagnosis/chromium-before-hit.png
-A	docs/ux-proposals/issue-914/review/diagnosis/chromium-isolated-pointer-fix.png
-A	docs/ux-proposals/issue-914/review/diagnosis/webkit-after-accidental-hit.png
-A	docs/ux-proposals/issue-914/review/diagnosis/webkit-before-hit.png
-A	docs/ux-proposals/issue-914/review/diagnosis/webkit-isolated-pointer-fix.png
-A	docs/ux-proposals/issue-914/review/index.html
-A	docs/ux-proposals/issue-914/review/manifest.json
-A	docs/ux-proposals/issue-914/review/proposal/chromium-1440-dark-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-1440-light-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-short.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-short.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-320-light-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-360-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-short.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-short.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-393-light-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-430-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-768-dark-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/chromium-768-light-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-1440-dark-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-1440-light-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-short.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-short.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-320-light-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-360-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-short.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-keyboard.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-short.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-393-light-tma-safe.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-light-plus30.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-light-plus60.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-light-skip.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-430-light-timer.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-768-dark-desktop.png
-A	docs/ux-proposals/issue-914/review/proposal/webkit-768-light-desktop.png
-A	docs/ux-proposals/issue-914/review/prototype/install-proposal.mjs
-A	docs/ux-proposals/issue-914/review/prototype/proposal.css
-M	frontend/src/app/AppShell.tsx
-M	frontend/src/app/QuickAddSheet.tsx
-M	frontend/src/features/account/NotificationsPanel.tsx
-M	frontend/src/features/cardio/CardioLogging.tsx
-M	frontend/src/features/coach/coach-os.css
-M	frontend/src/features/exercises/ExerciseMediaAsset.tsx
-M	frontend/src/features/nutrition/HydrationTracker.tsx
-M	frontend/src/features/profile/ProfileForm.tsx
-M	frontend/src/features/programs/AssignedProgramDetails.tsx
-M	frontend/src/features/programs/ProgramBuilder.tsx
-M	frontend/src/features/programs/SearchableExercisePicker.tsx
-M	frontend/src/features/programs/TemplatesList.tsx
-M	frontend/src/features/workouts/ExerciseSetupMemory.tsx
-M	frontend/src/features/workouts/NutritionReport.tsx
-M	frontend/src/features/workouts/ProgressExperience.tsx
-M	frontend/src/features/workouts/ProgressSchedule.tsx
-M	frontend/src/features/workouts/TodayWorkout.tsx
-M	frontend/src/features/workouts/WeeklyCheckInCard.tsx
-M	frontend/src/features/workouts/WorkoutAdaptation.tsx
-M	frontend/src/features/workouts/progressPeriods.ts
-M	frontend/src/pages/miniapp/MiniAppPage.tsx
-M	frontend/src/pages/reports/ProgressReportPage.tsx
-M	frontend/src/shared/dateTime.ts
-M	frontend/src/shared/navigation/router.tsx
-M	frontend/src/shared/telegram/layout.ts
-M	frontend/src/shared/ui/useModalA11y.ts
-M	frontend/src/styles/data-viz.css
-M	frontend/src/styles/design-system.css
-M	frontend/src/styles/design-v2.css
-M	frontend/src/styles/fonts.css
-M	frontend/src/styles/liquid-glass.css
-M	frontend/src/styles/react.css
-M	frontend/src/styles/ux-ia-redesign.css
-M	frontend/tests/e2e/active-workout-experience.spec.ts
-M	frontend/tests/e2e/app.spec.ts
-A	frontend/tests/e2e/approved-mobile-ui.spec.ts
-M	frontend/tests/e2e/exercise-catalog-lower-body.spec.ts
-M	frontend/tests/e2e/glass-overlays.spec.ts
-A	frontend/tests/e2e/glass-polish.spec.ts
-A	frontend/tests/e2e/hydration-preset-labels.spec.ts
-M	frontend/tests/e2e/liquid-glass-system.spec.ts
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/active-workout-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/nutrition-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/nutrition-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/profile-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/profile-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/progress-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/progress-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/tma-today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/today-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/active-workout-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/nutrition-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/nutrition-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/profile-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/profile-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/progress-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/progress-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/tma-today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/today-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/active-workout-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/nutrition-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/nutrition-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/profile-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/profile-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/progress-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/progress-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/tma-today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/today-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/active-workout-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/nutrition-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/nutrition-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/profile-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/profile-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-light.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/tma-today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/today-390x844-dark.png
-M	frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/today-390x844-light.png
-M	frontend/tests/e2e/motion-pilot.spec.ts
-M	frontend/tests/e2e/nutrition-diary.spec.ts
-M	frontend/tests/e2e/offline-workout.spec.ts
-A	frontend/tests/e2e/personal-reminder-date.spec.ts
-A	frontend/tests/e2e/profile-goal-value.spec.ts
-M	frontend/tests/e2e/progress-experience.spec.ts
-M	frontend/tests/e2e/progress-report.spec.ts
-M	frontend/tests/e2e/pulse-concepts-pilot.spec.ts
-M	frontend/tests/e2e/soft-glass.spec.ts
-M	frontend/tests/e2e/task-294-mobile-first-ux.spec.ts
-M	frontend/tests/e2e/task-295-today-daily-snapshot.spec.ts
-M	frontend/tests/e2e/task-731-programs-editor-import-search.spec.ts
-M	frontend/tests/e2e/tma-smoke.spec.ts
-A	frontend/tests/e2e/typography-system.spec.ts
-M	frontend/tests/e2e/v9-05-active-session-intelligence.spec.ts
-M	frontend/tests/unit/app/AppShell.test.tsx
-M	frontend/tests/unit/features/account/NotificationsPanel.test.tsx
-M	frontend/tests/unit/features/exercises/ExerciseMediaAsset.test.tsx
-M	frontend/tests/unit/features/nutrition/HydrationTracker.test.tsx
-M	frontend/tests/unit/features/profile/ProfileForm.test.tsx
-M	frontend/tests/unit/features/programs/AssignedProgramDetails.test.tsx
-M	frontend/tests/unit/features/workouts/NutritionReport.test.tsx
-M	frontend/tests/unit/features/workouts/ProgressExperience.test.tsx
-M	frontend/tests/unit/features/workouts/ProgressSchedule.test.tsx
-A	frontend/tests/unit/features/workouts/RestTimer.test.tsx
-M	frontend/tests/unit/features/workouts/WorkoutAdaptation.test.tsx
-M	frontend/tests/unit/features/workouts/progressPeriods.test.ts
-M	frontend/tests/unit/pages/ProgressReportPage.test.tsx
-A	frontend/tests/unit/shared/dateTime.test.ts
-M	frontend/tests/unit/shared/navigation/router.test.tsx
-M	frontend/tests/unit/shared/telegram/layout.test.ts
-M	frontend/tests/unit/shared/useModalA11y.test.tsx
+backend/fitminiapp_api/api/v1/auth.py
+backend/fitminiapp_api/assets/fonts/Inter-Bold.ttf
+backend/fitminiapp_api/assets/fonts/Inter-Regular.ttf
+backend/fitminiapp_api/assets/fonts/Oswald-Bold.ttf
+backend/fitminiapp_api/assets/fonts/README.md
+backend/fitminiapp_api/assets/fonts/inter-OFL.txt
+backend/fitminiapp_api/assets/fonts/oswald-OFL.txt
+backend/fitminiapp_api/services/progress_report_pdf.py
+backend/tests/test_auth_hardening.py
+backend/tests/test_progress_reports.py
+codex-backlog/ACTIVE_DESIGN_SOURCE.md
+docs/app-experience-v3/stage-0/prototype/app.js
+docs/ux-proposals/issue-914/review/README.md
+docs/ux-proposals/issue-914/review/audit/desktop-accessibility.json
+docs/ux-proposals/issue-914/review/audit/event-trace.json
+docs/ux-proposals/issue-914/review/audit/isolated-hit-proof.json
+docs/ux-proposals/issue-914/review/audit/matrix.json
+docs/ux-proposals/issue-914/review/audit/skip-event-trace.json
+docs/ux-proposals/issue-914/review/audit/status.json
+docs/ux-proposals/issue-914/review/audit/tma-keyboard-lifecycle.json
+docs/ux-proposals/issue-914/review/before/chromium-320-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-320-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-320-dark-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-320-dark-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-320-light-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-320-light-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-320-light-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-320-light-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-360-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-360-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-360-dark-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-360-dark-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-360-light-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-360-light-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-360-light-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-360-light-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-393-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-393-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-393-dark-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-393-dark-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-393-light-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-393-light-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-393-light-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-393-light-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-430-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-430-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-430-dark-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-430-dark-timer.png
+docs/ux-proposals/issue-914/review/before/chromium-430-light-plus30.png
+docs/ux-proposals/issue-914/review/before/chromium-430-light-plus60.png
+docs/ux-proposals/issue-914/review/before/chromium-430-light-skip.png
+docs/ux-proposals/issue-914/review/before/chromium-430-light-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-320-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-320-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-320-dark-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-320-dark-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-320-light-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-320-light-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-320-light-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-320-light-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-360-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-360-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-360-dark-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-360-dark-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-360-light-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-360-light-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-360-light-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-360-light-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-393-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-393-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-393-dark-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-393-dark-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-393-light-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-393-light-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-393-light-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-393-light-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-430-dark-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-430-dark-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-430-dark-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-430-dark-timer.png
+docs/ux-proposals/issue-914/review/before/webkit-430-light-plus30.png
+docs/ux-proposals/issue-914/review/before/webkit-430-light-plus60.png
+docs/ux-proposals/issue-914/review/before/webkit-430-light-skip.png
+docs/ux-proposals/issue-914/review/before/webkit-430-light-timer.png
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-320-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-360-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-393-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/chromium-430-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-320-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-360-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-393-light-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-dark-timer.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-plus30.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-plus60.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-skip.jpg
+docs/ux-proposals/issue-914/review/comparisons/webkit-430-light-timer.jpg
+docs/ux-proposals/issue-914/review/diagnosis/chromium-after-accidental-hit.png
+docs/ux-proposals/issue-914/review/diagnosis/chromium-before-hit.png
+docs/ux-proposals/issue-914/review/diagnosis/chromium-isolated-pointer-fix.png
+docs/ux-proposals/issue-914/review/diagnosis/webkit-after-accidental-hit.png
+docs/ux-proposals/issue-914/review/diagnosis/webkit-before-hit.png
+docs/ux-proposals/issue-914/review/diagnosis/webkit-isolated-pointer-fix.png
+docs/ux-proposals/issue-914/review/index.html
+docs/ux-proposals/issue-914/review/manifest.json
+docs/ux-proposals/issue-914/review/proposal/chromium-1440-dark-desktop.png
+docs/ux-proposals/issue-914/review/proposal/chromium-1440-light-desktop.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-short.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-dark-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-short.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-320-light-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-360-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-short.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-dark-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-short.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-393-light-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/chromium-430-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/chromium-768-dark-desktop.png
+docs/ux-proposals/issue-914/review/proposal/chromium-768-light-desktop.png
+docs/ux-proposals/issue-914/review/proposal/webkit-1440-dark-desktop.png
+docs/ux-proposals/issue-914/review/proposal/webkit-1440-light-desktop.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-short.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-dark-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-short.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-320-light-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-360-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-short.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-dark-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-keyboard.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-short.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-393-light-tma-safe.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-dark-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-light-plus30.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-light-plus60.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-light-skip.png
+docs/ux-proposals/issue-914/review/proposal/webkit-430-light-timer.png
+docs/ux-proposals/issue-914/review/proposal/webkit-768-dark-desktop.png
+docs/ux-proposals/issue-914/review/proposal/webkit-768-light-desktop.png
+docs/ux-proposals/issue-914/review/prototype/install-proposal.mjs
+docs/ux-proposals/issue-914/review/prototype/proposal.css
+docs/ux/issue-914-acceptance/README.md
+docs/ux/issue-914-acceptance/after/chromium-1440-dark-desktop.png
+docs/ux/issue-914-acceptance/after/chromium-1440-light-desktop.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-keyboard.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-overview.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-short.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-skip.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-320-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-keyboard.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-overview.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-short.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-skip.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-timer.png
+docs/ux/issue-914-acceptance/after/chromium-320-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-overview.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-skip.png
+docs/ux/issue-914-acceptance/after/chromium-360-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-overview.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-skip.png
+docs/ux/issue-914-acceptance/after/chromium-360-light-timer.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-keyboard.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-overview.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-short.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-skip.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-393-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-keyboard.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-overview.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-short.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-skip.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-timer.png
+docs/ux/issue-914-acceptance/after/chromium-393-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-overview.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-skip.png
+docs/ux/issue-914-acceptance/after/chromium-430-dark-timer.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-overview.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-plus30.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-plus60.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-skip-before.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-skip.png
+docs/ux/issue-914-acceptance/after/chromium-430-light-timer.png
+docs/ux/issue-914-acceptance/after/chromium-768-dark-desktop.png
+docs/ux/issue-914-acceptance/after/chromium-768-light-desktop.png
+docs/ux/issue-914-acceptance/after/webkit-1440-dark-desktop.png
+docs/ux/issue-914-acceptance/after/webkit-1440-light-desktop.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-keyboard.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-overview.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-short.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-skip.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-320-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-keyboard.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-overview.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-short.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-skip.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-timer.png
+docs/ux/issue-914-acceptance/after/webkit-320-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-overview.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-skip.png
+docs/ux/issue-914-acceptance/after/webkit-360-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-overview.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-skip.png
+docs/ux/issue-914-acceptance/after/webkit-360-light-timer.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-keyboard.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-overview.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-short.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-skip.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-393-dark-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-keyboard.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-overview.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-short.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-skip.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-timer.png
+docs/ux/issue-914-acceptance/after/webkit-393-light-tma-safe.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-overview.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-skip.png
+docs/ux/issue-914-acceptance/after/webkit-430-dark-timer.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-overview.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-plus30.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-plus60.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-skip-before.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-skip-pending.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-skip.png
+docs/ux/issue-914-acceptance/after/webkit-430-light-timer.png
+docs/ux/issue-914-acceptance/after/webkit-768-dark-desktop.png
+docs/ux/issue-914-acceptance/after/webkit-768-light-desktop.png
+docs/ux/issue-914-acceptance/audit/changed-files.txt
+docs/ux/issue-914-acceptance/audit/ci-blocker.json
+docs/ux/issue-914-acceptance/audit/ci-blocker.md
+docs/ux/issue-914-acceptance/audit/codeql-remediation.json
+docs/ux/issue-914-acceptance/audit/codeql-remediation.md
+docs/ux/issue-914-acceptance/audit/final-related-results.json
+docs/ux/issue-914-acceptance/audit/final-timer-results.json
+docs/ux/issue-914-acceptance/audit/glass.json
+docs/ux/issue-914-acceptance/audit/integration.json
+docs/ux/issue-914-acceptance/audit/native-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-1440-dark-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-1440-light-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-320-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-320-dark-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-320-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-320-light-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-360-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-360-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-393-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-393-dark-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-393-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-393-light-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-430-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-430-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-768-dark-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/chromium-768-light-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-1440-dark-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-1440-light-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-320-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-320-dark-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-320-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-320-light-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-360-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-360-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-393-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-393-dark-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-393-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-393-light-tma-safe-short-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-430-dark-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-430-light-mobile-actions.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-768-dark-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/native-actions/webkit-768-light-desktop-keyboard.json
+docs/ux/issue-914-acceptance/audit/prototype-negative-control.json
+docs/ux/issue-914-acceptance/audit/security-browser-results-final.json
+docs/ux/issue-914-acceptance/audit/security-joint-timer-results.json
+docs/ux/issue-914-acceptance/audit/security-prototypes-final.json
+docs/ux/issue-914-acceptance/audit/tests.json
+docs/ux/issue-914-acceptance/before/chromium-320-dark-skip.png
+docs/ux/issue-914-acceptance/before/chromium-320-dark-timer.png
+docs/ux/issue-914-acceptance/before/chromium-320-light-skip.png
+docs/ux/issue-914-acceptance/before/chromium-320-light-timer.png
+docs/ux/issue-914-acceptance/before/chromium-360-dark-skip.png
+docs/ux/issue-914-acceptance/before/chromium-360-dark-timer.png
+docs/ux/issue-914-acceptance/before/chromium-360-light-skip.png
+docs/ux/issue-914-acceptance/before/chromium-360-light-timer.png
+docs/ux/issue-914-acceptance/before/chromium-393-dark-skip.png
+docs/ux/issue-914-acceptance/before/chromium-393-dark-timer.png
+docs/ux/issue-914-acceptance/before/chromium-393-light-skip.png
+docs/ux/issue-914-acceptance/before/chromium-393-light-timer.png
+docs/ux/issue-914-acceptance/before/chromium-430-dark-skip.png
+docs/ux/issue-914-acceptance/before/chromium-430-dark-timer.png
+docs/ux/issue-914-acceptance/before/chromium-430-light-skip.png
+docs/ux/issue-914-acceptance/before/chromium-430-light-timer.png
+docs/ux/issue-914-acceptance/before/webkit-320-dark-skip.png
+docs/ux/issue-914-acceptance/before/webkit-320-dark-timer.png
+docs/ux/issue-914-acceptance/before/webkit-320-light-skip.png
+docs/ux/issue-914-acceptance/before/webkit-320-light-timer.png
+docs/ux/issue-914-acceptance/before/webkit-360-dark-skip.png
+docs/ux/issue-914-acceptance/before/webkit-360-dark-timer.png
+docs/ux/issue-914-acceptance/before/webkit-360-light-skip.png
+docs/ux/issue-914-acceptance/before/webkit-360-light-timer.png
+docs/ux/issue-914-acceptance/before/webkit-393-dark-skip.png
+docs/ux/issue-914-acceptance/before/webkit-393-dark-timer.png
+docs/ux/issue-914-acceptance/before/webkit-393-light-skip.png
+docs/ux/issue-914-acceptance/before/webkit-393-light-timer.png
+docs/ux/issue-914-acceptance/before/webkit-430-dark-skip.png
+docs/ux/issue-914-acceptance/before/webkit-430-dark-timer.png
+docs/ux/issue-914-acceptance/before/webkit-430-light-skip.png
+docs/ux/issue-914-acceptance/before/webkit-430-light-timer.png
+docs/ux/issue-914-acceptance/comparisons/chromium-320-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-320-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-320-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-320-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-320-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-320-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-360-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-393-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/chromium-430-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-320-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-360-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-393-light-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-dark-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-dark-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-dark-timer.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-light-current-set.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-light-skip.jpg
+docs/ux/issue-914-acceptance/comparisons/webkit-430-light-timer.jpg
+docs/ux/issue-914-acceptance/index.html
+docs/ux/issue-914-acceptance/manifest.json
+docs/ux/post-release-reset/prototype/app.js
+frontend/src/app/AppShell.tsx
+frontend/src/app/QuickAddSheet.tsx
+frontend/src/features/account/NotificationsPanel.tsx
+frontend/src/features/cardio/CardioLogging.tsx
+frontend/src/features/coach/coach-os.css
+frontend/src/features/exercises/ExerciseMediaAsset.tsx
+frontend/src/features/nutrition/HydrationTracker.tsx
+frontend/src/features/profile/ProfileForm.tsx
+frontend/src/features/programs/AssignedProgramDetails.tsx
+frontend/src/features/programs/ProgramBuilder.tsx
+frontend/src/features/programs/SearchableExercisePicker.tsx
+frontend/src/features/programs/TemplatesList.tsx
+frontend/src/features/workouts/ExerciseSetupMemory.tsx
+frontend/src/features/workouts/NutritionReport.tsx
+frontend/src/features/workouts/ProgressExperience.tsx
+frontend/src/features/workouts/ProgressSchedule.tsx
+frontend/src/features/workouts/TodayWorkout.tsx
+frontend/src/features/workouts/WeeklyCheckInCard.tsx
+frontend/src/features/workouts/WorkoutAdaptation.tsx
+frontend/src/features/workouts/progressPeriods.ts
+frontend/src/pages/miniapp/MiniAppPage.tsx
+frontend/src/pages/reports/ProgressReportPage.tsx
+frontend/src/shared/account/AccountIdentity.tsx
+frontend/src/shared/dateTime.ts
+frontend/src/shared/navigation/router.tsx
+frontend/src/shared/telegram/layout.ts
+frontend/src/shared/ui/useModalA11y.ts
+frontend/src/styles/data-viz.css
+frontend/src/styles/design-system.css
+frontend/src/styles/design-v2.css
+frontend/src/styles/fonts.css
+frontend/src/styles/liquid-glass.css
+frontend/src/styles/react.css
+frontend/src/styles/ux-ia-redesign.css
+frontend/tests/e2e/active-workout-experience.spec.ts
+frontend/tests/e2e/app.spec.ts
+frontend/tests/e2e/approved-mobile-ui.spec.ts
+frontend/tests/e2e/avatar-settings.spec.ts
+frontend/tests/e2e/exercise-catalog-lower-body.spec.ts
+frontend/tests/e2e/fixtures/platform-api.ts
+frontend/tests/e2e/glass-overlays.spec.ts
+frontend/tests/e2e/glass-polish.spec.ts
+frontend/tests/e2e/hydration-preset-labels.spec.ts
+frontend/tests/e2e/legacy-prototype-security.spec.ts
+frontend/tests/e2e/liquid-glass-system.spec.ts
+frontend/tests/e2e/mobile-ui-regression.spec.ts
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/active-workout-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/nutrition-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/nutrition-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/profile-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/profile-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/progress-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/progress-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/tma-today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/today-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/active-workout-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/nutrition-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/nutrition-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/profile-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/profile-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/progress-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/progress-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/tma-today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/today-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/active-workout-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/nutrition-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/nutrition-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/profile-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/profile-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/progress-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/progress-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/tma-today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/today-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/active-workout-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/nutrition-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/nutrition-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/profile-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/profile-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/progress-390x844-light.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/tma-today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/today-390x844-dark.png
+frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-webkit/win32/today-390x844-light.png
+frontend/tests/e2e/motion-pilot.spec.ts
+frontend/tests/e2e/nutrition-diary.spec.ts
+frontend/tests/e2e/offline-workout.spec.ts
+frontend/tests/e2e/personal-reminder-date.spec.ts
+frontend/tests/e2e/profile-goal-value.spec.ts
+frontend/tests/e2e/progress-experience.spec.ts
+frontend/tests/e2e/progress-report.spec.ts
+frontend/tests/e2e/pulse-concepts-pilot.spec.ts
+frontend/tests/e2e/soft-glass.spec.ts
+frontend/tests/e2e/task-294-mobile-first-ux.spec.ts
+frontend/tests/e2e/task-295-today-daily-snapshot.spec.ts
+frontend/tests/e2e/task-731-programs-editor-import-search.spec.ts
+frontend/tests/e2e/tma-smoke.spec.ts
+frontend/tests/e2e/typography-system.spec.ts
+frontend/tests/e2e/v9-05-active-session-intelligence.spec.ts
+frontend/tests/unit/app/AppShell.test.tsx
+frontend/tests/unit/features/account/NotificationsPanel.test.tsx
+frontend/tests/unit/features/exercises/ExerciseMediaAsset.test.tsx
+frontend/tests/unit/features/nutrition/HydrationTracker.test.tsx
+frontend/tests/unit/features/profile/ProfileForm.test.tsx
+frontend/tests/unit/features/programs/AssignedProgramDetails.test.tsx
+frontend/tests/unit/features/workouts/NutritionReport.test.tsx
+frontend/tests/unit/features/workouts/ProgressExperience.test.tsx
+frontend/tests/unit/features/workouts/ProgressSchedule.test.tsx
+frontend/tests/unit/features/workouts/RestTimer.test.tsx
+frontend/tests/unit/features/workouts/WorkoutAdaptation.test.tsx
+frontend/tests/unit/features/workouts/progressPeriods.test.ts
+frontend/tests/unit/pages/ProgressReportPage.test.tsx
+frontend/tests/unit/shared/account/AccountIdentity.test.tsx
+frontend/tests/unit/shared/dateTime.test.ts
+frontend/tests/unit/shared/navigation/router.test.tsx
+frontend/tests/unit/shared/telegram/layout.test.ts
+frontend/tests/unit/shared/useModalA11y.test.tsx
+scripts/allure_report.py
+tests/test_scheduled_regression.py

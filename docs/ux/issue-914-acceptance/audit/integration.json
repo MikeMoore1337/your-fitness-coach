@@ -1,11 +1,12 @@
 {
-  "runtime": "e120009b2e538951cbdd3c68129bb1f6c22ee73c",
-  "master": "fa10c13090ad103dc8a4e179c4ad4b2dc68bc473",
+  "runtime": "20d800b530cdb2cc5bec7cebd0c9b5f1eaa70afc",
+  "master": "1622aa19decfe4b109dd5f2f891d2c24f3c00c12",
   "pr915": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
   "pr907_911": "Exact heads are ancestors; source branches not mutated",
   "merge_conflicts": 0,
   "env_change_required": false,
   "merge": false,
   "deploy": false,
-  "release_gate": "STOP_OWNER_RELEASE_APPROVAL"
+  "release_gate": "STOP_OWNER_RELEASE_APPROVAL",
+  "runtime_scope": "Production frontend source; later changes are provider error category naming, static prototype attribute and evidence only"
 }

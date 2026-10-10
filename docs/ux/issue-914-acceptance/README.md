@@ -1,6 +1,6 @@
 # #914 + #915 · приёмка реализации таймера отдыха
 
-Реальный AFTER: локальная production-сборка `e120009b2e538951cbdd3c68129bb1f6c22ee73c`. Использованы детерминированные тестовые API-данные; прототипные DOM/CSS не подключались. [PR #927](https://github.com/MikeMoore1337/your-fitness-coach/pull/927), [Issue #914](https://github.com/MikeMoore1337/your-fitness-coach/issues/914), [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915), [галерея](index.html), [manifest](manifest.json).
+Реальный AFTER: локальная production-сборка `20d800b530cdb2cc5bec7cebd0c9b5f1eaa70afc`. Использованы детерминированные тестовые API-данные; прототипные DOM/CSS не подключались. [PR #927](https://github.com/MikeMoore1337/your-fitness-coach/pull/927), [Issue #914](https://github.com/MikeMoore1337/your-fitness-coach/issues/914), [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915), [галерея](index.html), [manifest](manifest.json).
 
 Согласование владельца: [Issue](https://github.com/MikeMoore1337/your-fitness-coach/issues/914#issuecomment-6099921118), [PR](https://github.com/MikeMoore1337/your-fitness-coach/pull/927#issuecomment-6099921450). BEFORE взят из работающей сборки #915 `e88ba039`; исходные изображения закреплены в `cf4c8f38fbb83a43a8f23acd1054c00465f4ce50`.
 
@@ -12,7 +12,7 @@
 
 Проверки: [финальная матрица таймера](audit/final-timer-results.json), [регрессия связанных компонентов](audit/final-related-results.json), [остальные результаты](audit/tests.json), [интеграция и ancestry](audit/integration.json), [полный список изменённых файлов относительно master](audit/changed-files.txt). Файлы самого приёмочного пакета перечислены с SHA256 в manifest. Обязательные проверки **текущего HEAD** смотреть в [PR Checks](https://github.com/MikeMoore1337/your-fitness-coach/pull/927/checks); этот пакет не заменяет CI или решение владельца.
 
-На предыдущем CI интегрированной реализации выявлен [блокер CodeQL вне изменений таймера](audit/ci-blocker.md). Исходный код сигналов, правила и gate не менялись; исключения не добавлены. Зелёный CI и release-ready пока не заявляются.
+По разрешению владельца выполнены [адресные исправления семи сигналов CodeQL](audit/codeql-remediation.md). [Исходный блокер](audit/ci-blocker.md) сохранён как история; gate, правила и исключения не менялись. 823 unit-теста прошли в CI; после исправлений повторно прошли 24 browser checks, 4 проверки прототипов, 54 проверки таймера и 32 native-event сценария с 0 нежелательных mutations. Зелёный статус обязательного CI и приёмка владельца проверяются отдельно для текущего HEAD.
 
 PDF #915 сохранён: [браузерный](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/browser-after.pdf), [серверный](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/server-after.pdf). В #914 его код и типографика не менялись; 8 серверных тестов отчётов прошли на интегрированной версии.
 

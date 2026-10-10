@@ -196,7 +196,7 @@ def _cleanup_oauth_artifact(
         _clear_oauth_cookie(response)
 
 
-def _oauth_error_category(provider_error: str) -> str:
+def _provider_error_category(provider_error: str) -> str:
     return (
         "denied"
         if provider_error in {"access_denied", "cancelled", "user_cancelled", "user_denied"}
@@ -607,7 +607,7 @@ async def _oauth_callback_impl(
     try:
         provider_error = params.get("error")
         if provider_error:
-            error_category = _oauth_error_category(provider_error)
+            error_category = _provider_error_category(provider_error)
             failure_reason = "provider_denied" if error_category == "denied" else "provider_failure"
             finish_oauth_transaction(db, row, failure_reason=failure_reason)
             _log_oauth_event(
@@ -808,7 +808,7 @@ async def _oauth_callback_impl(
         )
         return response
     except OAuthProviderResponseError as exc:
-        error_category = _oauth_error_category(exc.error)
+        error_category = _provider_error_category(exc.error)
         db.rollback()
         finish_oauth_transaction(
             db,
@@ -867,8 +867,8 @@ async def _oauth_callback_impl(
         )
         return response
     except OAuthError as exc:
-        oauth_error = getattr(exc, "error", "")
-        error_category = _oauth_error_category(oauth_error)
+        provider_error = getattr(exc, "error", "")
+        error_category = _provider_error_category(provider_error)
         db.rollback()
         finish_oauth_transaction(
             db,

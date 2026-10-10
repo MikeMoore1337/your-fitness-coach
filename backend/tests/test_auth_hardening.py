@@ -45,7 +45,7 @@ def test_oauth_log_contains_only_error_category_and_hashed_state(
     request = Request({"type": "http"})
     request.state.request_id = "test-oauth-request"
     state = "private-oauth-state-12345678"
-    category = auth_api._oauth_error_category(provider_error)
+    category = auth_api._provider_error_category(provider_error)
     assert category == expected_category
 
     auth_api._log_oauth_event(
