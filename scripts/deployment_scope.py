@@ -30,6 +30,7 @@ _NO_DEPLOY_PREFIXES = (
     "frontend/tests/",
 )
 _NO_DEPLOY_FILES = {
+    ".codex/config.toml",  # Project-scoped developer MCP configuration, not application runtime.
     "AGENTS.md",
     "README.md",
     ".gitignore",
