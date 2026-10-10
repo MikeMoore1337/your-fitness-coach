@@ -1100,7 +1100,12 @@ test('V9-03 calculates exact and nearest local loads without network or workout 
     window.dispatchEvent(new Event('offline'));
   });
   await calculator.getByLabel('Целевой вес, кг').fill('80');
-  await calculator.getByRole('button', { name: 'Сбросить' }).click();
+  const resetInventory = calculator.getByRole('button', { name: 'Сбросить' });
+  // Stop the ongoing smooth scroll before targeting a control moved by the result reflow.
+  await resetInventory.evaluate((element) =>
+    element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'nearest' }),
+  );
+  await resetInventory.click();
   await expect(calculator.getByRole('status')).toContainText('Точный результат');
   await expect(currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('');
   await expect(currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('');
