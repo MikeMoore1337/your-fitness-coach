@@ -94,9 +94,10 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const inFlightId = useRef<string | null>(null);
   const flushPromise = useRef<Promise<boolean> | null>(null);
 
-  const persist = useCallback((next: ActiveWorkoutQueue) => {
+  const persist = useCallback((next: ActiveWorkoutQueue, requireDurable = false) => {
     const durable = saveActiveWorkoutQueue(next);
     storageAvailable.current = durable;
+    if (requireDurable && !durable) return false;
     memoryState.current = next;
     setStoredState({ key: activeWorkoutQueueKey(next.user_id, next.workout_id), data: next });
     return durable;
@@ -276,19 +277,23 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }, [lockName, runQueue]);
 
   const enqueue = useCallback(
-    (setId: number, serverVersion: number, values: ActiveWorkoutSetValues, immediate = false) => {
-      if (!userId || !workoutId || !lockName) return;
-      const onlineAtEnqueue = navigator.onLine;
-      setSyncState(onlineAtEnqueue ? 'pending' : 'offline');
-      void crossContextCoordinator
-        .run(lockName, () => {
+    async (
+      setId: number,
+      serverVersion: number,
+      values: ActiveWorkoutSetValues,
+      immediate = false,
+    ): Promise<boolean> => {
+      if (!userId || !workoutId || !lockName) return false;
+      setSyncState(navigator.onLine ? 'pending' : 'offline');
+      try {
+        const durable = await crossContextCoordinator.run(lockName, () => {
           const next = enqueueWorkoutMutation(readFresh(), {
             setId,
             serverVersion,
             values,
             inFlightMutationId: inFlightId.current,
           });
-          const durable = persist(next);
+          const durable = persist(next, immediate && !navigator.onLine);
           setMessage(
             durable
               ? navigator.onLine
@@ -296,14 +301,21 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
                 : 'Нет сети. Изменения сохранены на этом устройстве.'
               : 'Хранилище устройства недоступно. Не закрывайте приложение до синхронизации.',
           );
-        })
-        .then(() => {
-          if (immediate && onlineAtEnqueue) window.setTimeout(() => void flushNow(), 0);
-        })
-        .catch((reason) => {
-          setSyncState('error');
-          setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
+          return durable;
         });
+        if (!navigator.onLine) {
+          setSyncState(durable ? 'offline' : 'error');
+          return durable;
+        }
+        if (!immediate) return durable;
+        if (!(await flushNow())) return false;
+        // An existing flush can finish just before this enqueue acquires its write turn.
+        return latestMutationForSet(readFresh(), setId) ? await flushNow() : true;
+      } catch (reason) {
+        setSyncState('error');
+        setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
+        return false;
+      }
     },
     [flushNow, lockName, persist, readFresh, userId, workoutId],
   );

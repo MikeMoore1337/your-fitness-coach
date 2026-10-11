@@ -54,13 +54,14 @@
   --v2-compact-radius: 10px;
   --v2-region-radius: 20px;
   --v2-panel-radius: 24px;
-  --v2-selected-surface: linear-gradient(180deg, #465631, #2e3b25);
+  --v2-selected-surface: linear-gradient(180deg, #3b4436, #2a3028);
   --v2-selected-outline: #778e55;
   --v2-selected-ink: #d9f9b5;
   --v2-selected-relief:
     inset 0 0 0 1px var(--v2-selected-outline), inset 0 1px 0 rgb(255 255 255 / 30%),
     inset 0 -1px 0 rgb(0 0 0 / 28%), 0 2px 5px rgb(0 0 0 / 18%);
   --v2-selected-radius: 18px;
+  --v2-selected-radius-pill: 9999px;
   --v2-selected-radius-compact: var(--v2-control-radius);
   --v2-selected-motion: var(--motion-state) var(--motion-ease);
   --v2-space-1: 4px;
@@ -562,6 +563,10 @@ h3 {
 
 :root [data-yfc-choice='compact'] {
   border-radius: var(--v2-selected-radius-compact);
+}
+
+:root .app-bottom-nav__primary [data-yfc-choice] {
+  border-radius: var(--v2-selected-radius-pill);
 }
 
 :root .app-bottom-nav__btn[data-yfc-choice]::before {

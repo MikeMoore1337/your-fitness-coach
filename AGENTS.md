@@ -58,6 +58,8 @@ visual redesigns.
 - Selected/current controls must reuse the shared YFC choice tokens and explicit styling contract
   in `docs/design/component-states-v2.1.md#unified-yfc-selected-states`. Preserve native/ARIA
   semantics and separate selection from focus, hover, pressed, disabled and semantic statuses.
+  Mobile primary navigation uses the shared full-pill radius at every breakpoint and the existing
+  Liquid Glass material/fallback contract; never introduce a page-local selected-state system.
 
 ## RUSSIAN_USER_FACING_UI (mandatory)
 

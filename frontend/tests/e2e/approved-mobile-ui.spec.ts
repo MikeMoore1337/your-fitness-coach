@@ -93,12 +93,13 @@ for (const width of [320, 360, 393, 430])
       expect(triggerBox.y + triggerBox.height).toBeLessThanOrEqual(
         navigationBox.y + navigationBox.height,
       );
-      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(12px\)/);
+      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(18px\)/);
       expect(triggerBox.x).toBeGreaterThanOrEqual(navigationBox.x);
       expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(
         navigationBox.x + navigationBox.width,
       );
       for (const tab of await tabs.all()) {
+        await expect(tab).toHaveCSS('border-radius', '9999px');
         const box = (await tab.boundingBox())!;
         expect(box.width).toBeGreaterThanOrEqual(44);
         expect(box.height).toBeGreaterThanOrEqual(44);
@@ -227,6 +228,9 @@ for (const width of [320, 360, 393, 430])
         await page.evaluate(() => document.fonts.ready);
         await expectNoHorizontalOverflow(page);
         await page.screenshot({ path: testInfo.outputPath(`${section}-${width}-${theme}.png`) });
+        await navigation.screenshot({
+          path: testInfo.outputPath(`nav-detail-${section}-${width}-${theme}.png`),
+        });
         if (section === 'nutrition') {
           const week = page.getByRole('navigation', { name: 'Неделя дневника' });
           const selectedDay = week.locator('[aria-pressed="true"]');

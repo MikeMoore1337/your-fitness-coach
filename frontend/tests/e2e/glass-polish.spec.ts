@@ -9,7 +9,9 @@ import {
 test.use({ serviceWorkers: 'block' });
 
 for (const theme of ['dark', 'light'] as const) {
-  test(`glass contrast, progress clarity and material fallbacks ${theme}`, async ({ page }) => {
+  test(`glass contrast, progress clarity and material fallbacks ${theme}`, async ({
+    page,
+  }, info) => {
     await page.setViewportSize({ width: 393, height: 844 });
     await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
     await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
@@ -47,11 +49,13 @@ for (const theme of ['dark', 'light'] as const) {
       });
     const categoryText = (await rail.locator('a strong').first().boundingBox())!;
     expect(categoryText.y - downloadTextBottom).toBeLessThanOrEqual(34);
+    await page.screenshot({ path: info.outputPath(`glass-content-${theme}.png`) });
 
     const add = page.getByRole('button', { name: 'Быстро добавить', exact: true });
     await add.click();
     const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
     await expect(sheet).toHaveCSS('backdrop-filter', /blur\(20px\)/);
+    await page.screenshot({ path: info.outputPath(`glass-quick-add-${theme}.png`) });
     for (const surface of [sheet, page.locator('#appBottomNav')]) {
       const alpha = await surface.evaluate((element) => {
         const canvas = document.createElement('canvas');
@@ -61,7 +65,8 @@ for (const theme of ['dark', 'light'] as const) {
         context.fillRect(0, 0, 1, 1);
         return context.getImageData(0, 0, 1, 1).data[3]! / 255;
       });
-      expect(alpha).toBeGreaterThanOrEqual(0.9 - 1 / 255);
+      expect(alpha).toBeGreaterThanOrEqual(surface === sheet ? 0.9 - 1 / 255 : 0.5);
+      if (surface !== sheet) expect(alpha).toBeLessThanOrEqual(0.8);
       expect(alpha).toBeLessThan(1);
     }
     await expect(page.locator('.progress-overview')).not.toHaveAttribute('data-glass');
@@ -125,6 +130,11 @@ for (const theme of ['dark', 'light'] as const) {
       expect(item.minimum, JSON.stringify(item)).toBeGreaterThanOrEqual(item.required);
     await page.keyboard.press('Escape');
     await expect(add).toBeFocused();
+    await page
+      .locator('#appBottomNav')
+      .screenshot({ path: info.outputPath(`glass-dock-detail-${theme}.png`) });
+    await page.evaluate(() => window.scrollBy(0, window.innerHeight / 2));
+    await page.screenshot({ path: info.outputPath(`glass-scroll-${theme}.png`) });
     expect(
       await add.evaluate((element) =>
         getComputedStyle(element)
@@ -158,7 +168,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(add).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     await page.reload();
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(12px\)/);
+    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(18px\)/);
     // Exercise the unsupported-backdrop branch by removing only its @supports opt-in.
     const supportRules = await page.evaluate(() => {
       let count = 0;
@@ -184,6 +194,7 @@ for (const theme of ['dark', 'light'] as const) {
       'background-color',
       theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
     );
+    await page.screenshot({ path: info.outputPath(`glass-fallback-${theme}.png`) });
     await expectNoHorizontalOverflow(page);
   });
 
@@ -200,7 +211,7 @@ for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430]) {
       await page.setViewportSize({ width, height: 844 });
       const dock = page.locator('#appBottomNav');
-      await expect(dock).toHaveCSS('backdrop-filter', /blur\(12px\)/);
+      await expect(dock).toHaveCSS('backdrop-filter', /blur\(18px\)/);
       const dockBox = (await dock.boundingBox())!;
       expect(dockBox.y + dockBox.height).toBeLessThanOrEqual(844 - 34 - 12);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));

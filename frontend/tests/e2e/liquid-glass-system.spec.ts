@@ -36,7 +36,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(nav).toHaveAttribute('data-glass-variant', 'regular');
       await expect(nav).toHaveCSS('background-image', /radial-gradient.*linear-gradient/);
       await expect(nav).toHaveCSS('box-shadow', /inset/);
-      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(12px\)/ : 'none');
+      await expect(nav).toHaveCSS('backdrop-filter', width < 900 ? /blur\(18px\)/ : 'none');
       await expectNoHorizontalOverflow(page);
       // Content containers remain ordinary surfaces; navigation alone carries this material.
       await expect(

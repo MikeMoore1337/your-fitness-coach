@@ -83,6 +83,8 @@ async function mockActiveWorkout(
       }
     : null;
   let failSetPatch = false;
+  let nextPatchBarrier: Promise<void> | null = null;
+  const patches: Array<{ setId: number; body: Record<string, unknown>; status?: number }> = [];
   let resolveCardioCompleted!: () => void;
   const cardioCompleted = new Promise<void>((resolve) => {
     resolveCardioCompleted = resolve;
@@ -605,12 +607,33 @@ async function mockActiveWorkout(
     }
     const setMatch = path.match(/\/workouts\/sets\/(\d+)$/);
     if (setMatch) {
+      const setId = Number(setMatch[1]);
+      const body = request.postDataJSON() as Partial<SetState> & {
+        expected_version: number;
+        mutation_id: string;
+      };
+      const patch = { setId, body, status: undefined as number | undefined };
+      patches.push(patch);
+      const barrier = nextPatchBarrier;
+      nextPatchBarrier = null;
+      if (barrier) await barrier;
       if (failSetPatch) {
+        patch.status = 503;
         return route.fulfill({ status: 503, json: { detail: 'Сервис временно недоступен' } });
       }
-      const setId = Number(setMatch[1]);
       const current = sets.get(setId)!;
-      const body = request.postDataJSON() as Partial<SetState>;
+      if (body.expected_version !== current.version) {
+        patch.status = 409;
+        return route.fulfill({
+          status: 409,
+          json: {
+            detail: {
+              code: 'workout_set_version_conflict',
+              current: { id: setId, ...current },
+            },
+          },
+        });
+      }
       const next = {
         ...current,
         actual_reps: body.actual_reps ?? null,
@@ -626,6 +649,7 @@ async function mockActiveWorkout(
         version: current.version + 1,
       };
       sets.set(setId, next);
+      patch.status = 200;
       if (setId === 204 && next.is_completed) resolveCardioCompleted();
       return route.fulfill({
         json: { id: setId, set_number: setId === 204 ? 1 : setId - 200, ...next },
@@ -656,11 +680,377 @@ async function mockActiveWorkout(
   );
 
   return {
+    patches,
+    readSet: (setId: number) => sets.get(setId)!,
+    setRole(setId: number, role: SetState['planned_role']) {
+      sets.get(setId)!.planned_role = role;
+    },
+    holdNextPatch() {
+      let release!: () => void;
+      nextPatchBarrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return release;
+    },
     failSetPatch(value: boolean) {
       failSetPatch = value;
     },
     cardioCompleted,
   };
+}
+
+test('P1 completion waits for acceptance behind an in-flight autosave', async ({ page }, info) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 393, height: 844 });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  const release = server.holdNextPatch();
+  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await expect.poll(() => server.patches.length).toBe(1);
+  await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+  await first.getByRole('button', { name: /^2 —/ }).click();
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  try {
+    await page.screenshot({ path: info.outputPath('held-autosave.png') });
+    await info.attach('held-autosave.json', {
+      body: JSON.stringify(
+        {
+          patches: server.patches,
+          server: server.readSet(201),
+          currentSet: await page
+            .locator('[aria-current="step"]')
+            .getAttribute('data-workout-set-id'),
+          timers: await page.getByRole('timer', { name: 'Отдых' }).count(),
+          queue: await page.evaluate(() =>
+            JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+          ),
+        },
+        null,
+        2,
+      ),
+      contentType: 'application/json',
+    });
+    expect(server.readSet(201).is_completed).toBe(false);
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+    await expect(first.getByRole('button', { name: /^Завершить:/ })).toBeDisabled();
+    const box = (await first.locator('[data-workout-field="done"]').boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  } finally {
+    release();
+  }
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+  expect(server.readSet(201)).toMatchObject({ actual_weight: 42.5, actual_reps: 9, rir: '2' });
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  await page.reload();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+  await info.attach('completion-network.json', {
+    body: JSON.stringify(server.patches, null, 2),
+    contentType: 'application/json',
+  });
+});
+
+for (const edit of ['weight', 'reps', 'rir', 'multiple'] as const) {
+  test(`P1 immediate completion preserves ${edit} and survives a version conflict`, async ({
+    page,
+  }, info) => {
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    if (edit === 'weight' || edit === 'multiple')
+      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    if (edit === 'reps' || edit === 'multiple')
+      await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+    if (edit === 'rir' || edit === 'multiple')
+      await first.getByRole('button', { name: /^2 —/ }).click();
+    server.readSet(201).version += 1;
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+    await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    expect(server.readSet(201)).toMatchObject({
+      is_completed: true,
+      actual_weight: edit === 'weight' || edit === 'multiple' ? 42.5 : null,
+      actual_reps: edit === 'reps' || edit === 'multiple' ? 9 : null,
+      rir: edit === 'rir' || edit === 'multiple' ? '2' : null,
+    });
+    expect(server.patches.some((patch) => patch.status === 409)).toBe(true);
+    expect(
+      server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+    ).toHaveLength(1);
+    await info.attach('completion-network.json', {
+      body: JSON.stringify(server.patches, null, 2),
+      contentType: 'application/json',
+    });
+  });
+}
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`P1 rejected completion does not start rest and retries without undoing the set ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 360, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+    await first.getByRole('button', { name: /^2 —/ }).click();
+    await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    server.failSetPatch(true);
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+    expect(server.readSet(201).is_completed).toBe(false);
+    await page.screenshot({ path: info.outputPath(`completion-error-360-${theme}.png`) });
+    server.failSetPatch(false);
+    await first.getByRole('button', { name: /^Повторить сохранение:/ }).click();
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+    expect(server.readSet(201)).toMatchObject({
+      is_completed: true,
+      actual_weight: 42.5,
+      actual_reps: 9,
+      rir: '2',
+    });
+    expect(server.patches.slice(-2).every((patch) => patch.body.is_completed === true)).toBe(true);
+    await info.attach('completion-network.json', {
+      body: JSON.stringify(server.patches, null, 2),
+      contentType: 'application/json',
+    });
+  });
+}
+
+for (const role of ['working', 'warmup', 'activation'] as const) {
+  test(`P1 offline durable ${role} completion restores after reload and reconnect`, async ({
+    page,
+  }, info) => {
+    const server = await mockActiveWorkout(page);
+    server.setRole(201, role);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    // Keep the test shell available while restoring an offline queue on reload.
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false }),
+    );
+    await page.evaluate(() =>
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: false }),
+    );
+    const first = page.locator('[data-workout-set-id="201"]');
+    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+    await first.getByRole('button', { name: /^2 —/ }).click();
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '202',
+    );
+    await expect(page.locator('.active-workout-sync')).toContainText('Сохранено на устройстве');
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(
+      role === 'working' ? 1 : 0,
+    );
+    expect(server.patches).toHaveLength(0);
+    await page.reload();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '202',
+    );
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
+      window.dispatchEvent(new Event('online'));
+    });
+    await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    expect(server.readSet(201)).toMatchObject({
+      is_completed: true,
+      actual_weight: 42.5,
+      actual_reps: 9,
+      rir: '2',
+    });
+    await info.attach('completion-network.json', {
+      body: JSON.stringify(server.patches, null, 2),
+      contentType: 'application/json',
+    });
+  });
+}
+
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`P1 completion evidence ${width}px ${theme}`, async ({ page }, info) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => {
+        localStorage.setItem('app-theme', value);
+        const rests: unknown[] = [];
+        Object.assign(window, { __completionRests: rests });
+        window.addEventListener('fit:rest', (event) =>
+          rests.push({ time: Date.now(), detail: (event as CustomEvent).detail }),
+        );
+      }, theme);
+      const server = await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+      await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+      await first.getByRole('button', { name: /^2 —/ }).click();
+      await page.screenshot({ path: info.outputPath(`completion-before-${width}-${theme}.png`) });
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+      await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+      await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+        'data-workout-set-id',
+        '202',
+      );
+      expect(server.readSet(201)).toMatchObject({
+        is_completed: true,
+        actual_weight: 42.5,
+        actual_reps: 9,
+        rir: '2',
+      });
+      const rests = await page.evaluate(
+        () => (window as unknown as { __completionRests: unknown[] }).__completionRests,
+      );
+      expect(rests).toHaveLength(1);
+      const queue = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('fit_active_workout_v1_user_7_workout_42') ?? '{}'),
+      );
+      expect(queue.queue).toEqual([]);
+      await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
+      const completedPatch = server.patches.findIndex(
+        (patch) => patch.status === 200 && patch.body.is_completed === true,
+      );
+      expect(completedPatch).toBeGreaterThanOrEqual(0);
+      expect(
+        server.patches
+          .slice(completedPatch + 1)
+          .filter((patch) => patch.setId === 201 && patch.body.is_completed === false),
+      ).toEqual([]);
+      await page.reload();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+        'data-workout-set-id',
+        '202',
+      );
+      await page.screenshot({ path: info.outputPath(`completion-reload-${width}-${theme}.png`) });
+      await info.attach('completion-network.json', {
+        body: JSON.stringify(
+          { patches: server.patches, rests, queue, server: server.readSet(201), currentSet: 202 },
+          null,
+          2,
+        ),
+        contentType: 'application/json',
+      });
+    });
+  }
+}
+
+test('P1 sequential completions reach the final workout set without duplicate timers', async ({
+  page,
+}) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  for (const id of [201, 202, 203]) {
+    const row = page.locator(`[data-workout-set-id="${id}"]`);
+    await expect(row).toHaveAttribute('aria-current', 'step');
+    await row.getByRole('spinbutton', { name: /^Вес,/ }).fill('40');
+    await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
+    await row.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+    expect(server.readSet(id).is_completed).toBe(true);
+    await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+    await expect(page.getByRole('status').filter({ hasText: 'Отдых пропущен' })).toBeVisible();
+  }
+  await expect(page.locator('[aria-current="step"]')).toHaveCount(0);
+  expect(
+    server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
+  ).toHaveLength(3);
+  await expect(
+    page.getByRole('button', { name: 'Завершить тренировку', exact: true }),
+  ).toBeVisible();
+});
+
+test('P1 completion preserves rest when navigation unmounts the pending workout', async ({
+  page,
+}) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  const release = server.holdNextPatch();
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect
+    .poll(() => server.patches.some((patch) => patch.body.is_completed === true))
+    .toBe(true);
+  await page.locator('#appBottomNav').getByRole('link', { name: 'План', exact: true }).click();
+  release();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Number(localStorage.getItem('fit_active_workout_rest_v1_user_7_workout_42')),
+      ),
+    )
+    .toBeGreaterThan(0);
+  await page.locator('#appBottomNav').getByRole('link', { name: 'Сегодня', exact: true }).click();
+  const resume = page.getByRole('button', { name: 'Продолжить тренировку' });
+  if (await resume.isVisible()) await resume.click();
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`P1 storage rejection keeps fields and current set without rest ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 360, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    const server = await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const first = page.locator('[data-workout-set-id="201"]');
+    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+    await first.getByRole('button', { name: /^2 —/ }).click();
+    await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    await setNetworkOffline(page, true);
+    await page.evaluate(() => {
+      const write = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (key.startsWith('fit_active_workout_v1_'))
+          throw new DOMException('Quota', 'QuotaExceededError');
+        return write.call(this, key, value);
+      };
+    });
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+    await expect(first).toHaveAttribute('aria-current', 'step');
+    await expect(first.getByRole('spinbutton', { name: /^Вес,/ })).toHaveValue('42.5');
+    await expect(first.getByRole('spinbutton', { name: /^Повторы,/ })).toHaveValue('9');
+    expect(server.readSet(201).is_completed).toBe(false);
+    await page.screenshot({ path: info.outputPath(`completion-storage-error-360-${theme}.png`) });
+  });
 }
 
 function waitForCompletedSetPatch(page: Page, setId: number) {

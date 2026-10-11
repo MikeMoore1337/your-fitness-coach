@@ -348,12 +348,14 @@ function WorkoutSetRow({
   previousResult,
   previousValues,
   restSeconds,
+  userId,
   workoutId,
   workoutExerciseId,
   exerciseTitle,
   hasWarmupRows,
   pending,
   syncing,
+  syncFailed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -365,18 +367,20 @@ function WorkoutSetRow({
   previousResult: string | null;
   previousValues?: PreviousSetValues;
   restSeconds: number;
+  userId?: number;
   workoutId: number;
   workoutExerciseId: number;
   exerciseTitle: string;
   hasWarmupRows: boolean;
   pending?: ActiveWorkoutMutation;
   syncing: boolean;
+  syncFailed: boolean;
   enqueue: (
     setId: number,
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const [reps, setReps] = useState<string>(
     String(pending?.values.actual_reps ?? set.actual_reps ?? ''),
@@ -391,10 +395,12 @@ function WorkoutSetRow({
   const [reachedFailure, setReachedFailure] = useState(
     pending?.values.reached_failure ?? set.reached_failure ?? false,
   );
-  const [completed, setCompleted] = useState(pending?.values.is_completed ?? set.is_completed);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const [completing, setCompleting] = useState(false);
+  const completionInFlight = useRef(false);
+  const retryCompletion = syncFailed && pending?.values.is_completed;
   const [justConfirmed, setJustConfirmed] = useState(false);
   const editing = useRef(false);
-  const lastCompletionActionAt = useRef(0);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
@@ -412,7 +418,7 @@ function WorkoutSetRow({
     set.planned_role !== 'warmup' &&
     set.planned_role !== 'activation';
 
-  const enqueueSave = (
+  const enqueueSave = async (
     next: Partial<{
       reps: string;
       weight: string;
@@ -423,32 +429,49 @@ function WorkoutSetRow({
     }>,
     immediate = false,
   ) => {
+    if (completionInFlight.current) return;
+    if (immediate) {
+      completionInFlight.current = true;
+      setCompleting(true);
+    }
     const nextReps = next.reps ?? reps;
     const nextWeight = next.weight ?? weight;
     const nextRir = next.rir === undefined ? rir : next.rir;
     const nextSetKind = next.setKind ?? setKind;
     const nextReachedFailure = next.reachedFailure ?? reachedFailure;
     const nextCompleted = next.completed ?? completed;
-    enqueue(
-      set.id,
-      serverVersion,
-      {
-        actual_reps: nextReps === '' ? null : Number(nextReps),
-        actual_weight: nextWeight === '' ? null : Number(nextWeight),
-        rir: nextRir,
-        set_kind: nextSetKind,
-        reached_failure: nextReachedFailure,
-        is_completed: nextCompleted,
-      },
-      immediate,
-    );
-    if (immediate && nextCompleted) {
-      haptic('success');
-    }
-    if (immediate && canStartRest(nextSetKind, nextCompleted)) {
-      window.dispatchEvent(
-        new CustomEvent('fit:rest', { detail: { workoutId, seconds: restSeconds } }),
+    try {
+      const accepted = await enqueue(
+        set.id,
+        serverVersion,
+        {
+          actual_reps: nextReps === '' ? null : Number(nextReps),
+          actual_weight: nextWeight === '' ? null : Number(nextWeight),
+          rir: nextRir,
+          set_kind: nextSetKind,
+          reached_failure: nextReachedFailure,
+          is_completed: nextCompleted,
+        },
+        immediate,
       );
+      if (accepted && immediate && nextCompleted) {
+        haptic('success');
+        setJustConfirmed(true);
+      }
+      if (accepted && immediate && canStartRest(nextSetKind, nextCompleted)) {
+        const deadline = Date.now() + restSeconds * 1000;
+        if (userId) writeStorage(activeWorkoutRestKey(userId, workoutId), deadline);
+        window.dispatchEvent(
+          new CustomEvent('fit:rest', {
+            detail: { workoutId, setId: set.id, seconds: restSeconds, deadline },
+          }),
+        );
+      }
+    } finally {
+      if (immediate) {
+        completionInFlight.current = false;
+        setCompleting(false);
+      }
     }
   };
 
@@ -460,7 +483,6 @@ function WorkoutSetRow({
       setRir(pending.values.rir ?? set.rir ?? null);
       setSetKind(pending.values.set_kind ?? set.set_kind ?? 'working');
       setReachedFailure(pending.values.reached_failure ?? set.reached_failure ?? false);
-      setCompleted(pending.values.is_completed);
     } else {
       if (editing.current) {
         editing.current = false;
@@ -471,7 +493,6 @@ function WorkoutSetRow({
       setRir(set.rir ?? null);
       setSetKind(set.set_kind ?? 'working');
       setReachedFailure(set.reached_failure ?? false);
-      setCompleted(set.is_completed);
     }
   }, [
     pending,
@@ -529,7 +550,7 @@ function WorkoutSetRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> Выполнен
+            <CheckIcon /> {pending ? 'Сохранено на устройстве' : 'Выполнен'}
           </span>
         )}
       </div>
@@ -541,6 +562,7 @@ function WorkoutSetRow({
         <div className="active-workout-set__prefill-actions">
           <button
             className="active-workout-set__prefill"
+            disabled={completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
@@ -558,6 +580,7 @@ function WorkoutSetRow({
           </button>
           <button
             className="active-workout-set__prefill active-workout-set__prefill--commit"
+            disabled={completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
@@ -565,8 +588,6 @@ function WorkoutSetRow({
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
-              setCompleted(true);
-              setJustConfirmed(true);
               enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
               trackProductEvent({
                 name: 'previous_set_reuse_used',
@@ -590,7 +611,7 @@ function WorkoutSetRow({
       {isCurrent && (
         <RirSelector
           compact
-          disabled={disabled}
+          disabled={disabled || completing}
           value={rir}
           onChange={(nextRir) => {
             editing.current = true;
@@ -605,7 +626,7 @@ function WorkoutSetRow({
           <span>Вес, кг</span>
           <input
             data-workout-field="weight"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="next"
             inputMode="decimal"
@@ -631,7 +652,7 @@ function WorkoutSetRow({
           <span>Повторы</span>
           <input
             data-workout-field="reps"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="done"
             inputMode="numeric"
@@ -655,24 +676,23 @@ function WorkoutSetRow({
         </label>
         <Button
           type="button"
-          disabled={disabled}
-          aria-label={`${completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
+          disabled={disabled || completing}
+          aria-busy={completing || undefined}
+          aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
-          onClick={() => {
-            const now = Date.now();
-            if (now - lastCompletionActionAt.current < 600) return;
-            lastCompletionActionAt.current = now;
-            const nextCompleted = !completed;
+          onClick={(event) => {
+            if (event.detail > 1) return;
+            const nextCompleted = retryCompletion || !completed;
             editing.current = true;
-            setCompleted(nextCompleted);
-            setJustConfirmed(nextCompleted);
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {completed ? (
+          {retryCompletion ? (
+            'Повторить сохранение'
+          ) : completed ? (
             <>
               <CheckIcon /> Готово
             </>
@@ -684,7 +704,7 @@ function WorkoutSetRow({
 
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
-          disabled={disabled}
+          disabled={disabled || completing}
           exerciseTitle={exerciseTitle}
           hasWarmupRows={hasWarmupRows}
           targetSetId={set.id}
@@ -700,7 +720,7 @@ function WorkoutSetRow({
           <label className="active-workout-advanced-field">
             <span>Вид подхода</span>
             <select
-              disabled={disabled}
+              disabled={disabled || completing}
               value={setKind}
               onChange={(event) => {
                 const nextSetKind = event.target.value as SetKind;
@@ -723,7 +743,7 @@ function WorkoutSetRow({
 
           {!isCurrent && (
             <RirSelector
-              disabled={disabled}
+              disabled={disabled || completing}
               value={rir}
               onChange={(nextRir) => {
                 editing.current = true;
@@ -736,7 +756,7 @@ function WorkoutSetRow({
           <label className="active-workout-failure">
             <input
               type="checkbox"
-              disabled={disabled}
+              disabled={disabled || completing}
               checked={reachedFailure}
               onChange={(event) => {
                 const nextReachedFailure = event.target.checked;
@@ -768,6 +788,7 @@ function CardioWorkoutRow({
   exerciseTitle,
   pending,
   syncing,
+  syncFailed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -778,12 +799,13 @@ function CardioWorkoutRow({
   exerciseTitle: string;
   pending?: ActiveWorkoutMutation;
   syncing: boolean;
+  syncFailed: boolean;
   enqueue: (
     setId: number,
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const [duration, setDuration] = useState(
     String(pending ? (pending.values.duration_minutes ?? '') : (set.duration_minutes ?? '')),
@@ -799,10 +821,12 @@ function CardioWorkoutRow({
   const [heartRateZone, setHeartRateZone] = useState(
     String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
   );
-  const [completed, setCompleted] = useState(pending?.values.is_completed ?? set.is_completed);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const [completing, setCompleting] = useState(false);
+  const completionInFlight = useRef(false);
+  const retryCompletion = syncFailed && pending?.values.is_completed;
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
-  const lastCompletionActionAt = useRef(0);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillDuration = duration === '' && previousValues?.duration_minutes != null;
@@ -814,7 +838,7 @@ function CardioWorkoutRow({
     previousResult !== null &&
     (canPrefillDuration || canPrefillDistance);
 
-  const enqueueSave = (
+  const enqueueSave = async (
     next: Partial<{
       duration: string;
       distance: string;
@@ -824,29 +848,41 @@ function CardioWorkoutRow({
     }>,
     immediate = false,
   ) => {
+    if (completionInFlight.current) return;
+    if (immediate) {
+      completionInFlight.current = true;
+      setCompleting(true);
+    }
     const nextDuration = next.duration ?? duration;
     const nextDistance = next.distance ?? distance;
     const nextAverageHeartRate = next.averageHeartRate ?? averageHeartRate;
     const nextHeartRateZone = next.heartRateZone ?? heartRateZone;
     const nextCompleted = next.completed ?? completed;
-    enqueue(
-      set.id,
-      serverVersion,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        duration_minutes: nextDuration === '' ? null : Number(nextDuration),
-        distance_km: nextDistance === '' ? null : Number(nextDistance),
-        average_heart_rate_bpm: nextAverageHeartRate === '' ? null : Number(nextAverageHeartRate),
-        heart_rate_zone: nextHeartRateZone === '' ? null : Number(nextHeartRateZone),
-        rir: null,
-        set_kind: null,
-        reached_failure: null,
-        is_completed: nextCompleted,
-      },
-      immediate,
-    );
-    if (immediate && nextCompleted) haptic('success');
+    try {
+      const accepted = await enqueue(
+        set.id,
+        serverVersion,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          duration_minutes: nextDuration === '' ? null : Number(nextDuration),
+          distance_km: nextDistance === '' ? null : Number(nextDistance),
+          average_heart_rate_bpm: nextAverageHeartRate === '' ? null : Number(nextAverageHeartRate),
+          heart_rate_zone: nextHeartRateZone === '' ? null : Number(nextHeartRateZone),
+          rir: null,
+          set_kind: null,
+          reached_failure: null,
+          is_completed: nextCompleted,
+        },
+        immediate,
+      );
+      if (accepted && immediate && nextCompleted) haptic('success');
+    } finally {
+      if (immediate) {
+        completionInFlight.current = false;
+        setCompleting(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -868,7 +904,6 @@ function CardioWorkoutRow({
     setHeartRateZone(
       String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
     );
-    setCompleted(pending ? pending.values.is_completed : set.is_completed);
   }, [
     pending,
     set.average_heart_rate_bpm,
@@ -910,7 +945,7 @@ function CardioWorkoutRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> Выполнено
+            <CheckIcon /> {pending ? 'Сохранено на устройстве' : 'Выполнено'}
           </span>
         )}
       </div>
@@ -923,6 +958,7 @@ function CardioWorkoutRow({
           <button
             className="active-workout-set__prefill"
             type="button"
+            disabled={disabled || completing}
             onClick={() => {
               const nextDuration = canPrefillDuration
                 ? String(previousValues?.duration_minutes)
@@ -944,6 +980,7 @@ function CardioWorkoutRow({
           <button
             className="active-workout-set__prefill active-workout-set__prefill--commit"
             type="button"
+            disabled={disabled || completing}
             onClick={() => {
               const nextDuration = canPrefillDuration
                 ? String(previousValues?.duration_minutes)
@@ -954,7 +991,6 @@ function CardioWorkoutRow({
               editing.current = true;
               setDuration(nextDuration);
               setDistance(nextDistance);
-              setCompleted(true);
               enqueueSave(
                 { duration: nextDuration, distance: nextDistance, completed: true },
                 true,
@@ -975,7 +1011,7 @@ function CardioWorkoutRow({
           <span>Длительность, мин</span>
           <input
             data-workout-field="duration"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Длительность, ${exerciseTitle}`}
             enterKeyHint="next"
             inputMode="numeric"
@@ -1002,7 +1038,7 @@ function CardioWorkoutRow({
           <span>Дистанция, км</span>
           <input
             data-workout-field="distance"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Дистанция, ${exerciseTitle}`}
             enterKeyHint="done"
             inputMode="decimal"
@@ -1026,28 +1062,28 @@ function CardioWorkoutRow({
         </label>
         <Button
           type="button"
-          disabled={disabled}
-          aria-label={`${completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
+          disabled={disabled || completing}
+          aria-busy={completing || undefined}
+          aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
-          onClick={() => {
-            const now = Date.now();
-            if (now - lastCompletionActionAt.current < 600) return;
-            lastCompletionActionAt.current = now;
-            const nextCompleted = !completed;
+          onClick={(event) => {
+            if (event.detail > 1) return;
+            const nextCompleted = retryCompletion || !completed;
             if (nextCompleted && !duration) {
               setValidation('Укажите длительность кардио.');
               return;
             }
             editing.current = true;
             setValidation(null);
-            setCompleted(nextCompleted);
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {completed ? (
+          {retryCompletion ? (
+            'Повторить сохранение'
+          ) : completed ? (
             <>
               <CheckIcon /> Готово
             </>
@@ -1068,7 +1104,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Средний пульс, уд/мин</span>
             <input
-              disabled={disabled}
+              disabled={disabled || completing}
               inputMode="numeric"
               type="number"
               min="30"
@@ -1084,7 +1120,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Зона пульса</span>
             <select
-              disabled={disabled}
+              disabled={disabled || completing}
               value={heartRateZone}
               onChange={(event) => {
                 editing.current = true;
@@ -1143,9 +1179,11 @@ export function RestTimer({
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
   useEffect(() => {
     const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ workoutId: number; seconds: number }>).detail;
+      const detail = (
+        event as CustomEvent<{ workoutId: number; seconds: number; deadline?: number }>
+      ).detail;
       if (!detail || detail.workoutId !== workoutId) return;
-      const nextDeadline = Date.now() + detail.seconds * 1000;
+      const nextDeadline = detail.deadline ?? Date.now() + detail.seconds * 1000;
       setNow(Date.now());
       setDeadline(nextDeadline);
       setCompletedNotice(null);
@@ -1543,20 +1581,19 @@ export function TodayWorkout({
       ? currentSet.exercise.exercise_title
       : `${currentSet.exercise.exercise_title}, подход ${currentSet.set.set_number}`
     : 'завершить тренировку';
-  const syncText =
-    activeSync.syncState === 'syncing'
+  const syncFailed = activeSync.syncState === 'error' || activeSync.syncState === 'conflict';
+  const syncInProgress = activeSync.syncState === 'syncing';
+  const syncOffline = activeSync.syncState === 'offline';
+  const syncText = syncFailed
+    ? 'Требуется действие'
+    : syncInProgress
       ? 'Синхронизация…'
       : activeSync.pendingCount > 0
-        ? activeSync.syncState === 'offline'
+        ? syncOffline
           ? 'Сохранено на устройстве'
-          : activeSync.syncState === 'error' || activeSync.syncState === 'conflict'
-            ? 'Требуется действие'
-            : 'Сохранение…'
+          : 'Сохранение…'
         : 'Синхронизировано';
-  const syncNeedsAction =
-    activeSync.pendingCount > 0 &&
-    activeSync.syncState !== 'syncing' &&
-    activeSync.syncState !== 'pending';
+  const syncNeedsAction = syncFailed || (activeSync.pendingCount > 0 && syncOffline);
   const adaptationEntry =
     data.status === 'planned' || started ? (
       capabilities.canMutatePrograms ? (
@@ -1626,7 +1663,7 @@ export function TodayWorkout({
                 <strong>{syncText}</strong>
                 {activeSync.message && <span>{activeSync.message}</span>}
               </div>
-              {syncNeedsAction && navigator.onLine && (
+              {syncNeedsAction && activeSync.pendingCount > 0 && navigator.onLine && (
                 <button className="secondary" type="button" onClick={() => void activeSync.retry()}>
                   Повторить
                 </button>
@@ -1925,6 +1962,7 @@ export function TodayWorkout({
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
                           syncing={activeSync.syncState === 'syncing'}
+                          syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
                         />
                       ) : (
@@ -1935,6 +1973,7 @@ export function TodayWorkout({
                           setTotal={exercise.sets.length}
                           prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
+                          userId={user?.id}
                           disabled={!started}
                           workoutId={data.id}
                           workoutExerciseId={exercise.id}
@@ -1947,6 +1986,7 @@ export function TodayWorkout({
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
                           syncing={activeSync.syncState === 'syncing'}
+                          syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
                         />
                       );
