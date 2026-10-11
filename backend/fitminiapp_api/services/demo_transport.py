@@ -6,6 +6,8 @@ from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from fitminiapp_api.schemas.coach_capacity import CoachCapacityBottleneck, CoachCapacityResponse
+from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
+from fitminiapp_api.schemas.workout import ExerciseHistoryResponse
 from fitminiapp_api.services.demo_sessions import (
     DemoActionForbiddenError,
     DemoSessionStore,
@@ -51,6 +53,135 @@ def _coach_capacity(session: _DemoSession) -> dict[str, Any]:
         bottlenecks=[CoachCapacityBottleneck(key="attention", count=1, action="attention")],
         generated_at=_now(session),
     ).model_dump(mode="json")
+
+
+def _coach_inbox(session: _DemoSession) -> dict[str, Any]:
+    if session.scenario != "trainer":
+        raise DemoActionForbiddenError
+    now = _now(session)
+    return CoachInboxResponse.model_validate(
+        {
+            "date": _today(session),
+            "timezone": "Europe/Moscow",
+            "items": [
+                {
+                    "key": "attention:without_program:51003:51003",
+                    "kind": "attention",
+                    "client": {"id": DEMO_CLIENT_IDS["ivan"], "name": "Иван"},
+                    "title": "Нет активной программы",
+                    "reason": "Назначьте следующий рабочий план клиента.",
+                    "source_kind": "client",
+                    "source_id": DEMO_CLIENT_IDS["ivan"],
+                    "action": "assign_program",
+                    "destination": f"/coach?client_id={DEMO_CLIENT_IDS['ivan']}",
+                    "priority": "normal",
+                    "created_at": now,
+                    "due_at": None,
+                    "evidence": [],
+                }
+            ],
+            "total": 1,
+            "counts": {
+                "attention": 1,
+                "pending_reviews": 0,
+                "tasks": 0,
+                "sessions": 0,
+                "packages": 0,
+                "payments": 0,
+            },
+            "generated_at": now,
+        }
+    ).model_dump(mode="json")
+
+
+def _exercise_history(session: _DemoSession, exercise_id: int) -> dict[str, Any]:
+    if session.scenario not in {"self_training", "trainer"} or exercise_id != 1_001:
+        raise DemoActionForbiddenError
+    performed_on = _today(session) - timedelta(days=2)
+    workout = {
+        "workout_id": DEMO_WORKOUT_ID,
+        "workout_title": "Верх тела · уверенный старт",
+        "performed_on": performed_on,
+        "completed_at": _now(session) - timedelta(days=2),
+    }
+    sets = [
+        {
+            "set_number": number,
+            "reps": 10,
+            "load_kg": 18.0,
+            "volume_kg": 180.0,
+            "rir": "2",
+            "set_kind": "working",
+            "planned_role": "working",
+            "analytics_bucket": "working",
+            "pr_eligible": True,
+        }
+        for number in (1, 2, 3)
+    ]
+    history = ExerciseHistoryResponse.model_validate(
+        {
+            "exercise_id": exercise_id,
+            "exercise_title": "Жим гантелей лёжа с контролируемой паузой",
+            "metric_type": "strength",
+            "load_unit": "kg",
+            "last_performed": workout,
+            "best_authoritative_load": {
+                "value_kg": 18.0,
+                "workout": workout,
+                "reps": 10,
+            },
+            "estimated_1rm": {
+                "kind": "estimated",
+                "formula": "brzycki",
+                "value_kg": 24.0,
+                "workout": workout,
+                "reps": 10,
+                "load_kg": 18.0,
+            },
+            "rep_prs": [],
+            "windows": [
+                {
+                    "days": days,
+                    "period_start": _today(session) - timedelta(days=days - 1),
+                    "period_end": _today(session),
+                    "performed_session_count": 1,
+                    "completed_set_count": 3,
+                    "authoritative_set_count": 3,
+                    "reps_total": 30,
+                    "best_authoritative_load_kg": 18.0,
+                    "estimated_1rm_kg": 24.0,
+                }
+                for days in (7, 30, 90)
+            ],
+            "recent_sessions": [
+                {
+                    "workout": workout,
+                    "workout_exercise_id": 61_001,
+                    "prescribed_reps": "10",
+                    "completed_set_count": 3,
+                    "authoritative_set_count": 3,
+                    "reps_total": 30,
+                    "max_authoritative_load_kg": 18.0,
+                    "best_set_volume_kg": 180.0,
+                    "estimated_1rm_kg": 24.0,
+                    "sets": sets,
+                }
+            ],
+            "progression": [
+                {
+                    "performed_on": performed_on,
+                    "workout_id": DEMO_WORKOUT_ID,
+                    "max_reps": 10,
+                    "max_authoritative_load_kg": 18.0,
+                    "estimated_1rm_kg": 24.0,
+                    "authoritative_set_count": 3,
+                }
+            ],
+            "progression_events": [],
+            "history_truncated": False,
+        }
+    )
+    return history.model_dump(mode="json")
 
 
 def _period_days(raw_value: str | None) -> int:
@@ -1938,6 +2069,13 @@ def handle_demo_transport(
             return {"items": [], "total": 0, "limit": 20, "offset": 0}
         if path == "/api/v1/programs/exercises":
             return _exercise_catalog()
+        if (
+            len(parts) == 4
+            and parts[:2] == ["programs", "exercises"]
+            and parts[2].isdigit()
+            and parts[3] == "history"
+        ):
+            return _exercise_history(session, int(parts[2]))
         if path in {"/api/v1/programs/templates/mine", "/api/v1/programs/templates/hidden"}:
             return [] if path.endswith("hidden") else [_program_template(session)]
         if path == "/api/v1/coach/clients":
@@ -1975,6 +2113,8 @@ def handle_demo_transport(
                 "total": 1,
                 "generated_at": _iso(_now(session)),
             }
+        if path == "/api/v1/coach/inbox":
+            return _coach_inbox(session)
         if path == "/api/v1/coach/workflow-automation/preview":
             return {
                 "ruleset_version": "coach-workflow-v1",

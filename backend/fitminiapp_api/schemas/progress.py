@@ -124,6 +124,7 @@ class NutritionReportDailyPoint(BaseModel):
     protein_g: float | None = None
     fat_g: float | None = None
     carbs_g: float | None = None
+    fiber_g: float | None = None
     target_calories: int | None = None
     target_protein_g: int | None = None
     target_fat_g: int | None = None
@@ -173,6 +174,7 @@ class NutritionReportSummary(BaseModel):
     protein_g: NutritionReportMetricSummary
     fat_g: NutritionReportMetricSummary
     carbs_g: NutritionReportMetricSummary
+    fiber_g: NutritionReportMetricSummary | None = None
     calorie_comparison: NutritionReportTargetComparison
     protein_comparison: NutritionReportTargetComparison
     fat_comparison: NutritionReportTargetComparison
@@ -186,6 +188,16 @@ class NutritionReportSummary(BaseModel):
     partial_entry_count: int | None = Field(default=0, ge=0)
 
 
+class NutritionReportInsight(BaseModel):
+    metric: Literal["calories", "protein_g", "fat_g", "carbs_g"]
+    direction: Literal["above", "below"]
+    evaluated_days: int = Field(ge=3)
+    deviation_days: int = Field(ge=3)
+    average_deviation: float
+    action_code: Literal["review_portions", "open_meal_suggestions"]
+    message: str
+
+
 class NutritionReportResponse(BaseModel):
     period: NutritionReportPeriod
     period_start: date
@@ -195,6 +207,7 @@ class NutritionReportResponse(BaseModel):
     daily: list[NutritionReportDailyPoint]
     target_changes: list[NutritionReportTargetChange]
     hydration: HydrationReportSummary | None = None
+    insights: list[NutritionReportInsight] = Field(default_factory=list)
 
 
 class BodyMetricPoint(BaseModel):

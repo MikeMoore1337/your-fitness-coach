@@ -24,6 +24,7 @@ from fitminiapp_api.services.period_bounds import (
 from fitminiapp_api.services.progress import is_calorie_target_met, is_protein_target_met
 
 METRICS = ("calories", "protein_g", "fat_g", "carbs_g")
+TRACKED_METRICS = (*METRICS, "fiber_g")
 
 NutritionReportError = PeriodBoundsError
 
@@ -35,6 +36,7 @@ class AggregatedDiaryDay:
     protein_g: Decimal | None
     fat_g: Decimal | None
     carbs_g: Decimal | None
+    fiber_g: Decimal | None
     has_entries: bool
     exact_entry_count: int = 0
     approximate_entry_count: int = 0
@@ -66,6 +68,7 @@ def _aggregated_diary_days(
             protein_g=totals.protein_g,
             fat_g=totals.fat_g,
             carbs_g=totals.carbs_g,
+            fiber_g=totals.fiber_g,
             has_entries=True,
             exact_entry_count=totals.exact_entry_count,
             approximate_entry_count=totals.approximate_entry_count,
@@ -99,6 +102,77 @@ def _effective_hydration_goal(goals: list[HydrationGoal], diary_date: date) -> H
         ),
         None,
     )
+
+
+def _nutrition_trend_insights(daily: list[dict]) -> list[dict]:
+    """Explain repeated departures from historical targets, only with sufficient facts."""
+
+    complete = [day for day in daily if day["status"] == "complete"]
+    if len(complete) < 3 or len(complete) / len(daily) < 0.6:
+        return []
+
+    insights: list[dict] = []
+    for metric, target_field, threshold in (
+        ("calories", "target_calories", 0.10),
+        ("protein_g", "target_protein_g", 0.15),
+        ("fat_g", "target_fat_g", 0.15),
+        ("carbs_g", "target_carbs_g", 0.15),
+    ):
+        comparable = [
+            day
+            for day in complete
+            if day[metric] is not None and day[target_field] is not None and day[target_field] > 0
+        ]
+        if len(comparable) < 3 or len(comparable) / len(complete) < 0.6:
+            continue
+        deviations = [day[metric] - day[target_field] for day in comparable]
+        above = sum(
+            deviation > day[target_field] * threshold
+            for day, deviation in zip(comparable, deviations, strict=True)
+        )
+        below = sum(
+            deviation < -day[target_field] * threshold
+            for day, deviation in zip(comparable, deviations, strict=True)
+        )
+        sign = "above" if above >= below else "below"
+        occurrences = max(above, below)
+        if occurrences < 3 or occurrences / len(comparable) < 0.7:
+            continue
+
+        # The deviation is against the target effective on each individual day.
+        average_deviation = round(sum(deviations) / len(deviations), 1)
+        action = (
+            "open_meal_suggestions"
+            if sign == "below" and metric in {"calories", "protein_g"}
+            else "review_portions"
+        )
+        label = {
+            "calories": "калорий",
+            "protein_g": "белка",
+            "fat_g": "жиров",
+            "carbs_g": "углеводов",
+        }[metric]
+        hint = (
+            "Посмотрите подбор еды из ваших сохранённых продуктов и блюд."
+            if action == "open_meal_suggestions"
+            else "Проверьте записи, порции и действовавшие в эти дни цели."
+        )
+        insights.append(
+            {
+                "metric": metric,
+                "direction": sign,
+                "evaluated_days": len(comparable),
+                "deviation_days": occurrences,
+                "average_deviation": average_deviation,
+                "action_code": action,
+                "message": (
+                    f"В {occurrences} из {len(comparable)} подтверждённых дней "
+                    f"количество {label} было {'выше' if sign == 'above' else 'ниже'} "
+                    f"дневной цели. {hint}"
+                ),
+            }
+        )
+    return insights
 
 
 def _metric_summary(points: list[dict], metric: str) -> dict:
@@ -207,6 +281,7 @@ def build_nutrition_report(
                 protein_g=Decimal(0),
                 fat_g=Decimal(0),
                 carbs_g=Decimal(0),
+                fiber_g=Decimal(0),
                 has_entries=False,
             )
         target = _effective_target(targets, diary_date)
@@ -222,7 +297,7 @@ def build_nutrition_report(
             metric: round(float(getattr(aggregate, metric)), 1)
             if aggregate is not None and getattr(aggregate, metric) is not None
             else None
-            for metric in METRICS
+            for metric in TRACKED_METRICS
         }
         target_values = {
             "target_calories": target.calories if target else None,
@@ -230,7 +305,7 @@ def build_nutrition_report(
             "target_fat_g": target.fat_g if target else None,
             "target_carbs_g": target.carbs_g if target else None,
         }
-        comparison_actual = actual if is_logged else dict.fromkeys(METRICS)
+        comparison_actual = actual if is_logged else dict.fromkeys(TRACKED_METRICS)
         point = {
             "diary_date": diary_date,
             "status": status,
@@ -301,7 +376,7 @@ def build_nutrition_report(
         "fasted_days": counts["fasted"],
         "missing_days": counts["missing"],
         "current_day_status": current_day["status"] if current_day else None,
-        **{metric: _metric_summary(logged_points, metric) for metric in METRICS},
+        **{metric: _metric_summary(logged_points, metric) for metric in TRACKED_METRICS},
         "calorie_comparison": _target_comparison(logged_points, "calories", "target_calories"),
         "protein_comparison": _target_comparison(logged_points, "protein_g", "target_protein_g"),
         "fat_comparison": _target_comparison(logged_points, "fat_g", "target_fat_g"),
@@ -378,6 +453,7 @@ def build_nutrition_report(
         "daily": daily,
         "target_changes": target_changes,
         "hydration": hydration_summary,
+        "insights": _nutrition_trend_insights(daily),
     }
 
 
@@ -405,6 +481,7 @@ def nutrition_report_csv(report: dict) -> str:
         "protein_g",
         "fat_g",
         "carbs_g",
+        "fiber_g",
         "target_calories_kcal",
         "target_protein_g",
         "target_fat_g",
@@ -422,6 +499,7 @@ def nutrition_report_csv(report: dict) -> str:
         "summary_logged_days",
         "summary_eligible_days",
         "summary_coverage_percent",
+        "summary_fiber_average_g",
         "summary_hydration_total_ml",
         "summary_hydration_average_ml",
         "summary_hydration_coverage_percent",
@@ -440,6 +518,7 @@ def nutrition_report_csv(report: dict) -> str:
             "summary_logged_days": summary["logged_days"],
             "summary_eligible_days": summary["eligible_days"],
             "summary_coverage_percent": summary["coverage_percent"],
+            "summary_fiber_average_g": summary["fiber_g"]["average"],
             "summary_hydration_total_ml": hydration["total_ml"] if hydration else None,
             "summary_hydration_average_ml": hydration["average_ml"] if hydration else None,
             "summary_hydration_coverage_percent": (
@@ -460,6 +539,7 @@ def nutrition_report_csv(report: dict) -> str:
             "protein_g": point["protein_g"],
             "fat_g": point["fat_g"],
             "carbs_g": point["carbs_g"],
+            "fiber_g": point["fiber_g"],
             "target_calories_kcal": point["target_calories"],
             "target_protein_g": point["target_protein_g"],
             "target_fat_g": point["target_fat_g"],

@@ -1,0 +1,44 @@
+name: "Epic"
+description: "Крупная цель с дочерними задачами"
+title: "[Product Vxx] "
+body:
+  - type: markdown
+    attributes:
+      value: "Замените Vxx фактическим номером продуктовой версии. Не создавайте новый Epic, если он уже существует."
+  - type: textarea
+    id: outcome
+    attributes:
+      label: "Цель и ожидаемый результат"
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: "Ценность для пользователей"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Обязательный объём и исключения"
+    validations:
+      required: true
+  - type: textarea
+    id: child
+    attributes:
+      label: "Дочерние Issues и зависимости"
+      description: "После создания оформите Parent/Sub-issues нативными средствами GitHub."
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Общие критерии приёмки Epic"
+    validations:
+      required: true
+  - type: textarea
+    id: gates
+    attributes:
+      label: "Решения владельца и ограничения выпуска"
+    validations:
+      required: false
