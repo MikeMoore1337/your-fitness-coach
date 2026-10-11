@@ -1053,6 +1053,34 @@ for (const theme of ['dark', 'light'] as const) {
   });
 }
 
+test('P1 combined API and storage failure never claims durable completion', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  server.failSetPatch(true);
+  await page.evaluate(() => {
+    const write = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key: string, value: string) {
+      if (key.startsWith('fit_active_workout_v1_'))
+        throw new DOMException('Quota', 'QuotaExceededError');
+      return write.call(this, key, value);
+    };
+  });
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
+  await expect(first.locator('.active-workout-set__complete-label')).toHaveText(/Не сохранено/);
+  await expect(page.locator('.active-workout-sync')).toContainText('Не закрывайте приложение');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+  await expect(first.getByRole('spinbutton', { name: /^Вес,/ })).toHaveValue('42.5');
+  await expect(first.getByRole('spinbutton', { name: /^Повторы,/ })).toHaveValue('9');
+  expect(server.readSet(201).is_completed).toBe(false);
+});
+
 function waitForCompletedSetPatch(page: Page, setId: number) {
   return page.waitForResponse((response) => {
     const url = new URL(response.url());

@@ -81,6 +81,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   }));
   const memoryState = useRef(storedState.data);
   const storageAvailable = useRef(true);
+  const [durable, setDurable] = useState(true);
   const loadedState = useMemo(
     () =>
       userId && workoutId
@@ -97,6 +98,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const persist = useCallback((next: ActiveWorkoutQueue, requireDurable = false) => {
     const durable = saveActiveWorkoutQueue(next);
     storageAvailable.current = durable;
+    setDurable(durable);
     if (requireDurable && !durable) return false;
     memoryState.current = next;
     setStoredState({ key: activeWorkoutQueueKey(next.user_id, next.workout_id), data: next });
@@ -239,11 +241,13 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
             : 'error',
         );
         setMessage(
-          navigator.onLine
-            ? reason instanceof Error
-              ? reason.message
-              : 'Не удалось синхронизировать тренировку.'
-            : 'Нет сети. Изменения сохранены на этом устройстве.',
+          !storageAvailable.current
+            ? 'Изменения ещё не сохранены. Хранилище устройства недоступно. Не закрывайте приложение.'
+            : navigator.onLine
+              ? reason instanceof Error
+                ? reason.message
+                : 'Не удалось синхронизировать тренировку.'
+              : 'Нет сети. Изменения сохранены на этом устройстве.',
         );
         return false;
       } finally {
@@ -325,6 +329,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     await crossContextCoordinator.run(lockName, () => {
       clearActiveWorkoutData(userId, workoutId);
       storageAvailable.current = true;
+      setDurable(true);
       memoryState.current = emptyActiveWorkoutQueue(userId, workoutId);
       setStoredState({
         key: activeWorkoutQueueKey(userId, workoutId),
@@ -397,6 +402,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   return {
     pendingBySet,
     pendingCount: state.queue.length,
+    durable,
     syncState,
     message,
     enqueue,

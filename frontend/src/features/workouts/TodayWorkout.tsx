@@ -354,6 +354,7 @@ function WorkoutSetRow({
   exerciseTitle,
   hasWarmupRows,
   pending,
+  durable,
   syncing,
   syncFailed,
   enqueue,
@@ -373,6 +374,7 @@ function WorkoutSetRow({
   exerciseTitle: string;
   hasWarmupRows: boolean;
   pending?: ActiveWorkoutMutation;
+  durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
   enqueue: (
@@ -550,7 +552,8 @@ function WorkoutSetRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> {pending ? 'Сохранено на устройстве' : 'Выполнен'}
+            {(!pending || durable) && <CheckIcon />}
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнен'}
           </span>
         )}
       </div>
@@ -787,6 +790,7 @@ function CardioWorkoutRow({
   previousValues,
   exerciseTitle,
   pending,
+  durable,
   syncing,
   syncFailed,
   enqueue,
@@ -798,6 +802,7 @@ function CardioWorkoutRow({
   previousValues?: PreviousSetValues;
   exerciseTitle: string;
   pending?: ActiveWorkoutMutation;
+  durable: boolean;
   syncing: boolean;
   syncFailed: boolean;
   enqueue: (
@@ -945,7 +950,8 @@ function CardioWorkoutRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> {pending ? 'Сохранено на устройстве' : 'Выполнено'}
+            {(!pending || durable) && <CheckIcon />}
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнено'}
           </span>
         )}
       </div>
@@ -1961,6 +1967,7 @@ export function TodayWorkout({
                           previousResult={previousResult}
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
@@ -1985,6 +1992,7 @@ export function TodayWorkout({
                           previousResult={previousResult}
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
