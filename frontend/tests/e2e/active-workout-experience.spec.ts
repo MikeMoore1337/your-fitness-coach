@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { emptyHydrationDay } from './fixtures/platform-api';
+import { expectSelectedChoice } from './fixtures/selected-state';
 import {
   expectTouchTargets,
   installTelegramHarness,
@@ -2443,9 +2444,17 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         await sheet.getByRole('button', { name: 'Закрыть быстрые действия' }).tap();
         await expect(add).toBeFocused();
         await unchanged(page, context);
+        await expectSelectedChoice(
+          context.current.getByRole('button', { name: '2 — ещё примерно 2 повтора' }),
+        );
+        await expect(context.current).not.toHaveAttribute('data-yfc-choice');
         await page.screenshot({
           path: testInfo.outputPath(`navigation-workout-${width}-${theme}.png`),
         });
+        await context.current
+          .getByRole('button', { name: '2 — ещё примерно 2 повтора' })
+          .scrollIntoViewIfNeeded();
+        await page.screenshot({ path: testInfo.outputPath(`selection-rir-${width}-${theme}.png`) });
 
         await navigation.getByRole('link', { name: 'Питание', exact: true }).tap();
         await expect(page).toHaveURL(/section=nutrition/);

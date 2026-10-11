@@ -479,6 +479,7 @@ export function AppShell({
                 <div className="app-bottom-nav__profile-slot">
                   <AppLink
                     id="appAccountProfileLink"
+                    data-yfc-choice="compact"
                     to={
                       demo?.accountTo ??
                       personalDestinationWithTrainerReturn('/app?section=profile', search)
@@ -543,7 +544,7 @@ export function AppShell({
                           ? ' app-bottom-nav__btn--mobile-hidden'
                           : ''
                       }`}
-                      {...(active && !mobileNavigation ? glassProps('clear', true) : {})}
+                      data-yfc-choice="capsule"
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);
@@ -599,7 +600,7 @@ export function AppShell({
                               key={destination.key}
                               to={personalDestinationWithTrainerReturn(destination.to, search)}
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
-                              {...(active ? glassProps('clear', true) : {})}
+                              data-yfc-choice="compact"
                               aria-current={active ? 'page' : undefined}
                               onClick={() =>
                                 trackSectionNavigation(
@@ -766,6 +767,7 @@ export function AppShell({
                             key={destination.key}
                             to={personalDestinationWithTrainerReturn(destination.to, search)}
                             className="app-more-panel__item"
+                            data-yfc-choice="compact"
                             aria-current={active ? 'page' : undefined}
                             onClick={() => {
                               trackSectionNavigation(

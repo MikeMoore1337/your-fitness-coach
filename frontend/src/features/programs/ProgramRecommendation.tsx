@@ -129,7 +129,10 @@ function Choice({
   value: string | number;
 }) {
   return (
-    <label className={`program-wizard-choice${checked ? ' is-selected' : ''}`}>
+    <label
+      className={`program-wizard-choice${checked ? ' is-selected' : ''}`}
+      data-yfc-choice="compact"
+    >
       <input checked={checked} name={name} onChange={onChange} type="radio" value={value} />
       <span className="program-wizard-choice__control" aria-hidden="true" />
       <span>

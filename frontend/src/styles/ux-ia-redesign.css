@@ -504,8 +504,7 @@
   cursor: pointer;
 }
 
-.app-section--progress .progress-trend-switcher button:hover,
-.app-section--progress .progress-trend-switcher button.is-active {
+.app-section--progress .progress-trend-switcher button:hover:not([aria-selected='true']) {
   border-color: var(--v2-lime);
   background: var(--v2-lime-soft, var(--v2-surface-strong));
   color: var(--v2-text-primary);
@@ -640,8 +639,7 @@
   text-decoration: none;
 }
 
-.app-section--progress .progress-category-nav a:hover,
-.app-section--progress .progress-category-nav a.is-active {
+.app-section--progress .progress-category-nav a:hover:not([aria-current='page']) {
   border-color: var(--v2-lime);
   background: var(--v2-surface-strong);
 }
@@ -923,8 +921,9 @@
   overflow: visible;
 }
 
-.app-section--progress .progress-category-nav.section-navigation > a,
-.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item {
+:where(.app-section--progress .progress-category-nav.section-navigation) > a,
+:where(.app-section--profile .profile-settings-nav.section-navigation)
+  > .profile-settings-nav__item {
   display: grid;
   min-width: 0;
   min-height: 58px;
@@ -1018,16 +1017,10 @@
   white-space: nowrap;
 }
 
-.app-section--progress .progress-category-nav.section-navigation > a:hover,
-.app-section--progress .progress-category-nav.section-navigation > a.is-active,
-.app-section--progress .progress-category-nav.section-navigation > a[aria-current='page'],
-.app-section--profile .profile-settings-nav.section-navigation > .profile-settings-nav__item:hover,
+.app-section--progress .progress-category-nav.section-navigation > a:hover:not([aria-current]),
 .app-section--profile
   .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item.is-active,
-.app-section--profile
-  .profile-settings-nav.section-navigation
-  > .profile-settings-nav__item[aria-current='location'] {
+  > .profile-settings-nav__item:hover:not([aria-current]) {
   border-color: var(--v2-lime);
   background: var(--v2-surface-strong);
 }
@@ -1482,8 +1475,7 @@
     padding: 6px;
   }
 
-  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
-    .app-bottom-nav__primary
+  :where(.app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary)
     .app-bottom-nav__btn {
     min-width: 0;
     min-height: 52px;
@@ -1493,14 +1485,8 @@
     border-radius: 18px;
     background: transparent;
     box-shadow: none;
-    color: var(--v2-text-primary);
+    color: var(--v2-text-secondary);
     font-weight: 500;
-  }
-
-  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
-    .app-bottom-nav__primary
-    .app-bottom-nav__btn.is-active {
-    color: var(--v2-accent-text);
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav__btn.is-active::before {
@@ -1578,19 +1564,21 @@
 .progress-category-nav__rail::-webkit-scrollbar {
   display: none;
 }
-.app-shell--design-v2
-  .app-section--progress
-  .progress-category-nav.section-navigation
-  .progress-category-nav__rail
+:where(
+    .app-shell--design-v2
+      .app-section--progress
+      .progress-category-nav.section-navigation
+      .progress-category-nav__rail
+  )
   > a {
   display: flex;
   flex: 0 0 auto;
   min-width: 44px;
   min-height: 44px;
   align-items: center;
-  padding: 8px 0;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--v2-selected-radius-compact);
   background: transparent;
   white-space: nowrap;
 }
@@ -1600,10 +1588,6 @@
 }
 .app-section--progress .progress-category-nav__rail > a :is(small, .section-navigation__chevron) {
   display: none;
-}
-.app-section--progress .progress-category-nav__rail > a.is-active {
-  color: var(--v2-accent-text);
-  box-shadow: inset 0 -2px var(--v2-lime);
 }
 .app-section--progress .progress-category-nav__rail > a[data-clipped='true'] {
   opacity: 0;
@@ -1621,7 +1605,8 @@
   color: var(--v2-text-secondary);
 }
 .progress-category-nav__edge:disabled {
-  display: none;
+  /* Keep the rail still while a pointer gesture reveals the opposite edge. */
+  visibility: hidden;
 }
 @media (max-width: 680px) {
   .app-section--progress .progress-hero {

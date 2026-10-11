@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -1137,17 +1138,17 @@ test('цветовая система сохраняет иерархию в с�
     .getByRole('link', { name: 'Питание', exact: true })
     .locator('.app-bottom-nav__icon');
   await expect(selectedDestination).toHaveAttribute('aria-current', 'page');
-  await expect(selectedDestination).toHaveCSS('border-radius', '10px');
-  await expect(selectedDestination).toHaveCSS('background-color', 'rgb(27, 31, 31)');
+  const darkSelection = await expectSelectedChoice(selectedDestination);
   await expect(selectedDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon).toBeVisible();
   await expect(nutritionDestinationIcon.locator('.yfc-icon')).toBeVisible();
   await expect(page.locator('.app-bottom-nav__sequence')).toHaveCount(0);
   await expect(selectedDestinationIcon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(selectedDestinationIcon).toHaveCSS('color', 'rgb(185, 234, 114)');
+  await expect(selectedDestinationIcon).toHaveCSS('color', darkSelection.color);
   await page.getByRole('button', { name: 'Включить светлую тему' }).click();
   await expect(selectedDestinationIcon).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(selectedDestinationIcon).toHaveCSS('color', 'rgb(72, 100, 20)');
+  const lightSelection = await expectSelectedChoice(selectedDestination);
+  await expect(selectedDestinationIcon).toHaveCSS('color', lightSelection.color);
 });
 
 test('Web theme preference следует системе и сохраняет ручной выбор', async ({ page }) => {

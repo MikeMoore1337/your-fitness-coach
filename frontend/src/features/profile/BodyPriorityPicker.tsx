@@ -55,7 +55,7 @@ export function BodyPriorityPicker({
         ) : (
           <div className="body-priority-picker__grid" aria-label="Приоритетные мышечные группы">
             {options.data?.items.map((option) => (
-              <label className="checkbox-row" key={option.id}>
+              <label className="checkbox-row" data-yfc-choice="compact" key={option.id}>
                 <input
                   type="checkbox"
                   checked={selected.has(option.id)}

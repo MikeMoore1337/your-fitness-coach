@@ -62,6 +62,7 @@ export function EmailAuthPanel({ nextPath }: { nextPath?: string | null }) {
           type="button"
           role="tab"
           aria-selected={mode === 'login'}
+          data-yfc-choice="capsule"
           className={mode === 'login' ? 'is-active' : 'secondary'}
           onClick={() => switchMode('login')}
         >
@@ -71,6 +72,7 @@ export function EmailAuthPanel({ nextPath }: { nextPath?: string | null }) {
           type="button"
           role="tab"
           aria-selected={mode === 'register'}
+          data-yfc-choice="capsule"
           className={mode === 'register' ? 'is-active' : 'secondary'}
           onClick={() => switchMode('register')}
         >

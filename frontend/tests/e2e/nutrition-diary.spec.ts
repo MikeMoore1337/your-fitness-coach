@@ -6,6 +6,7 @@ import type {
 } from '../../src/shared/api/types';
 import { nutritionDaySummary } from './fixtures/locators';
 import { installTelegramHarness } from './fixtures/mobile-tma';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -1768,8 +1769,7 @@ test('dark nutrition uses the shared lime status and progress accents', async ({
   ).toHaveCSS('background-color', 'rgb(178, 245, 32)');
   const activeNutrition = page.getByRole('link', { name: 'Питание', exact: true });
   await expect(activeNutrition).toHaveAttribute('aria-current', 'page');
-  await expect(activeNutrition).toHaveCSS('color', 'rgb(185, 234, 114)');
-  await expect(activeNutrition).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expectSelectedChoice(activeNutrition);
   const lunch = page.getByRole('region', { name: 'Обед' });
   await expect(lunch.getByRole('button', { name: 'Обед' })).toHaveAttribute(
     'aria-expanded',

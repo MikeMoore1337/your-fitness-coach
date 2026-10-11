@@ -6,6 +6,7 @@ import {
   TelegramHarness,
 } from './fixtures/mobile-tma';
 import { makeProgressReportFixture } from '../fixtures/progress-report';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -41,10 +42,12 @@ for (const width of [320, 360, 393, 430])
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: testInfo.outputPath(`progress-${width}-${theme}.png`) });
       const periods = page.getByRole('tablist', { name: 'Период прогресса' });
+      await expectSelectedChoice(navigation.getByRole('link', { name: 'Прогресс', exact: true }));
       for (const label of ['7 дней', '30 дней', '90 дней']) {
         const period = periods.getByRole('tab', { name: label, exact: true });
         await period.click();
         await expect(period).toHaveAttribute('aria-selected', 'true');
+        await expectSelectedChoice(period);
         const textFits = await period.evaluate((element) => {
           const bounds = element.getBoundingClientRect();
           const text = document.createRange();
@@ -60,6 +63,16 @@ for (const width of [320, 360, 393, 430])
         });
         expect(textFits, `${label} at ${width}px`).toBe(true);
       }
+      await page.screenshot({
+        path: testInfo.outputPath(`selection-period-${width}-${theme}.png`),
+      });
+      const period = periods.getByRole('tab', { name: '90 дней', exact: true });
+      await period.focus();
+      await page.keyboard.press('ArrowLeft');
+      const previousPeriod = periods.getByRole('tab', { name: '30 дней', exact: true });
+      await expect(previousPeriod).toBeFocused();
+      await expect(previousPeriod).toHaveAttribute('aria-selected', 'true');
+      await expect(previousPeriod).toHaveCSS('outline-style', 'solid');
       const calorieLines = await page
         .locator('.progress-overview__metric strong')
         .filter({ hasText: 'ккал' })
@@ -161,9 +174,11 @@ for (const width of [320, 360, 393, 430])
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
       const rail = page.locator('.progress-category-nav__rail');
+      const initialRailWidth = (await rail.boundingBox())!.width;
       await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toBeHidden();
       await rail.getByRole('link', { name: /^Тело/ }).click();
       await expect(page).toHaveURL(/progress_view=body/);
+      await expect.poll(async () => (await rail.boundingBox())?.width).toBe(initialRailWidth);
       await rail.getByRole('link', { name: /^Тренировки/ }).click();
       await expect(page).toHaveURL(/progress_view=training/);
       await rail.getByRole('link', { name: /^Тело/ }).click();
@@ -212,6 +227,19 @@ for (const width of [320, 360, 393, 430])
         await page.evaluate(() => document.fonts.ready);
         await expectNoHorizontalOverflow(page);
         await page.screenshot({ path: testInfo.outputPath(`${section}-${width}-${theme}.png`) });
+        if (section === 'nutrition') {
+          const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+          const selectedDay = week.locator('[aria-pressed="true"]');
+          await expectSelectedChoice(selectedDay);
+          const beforeScroll = await page.evaluate(() => window.scrollY);
+          await week.getByRole('button', { name: 'Предыдущая неделя' }).click();
+          await expectSelectedChoice(week.locator('[aria-pressed="true"]'));
+          expect(await page.evaluate(() => window.scrollY)).toBe(beforeScroll);
+          await week.scrollIntoViewIfNeeded();
+          await page.screenshot({
+            path: testInfo.outputPath(`selection-day-${width}-${theme}.png`),
+          });
+        }
       }
       for (const section of ['profile', 'catalog']) {
         await page.goto(`/app?section=${section}`);
@@ -235,6 +263,9 @@ test('approved B quick add fits short TMA viewport and native Back restores focu
   const tma = new TelegramHarness(page);
   await installPlatformApi(page, { fixedDate: '2026-10-09' });
   await page.goto('/app?section=progress');
+  await expectSelectedChoice(
+    page.locator('#appBottomNav').getByRole('link', { name: 'Прогресс', exact: true }),
+  );
   await page.getByRole('button', { name: 'Быстро добавить', exact: true }).click();
   const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
   await expect(sheet).toBeVisible();

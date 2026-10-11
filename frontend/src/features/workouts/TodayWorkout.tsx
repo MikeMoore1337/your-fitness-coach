@@ -203,6 +203,7 @@ function RirSelector({
             disabled={disabled}
             aria-label={option.label}
             aria-pressed={value === option.value}
+            data-yfc-choice="compact"
             className={value === option.value ? 'is-selected' : ''}
             key={option.value}
             onClick={() => onChange(value === option.value ? null : option.value)}

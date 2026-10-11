@@ -247,6 +247,7 @@ function ProgressTrendPanel({
             {trends.map((trend) => (
               <button
                 aria-selected={activeMetric === trend.metric}
+                data-yfc-choice="compact"
                 className={activeMetric === trend.metric ? 'is-active' : ''}
                 key={trend.metric}
                 onClick={() => setSelectedMetric(trend.metric)}
@@ -462,6 +463,7 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
         {categories.map((category) => (
           <AppLink
             aria-current={view === category.value ? 'page' : undefined}
+            data-yfc-choice="compact"
             className={view === category.value ? 'is-active' : undefined}
             key={category.value}
             to={progressViewPath(search, category.value)}
@@ -1313,6 +1315,13 @@ function ProgressPeriodControls({
   const [customDateFrom, setCustomDateFrom] = useState(initialRange.dateFrom);
   const [customDateTo, setCustomDateTo] = useState(initialRange.dateTo);
   const [customError, setCustomError] = useState('');
+  const selectionKey = progressSelectionKey(selection);
+  const [draftSelectionKey, setDraftSelectionKey] = useState(selectionKey);
+  if (draftSelectionKey !== selectionKey) {
+    setDraftSelectionKey(selectionKey);
+    setCustomOpen(false);
+    setCustomError('');
+  }
   const range = selectionDateRange(selection, today);
   const selectedValue =
     customOpen || selection.kind === 'custom' ? 'custom' : String(selection.days);
@@ -1536,7 +1545,6 @@ export function ProgressExperience({
         </div>
         <div className="progress-hero__period">
           <ProgressPeriodControls
-            key={selectionKey}
             onApplyCustom={applyCustom}
             onSelectPreset={selectPreset}
             selection={selection}

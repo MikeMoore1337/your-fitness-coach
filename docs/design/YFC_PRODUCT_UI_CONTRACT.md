@@ -96,6 +96,18 @@ context-specific navigation.
 
 ## CTA и action hierarchy
 
+### Единая система выбора
+
+Owner decision от 11.10.2026: `UNIFIED_YFC_SELECTED_STATES`. Канонические правила и исключения:
+[component-states-v2.1.md](component-states-v2.1.md#unified-yfc-selected-states).
+Используй shared `--v2-selected-*` и явный `data-yfc-choice` для семантических controls выбора.
+Полная либо компактная капсула содержит различимую поверхность, внутреннюю световую грань,
+мягкий рельеф и лаймовый акцент в обеих темах. Не ограничивай выбор цветом текста/подчёркиванием.
+Сохраняй ARIA/native semantics; focus, hover, pressed, disabled и смысловые статусы независимы.
+Новые компоненты переиспользуют этот контракт автоматически. Page-local selected-система,
+массовая стилизация `.is-active` и превращение обычных карточек/CTA в капсулы запрещены.
+Baseline активируется при успешной согласованной доставке общего релиза PR #927.
+
 Если у card/surface одно primary action:
 
 - на mobile primary CTA занимает доступную ширину внутри surface;

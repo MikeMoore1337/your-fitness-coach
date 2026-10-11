@@ -108,6 +108,7 @@ export default function OnboardingPage() {
                 {profileGoals.map((option) => (
                   <label
                     className={`onboarding-goal${goal === option.value ? ' is-selected' : ''}`}
+                    data-yfc-choice="compact"
                     key={option.value}
                   >
                     <input

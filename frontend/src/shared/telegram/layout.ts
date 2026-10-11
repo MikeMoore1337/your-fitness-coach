@@ -125,6 +125,7 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
   };
   const onPointerDown = () => {
     editablePointerInFlight = editableTarget(document.activeElement);
+    update();
   };
   const onPointerEnd = () => {
     editablePointerInFlight = false;
@@ -140,8 +141,9 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
   document.addEventListener('focusin', update);
   document.addEventListener('focusout', updateAfterFocus);
   document.addEventListener('pointerdown', onPointerDown, true);
-  document.addEventListener('pointerup', onPointerEnd, true);
+  document.addEventListener('click', onPointerEnd, true);
   document.addEventListener('pointercancel', onPointerEnd, true);
+  window.addEventListener('blur', onPointerEnd);
 
   return () => {
     if (focusFrame !== null) window.cancelAnimationFrame(focusFrame);
@@ -153,7 +155,8 @@ export function installMobileLayoutAdapter(telegram: TelegramWebApp | null): () 
     document.removeEventListener('focusin', update);
     document.removeEventListener('focusout', updateAfterFocus);
     document.removeEventListener('pointerdown', onPointerDown, true);
-    document.removeEventListener('pointerup', onPointerEnd, true);
+    document.removeEventListener('click', onPointerEnd, true);
     document.removeEventListener('pointercancel', onPointerEnd, true);
+    window.removeEventListener('blur', onPointerEnd);
   };
 }

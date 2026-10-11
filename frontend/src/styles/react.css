@@ -5096,11 +5096,6 @@ button.today-text-link {
   background: var(--surface);
   color: var(--text);
 }
-.active-workout-rir__options button.is-selected {
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--button-text);
-}
 .active-workout-rir--quick {
   padding-top: 2px;
 }

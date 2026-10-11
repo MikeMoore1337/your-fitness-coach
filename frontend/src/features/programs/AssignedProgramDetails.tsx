@@ -235,7 +235,7 @@ function BlockForm({
           onChange={(event) => setValue((current) => ({ ...current, notes: event.target.value }))}
         />
       </Field>
-      <label className="program-block-editor__check">
+      <label className="program-block-editor__check" data-yfc-choice="compact">
         <input
           type="checkbox"
           checked={value.isDeload}

@@ -392,6 +392,7 @@ export function WorkoutAdaptation({
                       {availableReasons.map((item) => (
                         <label
                           className={`adaptation-choice ${activeReason === item.value ? 'is-selected' : ''}`}
+                          data-yfc-choice="compact"
                           key={item.value}
                         >
                           <input
@@ -424,6 +425,7 @@ export function WorkoutAdaptation({
                           type="button"
                           variant="secondary"
                           aria-pressed={timeBudget === String(minutes)}
+                          data-yfc-choice="compact"
                           key={minutes}
                           onClick={() => {
                             setTimeBudget(String(minutes));
@@ -496,6 +498,7 @@ export function WorkoutAdaptation({
                       {equipment.map((item) => (
                         <label
                           className={equipmentIds.includes(item.value) ? 'is-selected' : ''}
+                          data-yfc-choice="compact"
                           key={item.value}
                         >
                           <input
@@ -542,6 +545,7 @@ export function WorkoutAdaptation({
                         {alternatives.data.map((item) => (
                           <label
                             className={`adaptation-choice ${replacementId === String(item.exercise_id) ? 'is-selected' : ''}`}
+                            data-yfc-choice="compact"
                             key={item.exercise_id}
                           >
                             <input

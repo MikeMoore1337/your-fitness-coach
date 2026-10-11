@@ -32,8 +32,11 @@ Task 239 унифицирует функциональную иконограф�
 - Icon-only action всегда получает accessible name от control и touch target не меньше `44px`.
   Декоративная иконка скрыта от accessibility tree; самостоятельная смысловая иконка передаёт
   `label`.
-- Active state использует neutral surface, усиленный label и lime boundary. Цвет не заменяет форму
-  или подпись.
+- Selected/current интерактивного control использует shared YFC поверхность с мягким рельефом,
+  внутренней световой гранью, скруглением и лаймовым акцентом по
+  `component-states-v2.1.md#unified-yfc-selected-states`. Иконка наследует контрастный цвет control;
+  focus/hover/pressed и смысловые статусы остаются отдельными. Цвет не заменяет форму или подпись.
+  Маркеры графиков и статусы WeekStrip не превращаются в капсулы выбора.
 - YFC brand assets и Google/Yandex/Telegram/VK/Apple marks остаются защищёнными исключениями.
 
 ### Единый набор Lucide — owner visual revision 3

@@ -1679,11 +1679,6 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   border-radius: var(--v2-control-radius);
 }
 
-.ai-coach-history__item.is-active {
-  border-color: var(--v2-border-strong);
-  background: var(--v2-surface-secondary);
-}
-
 .ai-coach-history__item-open {
   display: grid;
   min-width: 0;

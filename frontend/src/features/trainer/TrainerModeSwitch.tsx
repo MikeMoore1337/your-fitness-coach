@@ -25,6 +25,7 @@ export function TrainerModeSwitch({
         <AppLink
           className={mode === 'personal' ? 'is-active' : ''}
           aria-current={mode === 'personal' ? 'page' : undefined}
+          data-yfc-choice="capsule"
           to={mode === 'personal' ? '/app?section=today' : personalPath}
         >
           Для себя
@@ -32,6 +33,7 @@ export function TrainerModeSwitch({
         <AppLink
           className={mode === 'clients' ? 'is-active' : ''}
           aria-current={mode === 'clients' ? 'page' : undefined}
+          data-yfc-choice="capsule"
           to={mode === 'personal' ? safeReturnTo : '/coach'}
         >
           {mode === 'personal' ? 'В кабинет тренера' : 'Клиенты'}

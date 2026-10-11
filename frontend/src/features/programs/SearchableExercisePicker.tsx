@@ -129,6 +129,7 @@ export function SearchableExercisePicker({
                 role="option"
                 id={`${resultsId}-${exercise.id}`}
                 aria-selected={exercise.id === value}
+                data-yfc-choice="compact"
                 className="exercise-picker__option"
                 key={exercise.id}
                 onPointerDown={(event) => {
@@ -304,6 +305,7 @@ export function SearchableExercisePicker({
                           className="exercise-picker__option"
                           type="button"
                           aria-pressed={exercise.id === value}
+                          data-yfc-choice="compact"
                           onClick={() => chooseExercise(exercise)}
                         >
                           <ExerciseMediaAsset

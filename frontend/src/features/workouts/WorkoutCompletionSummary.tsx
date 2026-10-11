@@ -259,6 +259,7 @@ export function WorkoutCompletionSummary({
                   key={value}
                   type="button"
                   aria-pressed={feedback === value}
+                  data-yfc-choice="compact"
                   onClick={() => updateFeedback(value)}
                 >
                   {label}

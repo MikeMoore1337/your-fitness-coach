@@ -962,7 +962,7 @@ body:has(.app-shell--design-v2) {
 
 .app-shell--design-v2 .app-bottom-nav__btn.is-active .app-bottom-nav__icon {
   background: transparent;
-  color: var(--v2-accent-text);
+  color: inherit;
 }
 
 .app-shell--design-v2 .app-bottom-nav__secondary,
@@ -1356,11 +1356,13 @@ body:has(.app-shell--design-v2) {
 
 .week-strip__days {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(var(--touch-target), 1fr));
   gap: 4px;
   width: 100%;
   margin: 0;
-  padding: 0;
+  padding: 4px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
   list-style: none;
 }
 
@@ -1809,12 +1811,6 @@ body:has(.app-shell--design-v2) {
   background: var(--v2-surface-secondary);
 }
 
-.nutrition-diary--design-v2 .nutrition-completeness__actions .ui-button[aria-pressed='true'] {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface);
-  color: var(--v2-text-primary);
-}
-
 .nutrition-diary--design-v2 .nutrition-entry__title > div > span,
 .nutrition-diary--design-v2 .nutrition-entry__amount,
 .nutrition-diary--design-v2 .nutrition-entry__macros {
@@ -2092,12 +2088,6 @@ body:has(.app-shell--design-v2) {
   cursor: pointer;
 }
 
-.adaptation-choice.is-selected {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface);
-  box-shadow: inset 3px 0 0 var(--v2-lime);
-}
-
 .adaptation-choice input,
 .adaptation-equipment__grid input {
   width: 18px;
@@ -2128,13 +2118,6 @@ body:has(.app-shell--design-v2) {
   gap: var(--v2-space-2);
 }
 
-.app-section--design-v2 .adaptation-time__presets .ui-button[aria-pressed='true'] {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface-secondary);
-  color: var(--v2-text-primary);
-  box-shadow: inset 0 -3px 0 var(--v2-lime);
-}
-
 .adaptation-time .ui-field {
   max-width: 180px;
 }
@@ -2156,12 +2139,6 @@ body:has(.app-shell--design-v2) {
   border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
   cursor: pointer;
-}
-
-.adaptation-equipment__grid label.is-selected {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface);
-  box-shadow: inset 0 -3px 0 var(--v2-lime);
 }
 
 .adaptation-equipment__grid span {
@@ -2776,12 +2753,6 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-text-primary);
 }
 
-.active-workout--design-v2 .active-workout-rir__options button.is-selected {
-  border-color: var(--v2-lime);
-  background: var(--v2-lime);
-  color: var(--v2-on-lime);
-}
-
 .active-workout--design-v2 .active-workout-finish {
   border-color: var(--v2-border);
 }
@@ -2802,8 +2773,7 @@ body:has(.app-shell--design-v2) {
   border-left: 5px solid var(--v2-lime);
 }
 
-.workout-completion__check,
-.workout-completion__feedback-options button[aria-pressed='true'] {
+.workout-completion__check {
   border-color: var(--v2-lime);
   background: var(--v2-lime);
   color: var(--v2-on-lime);
@@ -3112,7 +3082,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   .app-shell--design-v2 .app-bottom-nav__primary .app-bottom-nav__btn {
     display: grid;
     grid-template-columns: 24px minmax(0, 1fr);
-    min-height: 40px;
+    min-height: var(--touch-target);
     gap: var(--v2-space-2);
     padding: 4px 6px;
   }
@@ -3143,7 +3113,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   .app-shell--design-v2 .app-bottom-nav__secondary .app-bottom-nav__btn {
-    min-height: 38px;
+    min-height: var(--touch-target);
     gap: 7px;
     padding-inline: 6px;
   }
@@ -6757,10 +6727,6 @@ button.notification-row__main:focus-visible {
   background-clip: padding-box;
 }
 
-.app-section--progress .ui-tab[aria-selected='true'] {
-  box-shadow: inset 0 -2px var(--v2-lime);
-}
-
 .app-section--progress .nutrition-period-report {
   gap: var(--v2-space-4);
 }
@@ -7983,12 +7949,6 @@ button.notification-row__main:focus-visible {
   background: transparent;
 }
 
-.app-section--programs .program-wizard-choice.is-selected {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface-secondary);
-  box-shadow: inset 3px 0 var(--v2-lime);
-}
-
 .app-section--programs .program-wizard-result__summary {
   gap: 0;
   border-block: 1px solid var(--v2-border);
@@ -8117,18 +8077,6 @@ button.notification-row__main:focus-visible {
   background: var(--v2-surface-secondary);
 }
 
-.app-section--nutrition .nutrition-picker__tabs button.is-active {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface);
-  box-shadow: inset 0 -2px var(--v2-lime);
-}
-
-.app-section--nutrition .nutrition-target-mode > button.is-active {
-  background: var(--v2-surface);
-  color: var(--v2-text-primary);
-  box-shadow: inset 0 -2px 0 var(--v2-lime);
-}
-
 .app-section--nutrition .nutrition-target-save {
   border-color: var(--v2-lime);
   background: var(--v2-lime);
@@ -8196,12 +8144,6 @@ button.notification-row__main:focus-visible {
   background: transparent;
   color: var(--v2-text-primary);
   box-shadow: none;
-}
-
-.onboarding-page--design-v2 .onboarding-goal.is-selected {
-  border-color: var(--v2-lime);
-  background: var(--v2-surface-secondary);
-  box-shadow: inset 3px 0 var(--v2-lime);
 }
 
 .onboarding-page--design-v2 .onboarding-next-action:hover {
@@ -9221,13 +9163,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   border-radius: var(--v2-compact-radius);
   background: transparent;
   color: var(--v2-text-secondary);
-}
-
-.coach-workspace--design-v2 .react-tabs--coach button.is-active {
-  background: var(--v2-surface);
-  color: var(--v2-text-primary);
-  box-shadow: inset 0 -2px 0 var(--v2-lime);
-  font-weight: 800;
 }
 
 .coach-dashboard {
@@ -11082,11 +11017,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
 }
 
-@media (max-width: 899px) {
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav .app-bottom-nav__btn.is-active {
-    background: color-mix(in srgb, var(--v2-lime) 12%, var(--v2-surface));
-  }
-}
 .progress-report-brand .yfc-lockup__mark {
   width: 24px;
   height: 24px;

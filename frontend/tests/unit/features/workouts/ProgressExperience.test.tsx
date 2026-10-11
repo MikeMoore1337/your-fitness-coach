@@ -488,11 +488,11 @@ describe('ProgressExperience', () => {
     renderExperience('?section=progress&progress_view=training');
     await screen.findByRole('heading', { name: 'Тренировки', level: 2 });
 
-    fireEvent.click(
-      within(screen.getByRole('tablist', { name: 'Период прогресса' })).getByRole('tab', {
-        name: '7 дней',
-      }),
-    );
+    const periods = screen.getByRole('tablist', { name: 'Период прогресса' });
+    const sevenDays = within(periods).getByRole('tab', { name: '7 дней' });
+    const thirtyDays = within(periods).getByRole('tab', { name: '30 дней' });
+    thirtyDays.focus();
+    fireEvent.keyDown(thirtyDays, { key: 'ArrowLeft' });
 
     await waitFor(() => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -508,6 +508,8 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_7&progress_view=training',
     );
+    expect(sevenDays).toBe(screen.getByRole('tab', { name: '7 дней' }));
+    expect(sevenDays).toHaveFocus();
   });
 
   it('does not auto-select a custom metric when no canonical trend exists', async () => {

@@ -125,6 +125,29 @@ describe('Mobile Web/TMA layout adapter', () => {
     button.dispatchEvent(new Event('pointerup', { bubbles: true }));
     expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
     frames.at(-1)?.(0);
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('visible');
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    frames.at(-1)?.(0);
+    expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
+    cleanup();
+  });
+
+  it.each(['pointercancel', 'blur'])('releases an input-blurring gesture on %s', (type) => {
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const input = document.createElement('input');
+    const button = document.createElement('button');
+    document.body.append(input, button);
+    const cleanup = installMobileLayoutAdapter(null);
+    input.focus();
+    button.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    button.focus();
+    (type === 'blur' ? window : button).dispatchEvent(new Event(type, { bubbles: true }));
+    frames.at(-1)?.(0);
     expect(document.documentElement.dataset.yfcKeyboard).toBe('hidden');
     cleanup();
   });
