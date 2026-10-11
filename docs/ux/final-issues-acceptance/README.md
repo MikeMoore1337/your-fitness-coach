@@ -13,7 +13,7 @@
 | `NOT_IMPLEMENTED` | 0 (remaining unimplemented work is covered by explicit owner gates) |
 | `BLOCKED_OWNER_INPUT` | 9: #861, #862, #863, #864, #866, #871, #873, #874, #906 |
 | `INTENDED_BEHAVIOR` / `NOT_REPRODUCED` | 0 как итоговый статус Issue; отдельные под-критерии отмечены в матрице |
-| `MASTER_SHA` | `297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55` |
+| `MASTER_SHA` | `a70fa8a1493c2f1ad0711c3143ab7700c96a92f4` |
 | Production | Не изменялась |
 | Merge/deploy | Не выполнялись |
 
@@ -28,7 +28,7 @@
 - Nutrition labels #869: [PR #909](https://github.com/MikeMoore1337/your-fitness-coach/pull/909).
 - Profile goal #870: [PR #910](https://github.com/MikeMoore1337/your-fitness-coach/pull/910).
 - Reminder calendar guard #871: [PR #911](https://github.com/MikeMoore1337/your-fitness-coach/pull/911).
-- Landing #903: [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), [CI run 38153924101](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38153924101).
+- Landing #903: [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), [green CI run 38157331212](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38157331212).
 - Demo transport #904/#905: [PR #939](https://github.com/MikeMoore1337/your-fitness-coach/pull/939), [CI run 38154110013](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38154110013).
 
 ## Evidence gallery

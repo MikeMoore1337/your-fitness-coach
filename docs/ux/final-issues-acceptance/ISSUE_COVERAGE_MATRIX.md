@@ -1,6 +1,6 @@
 # YFC final issue coverage matrix
 
-Аудит выполнен 2026-10-11 по GitHub Issue, комментариям владельца, связанным PR, актуальным веткам, исходникам, тестам и Checks. Срез кода: `origin/master=297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55`; мобильный интеграционный PR #927 — `06cc0dbeaae04479cedfac1f7b860aa51dadd326` (source fix `be3d2a2a0ffac3e27c44029578f3354197387736`, evidence `f3475375f5b7ba59814ae4b9ccb8a78138cb1b08`).
+Аудит выполнен 2026-10-11 по GitHub Issue, комментариям владельца, связанным PR, актуальным веткам, исходникам, тестам и Checks. Срез кода: `origin/master=a70fa8a1493c2f1ad0711c3143ab7700c96a92f4`; мобильный интеграционный PR #927 — `06cc0dbeaae04479cedfac1f7b860aa51dadd326` (source fix `be3d2a2a0ffac3e27c44029578f3354197387736`, evidence `f3475375f5b7ba59814ae4b9ccb8a78138cb1b08`).
 
 Статусы означают покрытие отдельных критериев, а не только наличие номера Issue в PR:
 
@@ -210,7 +210,7 @@
 | Focus-visible сохраняется | Реализовано | `label:focus-within` outline | Chromium targeted 8 passed (оба публичных маршрута) |
 | Native radio semantics | Реализовано | Native inputs retained | Typecheck/lint/build passed |
 | Touch target ≥44×44 | Реализовано | CSS label min dimensions and E2E geometry | Owner visual acceptance pending |
-| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — 8 tests passed locally; PR #936 latest head `13604595ca45c3bdac07edac99a205d3022264e` | CI PR #936 required checks pending/acceptance; owner visual acceptance pending |
+| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — 8 tests passed locally; PR #936 head `13604595ca45c3bdac07edac99a205d3022264e3` | [required CI run 38157331212](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38157331212) green; owner visual acceptance pending |
 
 ## #904 — 403 на GET `/api/v1/coach/inbox` в демо тренера
 
@@ -256,7 +256,7 @@
 ## Технические gates и ограничения
 
 - #907–#911 не изменялись.
-- `MASTER_SHA=297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55`; master не изменялся.
+- `MASTER_SHA=a70fa8a1493c2f1ad0711c3143ab7700c96a92f4`; master не изменялся.
 - `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`, production mutations не выполнялись.
 - #871 (семантика прошедшего часа напоминания) и #906 (visual Hero) требуют решения владельца.
 - #861–#864, #866, #873, #874 имеют реальные недостающие production части; их нельзя объявлять выполненными по общей интеграции #915/#927.
