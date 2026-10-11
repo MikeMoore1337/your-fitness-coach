@@ -12968,7 +12968,7 @@ export interface components {
             protein_g: components["schemas"]["NutritionReportMetricSummary"];
             fat_g: components["schemas"]["NutritionReportMetricSummary"];
             carbs_g: components["schemas"]["NutritionReportMetricSummary"];
-            fiber_g: components["schemas"]["NutritionReportMetricSummary"];
+            fiber_g?: components["schemas"]["NutritionReportMetricSummary"] | null;
             calorie_comparison: components["schemas"]["NutritionReportTargetComparison"];
             protein_comparison: components["schemas"]["NutritionReportTargetComparison"];
             fat_comparison: components["schemas"]["NutritionReportTargetComparison"];

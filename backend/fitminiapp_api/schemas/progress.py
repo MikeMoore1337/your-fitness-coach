@@ -174,7 +174,7 @@ class NutritionReportSummary(BaseModel):
     protein_g: NutritionReportMetricSummary
     fat_g: NutritionReportMetricSummary
     carbs_g: NutritionReportMetricSummary
-    fiber_g: NutritionReportMetricSummary
+    fiber_g: NutritionReportMetricSummary | None = None
     calorie_comparison: NutritionReportTargetComparison
     protein_comparison: NutritionReportTargetComparison
     fat_comparison: NutritionReportTargetComparison
