@@ -941,7 +941,6 @@ body:has(.app-shell--design-v2) {
 
 .app-shell--design-v2 .app-bottom-nav__btn {
   border-radius: var(--v2-compact-radius);
-  color: var(--v2-text-secondary);
 }
 
 .app-shell--design-v2 .app-bottom-nav__btn:hover,

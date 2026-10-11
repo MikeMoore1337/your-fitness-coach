@@ -626,7 +626,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
-.app-section--progress .progress-category-nav a {
+.app-section--progress .progress-category-nav > a {
   display: grid;
   min-height: 68px;
   align-content: center;
@@ -721,7 +721,7 @@
     grid-template-columns: 1fr 1fr;
   }
 
-  .app-section--progress .progress-category-nav a {
+  .app-section--progress .progress-category-nav > a {
     min-height: 64px;
   }
 }
@@ -1485,7 +1485,7 @@
     border-radius: 18px;
     background: transparent;
     box-shadow: none;
-    color: var(--v2-text-secondary);
+    color: var(--v2-text-primary);
     font-weight: 500;
   }
 

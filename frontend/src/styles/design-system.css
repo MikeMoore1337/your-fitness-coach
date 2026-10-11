@@ -579,7 +579,7 @@ h3 {
   ) {
   background: transparent;
   box-shadow: none;
-  color: var(--v2-text-secondary);
+  color: var(--v2-text-primary);
 }
 
 :root

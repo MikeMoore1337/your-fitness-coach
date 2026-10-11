@@ -1805,6 +1805,7 @@ for (const width of [320, 360, 393, 430]) {
         await currentSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('42.5');
         await currentSet.getByLabel('Повторы, Жим штанги лёжа, подход 2').fill('9');
         await currentSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
+        await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
         await expect(page.locator('.active-workout-rest')).toBeVisible();
         await page.evaluate(
           () =>

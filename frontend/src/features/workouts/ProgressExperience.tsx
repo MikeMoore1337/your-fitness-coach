@@ -365,8 +365,8 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
     };
     const update = () => {
       setEdges({
-        start: rail.scrollLeft < 2,
-        end: rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 2,
+        start: rail.scrollLeft < 1,
+        end: rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 1,
       });
       const bounds = rail.getBoundingClientRect();
       rail.querySelectorAll<HTMLElement>('a').forEach((link) => {
@@ -406,7 +406,7 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
     const next =
       direction > 0
         ? links.find((link) => link.getBoundingClientRect().right > bounds.right + 1)
-        : [...links].reverse().find((link) => link.getBoundingClientRect().left < bounds.left - 1);
+        : [...links].reverse().find((link) => link.getBoundingClientRect().left <= bounds.left - 1);
     next?.focus({ preventScroll: true });
   };
   const categories: Array<{ detail: string; label: string; value: ProgressView }> = [
