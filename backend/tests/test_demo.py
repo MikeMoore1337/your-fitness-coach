@@ -16,6 +16,7 @@ from fitminiapp_api.schemas.coach_crm import (
     CoachSessionResponse,
     CoachTaskResponse,
 )
+from fitminiapp_api.schemas.coach_inbox import CoachInboxResponse
 from fitminiapp_api.schemas.feedback import WorkoutCommentResponse
 from fitminiapp_api.schemas.food_diary import FoodDiaryDayResponse
 from fitminiapp_api.schemas.hydration import HydrationDayResponse, HydrationEntryResponse
@@ -27,6 +28,7 @@ from fitminiapp_api.schemas.program import (
 from fitminiapp_api.schemas.progress import NutritionReportResponse, ProgressSummaryResponse
 from fitminiapp_api.schemas.user import UserResponse
 from fitminiapp_api.schemas.workout import (
+    ExerciseHistoryResponse,
     TrainingAnalyticsResponse,
     WorkoutScheduleItem,
     WorkoutStatusResponse,
@@ -360,6 +362,43 @@ def test_demo_transport_maps_coach_capacity_to_current_response_dto(client) -> N
     assert payload.next_capacity_boundary == 10
     assert payload.scale_boundaries == (10, 30, 100)
     assert payload.bottlenecks[0].key == "attention"
+
+
+def test_demo_transport_exposes_synthetic_coach_inbox_without_account_access(client) -> None:
+    with get_session_context() as db:
+        users_before = db.query(User).count()
+
+    trainer_token, _ = _create_session(client, "trainer")
+    response = _transport(client, trainer_token, "/api/v1/coach/inbox?limit=50")
+
+    assert response.status_code == 200, response.text
+    inbox = CoachInboxResponse.model_validate(response.json())
+    assert inbox.total == 1
+    assert inbox.items[0].client.id == 51_003
+    assert inbox.items[0].action == "assign_program"
+
+    self_token, _ = _create_session(client, "self_training")
+    assert _transport(client, self_token, "/api/v1/coach/inbox?limit=50").status_code == 403
+
+    with get_session_context() as db:
+        assert db.query(User).count() == users_before
+
+
+def test_demo_transport_exposes_owned_fixture_history_and_denies_unknown_exercises(client) -> None:
+    trainer_token, _ = _create_session(client, "trainer")
+
+    response = _transport(client, trainer_token, "/api/v1/programs/exercises/1001/history")
+
+    assert response.status_code == 200, response.text
+    history = ExerciseHistoryResponse.model_validate(response.json())
+    assert history.exercise_id == 1001
+    assert history.recent_sessions[0].workout_exercise_id == 61_001
+    assert history.recent_sessions[0].sets[0].rir == "2"
+
+    assert (
+        _transport(client, trainer_token, "/api/v1/programs/exercises/1002/history").status_code
+        == 403
+    )
 
 
 def test_demo_transport_covers_nutrition_and_trainer_feedback_without_external_writes(
