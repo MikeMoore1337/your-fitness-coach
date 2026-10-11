@@ -206,12 +206,12 @@
 
 | Критерий | Состояние | PR/commit и проверки | Evidence/остаток |
 |---|---|---|---|
-| Круглая шкала 1–5 без квадратных рамок | Реализовано | [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), source [`733933a7`](https://github.com/MikeMoore1337/your-fitness-coach/commit/733933a73a3bc27ca596b9efb00751105a539a86); `landing-v10.css` | [E2E spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/c40a64eedb467bb33938a1cf6165d5878ed0d56b/frontend/tests/e2e/landing-903.spec.ts), [BEFORE/AFTER evidence](https://github.com/MikeMoore1337/your-fitness-coach/tree/c40a64eedb467bb33938a1cf6165d5878ed0d56b/docs/ux/final-issues-acceptance/evidence/903) |
+| Круглая шкала 1–5 без квадратных рамок | Реализовано | [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), source [`733933a7`](https://github.com/MikeMoore1337/your-fitness-coach/commit/733933a73a3bc27ca596b9efb00751105a539a86), current head [`9d628f8e`](https://github.com/MikeMoore1337/your-fitness-coach/commit/9d628f8e9111e5bd39c65b8c55aa46b3559f1ece); `landing-v10.css` | [E2E spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/9d628f8e9111e5bd39c65b8c55aa46b3559f1ece/frontend/tests/e2e/landing-903.spec.ts), [BEFORE/AFTER evidence](https://github.com/MikeMoore1337/your-fitness-coach/tree/c40a64eedb467bb33938a1cf6165d5878ed0d56b/docs/ux/final-issues-acceptance/evidence/903) |
 | Selected-state остаётся видимым | Реализовано | Circular lime-tinted selected surface/inset ring | Визуальная приёмка владельца pending |
 | Focus-visible сохраняется | Реализовано | `input:focus-visible + span` outline; pointer selection не добавляет focus ring | Chromium и WebKit targeted по 8 passed (оба публичных маршрута) |
 | Native radio semantics | Реализовано | Native inputs retained | Typecheck/lint/build passed |
 | Touch target ≥44×44 | Реализовано | CSS label min dimensions and E2E geometry | Owner visual acceptance pending |
-| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — Chromium 8 и WebKit 8 passed локально; PR #936 head [`c40a64ee`](https://github.com/MikeMoore1337/your-fitness-coach/commit/c40a64eedb467bb33938a1cf6165d5878ed0d56b) | GitHub Checks для нового head остаются release gate; owner visual acceptance pending |
+| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — Chromium 8 и WebKit 8 passed локально; PR #936 head [`9d628f8e`](https://github.com/MikeMoore1337/your-fitness-coach/commit/9d628f8e9111e5bd39c65b8c55aa46b3559f1ece) | [GitHub Checks run 38161796686](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38161796686); owner visual acceptance pending |
 
 ## #904 — 403 на GET `/api/v1/coach/inbox` в демо тренера
 
