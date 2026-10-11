@@ -264,7 +264,7 @@ function FoodResults({
             className="nutrition-food-result__select"
             type="button"
             onClick={() => onSelect(food)}
-            aria-label={`Добавить ${food.name}`}
+            aria-label={`Выбрать ${food.name}`}
           >
             <span className="nutrition-food-result__main">
               <strong>{food.name}</strong>
@@ -605,18 +605,20 @@ export function FoodPickerDialog({
       frame = window.requestAnimationFrame(() => {
         frame = null;
         const active = document.activeElement;
-        if (active instanceof HTMLElement && panel?.contains(active)) {
-          active.scrollIntoView?.({ block: 'center', inline: 'nearest' });
+        if (!(active instanceof HTMLElement) || !panel?.contains(active)) return;
+        const visibleTop = viewport?.offsetTop ?? 0;
+        const visibleBottom = visibleTop + (viewport?.height ?? window.innerHeight);
+        const bounds = active.getBoundingClientRect();
+        if (bounds.top < visibleTop || bounds.bottom > visibleBottom) {
+          active.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
         }
       });
     };
     viewport?.addEventListener('resize', keepActiveFieldVisible);
-    viewport?.addEventListener('scroll', keepActiveFieldVisible);
     panel?.addEventListener('focusin', keepActiveFieldVisible);
     return () => {
       if (frame !== null) window.cancelAnimationFrame(frame);
       viewport?.removeEventListener('resize', keepActiveFieldVisible);
-      viewport?.removeEventListener('scroll', keepActiveFieldVisible);
       panel?.removeEventListener('focusin', keepActiveFieldVisible);
     };
   }, [panelRef]);

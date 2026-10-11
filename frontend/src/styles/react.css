@@ -8844,6 +8844,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-picker {
   align-items: center;
 }
+html[data-yfc-keyboard='visible'] .nutrition-picker {
+  inset-block-start: var(--yfc-visual-viewport-offset-top, 0px);
+  inset-block-end: var(--yfc-visual-viewport-offset-bottom, 0px);
+}
 .nutrition-picker__panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -8989,9 +8993,12 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   background: var(--surface);
 }
 .nutrition-food-result__select {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'main action'
+    'source action';
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   width: 100%;
   min-width: 0;
@@ -9002,11 +9009,30 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   text-align: left;
 }
 .nutrition-food-result__select-label {
+  grid-area: action;
+  align-self: center;
   flex: 0 0 auto;
   color: var(--accent-strong);
   font-size: 0.72rem;
   font-weight: 850;
   white-space: nowrap;
+}
+.nutrition-food-result__select:hover:not(:disabled) {
+  background: var(--v2-surface-secondary);
+}
+.nutrition-food-result__select:active:not(:disabled) {
+  background: var(--v2-surface-strong);
+  color: var(--v2-text-primary);
+}
+.nutrition-food-result__select:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.nutrition-food-result__select:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 .nutrition-food-result:hover,
 .nutrition-food-result:focus-within {
@@ -9049,15 +9075,17 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   outline-offset: 1px;
 }
 .nutrition-food-result__main {
+  grid-area: main;
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 .nutrition-food-result__main strong,
 .nutrition-food-result__main span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .nutrition-food-result__main strong {
   font-size: 0.88rem;
@@ -9065,6 +9093,13 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-food-result__main span {
   color: var(--muted);
   font-size: 0.73rem;
+}
+.nutrition-food-result__select > .ui-badge {
+  grid-area: source;
+  justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .nutrition-food-result__meta {
   display: flex;
@@ -10477,10 +10512,15 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
       max(14px, var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
   }
   .nutrition-food-result {
+    grid-template-columns: minmax(0, 1fr);
     min-height: 56px;
   }
   .nutrition-food-result__actions {
-    flex-direction: column;
+    flex-direction: row;
+    grid-column: 1;
+    justify-content: flex-end;
+    border-top: 1px solid var(--border);
+    border-left: 0;
   }
   .nutrition-picker__tools {
     grid-template-columns: 1fr;

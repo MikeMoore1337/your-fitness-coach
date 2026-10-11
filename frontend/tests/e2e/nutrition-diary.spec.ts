@@ -1502,6 +1502,236 @@ for (const current of russianSearchVisualCases) {
   });
 }
 
+const foodPickerAcceptanceCases = [
+  { label: '320-light', width: 320, height: 844, colorScheme: 'light' as const },
+  { label: '320-dark', width: 320, height: 844, colorScheme: 'dark' as const },
+  { label: '393-light', width: 393, height: 844, colorScheme: 'light' as const },
+  { label: '393-dark', width: 393, height: 844, colorScheme: 'dark' as const },
+];
+
+test.describe('Food picker mobile acceptance for #946-#948', () => {
+  test('keeps the search visible, preserves full product data and uses readable action states', async ({
+    page,
+  }) => {
+    await mockNutritionApi(page);
+    let favoriteState = false;
+    await page.route('**/api/v1/nutrition/foods/search*', async (route) => {
+      const url = new URL(route.request().url());
+      const query = url.searchParams.get('q') ?? '';
+      const includeExternal = url.searchParams.get('include_external') === 'true';
+      const isRice = query.includes('рис');
+      const isPotato = query.includes('картофель');
+      await route.fulfill({
+        json: {
+          items: isRice
+            ? [{ ...importedRiceFood, is_favorite: favoriteState, nutrition_basis_kind: 'per_100_g' }]
+            : [],
+          external_items: includeExternal
+            ? isPotato
+              ? externalPotatoFoods
+              : isRice
+                ? externalRiceFoods
+                : []
+            : [],
+          total: isRice ? 1 : 0,
+          limit: 20,
+          offset: 0,
+          provider_status: includeExternal ? 'available' : 'not_requested',
+        },
+      });
+    });
+    await page.route('**/api/v1/nutrition/foods/*/favorite', async (route) => {
+      favoriteState = route.request().method() === 'PUT';
+      await route.fulfill({ status: 200, json: { ...importedRiceFood, is_favorite: favoriteState } });
+    });
+    const project = test.info().project.name.replace(/[^a-z0-9-]+/gi, '-');
+
+    for (const current of foodPickerAcceptanceCases) {
+      favoriteState = false;
+      await page.setViewportSize({ width: current.width, height: current.height });
+      await page.emulateMedia({ colorScheme: current.colorScheme });
+      await page.goto('/app?section=nutrition');
+
+      await expect(page.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+      const breakfast = page.getByRole('region', { name: 'Завтрак' });
+      await expect(breakfast.getByRole('button', { name: /Добавить/ })).toBeVisible();
+      await breakfast.getByRole('button', { name: /Добавить/ }).click();
+      const search = page.getByRole('searchbox', { name: 'Найти продукт' });
+      await expect(search).toBeVisible();
+      await search.fill('рис');
+      const riceRow = page
+        .locator('.nutrition-food-result')
+        .filter({ hasText: 'Рис белый приготовленный, без добавления масла' })
+        .first();
+      await expect(riceRow).toBeVisible();
+      await expect(riceRow).toContainText('130 ккал / 100 г');
+
+      const riceLayout = await riceRow.evaluate((row) => {
+        const title = row.querySelector<HTMLElement>('.nutrition-food-result__main strong');
+        const select = row.querySelector<HTMLElement>('.nutrition-food-result__select');
+        const titleStyle = title ? getComputedStyle(title) : null;
+        return {
+          rowOverflow: row.scrollWidth > row.clientWidth,
+          titleOverflow: title ? title.scrollWidth > title.clientWidth : true,
+          titleWhiteSpace: titleStyle?.whiteSpace,
+          titleOverflowMode: titleStyle?.textOverflow,
+          selectWidth: select?.getBoundingClientRect().width ?? 0,
+        };
+      });
+      expect(riceLayout.rowOverflow).toBe(false);
+      expect(riceLayout.titleOverflow).toBe(false);
+      expect(riceLayout.titleWhiteSpace).toBe('normal');
+      expect(riceLayout.titleOverflowMode).toBe('clip');
+      expect(riceLayout.selectWidth).toBeGreaterThan(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        current.width,
+      );
+
+      await search.blur();
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-search-closed.png`,
+      });
+
+      await search.focus();
+      const keyboardViewportApplied = await page.evaluate(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return false;
+        try {
+          Object.defineProperty(viewport, 'height', { configurable: true, value: 420 });
+          Object.defineProperty(viewport, 'offsetTop', { configurable: true, value: 0 });
+        } catch {
+          return false;
+        }
+        viewport.dispatchEvent(new Event('resize'));
+        return true;
+      });
+      expect(keyboardViewportApplied).toBe(true);
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            document.documentElement.style.getPropertyValue('--yfc-viewport-height'),
+          ),
+        )
+        .toBe('420px');
+      const [searchBox, panelBox] = await Promise.all([
+        search.boundingBox(),
+        page.locator('.nutrition-picker__panel').boundingBox(),
+      ]);
+      expect(searchBox).not.toBeNull();
+      expect(panelBox).not.toBeNull();
+      expect(searchBox!.y + searchBox!.height).toBeLessThanOrEqual(420);
+      expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(420);
+      await expect(page.locator('.nutrition-food-results')).toBeVisible();
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-search.png`,
+      });
+      await riceRow.scrollIntoViewIfNeeded();
+      const riceResultBox = await riceRow.boundingBox();
+      expect(riceResultBox).not.toBeNull();
+      expect(riceResultBox!.y + riceResultBox!.height).toBeLessThanOrEqual(420);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-keyboard-open-rice-results.png`,
+      });
+
+      await page.evaluate(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+        Object.defineProperty(viewport, 'height', {
+          configurable: true,
+          value: window.innerHeight,
+        });
+        viewport.dispatchEvent(new Event('resize'));
+      });
+      await search.blur();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.dataset.yfcKeyboard))
+        .toBe('hidden');
+
+      await search.fill('картофель');
+      await expect(
+        page.getByText('Картофель жареный по-домашнему из свежего картофеля', { exact: true }),
+      ).toBeVisible();
+      await expect(page.getByText('289 ккал / 100 г')).toBeVisible();
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-potato-results.png`,
+      });
+
+      await search.fill('рис');
+      const action = riceRow.locator('.nutrition-food-result__select');
+      const favorite = riceRow.locator('.nutrition-food-result__favorite');
+      await favorite.click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(action).toBeVisible();
+      await expect(favorite).toHaveAttribute('aria-pressed', 'true');
+
+      const selectBox = await action.boundingBox();
+      expect(selectBox).not.toBeNull();
+      await page.mouse.move(
+        selectBox!.x + selectBox!.width / 2,
+        selectBox!.y + selectBox!.height / 2,
+      );
+      await page.mouse.down();
+      await page.waitForTimeout(250);
+      const pressedState = await action.evaluate((button) => {
+        const parseRgb = (value: string) => {
+          const channels = value.match(/[\d.]+/g)?.map(Number) ?? [];
+          return channels.length >= 3 ? channels.slice(0, 3) : null;
+        };
+        const luminance = (value: number[]) => {
+          const channels = value.map((channel) => {
+            const normalized = channel / 255;
+            return normalized <= 0.03928
+              ? normalized / 12.92
+              : ((normalized + 0.055) / 1.055) ** 2.4;
+          });
+          const [red, green, blue] = channels;
+          if (red === undefined || green === undefined || blue === undefined) return 0;
+          return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+        };
+        const styles = getComputedStyle(button);
+        const background = parseRgb(styles.backgroundColor);
+        const foreground = parseRgb(styles.color);
+        if (!background || !foreground)
+          return {
+            ratio: 0,
+            background: styles.backgroundColor,
+            color: styles.color,
+            active: button.matches(':active'),
+            hover: button.matches(':hover'),
+          };
+        const light = Math.max(luminance(background), luminance(foreground));
+        const dark = Math.min(luminance(background), luminance(foreground));
+        return {
+          ratio: (light + 0.05) / (dark + 0.05),
+          background: styles.backgroundColor,
+          color: styles.color,
+          active: button.matches(':active'),
+          hover: button.matches(':hover'),
+        };
+      });
+      expect(pressedState.ratio).toBeGreaterThanOrEqual(4.5);
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-pressed.png`,
+      });
+      await page.mouse.up();
+      await expect(
+        page.getByRole('heading', {
+          name: 'Рис белый приготовленный, без добавления масла',
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(page.getByRole('spinbutton', { name: 'Количество' })).toBeFocused();
+      await expect(page.getByLabel('Единица')).toHaveValue('g');
+      await page.screenshot({
+        path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-selected.png`,
+      });
+      await page.getByRole('button', { name: 'Выбрать другое' }).click();
+      await page.getByRole('button', { name: 'Закрыть добавление' }).click();
+      await expect(page.getByRole('dialog')).not.toBeAttached();
+    }
+  });
+});
+
 test('Russian search shows separate preparation states with their own macros', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockNutritionApi(page);
