@@ -262,6 +262,30 @@ function ReportMetrics({ report }: { report: NutritionReport }) {
         comparison={summary.carbs_comparison}
         unit="г"
       />
+      {summary.fiber_g && (
+        <div className="nutrition-report-metric">
+          <dt>Клетчатка</dt>
+          <dd>
+            <strong>
+              {formatNumber(summary.fiber_g.average, 1)} <span>г</span>
+            </strong>
+            <small>
+              {summary.fiber_g.sample_days
+                ? `по ${summary.fiber_g.sample_days} дн. с известными данными`
+                : 'Данных о клетчатке недостаточно'}
+            </small>
+          </dd>
+          <dd>
+            <span>Ориентир</span>
+            <strong>Не задан</strong>
+            <small>Без выдуманной нормы</small>
+          </dd>
+          <dd>
+            <span>Сопоставление</span>
+            <strong>—</strong>
+          </dd>
+        </div>
+      )}
     </dl>
   );
 }
@@ -298,6 +322,41 @@ function NutritionChart({
       targetLabel="Ориентир"
       unit="ккал"
     />
+  );
+}
+
+function NutritionReportInsights({
+  report,
+  canOpenDiary,
+}: {
+  report: NutritionReport;
+  canOpenDiary: boolean;
+}) {
+  const insights = report.insights ?? [];
+  if (!insights.length) return null;
+  const metricLabels = {
+    calories: 'Калории',
+    protein_g: 'Белок',
+    fat_g: 'Жиры',
+    carbs_g: 'Углеводы',
+  };
+  return (
+    <section aria-labelledby="nutrition-report-insights-title" className="nutrition-report-targets">
+      <h3 id="nutrition-report-insights-title">Повторяющиеся отклонения</h3>
+      <div className="nutrition-report-adherence">
+        {insights.map((insight) => (
+          <p key={insight.metric}>
+            <strong>{metricLabels[insight.metric]}</strong>
+            <span>{insight.message}</span>
+            {canOpenDiary && <AppLink to="/app?section=nutrition">Открыть питание</AppLink>}
+          </p>
+        ))}
+      </div>
+      <p className="progress-note">
+        Выводы основаны только на завершённых днях с подтверждёнными значениями и действовавшими
+        тогда целями. Они не меняют дневник или план питания.
+      </p>
+    </section>
   );
 }
 
@@ -372,6 +431,9 @@ function DailyTable({
                   {point.protein_g == null
                     ? '—'
                     : `${formatNumber(point.protein_g, 0)} / ${formatNumber(point.fat_g, 0)} / ${formatNumber(point.carbs_g, 0)} г`}
+                  {point.fiber_g != null && (
+                    <small>Клетчатка: {formatNumber(point.fiber_g, 1)} г</small>
+                  )}
                 </td>
                 <td data-label="Цель">
                   {point.target_calories == null ? 'Не задана' : `${point.target_calories} ккал`}
@@ -682,6 +744,7 @@ export function NutritionPeriodReport({
           ) : (
             <>
               <ReportMetrics report={report.data} />
+              <NutritionReportInsights report={report.data} canOpenDiary={clientId == null} />
               <div className="nutrition-report-adherence" aria-label="Сравнение с целью">
                 <p>
                   <strong>
@@ -708,9 +771,9 @@ export function NutritionPeriodReport({
           <TargetChanges report={report.data} />
           <DailyTable dayLink={dayLink} report={report.data} />
           <p className="progress-note nutrition-period-report__methodology">
-            Отчёт описывает только записи КБЖУ. Он не оценивает качество рациона, витамины, здоровье
-            или причины изменения веса. Неполные дни видны в списке, но не входят в средние и
-            сравнение с целью.
+            Отчёт описывает записи КБЖУ и известную клетчатку. Отсутствующие значения не считаются
+            нулём. Он не оценивает качество рациона, витамины, здоровье или причины изменения веса.
+            Неполные дни видны в списке, но не входят в средние и сравнение с целью.
           </p>
         </>
       ) : null}
