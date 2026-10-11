@@ -163,3 +163,16 @@ Actions, Actions concurrency and Environments/Deployments in that order. If nati
 insufficient, stop with `NEW_ORCHESTRATION_OWNER_APPROVAL_REQUIRED` and describe the unresolved
 problem, native options checked, smallest addition, state/failure modes and removal path. Do not
 implement it under another name.
+
+## Text writing and editing
+
+When creating or editing user-facing or project-related text, use `$clear-voice`
+from `.agents/skills/clear-voice/SKILL.md`, selecting the appropriate profile
+from `profiles/`. Follow existing domain-specific skills, including
+`$evidence-content-editor`, `$fitness-domain-reviewer`, `$technical-writer`
+and `$localization-engineer`, when applicable.
+
+Existing requirements for security, factual accuracy, Russian localization,
+legal review, data schemas, review processes and owner approval take precedence.
+Clear Voice does not replace domain-specific expertise or grant permission to
+publish content, write data or bypass the Hermes manual review process.

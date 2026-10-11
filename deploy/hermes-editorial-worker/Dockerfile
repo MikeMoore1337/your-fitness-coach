@@ -17,7 +17,7 @@ WORKDIR /opt/hermes
 COPY requirements.lock /tmp/requirements.lock
 RUN python -m pip install --no-cache-dir --only-binary=:all: --require-hashes --requirement /tmp/requirements.lock
 
-COPY editorial_worker.py config.schema.json hermes-provenance.json license_bundle.py ./
+COPY editorial_worker.py EDITORIAL_STYLE_PROMPT.txt config.schema.json hermes-provenance.json license_bundle.py ./
 COPY LICENSES /opt/licenses-source/
 
 # Generate license/NOTICE evidence while the exact locked distributions and APK database exist.

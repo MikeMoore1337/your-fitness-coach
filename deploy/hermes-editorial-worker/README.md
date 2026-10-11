@@ -35,24 +35,33 @@ provider и отправляет новую immutable revision с новым ide
 переигрывается бесконечно. Успешный preflight не является approval публикации:
 `manual_required`, Gate B/C и единственный publisher остаются на стороне YFC.
 
-### Human Writing: редакционный стиль только для Hermes
+### Clear Voice v1.0.0: редакционный стиль Hermes
 
-В `editorial_worker.py` встроена компактная адаптация правил
-[human-writing v1.3.1](https://github.com/codemistake/human-writing/blob/main/SKILL.md)
-(лицензия MIT). Она применяется к первичному draft и повторному bounded repair
-во всех разрешённых provider modes. Это prompt-level правила: никакой установки
-стороннего agent runtime, новых API, зависимостей, запросов в сеть или новых прав нет.
-Полный `SKILL.md` намеренно не передаётся модели; использована только часть о
-естественном русском языке, без шаблонов, канцелярита и искусственных фактов.
+Доверенный редакционный адаптер находится в `EDITORIAL_STYLE_PROMPT.txt` рядом с
+`editorial_worker.py` и поставляется в том же hardened Docker image.
+Worker читает его один раз при запуске, без сетевых обращений, установки Agent Skills,
+новых пакетов, внешних инструментов или дополнительных вызовов модели.
+Одни и те же правила действуют для первичного draft и bounded repair.
+
+Этот компактный текст соответствует
+`clear-voice/adapters/hermes/EDITORIAL_STYLE_PROMPT.txt` из Clear Voice v1.0.0 (MIT),
+созданного с опорой на [human-writing](https://github.com/codemistake/human-writing)
+и [humanizer](https://github.com/blader/humanizer) (оба MIT).
+Локальная копия адаптера является канонической для runtime Hermes: тест фиксирует
+её SHA-256 в `hermes-provenance.json`, а релизный manifest содержит контрольную
+сумму файла. При обновлении исходного скилла обновляйте prompt version,
+provenance digest, тесты и release components согласованно.
 
 **Приоритет:** source grounding, точность, контекст исследования, неопределённость,
-предостережения, политика YFC, JSON contract и жёсткие ограничения длины выше стиля.
-`human-writing` не заменяет научный fact-check и не отменяет preflight, fail-closed
-remediation, ручную модерацию и запрет автопубликации.
-Реальный эффект на качество формулировок требует отдельной редакционной оценки
-материалов; passing tests подтверждает только подключение prompt и целостность контрактов.
-Версия prompt: `task403-editorial-worker-v2-human-writing`. Версия intake skill по-прежнему
-`yfc-hermes-editorial-v1`, поскольку intake schema и provenance contract не менялись.
+предостережения, политика YFC, JSON contract и лимиты выше любых требований стиля.
+Clear Voice не заменяет научный fact-check и не отменяет preflight, fail-closed
+remediation, manual review, Gate B/C и запрет автопубликации.
+Passing tests подтверждает только подключение и целостность контракта, но не
+улучшение качества текстов: перед production rollout требуется отдельная оценка
+реальных черновиков и owner-approved release.
+
+Версия prompt: `task403-editorial-worker-v3-clear-voice-1.0.0`. Версия intake skill остаётся
+`yfc-hermes-editorial-v1`, так как формат и границы intake не менялись.
 
 Worker не содержит source fetching, scheduler, database client, shell/tool dispatch,
 browser, MCP, plugins, Telegram Bot API или publish endpoint. Полный Hermes monolith

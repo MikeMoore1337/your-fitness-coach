@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -49,8 +50,19 @@ def test_provenance_and_dependency_inventory_are_exact() -> None:
     )
     assert provenance["upstream"]["tag"] == "v2026.8.31"
     assert provenance["upstream"]["commit"] == "29112bef099274229cadff79cdff7bf7b99c4b77"
-    assert provenance["worker"]["promptVersion"] == "task403-editorial-worker-v2-human-writing"
-    assert "human-writing v1.3.1" in provenance["worker"]["sourceBehaviorPatches"]["humanWriting"]
+    assert provenance["worker"]["promptVersion"] == "task403-editorial-worker-v3-clear-voice-1.0.0"
+    assert "Clear Voice v1.0.0" in provenance["worker"]["sourceBehaviorPatches"]["clearVoice"]
+    assert "humanWriting" not in provenance["worker"]["sourceBehaviorPatches"]
+    adapter_bytes = (WORKER_ROOT / "EDITORIAL_STYLE_PROMPT.txt").read_bytes()
+    assert (
+        hashlib.sha256(adapter_bytes).hexdigest()
+        == provenance["worker"]["sourceBehaviorPatches"]["clearVoiceSha256"]
+    )
+    assert b"Clear Voice v1.0.0" in adapter_bytes
+    assert "EDITORIAL_STYLE_PROMPT.txt" in (WORKER_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "!EDITORIAL_STYLE_PROMPT.txt" in (WORKER_ROOT / ".dockerignore").read_text(
+        encoding="utf-8"
+    )
     assert provenance["worker"]["sourceBehaviorPatches"]["relevanceGate"]
     assert provenance["worker"]["publishCapability"] is False
     assert provenance["worker"]["telegramCapability"] is False

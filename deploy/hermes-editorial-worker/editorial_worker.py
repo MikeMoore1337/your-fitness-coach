@@ -32,7 +32,7 @@ UPSTREAM_TAG = "v2026.8.31"
 UPSTREAM_COMMIT = "29112bef099274229cadff79cdff7bf7b99c4b77"
 JOB_SCHEMA_VERSION = "hermes-editorial-job-v1"
 INTAKE_SCHEMA_VERSION = "hermes-editorial-intake-v2"
-PROMPT_VERSION = "task403-editorial-worker-v2-human-writing"
+PROMPT_VERSION = "task403-editorial-worker-v3-clear-voice-1.0.0"
 SKILL_VERSION = "yfc-hermes-editorial-v1"
 LOCAL_MOCK_MODE = "local_mock"
 EXTERNAL_MODE = "external"
@@ -80,28 +80,12 @@ EXTERNAL_GPT_OSS_SOFT_BUDGETS = (
     "Do not pad, repeat, or invent detail; concise output is correct when the evidence is thin. "
     "the worker enforces separate hard limits locally."
 )
-# Reader-facing style layer adapted from human-writing v1.3.1 (MIT):
-# https://github.com/codemistake/human-writing/blob/main/SKILL.md
-# Kept compact and scoped to the editorial prompt, not an agent/plugin runtime.
-HUMAN_WRITING_EDITORIAL_RULES = (
-    "Hermes editorial style: adapted from human-writing v1.3.1 (MIT). "
-    "Use natural, precise Russian for readers, not a chatbot voice. "
-    "Lead with what the source actually establishes; do not restate the task, praise the "
-    "reader, use boilerplate intros, or add generic closing calls to action. "
-    "Avoid bureaucratic nominalizations, empty 'important to note' statements, "
-    "hype, inflated significance, fake contrasts, decorative emojis, invented quotes, "
-    "fake personal experience, AI self-reference, and repeated template phrases. "
-    "Prefer concrete verbs and readable sentences while preserving terminology "
-    "appropriate to research, health, and fitness reporting. "
-    "Never add facts, numerical claims, causal conclusions, dates, names, opinions, "
-    "or details merely to make the text sound natural. Keep supported qualifications, "
-    "population, study design, uncertainty, limitations, and conditions intact. "
-    "Do not turn preliminary or secondary-source reporting into a medical recommendation. "
-    "If evidence is thin, write less rather than filling space. "
-    "Retain the required three-field JSON structure; never modify the trusted source URL. "
-    "Style is subordinate to source grounding, editorial safety checks, and output schema."
+# Production-scoped, trusted Clear Voice v1.0.0 style adapter (MIT).
+# The prompt is shipped in the hardened image, independently of Codex agent skills.
+# Keep this file synchronized with clear-voice/adapters/hermes/EDITORIAL_STYLE_PROMPT.txt.
+CLEAR_VOICE_EDITORIAL_RULES = (
+    Path(__file__).with_name("EDITORIAL_STYLE_PROMPT.txt").read_text(encoding="utf-8").strip()
 )
-
 
 LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "host.docker.internal"})
 FALSE_VALUES = frozenset({"0", "false", "no", "off"})
@@ -522,7 +506,7 @@ def _provider_messages(source: SourcePacket) -> list[dict[str, str]]:
         "effectiveness, safety, clinical applicability, or individualized advice. Preserve "
         "uncertainty and state that the primary source, study design, limitations, and "
         "applicability require editorial verification before any health claim. "
-        + HUMAN_WRITING_EDITORIAL_RULES
+        + CLEAR_VOICE_EDITORIAL_RULES
     )
     user = (
         "Create a draft proposal from this source packet.\n"
