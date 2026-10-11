@@ -94,9 +94,23 @@ export function applyMobileViewportSnapshot(
   root.dataset.yfcLayoutSurface = telegram?.initData ? 'telegram' : 'browser';
   root.style.setProperty('--yfc-viewport-height', `${snapshot.viewportHeight}px`);
   root.style.setProperty('--yfc-viewport-stable-height', `${snapshot.viewportStableHeight}px`);
-  root.style.setProperty('--yfc-viewport-bottom', String(Math.max(0, window.innerHeight - snapshot.viewportHeight - (window.visualViewport?.offsetTop ?? 0))) + 'px');
-  root.style.setProperty('--yfc-visual-viewport-offset-top', String(snapshot.viewportOffsetTop) + 'px');
-  root.style.setProperty('--yfc-visual-viewport-offset-bottom', String(snapshot.viewportOffsetBottom) + 'px');
+  root.style.setProperty(
+    '--yfc-viewport-bottom',
+    String(
+      Math.max(
+        0,
+        window.innerHeight - snapshot.viewportHeight - (window.visualViewport?.offsetTop ?? 0),
+      ),
+    ) + 'px',
+  );
+  root.style.setProperty(
+    '--yfc-visual-viewport-offset-top',
+    String(snapshot.viewportOffsetTop) + 'px',
+  );
+  root.style.setProperty(
+    '--yfc-visual-viewport-offset-bottom',
+    String(snapshot.viewportOffsetBottom) + 'px',
+  );
 
   for (const side of SIDES) {
     root.style.setProperty(`--yfc-tg-safe-${side}`, `${snapshot.safeArea[side]}px`);
