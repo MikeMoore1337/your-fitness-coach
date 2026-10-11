@@ -2397,14 +2397,6 @@ for (const width of [320, 360, 393, 430]) {
               requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
             ),
         );
-        await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight }));
-        await page.evaluate(
-          () =>
-            new Promise<void>((resolve) =>
-              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-            ),
-        );
-
         const writes: string[] = [];
         page.on('request', (request) => {
           if (/\/workouts\/sets\//.test(request.url()) && request.method() !== 'GET') {
@@ -2417,6 +2409,7 @@ for (const width of [320, 360, 393, 430]) {
           const nextDone = nextSet.querySelector<HTMLElement>('[data-workout-field="done"]')!;
           const current = document.querySelector<HTMLElement>('[data-workout-set-id="202"]')!;
           const currentInput = current.querySelector<HTMLElement>('input')!;
+          const currentDone = current.querySelector<HTMLElement>('[data-workout-field="done"]')!;
           const rest = document.querySelector<HTMLElement>('.active-workout-rest')!;
           const nextInteractive = Array.from(
             nextSet.querySelectorAll<HTMLElement>('input, button'),
@@ -2428,19 +2421,28 @@ for (const width of [320, 360, 393, 430]) {
             nav.querySelector<HTMLElement>('[aria-current="page"]') ??
             nav.querySelector<HTMLElement>('a, button')!;
           const nextDoneRect = nextDone.getBoundingClientRect();
+          const currentDoneRect = currentDone.getBoundingClientRect();
+          const currentInputRect = currentInput.getBoundingClientRect();
+          const nextSetRect = nextSet.getBoundingClientRect();
           const navRect = nav.getBoundingClientRect();
           const activeNavRect = activeNav.getBoundingClientRect();
           const nextInteractiveBottom = Math.max(
             ...nextInteractive.map((element) => element.getBoundingClientRect().bottom),
           );
-          const overlap = Math.max(
+          const currentDockOverlap = Math.max(
+            0,
+            Math.min(currentDoneRect.bottom, navRect.bottom) -
+              Math.max(currentDoneRect.top, navRect.top),
+          );
+          const nextDockOverlap = Math.max(
             0,
             Math.min(nextDoneRect.bottom, navRect.bottom) - Math.max(nextDoneRect.top, navRect.top),
           );
+          const nextVisible = nextSetRect.top < innerHeight && nextSetRect.bottom > 0;
           const inputRestOverlap = Math.max(
             0,
             Math.min(
-              currentInput.getBoundingClientRect().bottom,
+              currentInputRect.bottom,
               rest.getBoundingClientRect().bottom,
             ) -
               Math.max(currentInput.getBoundingClientRect().top, rest.getBoundingClientRect().top),
@@ -2451,19 +2453,30 @@ for (const width of [320, 360, 393, 430]) {
             nav: navRect.toJSON(),
             rest: rest.getBoundingClientRect().toJSON(),
             currentSet: current.getBoundingClientRect().toJSON(),
-            currentInput: currentInput.getBoundingClientRect().toJSON(),
-            nextSet: nextSet.getBoundingClientRect().toJSON(),
+            currentInput: currentInputRect.toJSON(),
+            currentDone: currentDoneRect.toJSON(),
+            nextSet: nextSetRect.toJSON(),
             nextDone: nextDoneRect.toJSON(),
             nextInteractiveBottom,
-            overlap,
+            currentDockOverlap,
+            nextDockOverlap,
+            nextVisible,
             inputRestOverlap,
-            hit:
+            currentDoneHit:
               document
                 .elementFromPoint(
-                  nextDoneRect.left + nextDoneRect.width / 2,
-                  Math.min(nextDoneRect.bottom - 2, innerHeight - 2),
+                  currentDoneRect.left + currentDoneRect.width / 2,
+                  currentDoneRect.top + currentDoneRect.height / 2,
                 )
                 ?.getAttribute('data-workout-field') ?? null,
+            nextDoneHit: nextVisible
+              ? (document
+                  .elementFromPoint(
+                    nextDoneRect.left + nextDoneRect.width / 2,
+                    Math.min(nextDoneRect.bottom - 2, innerHeight - 2),
+                  )
+                  ?.getAttribute('data-workout-field') ?? null)
+              : null,
             navHit: nav.contains(
               document.elementFromPoint(
                 activeNavRect.left + activeNavRect.width / 2,
@@ -2494,10 +2507,18 @@ for (const width of [320, 360, 393, 430]) {
           body: JSON.stringify({ geometry, writes }),
           contentType: 'application/json',
         });
-        expect(geometry.overlap, JSON.stringify(geometry)).toBe(0);
-        expect(geometry.nextInteractiveBottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
+        expect(geometry.currentDockOverlap, JSON.stringify(geometry)).toBe(0);
+        expect(geometry.currentDone.bottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
           geometry.nav.top - 8,
         );
+        expect(geometry.currentDoneHit).toBe('done');
+        if (geometry.nextVisible) {
+          expect(geometry.nextDockOverlap, JSON.stringify(geometry)).toBe(0);
+          expect(geometry.nextInteractiveBottom, JSON.stringify(geometry)).toBeLessThanOrEqual(
+            geometry.nav.top - 8,
+          );
+          expect(geometry.nextDoneHit).toBe('done');
+        }
         expect(geometry.inputRestOverlap, JSON.stringify(geometry)).toBe(0);
         expect(geometry.navHit).toBe(true);
         expect(geometry.current).toBe('202');

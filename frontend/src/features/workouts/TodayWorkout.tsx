@@ -1501,40 +1501,92 @@ export function TodayWorkout({
     }
   }, [clearActiveState, pendingActiveCount, user, workout.error]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!currentSetId || completed === 0) return;
-    const currentElement = document.querySelector<HTMLElement>(
-      `[data-workout-set-id="${currentSetId}"]`,
-    );
-    if (!currentElement) return;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const getCurrentElement = () =>
+      document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
+    const currentElement = getCurrentElement();
+    if (!currentElement) return;
     currentElement.scrollIntoView?.({
       behavior: reducedMotion ? 'auto' : 'smooth',
-      // Keep the newly active set away from the fixed mobile dock while the rest panel is present.
+      // Keep the newly active set away from the fixed mobile dock.
       block: 'center',
     });
 
     const settleDockClearance = () => {
+      const activeElement = getCurrentElement();
+      if (!activeElement) return;
       const navigation = document.getElementById('appBottomNav');
       if (!navigation || window.matchMedia?.('(min-width: 900px)').matches) return;
       const doneControls = Array.from(
         document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
       );
-      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
+      const currentIndex = doneControls.findIndex((control) => activeElement.contains(control));
       const nextControl = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
-      if (!nextControl) return;
       const navigationTop = navigation.getBoundingClientRect().top;
-      const nextBottom = nextControl.getBoundingClientRect().bottom;
-      const overlap = nextBottom - navigationTop;
+      const currentControls = Array.from(
+        activeElement.querySelectorAll<HTMLElement>('input, button, select, textarea, summary'),
+      ).filter((control) => {
+        const rect = control.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0;
+      });
+      const nextRect = nextControl?.getBoundingClientRect();
+      const controlsToClear = [
+        ...currentControls,
+        ...(nextControl && nextRect && nextRect.top < window.innerHeight ? [nextControl] : []),
+      ];
+      if (!controlsToClear.length) return;
+      const overlap = Math.max(
+        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - navigationTop),
+      );
       if (overlap <= 0) return;
       window.scrollBy({
         top: overlap + 8,
         behavior: reducedMotion ? 'auto' : 'smooth',
       });
     };
-    const frameId = window.requestAnimationFrame(settleDockClearance);
-    return () => window.cancelAnimationFrame(frameId);
+    // A pending workout sync can replace the set row before the next frame. Re-querying
+    // there keeps the clearance pass attached to the committed row instead of a detached node.
+    window.requestAnimationFrame(settleDockClearance);
+    window.setTimeout(settleDockClearance, 0);
   }, [completed, currentSetId]);
+
+  // The queue acknowledgement can restore the browser's pre-submit scroll position.
+  // Reconcile the active completion control after that final render while rest is visible.
+  useEffect(() => {
+    if (!currentSetId || completed === 0 || pendingActiveCount !== 0) return;
+    if (!document.querySelector('.active-workout-rest')) return;
+    const frameId = window.requestAnimationFrame(() => {
+      const currentElement = document.querySelector<HTMLElement>(
+        `[data-workout-set-id="${currentSetId}"]`,
+      );
+      const navigation = document.getElementById('appBottomNav');
+      const done = currentElement?.querySelector<HTMLElement>('[data-workout-field="done"]');
+      if (!currentElement || !navigation || !done) return;
+      done.scrollIntoView?.({
+        behavior: 'auto',
+        block: 'center',
+      });
+      const navigationTop = navigation.getBoundingClientRect().top;
+      const safeBottom = navigationTop - 8;
+      const doneControls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
+      );
+      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
+      const nextDone = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
+      const nextRect = nextDone?.getBoundingClientRect();
+      const controlsToClear = [
+        done,
+        ...(nextDone && nextRect && nextRect.top < window.innerHeight ? [nextDone] : []),
+      ];
+      const overlap = Math.max(
+        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - safeBottom),
+      );
+      if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [completed, currentSetId, pendingActiveCount]);
 
   if (workout.isLoading)
     return (
