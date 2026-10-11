@@ -12,7 +12,7 @@ from scripts.export_usda_reviewed_catalog import CuratedCatalogError, build_cata
 from fitminiapp_api.services.food_search_aliases import (
     USDA_RU_DISPLAY_NAMES_V2,
     USDA_RU_DISPLAY_NAMES_V3,
-    USDA_RU_DISPLAY_VERSION_V3,
+    USDA_RU_DISPLAY_VERSION_V4,
     generic_food_search_query,
     has_generic_food_alias,
     usda_ru_result_ids,
@@ -96,7 +96,7 @@ def test_v3_catalog_has_curated_russian_names_and_CC0_provenance() -> None:
             reviewed_at=date(2026, 10, 11),
             ids=selected,
         )
-    assert catalog.source.version == USDA_RU_DISPLAY_VERSION_V3
+    assert catalog.source.version == USDA_RU_DISPLAY_VERSION_V4
     assert catalog.source.license == "CC0-1.0"
     assert all(
         record.name == USDA_RU_DISPLAY_NAMES_V3[record.external_id] for record in catalog.foods

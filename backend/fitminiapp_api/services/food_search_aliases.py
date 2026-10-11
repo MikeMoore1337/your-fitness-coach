@@ -4,8 +4,12 @@ from fitminiapp_api.services.usda_reviewed_expansion import (
     USDA_REVIEWED_FNDDS_EXPANSION_V3,
     USDA_REVIEWED_SEARCH_GROUPS_V3,
 )
+from fitminiapp_api.services.usda_reviewed_foundation_legacy import (
+    USDA_REVIEWED_FOUNDATION_LEGACY_V4,
+    USDA_REVIEWED_SEARCH_GROUPS_V4,
+)
 
-FOOD_SEARCH_ALIAS_VERSION = "ru-en-v3"
+FOOD_SEARCH_ALIAS_VERSION = "ru-en-v4"
 USDA_RU_DISPLAY_VERSION = "fdc-fndds-2021-2023-ru-v2"
 
 RU_TO_EN_FOOD_ALIASES_V2: dict[str, str] = {
@@ -430,6 +434,31 @@ USDA_RU_RESULT_IDS_V3: dict[str, frozenset[str]] = {
 }
 
 
+USDA_RU_DISPLAY_VERSION_V4 = "fdc-foundation-srlegacy-fndds-ru-v4"
+USDA_RU_DISPLAY_NAMES_V4: dict[str, str] = {
+    **USDA_RU_DISPLAY_NAMES_V3,
+    **{fdc_id: data[0] for fdc_id, data in USDA_REVIEWED_FOUNDATION_LEGACY_V4.items()},
+}
+RU_TO_EN_FOOD_ALIASES_V4: dict[str, str] = {
+    **RU_TO_EN_FOOD_ALIASES_V3,
+    "банан перезрелый": "bananas overripe raw",
+    "куриная грудка сырая": "chicken breast raw",
+    "куриное мясо сырое": "chicken meat raw",
+    "яблоко без кожуры": "apples raw without skin",
+    "морковь зрелая": "carrots mature raw",
+    "картофель сырой": "potatoes raw",
+    "рис бурый сухой": "rice brown raw",
+    "миндаль сырой": "almonds raw",
+}
+USDA_RU_RESULT_IDS_V4: dict[str, frozenset[str]] = {
+    **USDA_RU_RESULT_IDS_V3,
+    **{
+        query: frozenset((*USDA_RU_RESULT_IDS_V3.get(query, frozenset()), *ids))
+        for query, ids in USDA_REVIEWED_SEARCH_GROUPS_V4.items()
+    },
+}
+
+
 def normalize_food_search_query(query: str) -> str:
     return " ".join(query.split()).casefold().replace("ё", "е")
 
@@ -439,16 +468,16 @@ def is_russian_food_query(query: str) -> bool:
 
 
 def has_generic_food_alias(query: str) -> bool:
-    return normalize_food_search_query(query) in RU_TO_EN_FOOD_ALIASES_V3
+    return normalize_food_search_query(query) in RU_TO_EN_FOOD_ALIASES_V4
 
 
 def usda_ru_result_ids(query: str) -> frozenset[str]:
-    return USDA_RU_RESULT_IDS_V3.get(normalize_food_search_query(query), frozenset())
+    return USDA_RU_RESULT_IDS_V4.get(normalize_food_search_query(query), frozenset())
 
 
 def external_food_search_terms(query: str) -> tuple[str, ...]:
     normalized = normalize_food_search_query(query)
-    alias = RU_TO_EN_FOOD_ALIASES_V3.get(normalized)
+    alias = RU_TO_EN_FOOD_ALIASES_V4.get(normalized)
     if alias is None or alias == normalized:
         return (normalized,)
     return (normalized, alias)
@@ -456,4 +485,4 @@ def external_food_search_terms(query: str) -> tuple[str, ...]:
 
 def generic_food_search_query(query: str) -> str:
     normalized = normalize_food_search_query(query)
-    return RU_TO_EN_FOOD_ALIASES_V3.get(normalized, normalized)
+    return RU_TO_EN_FOOD_ALIASES_V4.get(normalized, normalized)

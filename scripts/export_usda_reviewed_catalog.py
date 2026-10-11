@@ -16,8 +16,8 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from fitminiapp_api.schemas.food import FoodCatalog  # noqa: E402
 from fitminiapp_api.services.food_search_aliases import (  # noqa: E402
-    USDA_RU_DISPLAY_NAMES_V3,
-    USDA_RU_DISPLAY_VERSION_V3,
+    USDA_RU_DISPLAY_NAMES_V4,
+    USDA_RU_DISPLAY_VERSION_V4,
 )
 from fitminiapp_api.services.usda_food_data_central import (  # noqa: E402
     USDAFoodDataCentralProvider,
@@ -43,10 +43,10 @@ def build_catalog(
 ) -> FoodCatalog:
     """Only import verified FDC identities already bearing reviewed Russian labels."""
 
-    selected = ids if ids is not None else tuple(sorted(USDA_RU_DISPLAY_NAMES_V3, key=int))
+    selected = ids if ids is not None else tuple(sorted(USDA_RU_DISPLAY_NAMES_V4, key=int))
     if not selected or len(selected) != len(set(selected)):
         raise CuratedCatalogError("FDC IDs must be nonempty and unique")
-    if any(item not in USDA_RU_DISPLAY_NAMES_V3 for item in selected):
+    if any(item not in USDA_RU_DISPLAY_NAMES_V4 for item in selected):
         raise CuratedCatalogError("an FDC identity lacks an approved Russian label")
     if not api_key.strip():
         raise CuratedCatalogError("USDA_FDC_API_KEY is required")
@@ -106,11 +106,11 @@ def build_catalog(
             "schema_version": 1,
             "source": {
                 "name": "usda-fdc-reviewed-ru",
-                "version": USDA_RU_DISPLAY_VERSION_V3,
+                "version": USDA_RU_DISPLAY_VERSION_V4,
                 "source_url": "https://fdc.nal.usda.gov/",
                 "license": "CC0-1.0",
                 "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-                "reviewed_by": "YFC reviewed Russian FDC alias mapping v3",
+                "reviewed_by": "YFC reviewed Russian FDC alias mapping v4",
                 "reviewed_at": reviewed_at.isoformat(),
                 "license_verified": True,
             },
@@ -130,7 +130,7 @@ def main() -> None:
         parser.error("--limit must be positive")
     key = os.getenv("USDA_FDC_API_KEY", "")
     proxy = os.getenv("USDA_FDC_PROXY_URL", "").strip() or None
-    selected = tuple(sorted(USDA_RU_DISPLAY_NAMES_V3, key=int))
+    selected = tuple(sorted(USDA_RU_DISPLAY_NAMES_V4, key=int))
     if args.limit is not None:
         selected = selected[: args.limit]
     if args.output.exists():

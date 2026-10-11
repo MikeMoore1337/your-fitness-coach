@@ -1,0 +1,18 @@
+[Unit]
+Description=YFC USDA reviewed catalog quarterly read-only audit
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+ConditionPathExists=/srv/yfc/backups/food_catalog/usda_reviewed_approved.json
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/srv/yfc/fit-mini-app
+ExecStart=/usr/bin/bash /srv/yfc/fit-mini-app/current/scripts/run_usda_catalog_audit.sh
+TimeoutStartSec=15min
+Nice=10
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
