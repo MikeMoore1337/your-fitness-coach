@@ -12846,6 +12846,8 @@ export interface components {
             fat_g?: number | null;
             /** Carbs G */
             carbs_g?: number | null;
+            /** Fiber G */
+            fiber_g?: number | null;
             /** Target Calories */
             target_calories?: number | null;
             /** Target Protein G */
@@ -12877,6 +12879,32 @@ export interface components {
             hydration_target_ml?: number | null;
             /** Hydration Progress Percent */
             hydration_progress_percent?: number | null;
+        };
+        /** NutritionReportInsight */
+        NutritionReportInsight: {
+            /**
+             * Metric
+             * @enum {string}
+             */
+            metric: "calories" | "protein_g" | "fat_g" | "carbs_g";
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Evaluated Days */
+            evaluated_days: number;
+            /** Deviation Days */
+            deviation_days: number;
+            /** Average Deviation */
+            average_deviation: number;
+            /**
+             * Action Code
+             * @enum {string}
+             */
+            action_code: "review_portions" | "open_meal_suggestions";
+            /** Message */
+            message: string;
         };
         /** NutritionReportMetricSummary */
         NutritionReportMetricSummary: {
@@ -12915,6 +12943,8 @@ export interface components {
             /** Target Changes */
             target_changes: components["schemas"]["NutritionReportTargetChange"][];
             hydration?: components["schemas"]["HydrationReportSummary"] | null;
+            /** Insights */
+            insights?: components["schemas"]["NutritionReportInsight"][];
         };
         /** NutritionReportSummary */
         NutritionReportSummary: {
@@ -12938,6 +12968,7 @@ export interface components {
             protein_g: components["schemas"]["NutritionReportMetricSummary"];
             fat_g: components["schemas"]["NutritionReportMetricSummary"];
             carbs_g: components["schemas"]["NutritionReportMetricSummary"];
+            fiber_g: components["schemas"]["NutritionReportMetricSummary"];
             calorie_comparison: components["schemas"]["NutritionReportTargetComparison"];
             protein_comparison: components["schemas"]["NutritionReportTargetComparison"];
             fat_comparison: components["schemas"]["NutritionReportTargetComparison"];
