@@ -22,7 +22,7 @@
     "manifest": "before-manifest.json"
   },
   "after": {
-    "sourceSha": "to be filled with the evidence commit SHA",
+    "sourceSha": "7393ef1ad107da6239f01b87d58b82dc1289f0be",
     "manifest": "after-manifest.json"
   },
   "notes": [
