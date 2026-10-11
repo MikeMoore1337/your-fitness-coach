@@ -24,8 +24,8 @@
   <body>
     <header>
       <h1>YFC — финальная техническая приёмка</h1>
-      <p class="meta">Runtime source: <code>be3d2a2a0ffac3e27c44029578f3354197387736</code>; evidence commit: <code>f3475375f5b7ba59814ae4b9ccb8a78138cb1b08</code>; #903 correction/evidence: <code>c40a64eedb467bb33938a1cf6165d5878ed0d56b</code>.</p>
-      <p><a href="ISSUE_COVERAGE_MATRIX.md">Матрица покрытия Issues</a> · <a href="README.md">Индекс и gates</a> · <a href="https://github.com/MikeMoore1337/your-fitness-coach/pull/927">PR #927</a></p>
+      <p class="meta">Runtime source: <code>be3d2a2a0ffac3e27c44029578f3354197387736</code>; evidence commit: <code>f3475375f5b7ba59814ae4b9ccb8a78138cb1b08</code>; #903 correction/evidence: <code>c40a64eedb467bb33938a1cf6165d5878ed0d56b</code>; #946–#948 PR head: <code>df454007a1379a3fd98490d4ca2e7e334a535d16</code>.</p>
+      <p><a href="ISSUE_COVERAGE_MATRIX.md">Матрица покрытия Issues</a> · <a href="README.md">Индекс и gates</a> · <a href="https://github.com/MikeMoore1337/your-fitness-coach/pull/927">PR #927</a> · <a href="https://github.com/MikeMoore1337/your-fitness-coach/pull/958">PR #958</a></p>
     </header>
 
     <main>
@@ -50,6 +50,19 @@
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/f3475375f5b7ba59814ae4b9ccb8a78138cb1b08/docs/ux/final-issues-acceptance/evidence/867/after/webkit/resting-dock-430-light.png"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/f3475375f5b7ba59814ae4b9ccb8a78138cb1b08/docs/ux/final-issues-acceptance/evidence/867/after/webkit/resting-dock-430-light.png" alt="WebKit 430 light active workout dock" /></a><figcaption>WebKit · 430 · light · <a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/f3475375f5b7ba59814ae4b9ccb8a78138cb1b08/docs/ux/final-issues-acceptance/evidence/867/after/webkit/resting-dock-430-light.png">AFTER</a></figcaption></figure>
       </div>
 
+      <h2>#946–#948 — mobile food picker</h2>
+      <p class="meta">Real Playwright captures from PR #958. Chromium/WebKit, 320/393 CSS px, dark/light. The <a href="evidence/946-948/README.md">evidence index</a> links all 48 captures; this gallery shows representative keyboard, result, pressed and selected states. The keyboard geometry is controlled <code>visualViewport</code> emulation, not a physical iPhone keyboard.</p>
+      <div class="grid">
+        <figure><a href="evidence/946-948/after/chromium-320-dark-keyboard-open-rice-results.png"><img src="evidence/946-948/after/chromium-320-dark-keyboard-open-rice-results.png" alt="#946 Chromium 320 dark rice results above keyboard" /></a><figcaption>Chromium · 320 · dark · rice results above keyboard</figcaption></figure>
+        <figure><a href="evidence/946-948/after/chromium-320-light-pressed.png"><img src="evidence/946-948/after/chromium-320-light-pressed.png" alt="#947 Chromium 320 light pressed food result" /></a><figcaption>Chromium · 320 · light · pressed/favorite</figcaption></figure>
+        <figure><a href="evidence/946-948/after/chromium-393-dark-potato-results.png"><img src="evidence/946-948/after/chromium-393-dark-potato-results.png" alt="#948 Chromium 393 dark potato results" /></a><figcaption>Chromium · 393 · dark · potato results</figcaption></figure>
+        <figure><a href="evidence/946-948/after/chromium-393-light-selected.png"><img src="evidence/946-948/after/chromium-393-light-selected.png" alt="#947 Chromium 393 light selected food" /></a><figcaption>Chromium · 393 · light · selected product</figcaption></figure>
+        <figure><a href="evidence/946-948/after/webkit-320-dark-keyboard-open-rice-results.png"><img src="evidence/946-948/after/webkit-320-dark-keyboard-open-rice-results.png" alt="#946 WebKit 320 dark rice results above keyboard" /></a><figcaption>WebKit · 320 · dark · rice results above keyboard</figcaption></figure>
+        <figure><a href="evidence/946-948/after/webkit-320-light-pressed.png"><img src="evidence/946-948/after/webkit-320-light-pressed.png" alt="#947 WebKit 320 light pressed food result" /></a><figcaption>WebKit · 320 · light · pressed/favorite</figcaption></figure>
+        <figure><a href="evidence/946-948/after/webkit-393-dark-potato-results.png"><img src="evidence/946-948/after/webkit-393-dark-potato-results.png" alt="#948 WebKit 393 dark potato results" /></a><figcaption>WebKit · 393 · dark · potato results</figcaption></figure>
+        <figure><a href="evidence/946-948/after/webkit-393-light-selected.png"><img src="evidence/946-948/after/webkit-393-light-selected.png" alt="#947 WebKit 393 light selected food" /></a><figcaption>WebKit · 393 · light · selected product</figcaption></figure>
+      </div>
+
       <h2>#903 — Landing weekly score</h2>
       <p class="meta">Real comparable BEFORE/AFTER screenshots from Chromium at `/for-athletes`; the same interaction is covered by the E2E route matrix for `/` and `/for-athletes`. Evidence commit: <code>c40a64eedb467bb33938a1cf6165d5878ed0d56b</code>. Pointer, keyboard focus-visible and no-selection states are separate.</p>
       <div class="grid">
@@ -66,8 +79,8 @@
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c40a64eedb467bb33938a1cf6165d5878ed0d56b/docs/ux/final-issues-acceptance/evidence/903/after/after-1440-light.png"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c40a64eedb467bb33938a1cf6165d5878ed0d56b/docs/ux/final-issues-acceptance/evidence/903/after/after-1440-light.png" alt="#903 AFTER 1440 light" /></a><figcaption>AFTER · 1440 · light</figcaption></figure>
       </div>
 
-      <h2>#906 — Hero owner-gated BEFORE / A / B</h2>
-      <p class="meta">Изолированная Chromium-сборка, runtime <code>733933a73a3bc27ca596b9efb00751105a539a86</code>. Это proposal, не production AFTER. Полная таблица всех 36 кадров, provenance и контрольные 1920×1080 / 1440×900: <a href="evidence/906/README.md">evidence/906/README.md</a>.</p>
+      <h2>#906 — Hero, approved variant B</h2>
+      <p class="meta">Изолированная Chromium-сборка, runtime <code>733933a73a3bc27ca596b9efb00751105a539a86</code>; текущий PR head <code>2a8629def1c591d6c64df4d114546b54b6448d20</code>. Владелец визуально одобрил вариант B; реальные AFTER закреплены за PR #944. Native browser zoom 125% не проверялся. Полная таблица кадров и provenance: <a href="evidence/906/README.md">evidence/906/README.md</a>.</p>
       <div class="grid">
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/before-athletes-qhd-dark.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/before-athletes-qhd-dark.jpg" alt="#906 BEFORE athletes QHD dark" /></a><figcaption>BEFORE · athletes · 2560×1440 · dark</figcaption></figure>
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/a-athletes-qhd-dark.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/a-athletes-qhd-dark.jpg" alt="#906 variant A athletes QHD dark" /></a><figcaption>Variant A · athletes · 2560×1440 · dark</figcaption></figure>
@@ -79,6 +92,13 @@
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/b-trainers-qhd-dark.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/b-trainers-qhd-dark.jpg" alt="#906 variant B trainers QHD dark" /></a><figcaption>Variant B · trainers · 2560×1440 · dark</figcaption></figure>
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/a-trainers-qhd-light.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/a-trainers-qhd-light.jpg" alt="#906 variant A trainers QHD light" /></a><figcaption>Variant A · trainers · 2560×1440 · light</figcaption></figure>
         <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/b-trainers-qhd-light.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/c334290e354851f3d719a5b1912e6fa19c48d865/docs/ux/final-issues-acceptance/evidence/906/b-trainers-qhd-light.jpg" alt="#906 variant B trainers QHD light" /></a><figcaption>Variant B · trainers · 2560×1440 · light</figcaption></figure>
+      </div>
+      <p class="meta"><strong>Approved B AFTER:</strong> direct captures from PR #944 are linked below; the earlier comparison grid remains a historical proposal reference.</p>
+      <div class="grid">
+        <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/athletes-qhd-dark-after.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/athletes-qhd-dark-after.jpg" alt="#906 approved B athletes QHD dark" /></a><figcaption>Approved B · athletes · QHD · dark · AFTER</figcaption></figure>
+        <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/athletes-qhd-light-after.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/athletes-qhd-light-after.jpg" alt="#906 approved B athletes QHD light" /></a><figcaption>Approved B · athletes · QHD · light · AFTER</figcaption></figure>
+        <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/trainers-qhd-dark-after.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/trainers-qhd-dark-after.jpg" alt="#906 approved B trainers QHD dark" /></a><figcaption>Approved B · trainers · QHD · dark · AFTER</figcaption></figure>
+        <figure><a href="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/trainers-qhd-light-after.jpg"><img src="https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation/after/trainers-qhd-light-after.jpg" alt="#906 approved B trainers QHD light" /></a><figcaption>Approved B · trainers · QHD · light · AFTER</figcaption></figure>
       </div>
 
       <h2>Остальные визуальные Issues — reference index</h2>
@@ -98,7 +118,7 @@
       </table>
 
       <h2>#904, #905</h2>
-      <p class="meta">DemoCabinet transport/RBAC evidence is linked from <a href="README.md">README.md</a> and the matrix; #906 remains owner-gated.</p>
+      <p class="meta">DemoCabinet transport/RBAC evidence is linked from <a href="README.md">README.md</a> and the matrix. Production smoke remains unavailable until the separately forbidden release.</p>
     </main>
   </body>
 </html>

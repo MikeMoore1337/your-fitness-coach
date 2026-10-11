@@ -1,6 +1,6 @@
-# #906 — Hero: BEFORE / proposal A / proposal B
+# #906 — Hero: historical BEFORE / proposal A / proposal B
 
-Статус: `NOT_IMPLEMENTED_OWNER_GATE`. Это изолированное локальное предложение для выбора владельца; production-код, `master`, PR merge и deployment не менялись.
+Это исторический изолированный пакет сравнения до реализации. Владелец впоследствии визуально одобрил вариант B в [Issue #906](https://github.com/MikeMoore1337/your-fitness-coach/issues/906#issuecomment-6112622277) и [PR #944](https://github.com/MikeMoore1337/your-fitness-coach/pull/944#issuecomment-6112622702). Актуальные AFTER находятся в [evidence/906-implementation](https://github.com/MikeMoore1337/your-fitness-coach/tree/2a8629def1c591d6c64df4d114546b54b6448d20/docs/ux/final-issues-acceptance/evidence/906-implementation) на head `2a8629def1c591d6c64df4d114546b54b6448d20`.
 
 Снимки получены из реально запущенной Chromium-сборки на runtime `733933a73a3bc27ca596b9efb00751105a539a86` (ветка PR #936 после исправления #903), сервер `http://127.0.0.1:4173`, headless Chromium, device scale factor 1, шрифты дождались `document.fonts.ready`, viewport CSS px. `BEFORE` — текущий runtime без временного CSS overlay; `A` и `B` — тот же route/data/theme с временным overlay только на `.ref-hero`.
 
@@ -24,6 +24,6 @@
 - **A — conservative:** высота Hero `900px`, focal position `65% 34%`. Плюсы: минимальное изменение первого экрана и более ранний переход к следующему разделу. Минусы: часть верхнего силуэта и оборудования остаётся ближе к границе кадра на широких viewport.
 - **B — cinematic:** высота Hero `980px`, focal position `65% 27%`. Плюсы: больше вертикального пространства и спокойнее кадрирование лица/рук/оборудования. Минусы: ниже виден следующий раздел и выше стоимость вертикального скролла.
 
-Оба варианта сохраняют header, audience switch, типографику, CTA, пропорции изображения и текущие маршруты. Ни один вариант не выбран за владельца; до решения не создаётся production PR для #906.
+Оба варианта сохраняют header, audience switch, типографику, CTA, пропорции изображения и текущие маршруты. Для текущей приёмки этот пакет используется только как исторический BEFORE/A/B reference; не считать его актуальным AFTER.
 
 Полная provenance: [`provenance.json`](provenance.json).
