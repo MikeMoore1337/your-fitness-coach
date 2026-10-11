@@ -56,6 +56,16 @@ visual redesigns.
   changing authenticated UI. RETHINK requires an explicit owner-approved exploration task.
 - Use the shared `WeekStrip` for ordinary seven-day week contexts.
 
+## Owner-gated visual delivery
+
+For a new or substantially changed visual composition, use this sequence:
+
+`concrete mockup -> publish in Issue -> explicit owner approval -> implement the approved version 1:1 -> real AFTER evidence -> owner visual acceptance -> separate release approval`.
+
+Approval of the mockup authorizes implementation of the approved scope only; it does not authorize
+merge, deploy or release. Technical fixes that preserve the existing composition follow the normal
+workflow and do not require this visual gate.
+
 ## RUSSIAN_USER_FACING_UI (mandatory)
 
 - All new authenticated Web, Telegram Mini App, athlete-cabinet and trainer-cabinet UI copy is

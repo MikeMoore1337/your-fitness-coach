@@ -82,7 +82,47 @@ const importedRiceFood = {
   name: 'Рис белый приготовленный, без добавления масла',
   food_type: 'user',
   is_favorite: false,
+  catalog_quality: 'private',
 };
+
+const verifiedRiceFood = {
+  ...riceFood,
+  id: 83,
+  name: 'Рис бурый нешлифованный, отварной',
+  food_type: 'system',
+  is_favorite: false,
+  catalog_quality: 'verified',
+};
+
+const localPotatoFoods = [
+  {
+    ...riceFood,
+    id: 84,
+    name: 'Картофель запечённый, способ приготовления не указан',
+    energy_kcal_per_100g: '93.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+  {
+    ...riceFood,
+    id: 85,
+    name: 'Картофель отварной, способ приготовления не указан',
+    energy_kcal_per_100g: '87.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+  {
+    ...riceFood,
+    id: 86,
+    name: 'Картофель фри из свежего картофеля, жареный',
+    energy_kcal_per_100g: '289.00',
+    food_type: 'system',
+    is_favorite: false,
+    catalog_quality: 'verified',
+  },
+].map((food) => ({ ...food, nutrition_basis_kind: 'per_100_g' as const }));
 
 const externalRiceFoods = [
   {
@@ -1505,8 +1545,12 @@ for (const current of russianSearchVisualCases) {
 const foodPickerAcceptanceCases = [
   { label: '320-light', width: 320, height: 844, colorScheme: 'light' as const },
   { label: '320-dark', width: 320, height: 844, colorScheme: 'dark' as const },
+  { label: '360-light', width: 360, height: 844, colorScheme: 'light' as const },
+  { label: '360-dark', width: 360, height: 844, colorScheme: 'dark' as const },
   { label: '393-light', width: 393, height: 844, colorScheme: 'light' as const },
   { label: '393-dark', width: 393, height: 844, colorScheme: 'dark' as const },
+  { label: '430-light', width: 430, height: 844, colorScheme: 'light' as const },
+  { label: '430-dark', width: 430, height: 844, colorScheme: 'dark' as const },
 ];
 
 test.describe('Food picker mobile acceptance for #946-#948', () => {
@@ -1521,17 +1565,17 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       const includeExternal = url.searchParams.get('include_external') === 'true';
       const isRice = query.includes('рис');
       const isPotato = query.includes('картофель');
+      const localItems = isRice
+        ? [
+            { ...importedRiceFood, is_favorite: favoriteState, nutrition_basis_kind: 'per_100_g' },
+            { ...verifiedRiceFood, nutrition_basis_kind: 'per_100_g' },
+          ]
+        : isPotato
+          ? localPotatoFoods
+          : [];
       await route.fulfill({
         json: {
-          items: isRice
-            ? [
-                {
-                  ...importedRiceFood,
-                  is_favorite: favoriteState,
-                  nutrition_basis_kind: 'per_100_g',
-                },
-              ]
-            : [],
+          items: localItems,
           external_items: includeExternal
             ? isPotato
               ? externalPotatoFoods
@@ -1539,7 +1583,7 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
                 ? externalRiceFoods
                 : []
             : [],
-          total: isRice ? 1 : 0,
+          total: localItems.length,
           limit: 20,
           offset: 0,
           provider_status: includeExternal ? 'available' : 'not_requested',
@@ -1574,6 +1618,17 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
         .first();
       await expect(riceRow).toBeVisible();
       await expect(riceRow).toContainText('130 ккал / 100 г');
+      const verifiedRiceRow = page
+        .locator('.nutrition-food-result')
+        .filter({ hasText: 'Рис бурый нешлифованный, отварной' })
+        .first();
+      await expect(verifiedRiceRow).toBeVisible();
+      await expect(verifiedRiceRow).toContainText('Проверено YFC');
+      await expect(riceRow.locator('.nutrition-food-result__select-label')).toHaveCount(0);
+      await expect(riceRow.getByText('Выбрать', { exact: true })).toHaveCount(0);
+      const edit = riceRow.getByRole('button', { name: /Изменить Рис белый/ });
+      await expect(edit).toBeVisible();
+      await expect(verifiedRiceRow.getByRole('button', { name: /Изменить/ })).toHaveCount(0);
 
       const riceLayout = await riceRow.evaluate((row) => {
         const title = row.querySelector<HTMLElement>('.nutrition-food-result__main strong');
@@ -1660,7 +1715,11 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       await expect(
         page.getByText('Картофель жареный по-домашнему из свежего картофеля', { exact: true }),
       ).toBeVisible();
-      await expect(page.getByText('289 ккал / 100 г')).toBeVisible();
+      await expect(page.getByText('289 ккал / 100 г', { exact: true })).toBeVisible();
+      await expect(page.locator('.nutrition-food-result--picker')).toHaveCount(3);
+      await expect(page.locator('.nutrition-food-result--picker').first()).toContainText(
+        'Проверено YFC',
+      );
       await page.screenshot({
         path: `../docs/ux/final-issues-acceptance/evidence/946-948/after/${project}-${current.label}-potato-results.png`,
       });
@@ -1672,6 +1731,18 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       await expect(page.getByRole('dialog')).toBeVisible();
       await expect(action).toBeVisible();
       await expect(favorite).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByRole('heading', { name: /Рис белый приготовленный/ })).toHaveCount(0);
+      for (const control of [favorite, edit]) {
+        const box = await control.boundingBox();
+        expect(box).not.toBeNull();
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+      }
+      await edit.click();
+      await expect(page.getByRole('heading', { name: 'Изменить продукт' })).toBeVisible();
+      await page.getByRole('button', { name: 'Отмена', exact: true }).click();
+      await expect(riceRow).toBeVisible();
+      await riceRow.scrollIntoViewIfNeeded();
 
       const selectBox = await action.boundingBox();
       expect(selectBox).not.toBeNull();

@@ -155,6 +155,10 @@ function foodSourceLabel(food: Pick<Food, 'food_type' | 'catalog_quality'>): str
   return 'Каталог';
 }
 
+function isUserFood(food: Pick<Food, 'food_type'>): boolean {
+  return food.food_type === 'user';
+}
+
 function foodDraftSelection(food: Food): FoodDraftSelection {
   return {
     id: food.id,
@@ -257,44 +261,50 @@ function FoodResults({
       </p>
     );
   return (
-    <ul className="nutrition-food-results" aria-label="Продукты">
-      {foods.map((food) => (
-        <li className="nutrition-food-result" key={food.id}>
-          <button
-            className="nutrition-food-result__select"
-            type="button"
-            onClick={() => onSelect(food)}
-            aria-label={`Выбрать ${food.name}`}
-          >
-            <span className="nutrition-food-result__main">
-              <strong>{food.name}</strong>
-              <span>
-                {food.brand ? `${food.brand} · ` : ''}
-                {foodBasisLabel(food)}
+    <>
+      <p id="nutrition-food-results-hint" className="nutrition-food-results__hint">
+        Нажмите на карточку, чтобы выбрать продукт
+      </p>
+      <ul className="nutrition-food-results" aria-label="Продукты">
+        {foods.map((food) => (
+          <li className="nutrition-food-result nutrition-food-result--picker" key={food.id}>
+            <button
+              className="nutrition-food-result__select"
+              type="button"
+              onClick={() => onSelect(food)}
+              aria-describedby="nutrition-food-results-hint"
+              aria-label={`Выбрать ${food.name}`}
+            >
+              <span className="nutrition-food-result__main">
+                <strong>{food.name}</strong>
+                <span>
+                  {food.brand ? `${food.brand} · ` : ''}
+                  {foodBasisLabel(food)}
+                </span>
               </span>
-            </span>
-            <span className="nutrition-food-result__select-label">Выбрать</span>
-            <Badge>{foodSourceLabel(food)}</Badge>
-          </button>
-          {allowManage && (
-            <div className="nutrition-food-result__actions">
-              <button
-                type="button"
-                className="nutrition-food-result__favorite"
-                aria-label={
-                  food.is_favorite
-                    ? `Убрать ${food.name} из избранного`
-                    : `Добавить ${food.name} в избранное`
-                }
-                aria-pressed={food.is_favorite}
-                disabled={pendingFavorite === food.id}
-                onClick={() => onFavorite(food)}
-              >
-                <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
-              </button>
-              {food.food_type === 'user' && (
+            </button>
+            <div className="nutrition-food-result__meta">
+              <Badge>{foodSourceLabel(food)}</Badge>
+              {allowManage && (
                 <button
                   type="button"
+                  className="nutrition-food-result__favorite"
+                  aria-label={
+                    food.is_favorite
+                      ? `Убрать ${food.name} из избранного`
+                      : `Добавить ${food.name} в избранное`
+                  }
+                  aria-pressed={food.is_favorite}
+                  disabled={pendingFavorite === food.id}
+                  onClick={() => onFavorite(food)}
+                >
+                  <Icon name={food.is_favorite ? 'star-filled' : 'star'} size={20} />
+                </button>
+              )}
+              {isUserFood(food) && allowManage && (
+                <button
+                  type="button"
+                  className="nutrition-food-result__edit"
                   onClick={() => onEdit(food)}
                   aria-label={`Изменить ${food.name}`}
                 >
@@ -302,10 +312,10 @@ function FoodResults({
                 </button>
               )}
             </div>
-          )}
-        </li>
-      ))}
-    </ul>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 
