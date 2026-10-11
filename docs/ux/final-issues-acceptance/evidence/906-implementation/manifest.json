@@ -1,0 +1,24 @@
+{
+  "issue": 906,
+  "variant": "B",
+  "before": "before-manifest.json",
+  "after": "after-manifest.json",
+  "comparisons": [
+    "comparison/athletes-qhd-dark-before-after.jpg",
+    "comparison/athletes-qhd-light-before-after.jpg",
+    "comparison/trainers-qhd-dark-before-after.jpg",
+    "comparison/trainers-qhd-light-before-after.jpg"
+  ],
+  "routes": ["/for-athletes", "/for-trainers"],
+  "themes": ["dark", "light"],
+  "viewports": [
+    "1440x900",
+    "1920x1080",
+    "2560x1440",
+    "3440x1440",
+    "2560x1440@125%",
+    "320x844",
+    "390x844",
+    "430x932"
+  ]
+}
