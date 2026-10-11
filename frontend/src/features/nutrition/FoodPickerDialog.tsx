@@ -1253,282 +1253,291 @@ export function FoodPickerDialog({
             />
           </div>
         ) : (
-          <div className="nutrition-picker__browse">
-            <Field
-              label="Найти продукт"
-              labelFor="nutrition-food-search"
-              hint="Локальный поиск начинается после двух символов"
-            >
-              <div
-                className={`nutrition-picker__search-control${
-                  searchInput ? ' nutrition-picker__search-control--has-clear' : ''
-                }`}
+          <div
+            className="nutrition-picker__browse"
+            data-search-active={searchQuery.length >= 2 ? 'true' : undefined}
+          >
+            <div className="nutrition-picker__search-field">
+              <Field
+                label="Найти продукт"
+                labelFor="nutrition-food-search"
+                hint="Локальный поиск начинается после двух символов"
               >
-                <Input
-                  id="nutrition-food-search"
-                  className={searchInput ? 'nutrition-picker__search-input--has-clear' : ''}
-                  type="search"
-                  value={searchInput}
-                  onFocus={() =>
-                    trackProductEvent(
-                      {
+                <div
+                  className={`nutrition-picker__search-control${
+                    searchInput ? ' nutrition-picker__search-control--has-clear' : ''
+                  }`}
+                >
+                  <Input
+                    id="nutrition-food-search"
+                    className={searchInput ? 'nutrition-picker__search-input--has-clear' : ''}
+                    type="search"
+                    value={searchInput}
+                    onFocus={() =>
+                      trackProductEvent(
+                        {
+                          name: 'nutrition_food_add_path_selected',
+                          surface: productEventSurface(),
+                          path: 'search',
+                        },
+                        { dedupe: 'session', dedupeKey: 'nutrition-food-add-path-search' },
+                      )
+                    }
+                    onChange={(event) => {
+                      if (event.target.value.trim()) setEntryMethod('search');
+                      setSearchInput(event.target.value);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape' && searchInput) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        clearSearch();
+                      }
+                    }}
+                    placeholder="Например, овсянка"
+                  />
+                  {searchInput && (
+                    <IconButton
+                      className="nutrition-picker__search-clear"
+                      type="button"
+                      aria-label="Очистить поиск"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={clearSearch}
+                    >
+                      <Icon name="close" size={16} />
+                    </IconButton>
+                  )}
+                </div>
+              </Field>
+            </div>
+            <div className="nutrition-picker__search-flow">
+              {!demoSafeMode && (
+                <div className="nutrition-picker__primary-path-actions">
+                  <Button
+                    id="nutrition-label-scan-entry"
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
                         name: 'nutrition_food_add_path_selected',
                         surface: productEventSurface(),
-                        path: 'search',
-                      },
-                      { dedupe: 'session', dedupeKey: 'nutrition-food-add-path-search' },
-                    )
-                  }
-                  onChange={(event) => {
-                    if (event.target.value.trim()) setEntryMethod('search');
-                    setSearchInput(event.target.value);
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape' && searchInput) {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      clearSearch();
-                    }
-                  }}
-                  placeholder="Например, овсянка"
-                />
-                {searchInput && (
-                  <IconButton
-                    className="nutrition-picker__search-clear"
-                    type="button"
-                    aria-label="Очистить поиск"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={clearSearch}
+                        path: 'photo',
+                      });
+                      setEntryMethod('label_scan');
+                      setScanBarcode('');
+                      setView('label-scan');
+                    }}
                   >
-                    <Icon name="close" size={16} />
-                  </IconButton>
-                )}
-              </div>
-            </Field>
-            {!demoSafeMode && (
-              <div className="nutrition-picker__primary-path-actions">
-                <Button
-                  id="nutrition-label-scan-entry"
-                  fullWidth
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    trackProductEvent({
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'photo',
-                    });
-                    setEntryMethod('label_scan');
-                    setScanBarcode('');
-                    setView('label-scan');
-                  }}
-                >
-                  По фото этикетки
-                </Button>
-                <Button
-                  fullWidth
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    trackProductEvent({
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'photo',
-                    });
-                    setEntryMethod('label_scan');
-                    setView('photo-meal');
-                  }}
-                >
-                  По фото блюда
-                </Button>
-                <Button
-                  fullWidth
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    trackProductEvent({
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'manual',
-                    });
-                    setEntryMethod('custom');
-                    setEditingFood(undefined);
-                    setEditorBarcode('');
-                    setView('food-editor');
-                  }}
-                >
-                  <Icon name="plus" size={16} /> Ввести вручную
-                </Button>
-              </div>
-            )}
-            {demoSafeMode && (
-              <p className="muted demo-capability-notice" role="status">
-                В демо доступны поиск, подготовленный каталог и быстрый ввод. Фото этикетки, ручное
-                сохранение и внешние каталоги доступны после входа.
-              </p>
-            )}
-            <details className="nutrition-picker__secondary-tools">
-              <summary>Другие способы добавления</summary>
-              <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={demoSafeMode}
-                  title={demoSafeMode ? 'Доступно после входа' : undefined}
-                  onClick={() => setView('natural')}
-                >
-                  Вставить список
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={demoSafeMode}
-                  title={demoSafeMode ? 'Доступно после входа' : undefined}
-                  onClick={() => setView('templates')}
-                >
-                  Шаблоны приёмов
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    trackProductEvent({
-                      name: 'nutrition_food_add_path_selected',
-                      surface: productEventSurface(),
-                      path: 'quick_add',
-                    });
-                    setEntryMethod('quick_add');
-                    trackProductEvent({
-                      name: 'food_log_started',
-                      surface: productEventSurface(),
-                      entry_method: 'quick_add',
-                    });
-                    setView('quick-add');
-                  }}
-                >
-                  <Icon name="plus" size={16} /> Быстрый ввод
-                </Button>
-                {!demoSafeMode && (
+                    По фото этикетки
+                  </Button>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'photo',
+                      });
+                      setEntryMethod('label_scan');
+                      setView('photo-meal');
+                    }}
+                  >
+                    По фото блюда
+                  </Button>
+                  <Button
+                    fullWidth
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'manual',
+                      });
+                      setEntryMethod('custom');
+                      setEditingFood(undefined);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  >
+                    <Icon name="plus" size={16} /> Ввести вручную
+                  </Button>
+                </div>
+              )}
+              {demoSafeMode && (
+                <p className="muted demo-capability-notice" role="status">
+                  В демо доступны поиск, подготовленный каталог и быстрый ввод. Фото этикетки,
+                  ручное сохранение и внешние каталоги доступны после входа.
+                </p>
+              )}
+              <details className="nutrition-picker__secondary-tools">
+                <summary>Другие способы добавления</summary>
+                <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={demoSafeMode}
+                    title={demoSafeMode ? 'Доступно после входа' : undefined}
+                    onClick={() => setView('natural')}
+                  >
+                    Вставить список
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={demoSafeMode}
+                    title={demoSafeMode ? 'Доступно после входа' : undefined}
+                    onClick={() => setView('templates')}
+                  >
+                    Шаблоны приёмов
+                  </Button>
                   <Button
                     type="button"
                     variant="secondary"
                     onClick={() => {
-                      setEntryMethod('recipe');
-                      setView('recipes');
+                      trackProductEvent({
+                        name: 'nutrition_food_add_path_selected',
+                        surface: productEventSurface(),
+                        path: 'quick_add',
+                      });
+                      setEntryMethod('quick_add');
+                      trackProductEvent({
+                        name: 'food_log_started',
+                        surface: productEventSurface(),
+                        entry_method: 'quick_add',
+                      });
+                      setView('quick-add');
                     }}
                   >
-                    Рецепты
+                    <Icon name="plus" size={16} /> Быстрый ввод
                   </Button>
-                )}
-              </div>
-            </details>
-            {searchQuery.length < 2 && (
-              <details className="nutrition-picker__catalog-filters">
-                <summary>Каталог и фильтры</summary>
-                <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
-                  <button
-                    type="button"
-                    className={source === 'mine' ? 'is-active' : ''}
-                    aria-pressed={source === 'mine'}
-                    onClick={() => {
-                      setEntryMethod('personal');
-                      setSource('mine');
-                    }}
-                  >
-                    Мои продукты
-                  </button>
-                  <button
-                    type="button"
-                    className={source === 'frequent' ? 'is-active' : ''}
-                    aria-pressed={source === 'frequent'}
-                    onClick={() => {
-                      setEntryMethod('frequent');
-                      setSource('frequent');
-                    }}
-                  >
-                    Частые
-                  </button>
-                  <button
-                    type="button"
-                    className={source === 'recent' ? 'is-active' : ''}
-                    aria-pressed={source === 'recent'}
-                    onClick={() => {
-                      setEntryMethod('recent');
-                      setSource('recent');
-                    }}
-                  >
-                    Недавние
-                  </button>
-                  <button
-                    type="button"
-                    className={source === 'favorites' ? 'is-active' : ''}
-                    aria-pressed={source === 'favorites'}
-                    onClick={() => {
-                      setEntryMethod('favorite');
-                      setSource('favorites');
-                    }}
-                  >
-                    Избранное
-                  </button>
+                  {!demoSafeMode && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        setEntryMethod('recipe');
+                        setView('recipes');
+                      }}
+                    >
+                      Рецепты
+                    </Button>
+                  )}
                 </div>
               </details>
-            )}
-            {activeLoading && <LoadingState label="Ищем продукты…" />}
-            {activeError && (
-              <ErrorState
-                message="Локальный каталог сейчас не ответил. Попробуйте снова."
-                retry={() =>
-                  void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
-                }
-              />
-            )}
-            {!activeLoading && !activeError && (
-              <FoodResults
-                foods={shownFoods}
-                onSelect={(food) =>
-                  selectFood(food, {
-                    sourceOverride:
-                      searchQuery.length >= 2 ? undefined : pickerSourceAnalytics(source),
-                  })
-                }
-                onFavorite={(food) => favorite.mutate(food)}
-                pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
-                allowManage={!demoSafeMode}
-                onEdit={(food) => {
-                  setEditingFood(food);
-                  setEditorBarcode('');
-                  setView('food-editor');
-                }}
-              />
-            )}
-            {favorite.error && (
-              <p className="nutrition-form-error" role="alert">
-                Не удалось обновить избранное.
-              </p>
-            )}
-            {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
-            {external.error && (
-              <div className="nutrition-provider-fallback" role="status">
-                <strong>Внешний каталог временно недоступен</strong>
-                <span>Можно использовать локальный поиск или создать свой продукт.</span>
+              {searchQuery.length < 2 && (
+                <details className="nutrition-picker__catalog-filters">
+                  <summary>Каталог и фильтры</summary>
+                  <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
+                    <button
+                      type="button"
+                      className={source === 'mine' ? 'is-active' : ''}
+                      aria-pressed={source === 'mine'}
+                      onClick={() => {
+                        setEntryMethod('personal');
+                        setSource('mine');
+                      }}
+                    >
+                      Мои продукты
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'frequent' ? 'is-active' : ''}
+                      aria-pressed={source === 'frequent'}
+                      onClick={() => {
+                        setEntryMethod('frequent');
+                        setSource('frequent');
+                      }}
+                    >
+                      Частые
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'recent' ? 'is-active' : ''}
+                      aria-pressed={source === 'recent'}
+                      onClick={() => {
+                        setEntryMethod('recent');
+                        setSource('recent');
+                      }}
+                    >
+                      Недавние
+                    </button>
+                    <button
+                      type="button"
+                      className={source === 'favorites' ? 'is-active' : ''}
+                      aria-pressed={source === 'favorites'}
+                      onClick={() => {
+                        setEntryMethod('favorite');
+                        setSource('favorites');
+                      }}
+                    >
+                      Избранное
+                    </button>
+                  </div>
+                </details>
+              )}
+              <div className="nutrition-picker__result-content">
+                {activeLoading && <LoadingState label="Ищем продукты…" />}
+                {activeError && (
+                  <ErrorState
+                    message="Локальный каталог сейчас не ответил. Попробуйте снова."
+                    retry={() =>
+                      void (searchQuery.length >= 2 ? search.refetch() : activeCollection.refetch())
+                    }
+                  />
+                )}
+                {!activeLoading && !activeError && (
+                  <FoodResults
+                    foods={shownFoods}
+                    onSelect={(food) =>
+                      selectFood(food, {
+                        sourceOverride:
+                          searchQuery.length >= 2 ? undefined : pickerSourceAnalytics(source),
+                      })
+                    }
+                    onFavorite={(food) => favorite.mutate(food)}
+                    pendingFavorite={favorite.isPending ? (favorite.variables?.id ?? null) : null}
+                    allowManage={!demoSafeMode}
+                    onEdit={(food) => {
+                      setEditingFood(food);
+                      setEditorBarcode('');
+                      setView('food-editor');
+                    }}
+                  />
+                )}
+                {favorite.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    Не удалось обновить избранное.
+                  </p>
+                )}
+                {external.isFetching && <LoadingState label="Проверяем внешний каталог…" />}
+                {external.error && (
+                  <div className="nutrition-provider-fallback" role="status">
+                    <strong>Внешний каталог временно недоступен</strong>
+                    <span>Можно использовать локальный поиск или создать свой продукт.</span>
+                  </div>
+                )}
+                {!demoSafeMode && external.data && externalQuery === searchQuery && (
+                  <ExternalResults
+                    response={external.data}
+                    onSelect={selectExternalFood}
+                    pendingExternalKey={
+                      importExternal.isPending && importExternal.variables
+                        ? `${importExternal.variables.source.provider}-${importExternal.variables.external_id}`
+                        : null
+                    }
+                  />
+                )}
+                {importExternal.error && (
+                  <p className="nutrition-form-error" role="alert">
+                    Не удалось сохранить продукт. Попробуйте снова.
+                  </p>
+                )}
               </div>
-            )}
-            {!demoSafeMode && external.data && externalQuery === searchQuery && (
-              <ExternalResults
-                response={external.data}
-                onSelect={selectExternalFood}
-                pendingExternalKey={
-                  importExternal.isPending && importExternal.variables
-                    ? `${importExternal.variables.source.provider}-${importExternal.variables.external_id}`
-                    : null
-                }
-              />
-            )}
-            {importExternal.error && (
-              <p className="nutrition-form-error" role="alert">
-                Не удалось сохранить продукт. Попробуйте снова.
-              </p>
-            )}
+            </div>
           </div>
         )}
       </div>

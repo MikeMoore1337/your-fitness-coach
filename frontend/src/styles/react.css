@@ -8930,6 +8930,10 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   align-content: start;
   gap: 14px;
 }
+.nutrition-picker__search-flow,
+.nutrition-picker__result-content {
+  display: contents;
+}
 .nutrition-picker__search-control {
   position: relative;
   min-width: 0;
@@ -10513,6 +10517,49 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     padding: 14px max(20px, var(--yfc-layout-safe-right, env(safe-area-inset-right, 0px)))
       max(18px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)))
       max(20px, var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
+  }
+  html[data-yfc-keyboard='visible'] .nutrition-picker__browse[data-search-active='true'] {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+    overflow: hidden;
+    padding-block: 8px 0;
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-field {
+    position: sticky;
+    z-index: 3;
+    top: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-bg);
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-field
+    .ui-field__hint {
+    display: none;
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 14px;
+    padding-block: 9px max(18px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__result-content {
+    display: grid;
+    order: -1;
+    align-content: start;
+    min-width: 0;
+    gap: 14px;
   }
   .nutrition-food-result {
     grid-template-columns: minmax(0, 1fr);
