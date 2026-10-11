@@ -31,7 +31,9 @@ test.describe('Landing #903 weekly score scale', () => {
             }),
           );
           expect(styleValues).toHaveLength(5);
-          expect(new Set(styleValues.map(({ width, height }) => `${width}x${height}`)).size).toBe(1);
+          expect(new Set(styleValues.map(({ width, height }) => `${width}x${height}`)).size).toBe(
+            1,
+          );
           expect(styleValues[0]).toEqual(
             expect.objectContaining({
               borderStyle: 'solid',
@@ -48,10 +50,13 @@ test.describe('Landing #903 weekly score scale', () => {
           await expect(summary).toBeFocused();
           await page.keyboard.press('Tab');
           await expect(firstRadio).toBeFocused();
-          const focusStyle = await scores.nth(0).locator('span').evaluate((element) => {
-            const style = getComputedStyle(element);
-            return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
-          });
+          const focusStyle = await scores
+            .nth(0)
+            .locator('span')
+            .evaluate((element) => {
+              const style = getComputedStyle(element);
+              return { outlineStyle: style.outlineStyle, outlineWidth: style.outlineWidth };
+            });
           expect(focusStyle.outlineStyle).toBe('solid');
           expect(focusStyle.outlineWidth).toBe('2px');
 
