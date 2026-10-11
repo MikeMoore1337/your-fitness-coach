@@ -2441,10 +2441,7 @@ for (const width of [320, 360, 393, 430]) {
           const nextVisible = nextSetRect.top < innerHeight && nextSetRect.bottom > 0;
           const inputRestOverlap = Math.max(
             0,
-            Math.min(
-              currentInputRect.bottom,
-              rest.getBoundingClientRect().bottom,
-            ) -
+            Math.min(currentInputRect.bottom, rest.getBoundingClientRect().bottom) -
               Math.max(currentInput.getBoundingClientRect().top, rest.getBoundingClientRect().top),
           );
           return {
