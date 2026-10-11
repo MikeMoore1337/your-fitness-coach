@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>YFC #946 — состояние picker при открытой клавиатуре</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #dfe4df;
+        color: #17201b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #dfe4df;
+      }
+
+      .review {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(320px, 320px));
+        gap: 28px 24px;
+        width: max-content;
+        margin: 0 auto;
+      }
+
+      .direction {
+        display: grid;
+        gap: 10px;
+      }
+
+      .direction-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        color: #28332d;
+      }
+
+      .direction-heading strong {
+        font-size: 15px;
+        line-height: 20px;
+      }
+
+      .direction-heading span {
+        color: #5a685f;
+        font-size: 11px;
+        line-height: 16px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+
+      .artboard {
+        position: relative;
+        width: 320px;
+        height: 420px;
+        overflow: hidden;
+        border: 1px solid var(--outline);
+        border-radius: 18px 18px 0 0;
+        background: var(--page);
+        color: var(--text);
+        box-shadow: 0 12px 28px rgb(21 34 26 / 14%);
+      }
+
+      .light {
+        --page: #f4f7f3;
+        --surface: #ffffff;
+        --surface-muted: #edf1ed;
+        --text: #17201b;
+        --muted: #5b675f;
+        --outline: #758279;
+        --outline-soft: #c1cbc3;
+        --lime: #78bb00;
+        --lime-bright: #a4ed19;
+        --input: #ffffff;
+      }
+
+      .dark {
+        --page: #0f1312;
+        --surface: #151a18;
+        --surface-muted: #1d2321;
+        --text: #f2f6f2;
+        --muted: #a9b2ac;
+        --outline: #5e6963;
+        --outline-soft: #39423e;
+        --lime: #a5f51c;
+        --lime-bright: #a5f51c;
+        --input: #151a18;
+      }
+
+      .picker-header {
+        position: relative;
+        height: 82px;
+        padding: 13px 20px 0;
+        border-bottom: 1px solid var(--outline-soft);
+        background: color-mix(in srgb, var(--surface) 94%, var(--page));
+      }
+
+      .eyebrow {
+        color: var(--lime);
+        font-size: 11px;
+        font-weight: 800;
+        line-height: 16px;
+        letter-spacing: 0.07em;
+      }
+
+      .picker-title {
+        margin-top: 2px;
+        font-size: 21px;
+        font-weight: 800;
+        line-height: 27px;
+      }
+
+      .close {
+        position: absolute;
+        top: 14px;
+        right: 20px;
+        width: 44px;
+        height: 44px;
+        border: 1px solid var(--outline);
+        border-radius: 15px;
+        background: transparent;
+        color: var(--text);
+        font: inherit;
+        font-size: 23px;
+        line-height: 1;
+      }
+
+      .search-block {
+        padding: 14px 20px 0;
+      }
+
+      .search-label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 18px;
+      }
+
+      .search-input {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 46px;
+        padding: 0 5px 0 12px;
+        border: 2px solid var(--lime-bright);
+        border-radius: 15px;
+        background: var(--input);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--lime-bright) 32%, transparent);
+        font-size: 15px;
+        line-height: 20px;
+      }
+
+      .search-clear {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid var(--outline);
+        border-radius: 12px;
+        color: var(--text);
+        font-size: 18px;
+        line-height: 1;
+      }
+
+      .secondary-row {
+        display: flex;
+        align-items: center;
+        height: 44px;
+        margin-top: 12px;
+        padding: 0 12px;
+        border: 1px solid var(--outline-soft);
+        border-radius: 13px;
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        line-height: 16px;
+      }
+
+      .result-hint {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 16px;
+      }
+
+      .result-card {
+        position: relative;
+        height: 122px;
+        margin-top: 12px;
+        padding: 11px 12px;
+        border: 1px solid var(--outline);
+        border-radius: 15px;
+        background: var(--surface);
+      }
+
+      .result-title {
+        max-width: none;
+        padding-right: 48px;
+        color: var(--text);
+        font-size: 12.7px;
+        font-weight: 800;
+        line-height: 16px;
+      }
+
+      .result-kcal {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11.4px;
+        font-weight: 700;
+        line-height: 16px;
+      }
+
+      .result-meta {
+        position: absolute;
+        right: 12px;
+        bottom: 10px;
+        left: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 700;
+        line-height: 16px;
+      }
+
+      .origin {
+        padding: 1px 7px;
+        border: 1px solid var(--outline-soft);
+        border-radius: 9px;
+      }
+
+      .edit {
+        color: var(--text);
+      }
+
+      .favorite {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1;
+      }
+
+      .option-b .pinned-search {
+        height: 76px;
+        padding: 8px 20px 0;
+        border-bottom: 1px solid var(--outline-soft);
+        background: color-mix(in srgb, var(--surface) 94%, var(--page));
+      }
+
+      .option-b .pinned-search .search-label {
+        margin-bottom: 3px;
+        font-size: 11px;
+        line-height: 15px;
+      }
+
+      .option-b .pinned-search .search-input {
+        height: 42px;
+      }
+
+      .option-b .results-rail {
+        padding: 0 20px;
+      }
+
+      .option-b .result-hint {
+        margin-top: 9px;
+      }
+
+      .option-b .result-card {
+        margin-top: 9px;
+      }
+
+      .option-b .secondary-row {
+        margin-top: 10px;
+      }
+
+      @media (max-width: 720px) {
+        body {
+          padding: 16px;
+        }
+
+        .review {
+          grid-template-columns: 320px;
+          width: 320px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="review">
+      <section class="direction">
+        <div class="direction-heading">
+          <strong>Вариант A · фокусный поиск</strong>
+          <span>Light</span>
+        </div>
+        <div class="artboard light option-a" data-mock="a-light">
+          <header class="picker-header">
+            <div class="eyebrow">ДОБАВИТЬ В ЗАВТРАК</div>
+            <div class="picker-title">Выберите продукт</div>
+            <button class="close" aria-label="Закрыть">×</button>
+          </header>
+          <div class="search-block">
+            <label class="search-label">Найти продукт</label>
+            <div class="search-input"><span>рис</span><span class="search-clear">×</span></div>
+            <div class="secondary-row">▸&nbsp; Другие способы добавления</div>
+            <div class="result-hint">Нажмите на карточку, чтобы выбрать продукт</div>
+            <article class="result-card">
+              <div class="result-title">Рис белый приготовленный, без добавления масла</div>
+              <div class="result-kcal">130 ккал / 100 г</div>
+              <div class="favorite">☆</div>
+              <div class="result-meta"><span class="origin">Мой продукт</span><span class="edit">Изменить</span></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="direction">
+        <div class="direction-heading">
+          <strong>Вариант A · фокусный поиск</strong>
+          <span>Dark</span>
+        </div>
+        <div class="artboard dark option-a" data-mock="a-dark">
+          <header class="picker-header">
+            <div class="eyebrow">ДОБАВИТЬ В ЗАВТРАК</div>
+            <div class="picker-title">Выберите продукт</div>
+            <button class="close" aria-label="Закрыть">×</button>
+          </header>
+          <div class="search-block">
+            <label class="search-label">Найти продукт</label>
+            <div class="search-input"><span>рис</span><span class="search-clear">×</span></div>
+            <div class="secondary-row">▸&nbsp; Другие способы добавления</div>
+            <div class="result-hint">Нажмите на карточку, чтобы выбрать продукт</div>
+            <article class="result-card">
+              <div class="result-title">Рис белый приготовленный, без добавления масла</div>
+              <div class="result-kcal">130 ккал / 100 г</div>
+              <div class="favorite">☆</div>
+              <div class="result-meta"><span class="origin">Мой продукт</span><span class="edit">Изменить</span></div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="direction">
+        <div class="direction-heading">
+          <strong>Вариант B · результаты в приоритете</strong>
+          <span>Light</span>
+        </div>
+        <div class="artboard light option-b" data-mock="b-light">
+          <header class="picker-header">
+            <div class="eyebrow">ДОБАВИТЬ В ЗАВТРАК</div>
+            <div class="picker-title">Выберите продукт</div>
+            <button class="close" aria-label="Закрыть">×</button>
+          </header>
+          <div class="pinned-search">
+            <label class="search-label">Найти продукт</label>
+            <div class="search-input"><span>рис</span><span class="search-clear">×</span></div>
+          </div>
+          <div class="results-rail">
+            <div class="result-hint">Нажмите на карточку, чтобы выбрать продукт</div>
+            <article class="result-card">
+              <div class="result-title">Рис белый приготовленный, без добавления масла</div>
+              <div class="result-kcal">130 ккал / 100 г</div>
+              <div class="favorite">☆</div>
+              <div class="result-meta"><span class="origin">Мой продукт</span><span class="edit">Изменить</span></div>
+            </article>
+            <div class="secondary-row">▸&nbsp; Другие способы добавления</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="direction">
+        <div class="direction-heading">
+          <strong>Вариант B · результаты в приоритете</strong>
+          <span>Dark</span>
+        </div>
+        <div class="artboard dark option-b" data-mock="b-dark">
+          <header class="picker-header">
+            <div class="eyebrow">ДОБАВИТЬ В ЗАВТРАК</div>
+            <div class="picker-title">Выберите продукт</div>
+            <button class="close" aria-label="Закрыть">×</button>
+          </header>
+          <div class="pinned-search">
+            <label class="search-label">Найти продукт</label>
+            <div class="search-input"><span>рис</span><span class="search-clear">×</span></div>
+          </div>
+          <div class="results-rail">
+            <div class="result-hint">Нажмите на карточку, чтобы выбрать продукт</div>
+            <article class="result-card">
+              <div class="result-title">Рис белый приготовленный, без добавления масла</div>
+              <div class="result-kcal">130 ккал / 100 г</div>
+              <div class="favorite">☆</div>
+              <div class="result-meta"><span class="origin">Мой продукт</span><span class="edit">Изменить</span></div>
+            </article>
+            <div class="secondary-row">▸&nbsp; Другие способы добавления</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
