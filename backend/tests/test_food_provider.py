@@ -1322,3 +1322,46 @@ def test_open_food_facts_requires_identifying_user_agent_when_enabled() -> None:
     assert usda_configured.food_usda_enabled is True
     assert usda_configured.usda_fdc_api_key.get_secret_value() == "server-side-key"
     assert "server-side-key" not in repr(usda_configured)
+    proxied = Settings(
+        **common,
+        food_usda_enabled=True,
+        usda_fdc_api_key="server-side-key",
+        usda_fdc_proxy_url=" socks5h://host.docker.internal:1082 ",
+    )
+    assert proxied.usda_fdc_proxy_url == "socks5h://host.docker.internal:1082"
+    for invalid_proxy in (
+        "https://example.com:443",
+        "socks5://remote.example.org:1082",
+        "socks5h://username:secret@localhost:1082",
+        "socks5h://localhost:1082/other",
+        "socks5h://localhost:1082?key=exposed",
+        "socks5h://localhost",
+        "socks5h://localhost:99999",
+    ):
+        with pytest.raises(ValidationError, match="USDA_FDC_PROXY_URL"):
+            Settings(**common, usda_fdc_proxy_url=invalid_proxy)
+
+
+def test_usda_provider_uses_proxy_only_when_explicitly_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configured_proxy = "socks5h://host.docker.internal:1082"
+    captured_proxies: list[str | None] = []
+    actual_client = httpx.Client
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "api.nal.usda.gov"
+        return httpx.Response(200, request=request, json={"foods": []})
+
+    def client_spy(**kwargs):
+        captured_proxies.append(kwargs.pop("proxy"))
+        kwargs["transport"] = httpx.MockTransport(handler)
+        return actual_client(**kwargs)
+
+    monkeypatch.setattr(usda_module, "_REQUEST_BUDGET", usda_module.RequestBudget(15))
+    monkeypatch.setattr(usda_module.httpx, "Client", client_spy)
+    proxied = USDAFoodDataCentralProvider(api_key="test-key", proxy_url=configured_proxy)
+    direct = USDAFoodDataCentralProvider(api_key="test-key")
+    assert proxied.search("rice", limit=2) == []
+    assert direct.search("rice", limit=2) == []
+    assert captured_proxies == [configured_proxy, None]
