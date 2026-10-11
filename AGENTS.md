@@ -59,7 +59,8 @@ visual redesigns.
   in `docs/design/component-states-v2.1.md#unified-yfc-selected-states`. Preserve native/ARIA
   semantics and separate selection from focus, hover, pressed, disabled and semantic statuses.
   Mobile primary navigation uses the shared full-pill radius at every breakpoint and the existing
-  Liquid Glass material/fallback contract; never introduce a page-local selected-state system.
+  frosted matte Liquid Glass material/fallback contract based on the rest timer, not the Landing
+  header's transparency; never introduce a page-local selected-state system.
 
 ## RUSSIAN_USER_FACING_UI (mandatory)
 

@@ -84,7 +84,16 @@ async function mockActiveWorkout(
     : null;
   let failSetPatch = false;
   let nextPatchBarrier: Promise<void> | null = null;
-  const patches: Array<{ setId: number; body: Record<string, unknown>; status?: number }> = [];
+  const patches: Array<{
+    setId: number;
+    method: string;
+    endpoint: string;
+    body: Record<string, unknown>;
+    receivedAt: number;
+    respondedAt?: number;
+    status?: number;
+    response?: unknown;
+  }> = [];
   let resolveCardioCompleted!: () => void;
   const cardioCompleted = new Promise<void>((resolve) => {
     resolveCardioCompleted = resolve;
@@ -612,25 +621,30 @@ async function mockActiveWorkout(
         expected_version: number;
         mutation_id: string;
       };
-      const patch = { setId, body, status: undefined as number | undefined };
+      const patch: (typeof patches)[number] = {
+        setId,
+        method: request.method(),
+        endpoint: path,
+        body,
+        receivedAt: Date.now(),
+      };
       patches.push(patch);
+      const respond = (status: number, response: unknown) => {
+        Object.assign(patch, { status, response, respondedAt: Date.now() });
+        return route.fulfill({ status, json: response });
+      };
       const barrier = nextPatchBarrier;
       nextPatchBarrier = null;
       if (barrier) await barrier;
       if (failSetPatch) {
-        patch.status = 503;
-        return route.fulfill({ status: 503, json: { detail: 'Сервис временно недоступен' } });
+        return respond(503, { detail: 'Сервис временно недоступен' });
       }
       const current = sets.get(setId)!;
       if (body.expected_version !== current.version) {
-        patch.status = 409;
-        return route.fulfill({
-          status: 409,
-          json: {
-            detail: {
-              code: 'workout_set_version_conflict',
-              current: { id: setId, ...current },
-            },
+        return respond(409, {
+          detail: {
+            code: 'workout_set_version_conflict',
+            current: { id: setId, ...current },
           },
         });
       }
@@ -649,11 +663,8 @@ async function mockActiveWorkout(
         version: current.version + 1,
       };
       sets.set(setId, next);
-      patch.status = 200;
       if (setId === 204 && next.is_completed) resolveCardioCompleted();
-      return route.fulfill({
-        json: { id: setId, set_number: setId === 204 ? 1 : setId - 200, ...next },
-      });
+      return respond(200, { id: setId, set_number: setId === 204 ? 1 : setId - 200, ...next });
     }
     if (path.endsWith('/workouts/42/finish')) {
       finished = true;
@@ -759,6 +770,50 @@ for (const edit of ['weight', 'reps', 'rir', 'multiple'] as const) {
   test(`P1 immediate completion preserves ${edit} and survives a version conflict`, async ({
     page,
   }, info) => {
+    await page.addInitScript(() => {
+      const events: unknown[] = [];
+      (window as unknown as { __p1DraftTrace: unknown[] }).__p1DraftTrace = events;
+      for (const type of ['pointerdown', 'pointerup', 'click'])
+        document.addEventListener(
+          type,
+          (event) => {
+            const button = event.target instanceof Element ? event.target.closest('button') : null;
+            events.push({
+              type,
+              target: event.target instanceof Element ? event.target.tagName : null,
+              label: button?.getAttribute('aria-label'),
+              pressed: button?.getAttribute('aria-pressed'),
+              setId: button?.closest('[data-workout-set-id]')?.getAttribute('data-workout-set-id'),
+              x: event instanceof MouseEvent ? event.clientX : null,
+              y: event instanceof MouseEvent ? event.clientY : null,
+              scrollY,
+              time: performance.now(),
+            });
+          },
+          true,
+        );
+      new MutationObserver((records) => {
+        for (const record of records) {
+          const target = record.target;
+          if (
+            target instanceof Element &&
+            target.matches('button[aria-label^="2 —"]') &&
+            target.closest('[data-workout-set-id="201"]')
+          )
+            events.push({
+              type: 'selection',
+              from: record.oldValue,
+              to: target.getAttribute('aria-pressed'),
+              time: performance.now(),
+            });
+        }
+      }).observe(document, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['aria-pressed'],
+        attributeOldValue: true,
+      });
+    });
     const server = await mockActiveWorkout(page);
     await page.goto('/app');
     await page.getByRole('button', { name: 'Клиент' }).click();
@@ -768,12 +823,39 @@ for (const edit of ['weight', 'reps', 'rir', 'multiple'] as const) {
       await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
     if (edit === 'reps' || edit === 'multiple')
       await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
-    if (edit === 'rir' || edit === 'multiple')
-      await first.getByRole('button', { name: /^2 —/ }).click();
+    if (edit === 'rir' || edit === 'multiple') {
+      const choice = first.getByRole('button', { name: /^2 —/ });
+      await choice.click();
+      const selected = await choice.getAttribute('aria-pressed');
+      if (selected !== 'true')
+        await info.attach('selection-events.json', {
+          body: JSON.stringify({
+            patches: server.patches,
+            events: await page.evaluate(
+              () => (window as unknown as { __p1DraftTrace: unknown[] }).__p1DraftTrace,
+            ),
+          }),
+          contentType: 'application/json',
+        });
+      expect(selected).toBe('true');
+    }
     server.readSet(201).version += 1;
     await first.getByRole('button', { name: /^Завершить:/ }).click();
     await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+    await info.attach('completion-network.json', {
+      body: JSON.stringify(
+        {
+          patches: server.patches,
+          events: await page.evaluate(
+            () => (window as unknown as { __p1DraftTrace: unknown[] }).__p1DraftTrace,
+          ),
+        },
+        null,
+        2,
+      ),
+      contentType: 'application/json',
+    });
     expect(server.readSet(201)).toMatchObject({
       is_completed: true,
       actual_weight: edit === 'weight' || edit === 'multiple' ? 42.5 : null,
@@ -784,10 +866,6 @@ for (const edit of ['weight', 'reps', 'rir', 'multiple'] as const) {
     expect(
       server.patches.filter((patch) => patch.body.is_completed === true && patch.status === 200),
     ).toHaveLength(1);
-    await info.attach('completion-network.json', {
-      body: JSON.stringify(server.patches, null, 2),
-      contentType: 'application/json',
-    });
   });
 }
 
@@ -812,6 +890,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
     await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
     expect(server.readSet(201).is_completed).toBe(false);
+    await page.locator('.active-workout-sync').scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`completion-error-360-${theme}.png`) });
     server.failSetPatch(false);
     await first.getByRole('button', { name: /^Повторить сохранение:/ }).click();
@@ -928,6 +1007,35 @@ for (const width of [320, 360, 393, 430]) {
       );
       expect(queue.queue).toEqual([]);
       await page.screenshot({ path: info.outputPath(`completion-after-${width}-${theme}.png`) });
+      await info.attach('rest-dock-materials.json', {
+        body: JSON.stringify(
+          await page
+            .locator('.active-workout-rest[data-glass], #appBottomNav')
+            .evaluateAll((elements) =>
+              elements.map((element) => {
+                const style = getComputedStyle(element);
+                return {
+                  className: element.className,
+                  variant: element.getAttribute('data-glass-variant'),
+                  background: style.backgroundColor,
+                  reflection: style.backgroundImage,
+                  blur: style.backdropFilter,
+                  webkitBlur: style.getPropertyValue('-webkit-backdrop-filter'),
+                  border: style.borderColor,
+                  shadow: style.boxShadow,
+                  opacity: style.opacity,
+                  materialOpacity: style.getPropertyValue('--glass-opacity'),
+                  nestedBlur: [...element.querySelectorAll('[data-glass]')].map(
+                    (child) => getComputedStyle(child).backdropFilter,
+                  ),
+                };
+              }),
+            ),
+          null,
+          2,
+        ),
+        contentType: 'application/json',
+      });
       const completedPatch = server.patches.findIndex(
         (patch) => patch.status === 200 && patch.body.is_completed === true,
       );
@@ -1049,9 +1157,67 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(first.getByRole('spinbutton', { name: /^Вес,/ })).toHaveValue('42.5');
     await expect(first.getByRole('spinbutton', { name: /^Повторы,/ })).toHaveValue('9');
     expect(server.readSet(201).is_completed).toBe(false);
+    await page.locator('.active-workout-sync').scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`completion-storage-error-360-${theme}.png`) });
   });
 }
+
+test('P1 late workout read cannot revert a confirmed completion', async ({ page }, info) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+  await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+  const stale = await page.evaluate(async () => (await fetch('/api/v1/workouts/today')).json());
+  let release!: () => void;
+  let requested!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    requested = resolve;
+  });
+  await page.route(
+    '**/api/v1/workouts/today',
+    async (route) => {
+      requested();
+      await barrier;
+      await route.fulfill({ json: stale });
+    },
+    { times: 1 },
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await started;
+  const staleResponse = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/workouts/today'),
+  );
+  try {
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '202',
+    );
+  } finally {
+    release();
+  }
+  await (await staleResponse).finished();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
+  expect(server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  await info.attach('late-read.json', {
+    body: JSON.stringify({ stale, patches: server.patches, server: server.readSet(201) }),
+    contentType: 'application/json',
+  });
+});
 
 test('P1 combined API and storage failure never claims durable completion', async ({ page }) => {
   const server = await mockActiveWorkout(page);
@@ -2875,7 +3041,41 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           .scrollIntoViewIfNeeded();
         await page.screenshot({ path: testInfo.outputPath(`selection-rir-${width}-${theme}.png`) });
 
-        await navigation.getByRole('link', { name: 'Питание', exact: true }).tap();
+        const nutritionLink = navigation.getByRole('link', { name: 'Питание', exact: true });
+        const materialGeometry = await nutritionLink.evaluate((link) => {
+          const dock = link.closest<HTMLElement>('#appBottomNav')!;
+          const cta = document.querySelector<HTMLElement>(
+            '[data-workout-set-id="202"] [data-workout-field="done"]',
+          )!;
+          const control = link.getBoundingClientRect();
+          const targetY = control.y + control.height / 2;
+          const old = cta.getBoundingClientRect();
+          const scrollBefore = window.scrollY;
+          window.scrollBy({ top: old.y + old.height / 2 - targetY, behavior: 'instant' });
+          const style = getComputedStyle(dock);
+          return {
+            cta: cta.getBoundingClientRect().toJSON(),
+            targetY,
+            targetIsNavigation: dock.contains(
+              document.elementFromPoint(control.x + control.width / 2, targetY),
+            ),
+            scrollBefore,
+            scrollAfter: window.scrollY,
+            background: style.backgroundColor,
+            blur: style.backdropFilter,
+            opacity: style.opacity,
+          };
+        });
+        expect(materialGeometry.cta.top).toBeLessThan(materialGeometry.targetY);
+        expect(materialGeometry.cta.bottom).toBeGreaterThan(materialGeometry.targetY);
+        expect(materialGeometry.targetIsNavigation).toBe(true);
+        await expect(context.panel).toBeVisible();
+        await page.screenshot({ path: testInfo.outputPath(`dock-over-cta-${width}-${theme}.png`) });
+        await testInfo.attach('dock-over-cta.json', {
+          body: JSON.stringify(materialGeometry),
+          contentType: 'application/json',
+        });
+        await nutritionLink.tap();
         await expect(page).toHaveURL(/section=nutrition/);
         await expect(page.locator('.app-section--nutrition')).toBeVisible();
         await expect(

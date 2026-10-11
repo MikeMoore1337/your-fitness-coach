@@ -4,6 +4,8 @@
   --glass-clear-opacity: 0.64;
   --glass-regular-opacity: 0.78;
   --glass-tinted-opacity: 0.9;
+  --glass-nav-opacity: 0.95;
+  --glass-nav-blur: 20px;
   --glass-saturation: 1.12;
   --glass-brightness: 1.03;
   --glass-border-opacity: 0.34;
@@ -18,6 +20,7 @@
   --glass-rgb: 248 250 250;
   --glass-regular-opacity: 0.8;
   --glass-tinted-opacity: 0.92;
+  --glass-nav-opacity: 0.96;
   --glass-border-opacity: 0.2;
   --glass-highlight-opacity: 0.5;
   --glass-rim-light: rgb(255 255 255 / 86%);
@@ -83,19 +86,10 @@
   --glass-blur: 8px;
 }
 
-/* Landing-header material adapted for readable navigation above arbitrary scrolling content. */
+/* The rest panel's matte material keeps scrolling text and form details behind navigation. */
 :root .app-bottom-nav[data-glass][data-glass-variant] {
-  --glass-rgb: 9 11 11;
-  --glass-opacity: 0.68;
-  --glass-blur: 18px;
-  --glass-saturation: 1.2;
-  --glass-highlight-opacity: 0.04;
-}
-
-:root[data-color-scheme='light'] .app-bottom-nav[data-glass][data-glass-variant] {
-  --glass-rgb: 248 250 250;
-  --glass-opacity: 0.7;
-  --glass-highlight-opacity: 0.24;
+  --glass-opacity: var(--glass-nav-opacity);
+  --glass-blur: var(--glass-nav-blur);
 }
 
 :root .app-quick-add-panel[data-glass][data-glass-variant],

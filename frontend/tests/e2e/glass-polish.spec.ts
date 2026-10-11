@@ -65,8 +65,7 @@ for (const theme of ['dark', 'light'] as const) {
         context.fillRect(0, 0, 1, 1);
         return context.getImageData(0, 0, 1, 1).data[3]! / 255;
       });
-      expect(alpha).toBeGreaterThanOrEqual(surface === sheet ? 0.9 - 1 / 255 : 0.5);
-      if (surface !== sheet) expect(alpha).toBeLessThanOrEqual(0.8);
+      expect(alpha).toBeGreaterThanOrEqual(0.9 - 1 / 255);
       expect(alpha).toBeLessThan(1);
     }
     await expect(page.locator('.progress-overview')).not.toHaveAttribute('data-glass');
@@ -168,7 +167,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(add).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     await page.reload();
-    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(18px\)/);
+    await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(20px\)/);
     // Exercise the unsupported-backdrop branch by removing only its @supports opt-in.
     const supportRules = await page.evaluate(() => {
       let count = 0;
@@ -211,7 +210,7 @@ for (const theme of ['dark', 'light'] as const) {
     for (const width of [320, 360, 393, 430]) {
       await page.setViewportSize({ width, height: 844 });
       const dock = page.locator('#appBottomNav');
-      await expect(dock).toHaveCSS('backdrop-filter', /blur\(18px\)/);
+      await expect(dock).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       const dockBox = (await dock.boundingBox())!;
       expect(dockBox.y + dockBox.height).toBeLessThanOrEqual(844 - 34 - 12);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
