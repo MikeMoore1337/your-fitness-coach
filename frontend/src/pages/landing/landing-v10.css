@@ -1283,20 +1283,32 @@
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
+  aspect-ratio: 1;
   gap: 3px;
-  border: 1px solid var(--landing-line);
-  border-radius: var(--radius-control);
+  border: 0;
+  border-radius: 50%;
   font-size: 12px;
+  cursor: pointer;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
 }
 .ref-scores input {
   accent-color: var(--v2-lime);
   margin: 0;
 }
+.ref-scores label:focus-within {
+  outline: 2px solid var(--v2-lime);
+  outline-offset: 3px;
+}
 .ref-weekly details > p {
   font-size: 11px;
 }
 .ref-scores label:has(:checked) {
-  border-color: var(--v2-lime);
+  background: color-mix(in srgb, var(--v2-lime) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--v2-lime);
+  color: var(--v2-lime);
 }
 @media (max-width: 430px) {
   .ref-weekly {
