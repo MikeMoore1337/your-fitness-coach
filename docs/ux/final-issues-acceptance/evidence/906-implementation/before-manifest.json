@@ -1,0 +1,1798 @@
+[
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "qhd",
+      "width": 2560,
+      "height": 1440
+    },
+    "filename": "athletes-qhd-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 2560,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 128,
+        "y": 589.46875,
+        "width": 764,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "qhd125",
+      "width": 2560,
+      "height": 1440,
+      "cssZoom": 1.25
+    },
+    "filename": "athletes-qhd125-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 9169
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1075,
+        "bottom": 1075
+      },
+      "image": {
+        "x": 0,
+        "y": -102.5,
+        "width": 2560,
+        "height": 1177.5,
+        "bottom": 1075
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1275,
+        "height": 948.375,
+        "bottom": 948.375
+      },
+      "cta": {
+        "x": 160,
+        "y": 736.875,
+        "width": 955,
+        "height": 62,
+        "bottom": 798.875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "hd",
+      "width": 1920,
+      "height": 1080
+    },
+    "filename": "athletes-hd-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1920,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 96,
+        "y": 589.46875,
+        "width": 828,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "filename": "athletes-desktop-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 7389
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 72,
+        "y": 589.46875,
+        "width": 876,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "ultrawide",
+      "width": 3440,
+      "height": 1440
+    },
+    "filename": "athletes-ultrawide-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "document": {
+        "width": 3440,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 3440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 3440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 172,
+        "y": 589.46875,
+        "width": 676,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile320",
+      "width": 320,
+      "height": 844
+    },
+    "filename": "athletes-mobile320-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "document": {
+        "width": 320,
+        "height": 9601
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 670.625,
+        "bottom": 670.625
+      },
+      "cta": {
+        "x": 20,
+        "y": 429.625,
+        "width": 280,
+        "height": 112,
+        "bottom": 541.625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile390",
+      "width": 390,
+      "height": 844
+    },
+    "filename": "athletes-mobile390-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 9348
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 661.15625,
+        "bottom": 661.15625
+      },
+      "cta": {
+        "x": 20,
+        "y": 436.15625,
+        "width": 350,
+        "height": 112,
+        "bottom": 548.15625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile430",
+      "width": 430,
+      "height": 932
+    },
+    "filename": "athletes-mobile430-dark-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "document": {
+        "width": 430,
+        "height": 9190
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 671.65625,
+        "bottom": 671.65625
+      },
+      "cta": {
+        "x": 20,
+        "y": 446.65625,
+        "width": 360,
+        "height": 112,
+        "bottom": 558.65625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "qhd",
+      "width": 2560,
+      "height": 1440
+    },
+    "filename": "athletes-qhd-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 2560,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 128,
+        "y": 589.46875,
+        "width": 764,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "qhd125",
+      "width": 2560,
+      "height": 1440,
+      "cssZoom": 1.25
+    },
+    "filename": "athletes-qhd125-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 9169
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1075,
+        "bottom": 1075
+      },
+      "image": {
+        "x": 0,
+        "y": -102.5,
+        "width": 2560,
+        "height": 1177.5,
+        "bottom": 1075
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1275,
+        "height": 948.375,
+        "bottom": 948.375
+      },
+      "cta": {
+        "x": 160,
+        "y": 736.875,
+        "width": 955,
+        "height": 62,
+        "bottom": 798.875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "hd",
+      "width": 1920,
+      "height": 1080
+    },
+    "filename": "athletes-hd-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1920,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 96,
+        "y": 589.46875,
+        "width": 828,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "filename": "athletes-desktop-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 7389
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 72,
+        "y": 589.46875,
+        "width": 876,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "ultrawide",
+      "width": 3440,
+      "height": 1440
+    },
+    "filename": "athletes-ultrawide-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "document": {
+        "width": 3440,
+        "height": 7345
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 3440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 3440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 759.0625,
+        "bottom": 759.0625
+      },
+      "cta": {
+        "x": 172,
+        "y": 589.46875,
+        "width": 676,
+        "height": 50,
+        "bottom": 639.46875
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile320",
+      "width": 320,
+      "height": 844
+    },
+    "filename": "athletes-mobile320-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "document": {
+        "width": 320,
+        "height": 9601
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 670.625,
+        "bottom": 670.625
+      },
+      "cta": {
+        "x": 20,
+        "y": 429.625,
+        "width": 280,
+        "height": 112,
+        "bottom": 541.625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile390",
+      "width": 390,
+      "height": 844
+    },
+    "filename": "athletes-mobile390-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 9348
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 661.15625,
+        "bottom": 661.15625
+      },
+      "cta": {
+        "x": 20,
+        "y": 436.15625,
+        "width": 350,
+        "height": 112,
+        "bottom": 548.15625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-athletes",
+    "audience": "athletes",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile430",
+      "width": 430,
+      "height": 932
+    },
+    "filename": "athletes-mobile430-light-before.jpg",
+    "metrics": {
+      "title": "Your Fitness Coach — тренировки, питание и прогресс в браузере и Telegram",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "document": {
+        "width": 430,
+        "height": 9190
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 671.65625,
+        "bottom": 671.65625
+      },
+      "cta": {
+        "x": 20,
+        "y": 446.65625,
+        "width": 360,
+        "height": 112,
+        "bottom": 558.65625
+      },
+      "imageNatural": {
+        "width": 1440,
+        "height": 901
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "qhd",
+      "width": 2560,
+      "height": 1440
+    },
+    "filename": "trainers-qhd-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 8283
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 2560,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 128,
+        "y": 560.90625,
+        "width": 764,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "qhd125",
+      "width": 2560,
+      "height": 1440,
+      "cssZoom": 1.25
+    },
+    "filename": "trainers-qhd125-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 10363
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1075,
+        "bottom": 1075
+      },
+      "image": {
+        "x": 0,
+        "y": -102.5,
+        "width": 2560,
+        "height": 1177.5,
+        "bottom": 1075
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1275,
+        "height": 912.6875,
+        "bottom": 912.6875
+      },
+      "cta": {
+        "x": 160,
+        "y": 701.1875,
+        "width": 955,
+        "height": 62,
+        "bottom": 763.1875
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "hd",
+      "width": 1920,
+      "height": 1080
+    },
+    "filename": "trainers-hd-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 8304
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1920,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 96,
+        "y": 560.90625,
+        "width": 828,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "filename": "trainers-desktop-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 8493
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 72,
+        "y": 560.90625,
+        "width": 876,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "ultrawide",
+      "width": 3440,
+      "height": 1440
+    },
+    "filename": "trainers-ultrawide-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "document": {
+        "width": 3440,
+        "height": 8283
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 3440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 3440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 172,
+        "y": 560.90625,
+        "width": 676,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile320",
+      "width": 320,
+      "height": 844
+    },
+    "filename": "trainers-mobile320-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "document": {
+        "width": 320,
+        "height": 11875
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 686.796875,
+        "bottom": 686.796875
+      },
+      "cta": {
+        "x": 20,
+        "y": 445.796875,
+        "width": 280,
+        "height": 112,
+        "bottom": 557.796875
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile390",
+      "width": 390,
+      "height": 844
+    },
+    "filename": "trainers-mobile390-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 11191
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 653.84375,
+        "bottom": 653.84375
+      },
+      "cta": {
+        "x": 20,
+        "y": 428.84375,
+        "width": 350,
+        "height": 112,
+        "bottom": 540.84375
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "dark",
+    "viewport": {
+      "name": "mobile430",
+      "width": 430,
+      "height": 932
+    },
+    "filename": "trainers-mobile430-dark-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "document": {
+        "width": 430,
+        "height": 10968
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 663.59375,
+        "bottom": 663.59375
+      },
+      "cta": {
+        "x": 20,
+        "y": 438.59375,
+        "width": 360,
+        "height": 112,
+        "bottom": 550.59375
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "qhd",
+      "width": 2560,
+      "height": 1440
+    },
+    "filename": "trainers-qhd-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 8283
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 2560,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 128,
+        "y": 560.90625,
+        "width": 764,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "qhd125",
+      "width": 2560,
+      "height": 1440,
+      "cssZoom": 1.25
+    },
+    "filename": "trainers-qhd125-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 2560,
+        "height": 1440
+      },
+      "document": {
+        "width": 2560,
+        "height": 10363
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 2560,
+        "height": 1075,
+        "bottom": 1075
+      },
+      "image": {
+        "x": 0,
+        "y": -102.5,
+        "width": 2560,
+        "height": 1177.5,
+        "bottom": 1075
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1275,
+        "height": 912.6875,
+        "bottom": 912.6875
+      },
+      "cta": {
+        "x": 160,
+        "y": 701.1875,
+        "width": 955,
+        "height": 62,
+        "bottom": 763.1875
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "hd",
+      "width": 1920,
+      "height": 1080
+    },
+    "filename": "trainers-hd-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 1920,
+        "height": 1080
+      },
+      "document": {
+        "width": 1920,
+        "height": 8304
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1920,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1920,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 96,
+        "y": 560.90625,
+        "width": 828,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900
+    },
+    "filename": "trainers-desktop-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "document": {
+        "width": 1440,
+        "height": 8493
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 1440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 1440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 72,
+        "y": 560.90625,
+        "width": 876,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "ultrawide",
+      "width": 3440,
+      "height": 1440
+    },
+    "filename": "trainers-ultrawide-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 3440,
+        "height": 1440
+      },
+      "document": {
+        "width": 3440,
+        "height": 8283
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 3440,
+        "height": 860,
+        "bottom": 860
+      },
+      "image": {
+        "x": 0,
+        "y": -82,
+        "width": 3440,
+        "height": 942,
+        "bottom": 860
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 1020,
+        "height": 730.5,
+        "bottom": 730.5
+      },
+      "cta": {
+        "x": 172,
+        "y": 560.90625,
+        "width": 676,
+        "height": 50,
+        "bottom": 610.90625
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile320",
+      "width": 320,
+      "height": 844
+    },
+    "filename": "trainers-mobile320-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "document": {
+        "width": 320,
+        "height": 11875
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 320,
+        "height": 686.796875,
+        "bottom": 686.796875
+      },
+      "cta": {
+        "x": 20,
+        "y": 445.796875,
+        "width": 280,
+        "height": 112,
+        "bottom": 557.796875
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile390",
+      "width": 390,
+      "height": 844
+    },
+    "filename": "trainers-mobile390-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "document": {
+        "width": 390,
+        "height": 11191
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 653.84375,
+        "bottom": 653.84375
+      },
+      "cta": {
+        "x": 20,
+        "y": 428.84375,
+        "width": 350,
+        "height": 112,
+        "bottom": 540.84375
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  },
+  {
+    "route": "/for-trainers",
+    "audience": "trainers",
+    "theme": "light",
+    "viewport": {
+      "name": "mobile430",
+      "width": 430,
+      "height": 932
+    },
+    "filename": "trainers-mobile430-light-before.jpg",
+    "metrics": {
+      "title": "Coach OS для тренера — клиенты, прогресс и рабочий день | Your Fitness Coach",
+      "viewport": {
+        "width": 430,
+        "height": 932
+      },
+      "document": {
+        "width": 430,
+        "height": 10968
+      },
+      "hero": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "image": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 850,
+        "bottom": 850
+      },
+      "copy": {
+        "x": 0,
+        "y": 0,
+        "width": 430,
+        "height": 663.59375,
+        "bottom": 663.59375
+      },
+      "cta": {
+        "x": 20,
+        "y": 438.59375,
+        "width": 360,
+        "height": 112,
+        "bottom": 550.59375
+      },
+      "imageNatural": {
+        "width": 1000,
+        "height": 750
+      },
+      "overflowX": false,
+      "fonts": "loaded"
+    }
+  }
+]
