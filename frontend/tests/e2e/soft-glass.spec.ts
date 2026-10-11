@@ -62,9 +62,9 @@ for (const theme of ['light', 'dark'] as const) {
           ? theme === 'dark'
             ? 'rgb(32, 37, 37)'
             : 'rgb(243, 245, 245)'
-            : theme === 'dark'
-              ? 'rgba(28, 33, 33, 0.95)'
-              : 'rgba(248, 250, 250, 0.96)',
+          : theme === 'dark'
+            ? 'rgba(28, 33, 33, 0.95)'
+            : 'rgba(248, 250, 250, 0.96)',
       );
       const actionContrast = await page
         .getByRole('button', { name: 'Посмотреть упражнения', exact: true })
