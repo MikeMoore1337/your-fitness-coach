@@ -773,7 +773,7 @@ def test_usda_search_translates_versioned_ru_alias_and_normalizes_per_100g() -> 
     )
     results = provider.search("  КУРИНАЯ   ГРУДКА  ", limit=50)
 
-    assert FOOD_SEARCH_ALIAS_VERSION == "ru-en-v2"
+    assert FOOD_SEARCH_ALIAS_VERSION == "ru-en-v3"
     assert USDA_RU_DISPLAY_VERSION == "fdc-fndds-2021-2023-ru-v2"
     assert generic_food_search_query("куриная грудка") == "chicken breast"
     assert len(results) == 1
