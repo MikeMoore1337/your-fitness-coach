@@ -13,7 +13,7 @@
 | `NOT_IMPLEMENTED_OWNER_GATE` | 8: #861, #862, #863, #864, #866, #873, #874, #906 |
 | `BLOCKED_OWNER_INPUT` | 1: #871 |
 | `INTENDED_BEHAVIOR` / `NOT_REPRODUCED` | 0 как итоговый статус Issue; отдельные под-критерии отмечены в матрице |
-| `MASTER_SHA` | `c922851b082dfbacc580d78f9e6e5dc60cb23522` |
+| `MASTER_SHA` | `7430b95c528dd76123e79559728c51ed444175f8` (live `origin/master` at audit update) |
 | Production | Не изменялась |
 | Merge/deploy | Не выполнялись |
 
