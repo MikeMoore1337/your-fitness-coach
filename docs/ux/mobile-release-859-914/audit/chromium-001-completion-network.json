@@ -1,0 +1,108 @@
+[
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": null,
+      "actual_weight": 42.5,
+      "rir": null,
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": false,
+      "expected_version": 1,
+      "mutation_id": "667d56a8-2b0e-454f-90f5-077b47f27a50"
+    },
+    "receivedAt": 1791717479748,
+    "status": 200,
+    "response": {
+      "id": 201,
+      "set_number": 1,
+      "actual_reps": null,
+      "actual_weight": 42.5,
+      "rir": null,
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": false,
+      "version": 2,
+      "planned_role": "top",
+      "duration_minutes": null,
+      "distance_km": null,
+      "average_heart_rate_bpm": null,
+      "heart_rate_zone": null
+    },
+    "respondedAt": 1791717480193
+  },
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "expected_version": 1,
+      "mutation_id": "595d4afd-a891-4991-ae9e-af7dccb7d47e"
+    },
+    "receivedAt": 1791717480207,
+    "status": 409,
+    "response": {
+      "detail": {
+        "code": "workout_set_version_conflict",
+        "current": {
+          "id": 201,
+          "actual_reps": null,
+          "actual_weight": 42.5,
+          "rir": null,
+          "set_kind": "working",
+          "reached_failure": false,
+          "is_completed": false,
+          "version": 2,
+          "planned_role": "top",
+          "duration_minutes": null,
+          "distance_km": null,
+          "average_heart_rate_bpm": null,
+          "heart_rate_zone": null
+        }
+      }
+    },
+    "respondedAt": 1791717480207
+  },
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "expected_version": 2,
+      "mutation_id": "595d4afd-a891-4991-ae9e-af7dccb7d47e"
+    },
+    "receivedAt": 1791717480211,
+    "status": 200,
+    "response": {
+      "id": 201,
+      "set_number": 1,
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "version": 3,
+      "planned_role": "top",
+      "duration_minutes": null,
+      "distance_km": null,
+      "average_heart_rate_bpm": null,
+      "heart_rate_zone": null
+    },
+    "respondedAt": 1791717480211
+  }
+]

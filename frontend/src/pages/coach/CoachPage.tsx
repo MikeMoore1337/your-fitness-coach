@@ -1458,6 +1458,7 @@ export default function CoachPage({
             <button
               type="button"
               aria-current={tab === key ? 'page' : undefined}
+              data-yfc-choice="compact"
               className={tab === key ? 'is-active' : 'secondary'}
               aria-label={key === 'tools' ? label : undefined}
               onClick={() => navigateCoach(key)}

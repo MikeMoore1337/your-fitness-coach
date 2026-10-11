@@ -1,13 +1,15 @@
 const params = new URLSearchParams(window.location.search);
 const app = document.querySelector(".prototype-app");
 
+function directionValue(value) {
+  return value === "radar" ? "radar" : value === "stage" ? "stage" : "command";
+}
+
 const state = {
   role: params.get("role") === "client" ? "client" : "trainer",
   workspace: params.get("workspace") === "personal" ? "personal" : "work",
   screen: params.get("screen") || "today",
-  direction: ["command", "radar", "stage"].includes(params.get("direction"))
-    ? params.get("direction")
-    : "command",
+  direction: directionValue(params.get("direction")),
   theme: params.get("theme") === "dark" ? "dark" : "light",
 };
 
@@ -49,7 +51,7 @@ const directionCopy = {
 };
 
 function setState(key, value) {
-  state[key] = value;
+  state[key] = key === "direction" ? directionValue(value) : value;
   if (state.role === "client") state.workspace = "personal";
   if (state.role === "client" && state.screen === "clients")
     state.screen = "today";

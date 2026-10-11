@@ -1,0 +1,19 @@
+{
+  "cta": {
+    "x": 31,
+    "y": 771.484375,
+    "width": 298,
+    "height": 56,
+    "top": 771.484375,
+    "right": 329,
+    "bottom": 827.484375,
+    "left": 31
+  },
+  "targetY": 799,
+  "targetIsNavigation": true,
+  "scrollBefore": 2242,
+  "scrollAfter": 1827,
+  "background": "rgba(28, 33, 33, 0.95)",
+  "blur": "blur(20px) saturate(1.12) brightness(1.03)",
+  "opacity": "1"
+}

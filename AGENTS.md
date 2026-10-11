@@ -55,6 +55,12 @@ visual redesigns.
   `.agents/references/DESIGN_GUARDRAILS.md` and `docs/design/YFC_PRODUCT_UI_CONTRACT.md` before
   changing authenticated UI. RETHINK requires an explicit owner-approved exploration task.
 - Use the shared `WeekStrip` for ordinary seven-day week contexts.
+- Selected/current controls must reuse the shared YFC choice tokens and explicit styling contract
+  in `docs/design/component-states-v2.1.md#unified-yfc-selected-states`. Preserve native/ARIA
+  semantics and separate selection from focus, hover, pressed, disabled and semantic statuses.
+  Mobile primary navigation uses the shared full-pill radius at every breakpoint and the existing
+  frosted matte Liquid Glass material/fallback contract based on the rest timer, not the Landing
+  header's transparency; never introduce a page-local selected-state system.
 
 ## RUSSIAN_USER_FACING_UI (mandatory)
 

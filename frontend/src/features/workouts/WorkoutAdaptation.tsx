@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
@@ -151,6 +151,13 @@ export function WorkoutAdaptation({
   const close = () => setOpen(false);
   const panelRef = useModalA11y<HTMLDivElement>(open, close, '.workout-adaptation-dialog__close');
 
+  useEffect(() => {
+    if (!error && !preview) return;
+    panelRef.current
+      ?.querySelector<HTMLElement>('.adaptation-error, .adaptation-preview h3')
+      ?.focus();
+  }, [error, preview, panelRef]);
+
   const needsEquipment = [
     'unavailable_equipment',
     'replace_exercise',
@@ -217,7 +224,13 @@ export function WorkoutAdaptation({
       return null;
     }
     if (activeReason === 'replace_exercise' && !replacementId) {
-      setError({ kind: 'validation', message: 'Выберите проверенную замену.' });
+      setError({
+        kind: 'validation',
+        message:
+          alternatives.data?.length === 0
+            ? 'Для выбранного оборудования нет проверенной замены. Измените условия.'
+            : 'Выберите проверенную замену.',
+      });
       return null;
     }
     return {
@@ -379,6 +392,7 @@ export function WorkoutAdaptation({
                       {availableReasons.map((item) => (
                         <label
                           className={`adaptation-choice ${activeReason === item.value ? 'is-selected' : ''}`}
+                          data-yfc-choice="compact"
                           key={item.value}
                         >
                           <input
@@ -411,6 +425,7 @@ export function WorkoutAdaptation({
                           type="button"
                           variant="secondary"
                           aria-pressed={timeBudget === String(minutes)}
+                          data-yfc-choice="compact"
                           key={minutes}
                           onClick={() => {
                             setTimeBudget(String(minutes));
@@ -483,6 +498,7 @@ export function WorkoutAdaptation({
                       {equipment.map((item) => (
                         <label
                           className={equipmentIds.includes(item.value) ? 'is-selected' : ''}
+                          data-yfc-choice="compact"
                           key={item.value}
                         >
                           <input
@@ -529,6 +545,7 @@ export function WorkoutAdaptation({
                         {alternatives.data.map((item) => (
                           <label
                             className={`adaptation-choice ${replacementId === String(item.exercise_id) ? 'is-selected' : ''}`}
+                            data-yfc-choice="compact"
                             key={item.exercise_id}
                           >
                             <input
@@ -575,7 +592,7 @@ export function WorkoutAdaptation({
                 )}
 
                 {error && (
-                  <div className="adaptation-error" role="alert">
+                  <div className="adaptation-error" role="alert" tabIndex={-1}>
                     <strong>{errorTitle(error.kind)}</strong>
                     <p>{error.message}</p>
                   </div>
@@ -596,7 +613,7 @@ export function WorkoutAdaptation({
                   >
                     <header>
                       <span className="eyebrow">Предпросмотр</span>
-                      <h3 id={`${titleId}-preview`}>
+                      <h3 id={`${titleId}-preview`} tabIndex={-1}>
                         {preview.status === 'safety_stop'
                           ? 'Безопасность прежде всего'
                           : preview.status === 'no_changes'
@@ -676,7 +693,7 @@ export function WorkoutAdaptation({
                 {preview?.status === 'preview' && preview.preview_token && (
                   <Button
                     type="button"
-                    disabled={!online || applyMutation.isPending}
+                    disabled={!online || previewMutation.isPending || applyMutation.isPending}
                     aria-busy={applyMutation.isPending}
                     onClick={() => {
                       const request = buildRequest();

@@ -1,0 +1,36 @@
+[
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "expected_version": 1,
+      "mutation_id": "acc86bba-bed0-4932-ba02-3e6c7790ac3b"
+    },
+    "receivedAt": 1791717496281,
+    "status": 200,
+    "response": {
+      "id": 201,
+      "set_number": 1,
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "version": 2,
+      "planned_role": "activation",
+      "duration_minutes": null,
+      "distance_km": null,
+      "average_heart_rate_bpm": null,
+      "heart_rate_zone": null
+    },
+    "respondedAt": 1791717496281
+  }
+]

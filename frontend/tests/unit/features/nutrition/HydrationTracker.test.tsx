@@ -53,17 +53,18 @@ const day: HydrationDay = {
   action_url: '/app?section=nutrition&date=2026-09-01&hydration=quick',
 };
 
-function renderTracker() {
+function renderTracker(initialExpanded = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <HydrationTracker diaryDate="2026-09-01" />
+        <HydrationTracker diaryDate="2026-09-01" initialExpanded={initialExpanded} />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
+  return { ...result, queryClient };
 }
 
 describe('HydrationTracker', () => {
@@ -77,7 +78,62 @@ describe('HydrationTracker', () => {
     });
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
+  });
+
+  it('consumes a loaded water intent once and preserves the route and drafts on refresh', async () => {
+    const scroll = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scroll,
+    });
+    window.history.replaceState(
+      { returnTo: 'today' },
+      '',
+      '/app?section=nutrition&date=2026-09-01&hydration=quick#diary',
+    );
+    const { queryClient } = renderTracker(true);
+    const preset = await screen.findByRole('button', { name: /Стакан.*250 мл/ });
+    await waitFor(() => expect(preset).toHaveFocus());
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(window.location.search).toBe('?section=nutrition&date=2026-09-01');
+    expect(window.location.hash).toBe('#diary');
+    expect(window.history.state).toEqual({ returnTo: 'today' });
+    const volume = within(screen.getByRole('region', { name: 'Другой объём' })).getByLabelText(
+      'Объём, мл',
+    );
+    fireEvent.change(volume, { target: { value: '425' } });
+    await queryClient.invalidateQueries();
+    expect(volume).toHaveValue(425);
+    expect(scroll).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the water intent through a load error until retry mounts the controls', async () => {
+    const scroll = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scroll,
+    });
+    let failed = false;
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (!failed) {
+        failed = true;
+        return Promise.reject(new Error('Гидратация временно недоступна'));
+      }
+      return Promise.resolve(day);
+    });
+    window.history.replaceState({}, '', '/app?section=nutrition&hydration=quick');
+    renderTracker(true);
+    expect(await screen.findByText('Гидратация временно недоступна')).toBeVisible();
+    expect(window.location.search).toContain('hydration=quick');
+    expect(scroll).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /Повторить/ }));
+    await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+    expect(window.location.search).not.toContain('hydration=quick');
+  });
 
   it('shows a compact factual summary and quick presets', async () => {
     renderTracker();

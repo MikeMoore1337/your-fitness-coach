@@ -349,7 +349,8 @@ export function WeeklyCheckInCard({
       !autoFocus ||
       current.isLoading ||
       !current.data ||
-      draft.weekStart !== current.data.week_start
+      draft.weekStart !== current.data.week_start ||
+      document.activeElement !== document.body
     )
       return;
     cardRef.current?.focus({ preventScroll: true });

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { installTelegramHarness } from './fixtures/mobile-tma';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
 
@@ -1522,6 +1523,77 @@ async function assertCoachNavigationFits(page: Page, width: number) {
   }
 }
 
+for (const width of [320, 360, 393, 430, 1280]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`unified selected controls in Coach OS ${width} ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await openCoach(page);
+      await expectSelectedChoice(
+        trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }),
+      );
+      await expectSelectedChoice(
+        page
+          .getByRole('navigation', { name: 'Режим работы' })
+          .getByRole('link', { name: 'Клиенты', exact: true }),
+      );
+      await trainerPrimaryNavigation(page).getByRole('link', { name: 'Ещё', exact: true }).click();
+      await page.getByRole('button', { name: 'Расписание и встречи' }).click();
+      const modes = page.getByRole('tablist', { name: 'Режим просмотра расписания' });
+      const week = modes.getByRole('tab', { name: 'Неделя', exact: true });
+      await week.click();
+      await expectSelectedChoice(week);
+      await expect(modes.getByRole('tab', { name: 'День', exact: true })).toHaveCSS(
+        'box-shadow',
+        'none',
+      );
+      await week.focus();
+      await page.keyboard.press('Home');
+      const day = modes.getByRole('tab', { name: 'День', exact: true });
+      await expect(day).toBeFocused();
+      await expect(day).toHaveAttribute('aria-selected', 'true');
+      await expect(day).toHaveCSS('outline-style', 'solid');
+      await expectSelectedChoice(day);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({
+        path: testInfo.outputPath(`selection-segmented-${width}-${theme}.png`),
+      });
+      if (width === 1280) {
+        await page.emulateMedia({ forcedColors: 'active' });
+        await expect(day).toHaveCSS('background-image', 'none');
+        await expect(day).toHaveCSS('box-shadow', 'none');
+        if (await page.evaluate(() => CSS.supports('forced-color-adjust', 'none'))) {
+          await expect(day).toHaveCSS('forced-color-adjust', 'none');
+        }
+        const forced = await day.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return { background: style.backgroundColor, color: style.color };
+        });
+        expect(forced.background).not.toBe('rgba(0, 0, 0, 0)');
+        expect(forced.background).not.toBe(forced.color);
+        await expect(day).toHaveCSS('outline-style', 'solid');
+        await page.emulateMedia({ forcedColors: 'none', reducedMotion: 'no-preference' });
+        const durations = await day.evaluate((element) =>
+          getComputedStyle(element).transitionDuration.split(',').map(Number.parseFloat),
+        );
+        expect(durations.some((duration) => duration > 0)).toBe(true);
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        expect(
+          await day.evaluate((element) =>
+            getComputedStyle(element)
+              .transitionDuration.split(',')
+              .every((value) => parseFloat(value) <= 0.0001),
+          ),
+        ).toBe(true);
+      }
+    });
+  }
+}
+
 test('операционный roster даёт факты и не загружает полную историю заранее', async ({ page }) => {
   await page.setViewportSize(
     captureLandingProductProofs ? { width: 1280, height: 972 } : { width: 1440, height: 1000 },
@@ -1580,9 +1652,9 @@ test('операционный roster даёт факты и не загружа
   }
 
   await page.getByRole('button', { name: 'Включить тёмную тему' }).click();
-  await expect(
+  await expectSelectedChoice(
     trainerPrimaryNavigation(page).getByRole('link', { name: 'Клиенты', exact: true }),
-  ).toHaveCSS('background-color', 'rgb(27, 31, 31)');
+  );
   await expect(page.getByLabel('Найти клиента')).toHaveCSS('background-color', 'rgb(20, 23, 23)');
   await expect(page.getByRole('button', { name: 'Пригласить клиента', exact: true })).toHaveCSS(
     'background-color',

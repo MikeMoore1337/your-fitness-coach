@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
@@ -92,15 +93,24 @@ function setOnline(value: boolean) {
 
 function Harness() {
   const sync = useActiveWorkoutQueue(7, workout);
+  const [accepted, setAccepted] = useState<boolean | null>(null);
   const pending = sync.pendingBySet.get(201);
   return (
     <div>
       <span data-testid="pending">{sync.pendingCount}</span>
       <span data-testid="reps">{pending?.values.actual_reps ?? ''}</span>
       <span data-testid="sync-state">{sync.syncState}</span>
+      <span data-testid="accepted">{accepted === null ? 'waiting' : String(accepted)}</span>
       <button
-        onClick={() =>
-          sync.enqueue(201, 1, { actual_reps: 8, actual_weight: 40, is_completed: true }, true)
+        onClick={async () =>
+          setAccepted(
+            await sync.enqueue(
+              201,
+              1,
+              { actual_reps: 8, actual_weight: 40, is_completed: true },
+              true,
+            ),
+          )
         }
       >
         Изменить
@@ -195,6 +205,35 @@ describe('active workout durable queue', () => {
     await waitFor(() => expect(screen.getByTestId('sync-state')).toHaveTextContent('conflict'));
     expect(screen.getByTestId('pending')).toHaveTextContent('1');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('не принимает offline-завершение при отказе durable storage', async () => {
+    renderHarness();
+    await waitFor(() => expect(loadCurrentActiveWorkoutSnapshot(7)?.id).toBe(42));
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota', 'QuotaExceededError');
+    });
+    act(() => screen.getByRole('button', { name: 'Изменить' }).click());
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('false'));
+    expect(screen.getByTestId('sync-state')).toHaveTextContent('error');
+    expect(screen.getByTestId('pending')).toHaveTextContent('0');
+    expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([]);
+  });
+
+  it('возвращает отказ API без удаления данных для явного повтора', async () => {
+    setOnline(true);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'Сервис временно недоступен' }), { status: 503 }),
+    );
+    renderHarness();
+    act(() => screen.getByRole('button', { name: 'Изменить' }).click());
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('false'));
+    expect(screen.getByTestId('sync-state')).toHaveTextContent('error');
+    expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values).toMatchObject({
+      is_completed: true,
+      actual_reps: 8,
+      actual_weight: 40,
+    });
   });
 
   it('не даёт старой операции из второй вкладки перезаписать более новую', () => {

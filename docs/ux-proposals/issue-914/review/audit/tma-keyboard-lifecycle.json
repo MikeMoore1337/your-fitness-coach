@@ -1,0 +1,234 @@
+[
+  {
+    "engine": "chromium",
+    "theme": "dark",
+    "width": 320,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 224.734375,
+      "width": 124,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "theme": "dark",
+    "width": 393,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 225.078125,
+      "width": 160.5,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "theme": "light",
+    "width": 320,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 224.734375,
+      "width": 124,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "chromium",
+    "theme": "light",
+    "width": 393,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 225.078125,
+      "width": 160.5,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "theme": "dark",
+    "width": 320,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 225.390625,
+      "width": 124,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "theme": "dark",
+    "width": 393,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 224.84375,
+      "width": 160.5,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "theme": "light",
+    "width": 320,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 296,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 225.390625,
+      "width": 124,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  },
+  {
+    "engine": "webkit",
+    "theme": "light",
+    "width": 393,
+    "initialBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "timerBox": {
+      "x": 12,
+      "y": 24,
+      "width": 369,
+      "height": 110
+    },
+    "focusedBox": {
+      "x": 31,
+      "y": 224.84375,
+      "width": 160.5,
+      "height": 80
+    },
+    "writes": [],
+    "errors": [],
+    "backgroundResume": "1:54 -> 0:49 after 65 seconds",
+    "offlineAdjustment": "0:49 -> 1:49",
+    "input": "Browser touch and modeled viewport/TMA; focused field explicitly brought into view, not physical OS keyboard",
+    "status": "ISOLATED_PROPOSAL_CHECK"
+  }
+]

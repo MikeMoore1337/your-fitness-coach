@@ -1418,6 +1418,7 @@ export function FoodPickerDialog({
                     type="button"
                     className={source === 'mine' ? 'is-active' : ''}
                     aria-pressed={source === 'mine'}
+                    data-yfc-choice="compact"
                     onClick={() => {
                       setEntryMethod('personal');
                       setSource('mine');
@@ -1429,6 +1430,7 @@ export function FoodPickerDialog({
                     type="button"
                     className={source === 'frequent' ? 'is-active' : ''}
                     aria-pressed={source === 'frequent'}
+                    data-yfc-choice="compact"
                     onClick={() => {
                       setEntryMethod('frequent');
                       setSource('frequent');
@@ -1440,6 +1442,7 @@ export function FoodPickerDialog({
                     type="button"
                     className={source === 'recent' ? 'is-active' : ''}
                     aria-pressed={source === 'recent'}
+                    data-yfc-choice="compact"
                     onClick={() => {
                       setEntryMethod('recent');
                       setSource('recent');
@@ -1451,6 +1454,7 @@ export function FoodPickerDialog({
                     type="button"
                     className={source === 'favorites' ? 'is-active' : ''}
                     aria-pressed={source === 'favorites'}
+                    data-yfc-choice="compact"
                     onClick={() => {
                       setEntryMethod('favorite');
                       setSource('favorites');

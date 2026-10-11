@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { HydrationDay, HydrationEntry, HydrationPreset, User } from '../../shared/api/types';
@@ -175,6 +175,7 @@ export function HydrationTracker({
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
   const [expanded, setExpanded] = useState(initialExpanded);
+  const quickAddRef = useRef<HTMLDivElement>(null);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
   const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
@@ -193,6 +194,27 @@ export function HydrationTracker({
     queryKey: ['me'],
     queryFn: () => api<User>('/api/v1/me'),
   });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (
+      !initialExpanded ||
+      !hydration.data ||
+      !quickAddRef.current ||
+      url.searchParams.get('hydration') !== 'quick'
+    ) {
+      return;
+    }
+    setExpanded(true);
+    quickAddRef.current.querySelector('button')?.focus({ preventScroll: true });
+    quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    url.searchParams.delete('hydration');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [initialExpanded, hydration.data]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -367,7 +389,7 @@ export function HydrationTracker({
       >
         <span style={{ width: `${progress}%` }} />
       </div>
-      <div className="hydration-presets" aria-label="Быстро добавить напиток">
+      <div ref={quickAddRef} className="hydration-presets" aria-label="Быстро добавить напиток">
         {data.presets.map((preset) => (
           <Button
             variant="secondary"

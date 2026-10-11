@@ -28,29 +28,17 @@ _LINE = colors.HexColor("#D9DED2")
 _SURFACE = colors.HexColor("#F1F3ED")
 
 
-def _font_paths() -> tuple[str, str] | None:
-    candidates = (
-        (
-            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
-            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
-        ),
-        (Path("C:/Windows/Fonts/arial.ttf"), Path("C:/Windows/Fonts/arialbd.ttf")),
-    )
-    for regular, bold in candidates:
-        if regular.exists() and bold.exists():
-            return str(regular), str(bold)
-    return None
-
-
-def _register_fonts() -> tuple[str, str]:
-    paths = _font_paths()
-    if paths is None:
-        return "Helvetica", "Helvetica-Bold"
-    regular, bold = paths
-    if "YFCReport" not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont("YFCReport", regular))
-        pdfmetrics.registerFont(TTFont("YFCReport-Bold", bold))
-    return "YFCReport", "YFCReport-Bold"
+def _register_fonts() -> tuple[str, str, str]:
+    directory = Path(__file__).resolve().parents[1] / "assets" / "fonts"
+    for name, filename in (
+        ("YFCReport", "Inter-Regular.ttf"),
+        ("YFCReport-Bold", "Inter-Bold.ttf"),
+        ("YFCReport-Display", "Oswald-Bold.ttf"),
+    ):
+        if name not in pdfmetrics.getRegisteredFontNames():
+            pdfmetrics.registerFont(TTFont(name, str(directory / filename)))
+    pdfmetrics.registerFontFamily("YFCReport", normal="YFCReport", bold="YFCReport-Bold")
+    return "YFCReport", "YFCReport-Bold", "YFCReport-Display"
 
 
 def _number(value: Any, suffix: str = "") -> str:
@@ -145,12 +133,12 @@ def _wellbeing_value(value: int, metric: str) -> str:
 
 
 def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
-    regular, bold = _register_fonts()
+    regular, bold, display = _register_fonts()
     styles = getSampleStyleSheet()
     title = ParagraphStyle(
         "YFCTitle",
         parent=styles["Title"],
-        fontName=bold,
+        fontName=display,
         fontSize=21,
         leading=25,
         textColor=_TEXT,
@@ -159,23 +147,25 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
     heading = ParagraphStyle(
         "YFCHeading",
         parent=styles["Heading2"],
-        fontName=bold,
+        fontName=display,
         fontSize=13,
         leading=16,
         textColor=_TEXT,
         spaceBefore=3 * mm,
         spaceAfter=1.5 * mm,
+        keepWithNext=True,
     )
     body = ParagraphStyle(
         "YFCBody",
         parent=styles["BodyText"],
         fontName=regular,
-        fontSize=9,
-        leading=12,
+        fontSize=10.5,
+        leading=14,
         textColor=_TEXT,
     )
-    muted = ParagraphStyle("YFCMuted", parent=body, textColor=_MUTED, fontSize=8, leading=10)
+    muted = ParagraphStyle("YFCMuted", parent=body, textColor=_MUTED, fontSize=9, leading=12)
     label = ParagraphStyle("YFCLabel", parent=muted, fontName=bold, textTransform="uppercase")
+    metric_value = ParagraphStyle("YFCMetricValue", parent=heading, fontName=bold)
 
     stream = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -189,8 +179,9 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
         author="Your Fitness Coach",
     )
     story: list[Any] = [
-        Paragraph("ОТЧЁТ О ПРОГРЕССЕ", label),
-        Paragraph(_safe(report["subject"]["name"]), title),
+        Paragraph("YFC · Your Fitness Coach", label),
+        Paragraph("Отчёт о прогрессе", title),
+        Paragraph(_safe(report["subject"]["name"]), metric_value),
         Paragraph(
             f"Период: {_date(report['period_start'])} — {_date(report['period_end'])} · Часовой пояс: {_safe(report['timezone'])}",
             body,
@@ -202,7 +193,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
     def metric_table(items: list[tuple[str, str]]) -> Table:
         cells = [
             Table(
-                [[Paragraph(name, muted)], [Paragraph(value, heading)]],
+                [[Paragraph(name, muted)], [Paragraph(value, metric_value)]],
                 colWidths=[(A4[0] - 30 * mm) / max(1, len(items))],
             )
             for name, value in items
@@ -320,6 +311,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
     )
     trends = body_report.get("trends", [])
     if trends:
+        story.append(Paragraph("Замеры тела", heading))
         trend_rows = [
             [
                 Paragraph("Метрика", label),
@@ -338,11 +330,11 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
                 [
                     Paragraph(_safe(metric_name), body),
                     Paragraph(
-                        f"{_number(trend['first_value'], unit)}<br/><font size=7>{_date(trend['first_measured_on'])}</font>",
+                        f"{_number(trend['first_value'], unit)}<br/><font size=8.5>{_date(trend['first_measured_on'])}</font>",
                         body,
                     ),
                     Paragraph(
-                        f"{_number(trend['latest_value'], unit)}<br/><font size=7>{_date(trend['latest_measured_on'])}</font>",
+                        f"{_number(trend['latest_value'], unit)}<br/><font size=8.5>{_date(trend['latest_measured_on'])}</font>",
                         body,
                     ),
                     Paragraph(_number(trend.get("change"), unit), body),

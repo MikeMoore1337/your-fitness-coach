@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
@@ -78,6 +78,7 @@ export function ProgramBuilder({
   saveAsCopy = false,
   defaultOpen = false,
   onSaved,
+  onDirtyChange,
 }: {
   targetTelegramId?: number | null;
   targetName?: string | null;
@@ -85,6 +86,7 @@ export function ProgramBuilder({
   saveAsCopy?: boolean;
   defaultOpen?: boolean;
   onSaved?: () => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
@@ -148,6 +150,20 @@ export function ProgramBuilder({
     [],
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
+  const snapshot = JSON.stringify([
+    title,
+    goal,
+    level,
+    days,
+    defaultRestSeconds,
+    startDate,
+    durationWeeks,
+    scheduleWeekdays,
+  ]);
+  const originalSnapshot = useRef(snapshot);
+  useEffect(() => {
+    onDirtyChange?.(snapshot !== originalSnapshot.current);
+  }, [onDirtyChange, snapshot]);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [creationSuccess, setCreationSuccess] = useState<{ canStartToday: boolean } | null>(null);
   const exercises = useQuery({
@@ -549,6 +565,7 @@ export function ProgramBuilder({
                       </span>
                     </span>
                     <SearchableExercisePicker
+                      mobileSheet
                       key={`${exerciseIndex}-${item.exercise_id}`}
                       exercises={orderedExercises}
                       value={item.exercise_id}

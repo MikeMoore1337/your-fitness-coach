@@ -194,6 +194,8 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await expect(page.locator('#appBottomNav')).toBeVisible();
   await reps.evaluate((element) => (element as HTMLElement).blur());
   await expectDockWithinViewport(page);
+  // Focus-driven scrolling can leave the pointer hovering over a different button.
+  await page.mouse.move(0, 0);
 
   const activeWorkout = page.locator('.active-workout');
   const activeWorkoutClip = await activeWorkout.evaluate((element) => {
@@ -230,7 +232,7 @@ test('@critical active workout keeps the current set primary across mobile width
     await expect(currentSet).toContainText(/(?:повторений|Повторы по плану)/);
     await expect(currentSet).toContainText(/Отдых \d+ с/);
     await expect(currentSetDone).toBeVisible();
-    await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+    await expect(page.locator('.app-bottom-nav__quick-add')).toBeVisible();
     await assertMobileShellGeometry(page);
 
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
@@ -259,13 +261,14 @@ test('@critical active workout keeps the current set primary across mobile width
       await expect(input).toBeInViewport();
       await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
       await expect(page.locator('#appBottomNav')).toBeHidden();
-      await expect(page.locator('.app-quick-add-trigger')).toBeHidden();
+      await expect(page.locator('.app-bottom-nav__quick-add')).toBeHidden();
       await input.evaluate((element) => (element as HTMLElement).blur());
       await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
       await expect(page.locator('#appBottomNav')).toBeVisible();
     }
     const bottomNav = page.locator('#appBottomNav');
     await expect(bottomNav.locator('.app-bottom-nav__primary > a')).toHaveCount(4);
+    await expect(bottomNav.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
     for (const label of ['Сегодня', 'План', 'Питание', 'Прогресс']) {
       const link = bottomNav.getByRole('link', { name: label, exact: true });
       await expect(link).toBeVisible();

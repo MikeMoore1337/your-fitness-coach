@@ -202,7 +202,54 @@ describe('NotificationsPanel', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
+
+  it.each(['', '2030-01-09'])('не отправляет пустую или прошедшую дату %s', async (date) => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-09T22:30:00Z'));
+    renderPanel();
+    fireEvent.click(await screen.findByText('Личное напоминание', { selector: 'strong' }));
+    const field = screen
+      .getByText('Дата', { exact: true })
+      .closest('label')!
+      .querySelector('input')!;
+    expect(field).toHaveAttribute('min', '2030-01-10');
+    fireEvent.change(field, { target: { value: date } });
+    fireEvent.submit(field.closest('form')!);
+
+    expect(await screen.findByText('Выберите сегодняшнюю или будущую дату.')).toBeVisible();
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      '/api/v1/notifications',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it.each(['2030-01-10', '2030-01-11'])(
+    'сохраняет разрешённую дату %s в часовом поясе профиля',
+    async (date) => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2030-01-09T22:30:00Z'));
+      renderPanel();
+      fireEvent.click(await screen.findByText('Личное напоминание', { selector: 'strong' }));
+      const field = screen
+        .getByText('Дата', { exact: true })
+        .closest('label')!
+        .querySelector('input')!;
+      fireEvent.change(field, { target: { value: date } });
+      fireEvent.submit(field.closest('form')!);
+
+      await waitFor(() =>
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          '/api/v1/notifications',
+          expect.objectContaining({
+            method: 'POST',
+            body: expect.stringContaining(`"scheduled_for":"${date}T09:00:00"`),
+          }),
+        ),
+      );
+    },
+  );
 
   it('разделяет каналы и открывает canonical destination через server resolver', async () => {
     const onNavigate = renderPanel();
