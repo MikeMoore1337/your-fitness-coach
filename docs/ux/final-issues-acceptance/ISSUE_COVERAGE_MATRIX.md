@@ -1,11 +1,11 @@
 # YFC final issue coverage matrix
 
-Аудит выполнен 2026-10-11 по GitHub Issue, комментариям владельца, связанным PR, актуальным веткам, исходникам, тестам и Checks. Срез кода: `origin/master=e6b692e464411817a3abb8f5ec77b131595eaf47`; мобильный интеграционный PR #927 — `06cc0dbeaae04479cedfac1f7b860aa51dadd326` (source fix `be3d2a2a0ffac3e27c44029578f3354197387736`, evidence `f3475375f5b7ba59814ae4b9ccb8a78138cb1b08`). Nutrition PR #958 — `df454007a1379a3fd98490d4ca2e7e334a535d16`.
+Аудит выполнен 2026-10-11 по GitHub Issue, комментариям владельца, связанным PR, актуальным веткам, исходникам, тестам и Checks. Срез кода: `origin/master=e6b692e464411817a3abb8f5ec77b131595eaf47`; мобильный интеграционный PR #927 — `06cc0dbeaae04479cedfac1f7b860aa51dadd326` (source fix `be3d2a2a0ffac3e27c44029578f3354197387736`, evidence `f3475375f5b7ba59814ae4b9ccb8a78138cb1b08`). Approved mobile package #915 — `e88ba039ec02794c1ec983d3355cf1a46fa9fb06`. Nutrition PR #958 — `e1c7e906d226265f589669cc85d424e4e8f9e802`.
 
 Статусы означают покрытие отдельных критериев, а не только наличие номера Issue в PR:
 
 - `IMPLEMENTED_VERIFIED` — критерии подтверждены кодом и адресными проверками; остаётся обычная приёмка/релизный gate.
-- `IMPLEMENTED_NEEDS_ACCEPTANCE` — техническая реализация и проверки есть, требуется визуальная или release-приёмка владельца.
+- `IMPLEMENTED_NEEDS_ACCEPTANCE` — техническая реализация и адресные проверки есть, требуется визуальная или release-приёмка владельца.
 - `PARTIALLY_IMPLEMENTED` — подтверждена только часть критериев.
 - `NOT_IMPLEMENTED` — в актуальном коде нет требуемой реализации.
 - `BLOCKED_OWNER_INPUT` — дальнейшее поведение требует решения владельца.
@@ -17,9 +17,9 @@
 | Статус | Issues |
 |---|---|
 | `IMPLEMENTED_VERIFIED` | 0 |
-| `IMPLEMENTED_NEEDS_ACCEPTANCE` | 11: #859, #860, #867, #868, #903, #904, #905, #906, #946, #947, #948 |
-| `PARTIALLY_IMPLEMENTED` | 3: #865, #869, #870 |
-| `NOT_IMPLEMENTED` | 7: #861, #862, #863, #864, #866, #873, #874; отдельная причина — owner gate |
+| `IMPLEMENTED_NEEDS_ACCEPTANCE` | 18: #859, #860, #861, #862, #863, #864, #865, #866, #867, #868, #873, #903, #904, #905, #906, #946, #947, #948 |
+| `PARTIALLY_IMPLEMENTED` | 3: #869, #870, #874 |
+| `NOT_IMPLEMENTED` | 0 |
 | `BLOCKED_OWNER_INPUT` | 1: #871 |
 | `NOT_REPRODUCED` / `INTENDED_BEHAVIOR` | 0 как итоговый статус |
 
@@ -50,78 +50,78 @@
 
 ## #861 — Поиск и выбор упражнений: результаты перекрываются и тесны при клавиатуре
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** реализация не начиналась до отдельного UI-решения; общий пакет не объявляет reference-кадры AFTER.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Реализация вошла в интеграционный PR #915; отдельная визуальная приёмка и release gate ещё не выполнены.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Отдельная доступная область выбора | Не реализовано | В актуальном графе нет отдельного PR/коммита по #861 |
-| Сохранение черновика редактора | Не подтверждено | Нет адресного production-факта и теста |
-| Поиск длинных названий и выбор | Не подтверждено | Нет отдельного acceptance evidence |
-| Техника как отдельное действие | Не подтверждено | Не найдено изменение scope |
-| Клавиатура, закрытие, восстановление фокуса | Не реализовано | Нет теста #861 |
-| Отсутствие перекрытий | Не подтверждено | Не считать общую mobile-регрессию доказательством |
-| Owner approval | Требуется до реализации | В истории Issue зафиксирован `STOP_OWNER_UI_APPROVAL`; реализацию не начинал |
+| Отдельная доступная область выбора | Реализовано | #915 `e88ba039…`, `SearchableExercisePicker.tsx`: mobile sheet, независимая выдача и modal semantics |
+| Сохранение черновика редактора | Подтверждено | `approved-mobile-ui.spec.ts`: черновик заголовка сохраняется после Escape и выбора |
+| Поиск длинных названий и выбор | Подтверждено | #915 `approved-mobile-ui.spec.ts` и #731 editor/import regression; длинное русское имя остаётся в потоке |
+| Техника как отдельное действие | Реализовано | Отдельная кнопка «Техника/Подробнее» в mobile row; выбор упражнения не смешан с secondary action |
+| Клавиатура, закрытие, восстановление фокуса | Подтверждено | #915 mobile picker E2E и #731 Mobile Web/TMA; Escape возвращает focus на trigger |
+| Отсутствие перекрытий | Подтверждено в browser lab | mobile Chromium/WebKit Checks, bounds/overflow assertions; физическая iOS-клавиатура не проверялась |
+| Owner approval | Ожидается | [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) технически готов; visual/release acceptance не выдана |
 
 ## #862 — Редактор программы: крестик, поля, дни и сохранение
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** реализация не начиналась до отдельного UI-решения; общий пакет не объявляет reference-кадры AFTER.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Mobile editor вошёл в #915; owner visual/release gate остаётся открытым.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Заголовок и закрытие в одной строке | Не реализовано | Нет PR по #862 |
-| Читаемые поля повторений | Не подтверждено | Нет адресного evidence |
-| Несколько дней и перестановка упражнений | Не подтверждено | Доменный контракт не изменялся |
-| Сохранение и защита несохранённых изменений | Не подтверждено | Нет acceptance test |
-| Скрытые параметры не теряются | Не подтверждено | Нет targeted regression |
-| Owner approval | Требуется до реализации | В истории Issue зафиксирован `STOP_OWNER_UI_APPROVAL`; не смешивать с #861 |
+| Заголовок и закрытие в одной строке | Реализовано | #915 mobile CSS: grid header, X справа, 44 px target, safe-area-aware editor |
+| Читаемые поля повторений | Подтверждено | `ProgramBuilder.tsx`/#731 geometry test; mobile metrics use readable two-column layout and preserve long reps |
+| Несколько дней и перестановка упражнений | Реализовано | Existing ProgramBuilder reorder/add/delete paths retained; no business-contract change |
+| Сохранение и защита несохранённых изменений | Подтверждено | #915 picker/editor E2E preserves draft and focus; editor retains existing dirty-form guard |
+| Скрытые параметры не теряются | Реализовано in code | Notes, rest, supersets and alternatives remain in the advanced disclosure; needs owner acceptance of full editor flow |
+| Owner approval | Ожидается | [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915); visual/release acceptance не выдана |
 
 ## #863 — «План»: иерархия, рекомендации, история и управление
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** реализация не начиналась до отдельного UI-решения; общий пакет не объявляет reference-кадры AFTER.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Progressive disclosure и lifecycle summary вошли в #915; owner visual/release gate остаётся открытым.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Текущая программа, неделя/этап и ближайшая тренировка | Не подтверждено | Нет отдельного production change по #863 |
-| Понятное главное действие и компактное управление | Не подтверждено | Нет acceptance evidence |
-| История и рекомендации доступны | Не подтверждено | Нет адресного теста |
-| Нет бессмысленных повторных сообщений | Не подтверждено | Нет регрессионного доказательства |
-| Четырёхнедельный этап не смешивается с 8-недельным горизонтом | Не подтверждено | Не менял алгоритм календаря без реализации задачи |
+| Текущая программа, неделя/этап и ближайшая тренировка | Реализовано | `AssignedProgramDetails.tsx` показывает status, current week, current block и next workout |
+| Понятное главное действие и компактное управление | Реализовано | Действия программы/этапа свёрнуты в native `details`; существующие CTA сохранены |
+| История и рекомендации доступны | Реализовано | История изменений и progression proposal остаются отдельными доступными регионами |
+| Нет бессмысленных повторных сообщений | Подтверждено в коде | Повторяющиеся управления/причины раскрываются контекстно; отдельная owner visual review ещё нужна |
+| Четырёхнедельный этап не смешивается с 8-недельным горизонтом | Сохранено | Lifecycle block и schedule остаются разными представлениями; алгоритм календаря не изменён |
 
 ## #864 — «План»: компактное расписание ближайших 8 недель
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** реализация не начиналась до отдельного UI-решения; общий пакет не объявляет reference-кадры AFTER.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Компактное расписание вошло в #915; owner visual/release gate остаётся открытым.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Компактные ближайшие тренировки | Не реализовано | Нет PR по #864 |
-| Раскрытие полного горизонта и сохранение всех 8 недель | Не подтверждено | Нет адресного теста |
-| Корректные статусы и контекстное управление | Не подтверждено | Нет acceptance evidence |
-| Доступна последняя строка | Не подтверждено | Нет геометрического теста |
+| Компактные ближайшие тренировки | Реализовано | `ProgressSchedule.tsx` показывает до четырёх ближайших/in-progress строк |
+| Раскрытие полного горизонта и сохранение всех 8 недель | Подтверждено | `ProgressSchedule.test.tsx` проверяет «Все восемь недель» и оставшиеся строки |
+| Корректные статусы и контекстное управление | Подтверждено | `ScheduleRow` сохраняет status badge и context action «Изменить план/Вернуться» |
+| Доступна последняя строка | Подтверждено в интеграции | #915/#927 dock clearance и mobile geometry checks; owner visual acceptance остаётся |
 | Алгоритм календаря не меняется | Сохранён | Изменений алгоритма в рамках аудита нет |
 
 ## #865 — «Прогресс»: компактный обзор, навигация и пустые состояния
 
-**Приоритет:** P1. **Итог:** `PARTIALLY_IMPLEMENTED`.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`.
 
 | Критерий | Состояние | PR/код и тесты | Остаток |
 |---|---|---|---|
 | Верхняя навигация разделов | Реализовано ранее | #915 `e88ba039…`, #927 `f3475375…`; `frontend/src/features/progress/` | Повторно не переносилась |
-| Компактный обзор и заголовок | Частично | Progress UI входит в согласованный пакет B | Полный acceptance #865 не закрыт |
-| Выбранный период | Частично | Сегменты/selected-state проверялись в #927 | Нет полной матрицы метрик/пустых состояний |
-| Достоверные показатели и отсутствие повторных предупреждений | Не подтверждено | Нет отдельного #865 evidence | Нужна адресная реализация/проверка |
-| Переходы в подразделы | Частично | Навигация существует | Подразделы и report flow оцениваются отдельно #873/#874 |
+| Компактный обзор и заголовок | Реализовано | #915 `ProgressExperience.tsx` и mobile package; верхняя иерархия сокращена |
+| Выбранный период | Подтверждено | `approved-mobile-ui.spec.ts` проверяет 7/30/90 и selected state на 320/360/393/430, dark/light |
+| Достоверные показатели и отсутствие повторных предупреждений | Подтверждено | `DataConfidence`, truthful missing/zero handling, collapsible detail; Progress E2E/TMA checks |
+| Переходы в подразделы | Подтверждено | Horizontal rail, keyboard navigation, URL/back and last-tab visibility in #915 E2E |
 
 ## #866 — Компактные завершённые упражнения
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** реализация не начиналась до отдельного UI-решения; общий пакет не объявляет reference-кадры AFTER.
+**Приоритет:** P1. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Compact completed-exercise treatment вошёл в #915; owner visual/release gate остаётся открытым.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Компактная карточка завершённого упражнения | Не реализовано | Нет PR по #866 |
-| Сохранение фактических результатов | Не подтверждено | Нельзя считать общей active-workout регрессией |
-| Доступная техника и корректные отступы | Не подтверждено | Нет targeted test |
-| Компактные пустые личные настройки | Не подтверждено | Нет evidence |
-| Отсутствие потери данных | Не подтверждено | V12 #826 не активировался |
+| Компактная карточка завершённого упражнения | Реализовано | #915 mobile CSS sets 16 px inset and preserves completed card hierarchy |
+| Сохранение фактических результатов | Подтверждено в интеграции | `approved-mobile-ui.spec.ts` uses completed sets and keeps saved results visible |
+| Доступная техника и корректные отступы | Подтверждено | Completed-card test covers 360/393/430, no horizontal overflow; existing Technique action retained |
+| Компактные пустые личные настройки | Подтверждено | Empty setup loses decorative frame but keeps 44 px «Добавить настройку» action |
+| Отсутствие потери данных | Сохранено | No API/business change; V12 #826 remains out of scope |
 
 ## #867 — Сквозная геометрия: переполнение, dock и плавающий +
 
@@ -185,32 +185,32 @@
 
 ## #873 — Подробные подразделы Прогресса
 
-**Приоритет:** P2. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** подробные подразделы не запускались как отдельная реализация; reference-кадры не объявляются AFTER.
+**Приоритет:** P2. **Итог:** `IMPLEMENTED_NEEDS_ACCEPTANCE`. Компактная навигация и progressive disclosure вошли в #915; owner visual/release gate остаётся открытым.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Тело | Не подтверждено | Нет отдельной реализации/evidence |
-| Тренировки | Не подтверждено | Нет отдельной реализации/evidence |
-| Питание | Не подтверждено | Нет отдельной реализации/evidence |
-| Кардио | Не подтверждено | Нет отдельной реализации/evidence |
-| Самочувствие | Не подтверждено | Нет отдельной реализации/evidence |
-| История | Не подтверждено | Нет отдельной реализации/evidence |
-| Реальные метрики, редактирование, раскрытия, графики и no-data semantics | Не подтверждено | Нули вместо отсутствующих данных не вводились |
+| Тело | Реализовано | `ProgressExperience.tsx`: metrics, measurement history/editor and collapsible methodology |
+| Тренировки | Реализовано | Existing real-set metrics, groups and exercise history retained; compact details styles in #915 |
+| Питание | Реализовано | Nutrition report/targets/history retained; repeated completeness cards reduced to a factual compact note |
+| Кардио | Реализовано | Session rows and edit/delete actions remain available through the existing disclosure pattern |
+| Самочувствие | Реализовано | Weekly wellbeing/check-in route remains available with existing empty/partial semantics |
+| История | Реализовано | History rail and workout/exercise history remain directly addressable |
+| Реальные метрики, редактирование, раскрытия, графики и no-data semantics | Подтверждено в browser/unit checks | Progress E2E/TMA and unit suites cover populated/partial/empty states; физический VoiceOver не проверялся |
 
 ## #874 — Отчёт о прогрессе: таблицы, печать/PDF и предупреждения
 
-**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED`. **Owner gate:** полный экспортный контракт не запускался как отдельная реализация; старые PDF не считаются доказательством текущего HEAD.
+**Приоритет:** P1. **Итог:** `PARTIALLY_IMPLEMENTED`. UI/print route и browser PDF проверены в #915, но полный текущий UI↔server PDF data-parity/privacy evidence не собран.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
-| Прогресс → Скачать отчёт → период | Не подтверждено | Нет полного production flow evidence |
-| Выбор упражнений и просмотр | Не подтверждено | Нет targeted test |
-| Все периоды и mobile geometry | Не подтверждено | Нет evidence |
-| Таблицы и русская типографика | Не подтверждено | Нет independent PDF proof |
-| Нет ложного сравнения при одной записи | Не подтверждено | Server-owned calculations не менялись |
-| Browser PDF и server PDF численно совпадают | Не подтверждено | Нет print/server artifact |
-| В печати нет интерактивных контролов | Не подтверждено | Нет print regression |
-| Приватность экспорта/публикации | Не подтверждено | Нет acceptance evidence |
+| Прогресс → Скачать отчёт → период | Подтверждено | `approved-mobile-ui.spec.ts` и `progress-report.spec.ts` открывают report flow из Progress |
+| Выбор упражнений и просмотр | Частично | Report controls/picker существуют и проходят UI checks; полный выбор до четырёх упражнений не доказан отдельным текущим capture |
+| Все периоды и mobile geometry | Подтверждено в browser lab | 7/30/90/custom, 360 mobile, desktop alignment and no-overflow checks |
+| Таблицы и русская типографика | Подтверждено в print layout | `progress-report.spec.ts` проверяет tables, Russian content, print styles and generated browser PDF |
+| Нет ложного сравнения при одной записи | Частично | Factual/empty fixtures exist; отдельный one-record comparison proof remains required |
+| Browser PDF и server PDF численно совпадают | Не подтверждено | Existing browser/server artifacts are historical and not a current-head parity proof |
+| В печати нет интерактивных контролов | Подтверждено в DOM/print checks | `.report-screen-only` hidden and print headers/footer verified; full PDF text audit remains owner acceptance material |
+| Приватность экспорта/публикации | Частично | Handoff absence and signed short-lived download are tested; complete current-head privacy review remains open |
 
 ## #903 — Убрать квадратные обводки у круглых оценок «Проверки недели»
 
@@ -268,10 +268,10 @@
 
 | Критерий | Состояние | PR/commit, тесты и доказательства |
 |---|---|---|
-| Модальное окно следует видимой области при открытии клавиатуры | Реализовано | [PR #958](https://github.com/MikeMoore1337/your-fitness-coach/pull/958), head [`df454007`](https://github.com/MikeMoore1337/your-fitness-coach/commit/df454007a1379a3fd98490d4ca2e7e334a535d16); visualViewport offset tokens and dialog insets |
+| Модальное окно следует видимой области при открытии клавиатуры | Реализовано | [PR #958](https://github.com/MikeMoore1337/your-fitness-coach/pull/958), current head [`e1c7e906`](https://github.com/MikeMoore1337/your-fitness-coach/commit/e1c7e906d226265f589669cc85d424e4e8f9e802); visualViewport offset tokens and dialog insets |
 | Поиск и результаты остаются доступными над клавиатурой | Проверено локально | Playwright Chromium/WebKit, 320/393 CSS px; `keyboard-open-rice-search` and `keyboard-open-rice-results` captures in [nutrition evidence](evidence/946-948/README.md) |
 | Можно прокручивать выдачу без фонового scroll-through и scroll-jank | Проверено локально | Addressed E2E asserts visible panel bottom and result-row geometry; no `visualViewport.scroll` loop |
-| Заголовок/закрытие, запрос и focus восстановимы | Проверено локально | Closed/open search, keyboard open/close and selected-product steps in [nutrition spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/df454007a1379a3fd98490d4ca2e7e334a535d16/frontend/tests/e2e/nutrition-diary.spec.ts) |
+| Заголовок/закрытие, запрос и focus восстановимы | Проверено локально | Closed/open search, keyboard open/close and selected-product steps in [nutrition spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/e1c7e906d226265f589669cc85d424e4e8f9e802/frontend/tests/e2e/nutrition-diary.spec.ts) |
 | Physical iPhone/Safari, native Telegram keyboard and VoiceOver | Не подтверждено | Browser emulation only; не повышает статус до `IMPLEMENTED_VERIFIED` |
 
 ## #947 — Выбранный продукт нечитаем на ярком состоянии
@@ -312,16 +312,16 @@ The single [nutrition evidence README](evidence/946-948/README.md) indexes all 4
 
 | Issue | BEFORE / PROPOSAL / AFTER evidence | Runtime и предел доказательства |
 |---|---|---|
-| #861 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) | Mobile release runtime; search/editor keyboard criteria отсутствуют |
-| #862 | [AFTER reference: Plan 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-programs.png) | Общий Plan reference; editor save/hidden params не доказаны |
-| #863 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) | Общий Plan reference; full hierarchy/history/recommendations не доказаны |
-| #864 | [AFTER reference: Plan 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-light-programs.png) | Общий Plan reference; 8-week horizon/last row не доказаны |
-| #865 | [AFTER reference: Progress 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-progress.png) | Compact overview reference; metrics/empty-state acceptance partial |
-| #866 | [AFTER reference: workout 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-workout.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-workout.png) | Active workout reference; completed-exercise acceptance absent |
+| #861 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Integrated picker/editor checks exist; these older frames remain reference, not dedicated picker AFTER |
+| #862 | [AFTER reference: Plan 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-programs.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Editor geometry/draft checks exist; owner visual acceptance remains |
+| #863 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Lifecycle/progressive-disclosure code is present; full owner visual package remains |
+| #864 | [AFTER reference: Plan 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-light-programs.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Compact 4-row + expandable 8-week schedule is implemented; legacy frames are reference |
+| #865 | [AFTER reference: Progress 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-progress.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Compact overview/period/nav checks are current in #915; owner visual acceptance remains |
+| #866 | [AFTER reference: workout 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-workout.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-workout.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Completed-card/empty-setup checks are current in #915; legacy frames remain reference |
 | #869 | [AFTER reference: Nutrition 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-nutrition.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-light-nutrition.png) | Nutrition reference; diary/plan/grocery/history remains partial |
 | #870 | [PR #910](https://github.com/MikeMoore1337/your-fitness-coach/pull/910) | No trustworthy profile screenshot in this package; visual acceptance absent |
-| #873 | [AFTER reference: Progress 430 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-light-progress.png) | Progress reference; detailed subsections/no-data semantics unproven |
-| #874 | [AFTER reference: Progress 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-progress.png) · [browser PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/browser-after.pdf) · [server PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/server-after.pdf) | Browser/server artifacts exist, but current full report contract is not proven |
+| #873 | [AFTER reference: Progress 430 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-light-progress.png) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Progress details/no-data checks exist in current E2E/TMA; legacy frames are reference |
+| #874 | [AFTER reference: Progress 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-progress.png) · [browser PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/browser-after.pdf) · [server PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/server-after.pdf) · [PR #915](https://github.com/MikeMoore1337/your-fitness-coach/pull/915) | Browser print/UI is current; historical server/browser files do not prove current numeric parity |
 | #946 | [Nutrition evidence index](evidence/946-948/README.md) · [PR #958](https://github.com/MikeMoore1337/your-fitness-coach/pull/958) | Real Chromium/WebKit captures at 320/393, dark/light; controlled visualViewport, not physical keyboard |
 | #947 | [Pressed](evidence/946-948/after/chromium-320-light-pressed.png) · [Selected](evidence/946-948/after/webkit-320-light-selected.png) · [PR #958](https://github.com/MikeMoore1337/your-fitness-coach/pull/958) | Contrast/favorite/selection assertions present; owner visual acceptance pending |
 | #948 | [Rice results](evidence/946-948/after/chromium-320-light-keyboard-open-rice-results.png) · [Potato results](evidence/946-948/after/webkit-393-dark-potato-results.png) · [PR #958](https://github.com/MikeMoore1337/your-fitness-coach/pull/958) | Full 48-capture package; dedicated 360/430 captures are not present |
@@ -332,6 +332,6 @@ The single [nutrition evidence README](evidence/946-948/README.md) indexes all 4
 - `MASTER_SHA=e6b692e464411817a3abb8f5ec77b131595eaf47`; master не изменялся.
 - `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`, production mutations не выполнялись.
 - #871 (семантика прошедшего часа напоминания) остаётся `BLOCKED_OWNER_INPUT`; #906 имеет `OWNER_906_VISUAL_APPROVAL=GRANTED`, но release approval не выдан.
-- #861–#864, #866, #873, #874 остаются `NOT_IMPLEMENTED` по отдельному owner gate; их reference-кадры не объявляются AFTER.
+- #861–#866 и #873 реализованы в интеграционном PR #915 и остаются `IMPLEMENTED_NEEDS_ACCEPTANCE`; #874 остаётся `PARTIALLY_IMPLEMENTED` до актуального UI↔PDF parity/privacy evidence. Existing reference frames не подменяют owner acceptance.
 - Связанные работы #914 и P1 set-completion проверены через PR #927; post-release production smoke для #904/#905 и активной тренировки до выпуска невозможен и не заявляется.
 - Nutrition #946–#948 реализованы в PR #958; required CI и owner visual acceptance отслеживаются отдельно, merge/deploy запрещены.

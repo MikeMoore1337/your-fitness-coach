@@ -1,6 +1,6 @@
 # #946–#948 — мобильный выбор продуктов
 
-Это один browser-evidence пакет для трёх связанных Issues. Снимки сняты из рабочей сборки PR #958 (`df454007a1379a3fd98490d4ca2e7e334a535d16`) адресным Playwright-тестом `frontend/tests/e2e/nutrition-diary.spec.ts`.
+Это один browser-evidence пакет для трёх связанных Issues. Снимки сняты из рабочей сборки PR #958 (`e1c7e906d226265f589669cc85d424e4e8f9e802`) адресным Playwright-тестом `frontend/tests/e2e/nutrition-diary.spec.ts`.
 
 Покрытие: Chromium и WebKit; ширины 320 и 393 CSS px; dark и light; шесть состояний на каждый набор:
 
