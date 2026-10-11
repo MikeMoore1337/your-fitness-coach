@@ -1,0 +1,30 @@
+{
+  "issue": 903,
+  "route": "/for-athletes",
+  "fixture": "public landing; weekly score example data",
+  "browser": "Chromium (Playwright)",
+  "before": {
+    "commit": "297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55",
+    "viewport": [
+      { "width": 390, "height": 844 },
+      { "width": 1440, "height": 900 }
+    ],
+    "themes": ["dark", "light"],
+    "interaction": "Open Проверка недели and select radio 5"
+  },
+  "after": {
+    "commit": "6d4b061cda0a9272e71876af77e7f2165e51fbf1",
+    "viewport": [
+      { "width": 390, "height": 844 },
+      { "width": 1440, "height": 900 }
+    ],
+    "themes": ["dark", "light"],
+    "interaction": "Open Проверка недели and select radio 5"
+  },
+  "assertions": [
+    "Five native radio controls remain available",
+    "score labels are circular with at least 44px touch targets",
+    "selected state remains visible",
+    "focus-visible outline remains visible"
+  ]
+}
