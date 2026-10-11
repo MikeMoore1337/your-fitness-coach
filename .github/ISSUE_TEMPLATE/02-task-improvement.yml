@@ -1,0 +1,48 @@
+name: "Task / Improvement"
+description: "Функция, доработка, UI, инженерная или эксплуатационная задача"
+body:
+  - type: markdown
+    attributes:
+      value: "Начните заголовок с [Product Vxx], [UI Backlog], [Improvement], [Engineering], [Operations] или [Growth]. Если это ошибка, выберите Bug Report."
+  - type: textarea
+    id: goal
+    attributes:
+      label: "Цель и пользовательская ценность"
+      placeholder: "Зачем нужна работа и кому она поможет?"
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: "Текущее состояние"
+      placeholder: "Что уже существует?"
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: "Что изменить и что не входит в задачу"
+      placeholder: "Границы реализации и исключения."
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: "Критерии приёмки"
+      placeholder: "Проверяемые условия завершения."
+    validations:
+      required: true
+  - type: textarea
+    id: related
+    attributes:
+      label: "Зависимости, риски, согласования"
+      description: "Укажите номера Issues/PR. Нативные зависимости GitHub задаются отдельно."
+    validations:
+      required: false
+  - type: textarea
+    id: checks
+    attributes:
+      label: "Проверки и доказательства"
+      placeholder: "Тесты, измерения, скриншоты, безопасность."
+    validations:
+      required: false

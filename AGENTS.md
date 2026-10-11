@@ -176,3 +176,7 @@ Existing requirements for security, factual accuracy, Russian localization,
 legal review, data schemas, review processes and owner approval take precedence.
 Clear Voice does not replace domain-specific expertise or grant permission to
 publish content, write data or bypass the Hermes manual review process.
+
+## Issue governance (2026-10-12 owner-approved)
+
+Use [`docs/ISSUE_GOVERNANCE.md`](docs/ISSUE_GOVERNANCE.md) for approved Issue prefixes, labels, DoR/DoD, Priority/Effort/Status, templates and migration rules; [`docs/PARALLEL_DEVELOPMENT.md`](docs/PARALLEL_DEVELOPMENT.md) for independent three-worktree development. GitHub remains the sole operational source of truth. Migration of existing Issues requires owner review of [`docs/issue-governance-migration-review.md`](docs/issue-governance-migration-review.md). Do not infer owner approval, implement a new controller/queue, or auto-start the next product Issue.
