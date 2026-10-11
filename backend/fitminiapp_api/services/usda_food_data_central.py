@@ -46,10 +46,12 @@ class USDAFoodDataCentralProvider:
         api_key: str,
         timeout_seconds: float = 4.0,
         transport: httpx.BaseTransport | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         self._api_key = api_key.strip()
         self._timeout = httpx.Timeout(timeout_seconds)
         self._transport = transport
+        self._proxy_url = proxy_url
 
     def search(self, query: str, *, limit: int) -> list[ProviderFood]:
         russian_query = is_russian_food_query(query)
@@ -86,6 +88,7 @@ class USDAFoodDataCentralProvider:
                     headers={"Accept": "application/json"},
                     timeout=self._timeout,
                     transport=self._transport,
+                    proxy=self._proxy_url,
                     follow_redirects=False,
                     trust_env=False,
                 ) as client:

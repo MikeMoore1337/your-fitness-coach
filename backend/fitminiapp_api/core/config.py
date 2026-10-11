@@ -111,6 +111,7 @@ class Settings(BaseSettings):
     open_food_facts_user_agent: str = ""
     food_usda_enabled: bool = False
     usda_fdc_api_key: SecretStr = SecretStr("")
+    usda_fdc_proxy_url: str = ""
     food_provider_timeout_seconds: float = Field(default=4, ge=1, le=15)
 
     # Nutrition label recognition remains local-first. Task 283 adds a separately gated
@@ -326,6 +327,28 @@ class Settings(BaseSettings):
                 )
         if self.food_usda_enabled and not self.usda_fdc_api_key.get_secret_value().strip():
             raise ValueError("USDA_FDC_API_KEY must be configured when FOOD_USDA_ENABLED is true")
+        proxy_url = self.usda_fdc_proxy_url.strip()
+        if proxy_url:
+            try:
+                parsed_proxy = urlparse(proxy_url)
+                proxy_port = parsed_proxy.port
+            except ValueError as exc:
+                raise ValueError(
+                    "USDA_FDC_PROXY_URL must be a credential-free local SOCKS URL"
+                ) from exc
+            if (
+                parsed_proxy.scheme not in {"socks5", "socks5h"}
+                or parsed_proxy.hostname not in {"host.docker.internal", "127.0.0.1", "localhost"}
+                or proxy_port is None
+                or not 1 <= proxy_port <= 65535
+                or parsed_proxy.username is not None
+                or parsed_proxy.password is not None
+                or parsed_proxy.path not in {"", "/"}
+                or parsed_proxy.query
+                or parsed_proxy.fragment
+            ):
+                raise ValueError("USDA_FDC_PROXY_URL must be a credential-free local SOCKS URL")
+        self.usda_fdc_proxy_url = proxy_url
         return self
 
     @model_validator(mode="after")
