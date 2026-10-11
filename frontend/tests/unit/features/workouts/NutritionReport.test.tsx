@@ -291,3 +291,53 @@ describe('NutritionPeriodReport', () => {
     expect(screen.queryByRole('link', { name: /Открыть дневник/ })).not.toBeInTheDocument();
   });
 });
+
+describe('NutritionReport optional fiber and evidence insights', () => {
+  it('shows an informative fiber average and historical fact without inventing a target', async () => {
+    const report = makeReport();
+    report.summary.fiber_g = { average: 7.5, minimum: 5, maximum: 10, sample_days: 2 };
+    report.daily[0].fiber_g = 10;
+    report.insights = [
+      {
+        metric: 'protein_g',
+        direction: 'below',
+        evaluated_days: 4,
+        deviation_days: 3,
+        average_deviation: -30,
+        action_code: 'open_meal_suggestions',
+        message: 'В 3 из 4 подтверждённых дней белка было меньше цели.',
+      },
+    ];
+    installApi(report);
+    renderReport();
+
+    expect(await screen.findByText('Клетчатка')).toBeVisible();
+    expect(screen.getByText('по 2 дн. с известными данными')).toBeVisible();
+    expect(screen.getByText('Клетчатка: 10 г')).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Повторяющиеся отклонения' })).toBeVisible();
+    expect(screen.getByText('В 3 из 4 подтверждённых дней белка было меньше цели.')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Открыть питание' })).toHaveAttribute(
+      'href',
+      '/app?section=nutrition',
+    );
+  });
+
+  it('does not reveal a client diary link to a trainer', async () => {
+    const report = makeReport();
+    report.insights = [
+      {
+        metric: 'calories',
+        direction: 'above',
+        evaluated_days: 4,
+        deviation_days: 4,
+        average_deviation: 200,
+        action_code: 'review_portions',
+        message: 'Проверьте историю порций.',
+      },
+    ];
+    installApi(report);
+    renderReport(73);
+    expect(await screen.findByText('Проверьте историю порций.')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Открыть питание' })).not.toBeInTheDocument();
+  });
+});
