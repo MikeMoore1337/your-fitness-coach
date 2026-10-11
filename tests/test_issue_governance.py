@@ -1,4 +1,5 @@
 """Тесты необязательных проверок классификации Issues."""
+
 from __future__ import annotations
 
 from scripts.issue_governance import LABEL_OPTIONS, audit_items, suggested_prefix, title_errors
@@ -19,10 +20,14 @@ def test_approved_prefixes() -> None:
 
 def test_rejects_legacy_and_multiple_prefixes() -> None:
     cases = [
-        "[Product v13] Старый формат", "[Product Vxx] Без номера",
-        "[Fix] Исправить поиск", "[Bug][Mobile] Поиск перекрыт",
-        "[Bug] [Mobile] Поиск перекрыт", "[Bug]   ",
-        "Заголовок без префикса", "[Bug] Да",
+        "[Product v13] Старый формат",
+        "[Product Vxx] Без номера",
+        "[Fix] Исправить поиск",
+        "[Bug][Mobile] Поиск перекрыт",
+        "[Bug] [Mobile] Поиск перекрыт",
+        "[Bug]   ",
+        "Заголовок без префикса",
+        "[Bug] Да",
     ]
     assert all(title_errors(title) for title in cases)
 
@@ -36,11 +41,13 @@ def test_version_hint_is_conservative() -> None:
 
 
 def test_inventory_does_not_consider_pr_or_invent_priority() -> None:
-    result = audit_items([
-        {"number": 5, "title": "V13-01 - Функция"},
-        {"number": 6, "title": "[Mobile] Сбой"},
-        {"number": 7, "title": "[Bug] Сбой", "pull_request": {"url": "x"}},
-    ])
+    result = audit_items(
+        [
+            {"number": 5, "title": "V13-01 - Функция"},
+            {"number": 6, "title": "[Mobile] Сбой"},
+            {"number": 7, "title": "[Bug] Сбой", "pull_request": {"url": "x"}},
+        ]
+    )
     assert "Количество Issues: 2" in result
     assert "[Product V13]" in result
     assert "Решение владельца" in result
