@@ -1477,7 +1477,7 @@
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add)
     .app-bottom-nav__primary
-    .app-bottom-nav__btn {
+    .app-bottom-nav__btn:not([data-yfc-choice]) {
     min-width: 0;
     min-height: 52px;
     gap: 3px;
@@ -1488,6 +1488,15 @@
     box-shadow: none;
     color: var(--v2-text-primary);
     font-weight: 500;
+  }
+
+  /* Keep the shared selected-state contract ahead of the dock's neutral base. */
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__btn[data-yfc-choice][aria-current='page'] {
+    background: var(--v2-selected-surface);
+    box-shadow: var(--v2-selected-relief);
+    color: var(--v2-selected-ink);
   }
 
   .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav__btn.is-active::before {
@@ -1530,7 +1539,7 @@
   @media (max-width: 359px) {
     .app-shell--design-v2:has(.app-bottom-nav__quick-add)
       .app-bottom-nav__primary
-      .app-bottom-nav__btn {
+      .app-bottom-nav__btn:not([data-yfc-choice]) {
       padding-inline: 0;
     }
 
