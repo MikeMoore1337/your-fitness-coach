@@ -98,8 +98,13 @@ for (const width of [320, 360, 393, 430])
       expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(
         navigationBox.x + navigationBox.width,
       );
-      for (const tab of await tabs.all()) {
+      const choices = navigation.locator('.app-bottom-nav__primary [data-yfc-choice]');
+      await expect(choices).toHaveCount(4);
+      for (const tab of await choices.all()) {
         await expect(tab).toHaveCSS('border-radius', '9999px');
+      }
+      await expect(trigger).not.toHaveAttribute('aria-current', 'page');
+      for (const tab of await tabs.all()) {
         const box = (await tab.boundingBox())!;
         expect(box.width).toBeGreaterThanOrEqual(44);
         expect(box.height).toBeGreaterThanOrEqual(44);
