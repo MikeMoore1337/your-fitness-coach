@@ -296,7 +296,7 @@ describe('NutritionReport optional fiber and evidence insights', () => {
   it('shows an informative fiber average and historical fact without inventing a target', async () => {
     const report = makeReport();
     report.summary.fiber_g = { average: 7.5, minimum: 5, maximum: 10, sample_days: 2 };
-    report.daily[0].fiber_g = 10;
+    report.daily = report.daily.map((day, index) => (index === 0 ? { ...day, fiber_g: 10 } : day));
     report.insights = [
       {
         metric: 'protein_g',
