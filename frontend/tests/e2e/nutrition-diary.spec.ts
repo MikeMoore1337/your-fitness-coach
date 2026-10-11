@@ -1524,7 +1524,13 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
       await route.fulfill({
         json: {
           items: isRice
-            ? [{ ...importedRiceFood, is_favorite: favoriteState, nutrition_basis_kind: 'per_100_g' }]
+            ? [
+                {
+                  ...importedRiceFood,
+                  is_favorite: favoriteState,
+                  nutrition_basis_kind: 'per_100_g',
+                },
+              ]
             : [],
           external_items: includeExternal
             ? isPotato
@@ -1542,7 +1548,10 @@ test.describe('Food picker mobile acceptance for #946-#948', () => {
     });
     await page.route('**/api/v1/nutrition/foods/*/favorite', async (route) => {
       favoriteState = route.request().method() === 'PUT';
-      await route.fulfill({ status: 200, json: { ...importedRiceFood, is_favorite: favoriteState } });
+      await route.fulfill({
+        status: 200,
+        json: { ...importedRiceFood, is_favorite: favoriteState },
+      });
     });
     const project = test.info().project.name.replace(/[^a-z0-9-]+/gi, '-');
 

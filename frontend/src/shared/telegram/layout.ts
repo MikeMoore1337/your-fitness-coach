@@ -45,10 +45,7 @@ export function readMobileViewportSnapshot(
   const browserHeight = positiveMetric(visualViewport?.height, window.innerHeight);
   const stableFallback = positiveMetric(window.innerHeight, browserHeight);
   const viewportOffsetTop = boundedMetric(visualViewport?.offsetTop, 0);
-  const viewportOffsetBottom = Math.max(
-    0,
-    stableFallback - viewportOffsetTop - browserHeight,
-  );
+  const viewportOffsetBottom = Math.max(0, stableFallback - viewportOffsetTop - browserHeight);
   const isMiniApp = Boolean(telegram?.initData);
   const viewportHeight = isMiniApp
     ? Math.min(positiveMetric(telegram?.viewportHeight, browserHeight), browserHeight)
