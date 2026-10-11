@@ -59,6 +59,34 @@ short-lived editable draft; никакой food или diary row не появл
 [`nutrition-label-scanning/IMPLEMENTATION_CONTRACT.md`](nutrition-label-scanning/IMPLEMENTATION_CONTRACT.md).
 Recognition quality пока `NOT MEASURED`; synthetic eval не является доказательством качества OCR.
 
+## Пополнение общего каталога из USDA
+
+Для уже экспертно проверенных русских названий и точных FDC-идентификаторов из
+`USDA_RU_DISPLAY_NAMES_V2` доступен генератор `scripts/export_usda_reviewed_catalog.py`.
+Он получает официальный набор USDA через `POST /fdc/v1/foods` небольшими пакетами,
+не выполняет записей в базу, не переводит названия автоматически, не придумывает
+неизвестные нутриенты и отвергает неполный/чужой/повторный FDC ID. Используются
+только записи с подтверждёнными ккал, белками, жирами и углеводами и допустимой
+единицей; клетчатка остаётся `null`, если источник её не сообщил.
+
+Команда генерации (внутри backend runtime с серверными переменными `USDA_FDC_API_KEY`
+и при необходимости `USDA_FDC_PROXY_URL`):
+
+```sh
+python scripts/export_usda_reviewed_catalog.py --output .artifacts/usda_reviewed_v2.json
+python scripts/import_food_catalog.py .artifacts/usda_reviewed_v2.json --dry-run
+# Только после проверки результата, резервной копии и owner-approved data rollout:
+python scripts/import_food_catalog.py .artifacts/usda_reviewed_v2.json
+```
+
+Входящий и выходящий JSON не содержит API-ключа. Источник записывается как
+`usda-fdc-reviewed-ru`, `CC0-1.0`, `(source_name, external_id)` и версия
+проверенной карты русских названий. Импорт использует **существующие** таблицу `foods`
+и сервис upsert, не создаёт параллельную базу и не смешивает типы приготовления.
+Повторный импорт обновляет собственные FDC-идентификаторы. Публичные пользовательские
+продукты и записи дневника не редактируются. Неизвестные FDC ID требуют отдельного
+контентного ревью перед расширением карты имён.
+
 ## Воспроизводимый импорт каталога
 
 `scripts/import_food_catalog.py` принимает локальный JSON-каталог. Версионируемый манифест должен
