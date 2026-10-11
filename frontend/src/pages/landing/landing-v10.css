@@ -1729,6 +1729,24 @@
   margin: 0;
 }
 
+/* Issue #906: give the approved cinematic composition room on desktop while keeping mobile intact. */
+@media (min-width: 768px) {
+  .landing-v10-page .ref-hero {
+    height: clamp(860px, 100svh, 980px);
+    min-height: clamp(860px, 100svh, 980px);
+  }
+
+  .landing-v10-page .ref-hero .landing-hero__image {
+    top: 0;
+    height: 100%;
+    object-position: 65% 27%;
+  }
+
+  .landing-v10-page.landing-v10-page--coach .ref-hero .landing-hero__image {
+    object-position: 68% 27%;
+  }
+}
+
 /* Six trainer chapters: original #852 composition, scoped to restored scenes. */
 .ref-coach-facts {
   padding: 0;
