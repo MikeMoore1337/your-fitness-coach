@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 722 904" width="722" height="904">
+<rect width="722" height="904" fill="#0a0e0d"/>
+<style>text{font-family:Inter,Arial,sans-serif;text-rendering:geometricPrecision}</style>
+<text x="32" y="37" font-size="17" font-weight="700" fill="#f5f7f4">YFC • Поиск продуктов</text>
+<text x="32" y="59" font-size="12" font-weight="400" fill="#acb7b0">Концепция v1.0 • 320 CSS px • без фотографий • до аппрува</text>
+<rect x="30" y="83" width="320" height="788" rx="25" fill="#151918" stroke="#535f53" stroke-width="1"/>
+<text x="50" y="115" font-size="10" font-weight="700" fill="#a7ef18">ДОБАВИТЬ В ЗАВТРАК</text>
+<text x="50" y="145" font-size="20" font-weight="700" fill="#f4f6f2">Выберите продукт</text>
+<rect x="294" y="101" width="39" height="39" rx="13" fill="#242b26" stroke="#444e46" stroke-width="1"/>
+<path d="M308 114 L320 126" stroke="#f4f6f2" stroke-width="1.7" stroke-linecap="round"/>
+<path d="M320 114 L308 126" stroke="#f4f6f2" stroke-width="1.7" stroke-linecap="round"/>
+<path d="M47 158 L333 158" stroke="#444e46" stroke-width="1" stroke-linecap="round"/>
+<text x="50" y="186" font-size="12" font-weight="650" fill="#f4f6f2">Найти продукт</text>
+<rect x="50" y="197" width="280" height="46" rx="13" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="65" y="226" font-size="15" font-weight="400" fill="#f4f6f2">рис</text>
+<path d="M300 215 L312 227" stroke="#b6c1b9" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M312 215 L300 227" stroke="#b6c1b9" stroke-width="1.4" stroke-linecap="round"/>
+<text x="50" y="262" font-size="10.5" font-weight="400" fill="#b6c1b9">Локальный поиск начинается после двух символов</text>
+<rect x="50" y="281" width="133" height="48" rx="12" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="116.5" y="300" font-size="12" font-weight="600" fill="#f4f6f2" text-anchor="middle">По фото</text>
+<text x="116.5" y="315" font-size="12" font-weight="600" fill="#f4f6f2" text-anchor="middle">этикетки</text>
+<rect x="197" y="281" width="133" height="48" rx="12" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="263.5" y="300" font-size="12" font-weight="600" fill="#f4f6f2" text-anchor="middle">По фото</text>
+<text x="263.5" y="315" font-size="12" font-weight="600" fill="#f4f6f2" text-anchor="middle">блюда</text>
+<rect x="50" y="340" width="138" height="42" rx="12" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="119" y="366" font-size="11.5" font-weight="600" fill="#f4f6f2" text-anchor="middle">+ Ввести вручную</text>
+<rect x="50" y="392" width="280" height="37" rx="12" fill="#242a27" stroke="#444e46" stroke-width="1"/>
+<text x="64" y="416" font-size="11.4" font-weight="600" fill="#b6c1b9">▸ Другие способы добавления</text>
+<text x="50" y="452" font-size="10.9" font-weight="400" fill="#b6c1b9">Нажмите на карточку, чтобы выбрать</text>
+<rect x="50" y="464" width="280" height="118" rx="15" fill="#232b21" stroke="#a7ef18" stroke-width="1.6"/>
+<text x="63" y="486" font-size="12.7" font-weight="700" fill="#f4f6f2">Рис белый приготовленный,</text>
+<text x="63" y="504" font-size="12.7" font-weight="700" fill="#f4f6f2">без добавления масла</text>
+<text x="63" y="527" font-size="11.4" font-weight="400" fill="#b6c1b9">130 ккал / 100 г</text>
+<rect x="62" y="541" width="91" height="23" rx="9" fill="#394436"/>
+<text x="107.5" y="557" font-size="10.6" font-weight="500" fill="#f4f6f2" text-anchor="middle">Мой продукт</text>
+<text x="269" y="557" font-size="11.5" font-weight="650" fill="#a7ef18" text-anchor="middle">Изменить</text>
+<polygon points="301.0,481.0 304.0,487.9 311.5,488.6 305.9,493.6 307.5,500.9 301.0,497.1 294.5,500.9 296.1,493.6 290.5,488.6 298.0,487.9" fill="#a7ef18" stroke="#a7ef18" stroke-width="1.7" stroke-linejoin="round"/>
+<rect x="50" y="594" width="280" height="117" rx="15" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="63" y="616" font-size="12.7" font-weight="700" fill="#f4f6f2">Рис бурый нешлифованный,</text>
+<text x="63" y="634" font-size="12.7" font-weight="700" fill="#f4f6f2">отварной</text>
+<text x="63" y="657" font-size="11.4" font-weight="400" fill="#b6c1b9">111 ккал / 100 г</text>
+<rect x="62" y="671" width="107" height="23" rx="9" fill="#323935"/>
+<text x="115.5" y="687" font-size="10.3" font-weight="500" fill="#b6c1b9" text-anchor="middle">Проверено YFC</text>
+<polygon points="301.0,611.0 304.0,617.9 311.5,618.6 305.9,623.6 307.5,630.9 301.0,627.1 294.5,630.9 296.1,623.6 290.5,618.6 298.0,617.9" fill="none" stroke="#b6c1b9" stroke-width="1.7" stroke-linejoin="round"/>
+<rect x="50" y="724" width="280" height="126" rx="15" fill="#1e2321" stroke="#444e46" stroke-width="1"/>
+<text x="63" y="746" font-size="12.7" font-weight="700" fill="#f4f6f2">Картофель запечённый</text>
+<text x="63" y="764" font-size="12.7" font-weight="700" fill="#f4f6f2">в кожуре, без масла</text>
+<text x="63" y="787" font-size="11.4" font-weight="400" fill="#b6c1b9">93 ккал / 100 г</text>
+<rect x="62" y="801" width="107" height="23" rx="9" fill="#323935"/>
+<text x="115.5" y="817" font-size="10.3" font-weight="500" fill="#b6c1b9" text-anchor="middle">Проверено YFC</text>
+<polygon points="301.0,741.0 304.0,747.9 311.5,748.6 305.9,753.6 307.5,760.9 301.0,757.1 294.5,760.9 296.1,753.6 290.5,748.6 298.0,747.9" fill="none" stroke="#b6c1b9" stroke-width="1.7" stroke-linejoin="round"/>
+<text x="190" y="888" font-size="12" font-weight="600" fill="#c6d1ca" text-anchor="middle">Тёмная тема</text>
+<rect x="372" y="83" width="320" height="788" rx="25" fill="#f8faf7" stroke="#dce4dc" stroke-width="1"/>
+<text x="392" y="115" font-size="10" font-weight="700" fill="#48691b">ДОБАВИТЬ В ЗАВТРАК</text>
+<text x="392" y="145" font-size="20" font-weight="700" fill="#1c221e">Выберите продукт</text>
+<rect x="636" y="101" width="39" height="39" rx="13" fill="#f4f7f4" stroke="#d1d9d2" stroke-width="1"/>
+<path d="M650 114 L662 126" stroke="#1c221e" stroke-width="1.7" stroke-linecap="round"/>
+<path d="M662 114 L650 126" stroke="#1c221e" stroke-width="1.7" stroke-linecap="round"/>
+<path d="M389 158 L675 158" stroke="#d1d9d2" stroke-width="1" stroke-linecap="round"/>
+<text x="392" y="186" font-size="12" font-weight="650" fill="#1c221e">Найти продукт</text>
+<rect x="392" y="197" width="280" height="46" rx="13" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="407" y="226" font-size="15" font-weight="400" fill="#1c221e">рис</text>
+<path d="M642 215 L654 227" stroke="#59665c" stroke-width="1.4" stroke-linecap="round"/>
+<path d="M654 215 L642 227" stroke="#59665c" stroke-width="1.4" stroke-linecap="round"/>
+<text x="392" y="262" font-size="10.5" font-weight="400" fill="#59665c">Локальный поиск начинается после двух символов</text>
+<rect x="392" y="281" width="133" height="48" rx="12" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="458.5" y="300" font-size="12" font-weight="600" fill="#1c221e" text-anchor="middle">По фото</text>
+<text x="458.5" y="315" font-size="12" font-weight="600" fill="#1c221e" text-anchor="middle">этикетки</text>
+<rect x="539" y="281" width="133" height="48" rx="12" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="605.5" y="300" font-size="12" font-weight="600" fill="#1c221e" text-anchor="middle">По фото</text>
+<text x="605.5" y="315" font-size="12" font-weight="600" fill="#1c221e" text-anchor="middle">блюда</text>
+<rect x="392" y="340" width="138" height="42" rx="12" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="461" y="366" font-size="11.5" font-weight="600" fill="#1c221e" text-anchor="middle">+ Ввести вручную</text>
+<rect x="392" y="392" width="280" height="37" rx="12" fill="#eef0ed" stroke="#d1d9d2" stroke-width="1"/>
+<text x="406" y="416" font-size="11.4" font-weight="600" fill="#59665c">▸ Другие способы добавления</text>
+<text x="392" y="452" font-size="10.9" font-weight="400" fill="#59665c">Нажмите на карточку, чтобы выбрать</text>
+<rect x="392" y="464" width="280" height="118" rx="15" fill="#f2f9e9" stroke="#48691b" stroke-width="1.6"/>
+<text x="405" y="486" font-size="12.7" font-weight="700" fill="#1c221e">Рис белый приготовленный,</text>
+<text x="405" y="504" font-size="12.7" font-weight="700" fill="#1c221e">без добавления масла</text>
+<text x="405" y="527" font-size="11.4" font-weight="400" fill="#59665c">130 ккал / 100 г</text>
+<rect x="404" y="541" width="91" height="23" rx="9" fill="#e3edda"/>
+<text x="449.5" y="557" font-size="10.6" font-weight="500" fill="#1c221e" text-anchor="middle">Мой продукт</text>
+<text x="611" y="557" font-size="11.5" font-weight="650" fill="#48691b" text-anchor="middle">Изменить</text>
+<polygon points="643.0,481.0 646.0,487.9 653.5,488.6 647.9,493.6 649.5,500.9 643.0,497.1 636.5,500.9 638.1,493.6 632.5,488.6 640.0,487.9" fill="#48691b" stroke="#48691b" stroke-width="1.7" stroke-linejoin="round"/>
+<rect x="392" y="594" width="280" height="117" rx="15" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="405" y="616" font-size="12.7" font-weight="700" fill="#1c221e">Рис бурый нешлифованный,</text>
+<text x="405" y="634" font-size="12.7" font-weight="700" fill="#1c221e">отварной</text>
+<text x="405" y="657" font-size="11.4" font-weight="400" fill="#59665c">111 ккал / 100 г</text>
+<rect x="404" y="671" width="107" height="23" rx="9" fill="#eef1ed"/>
+<text x="457.5" y="687" font-size="10.3" font-weight="500" fill="#59665c" text-anchor="middle">Проверено YFC</text>
+<polygon points="643.0,611.0 646.0,617.9 653.5,618.6 647.9,623.6 649.5,630.9 643.0,627.1 636.5,630.9 638.1,623.6 632.5,618.6 640.0,617.9" fill="none" stroke="#59665c" stroke-width="1.7" stroke-linejoin="round"/>
+<rect x="392" y="724" width="280" height="126" rx="15" fill="#ffffff" stroke="#d1d9d2" stroke-width="1"/>
+<text x="405" y="746" font-size="12.7" font-weight="700" fill="#1c221e">Картофель запечённый</text>
+<text x="405" y="764" font-size="12.7" font-weight="700" fill="#1c221e">в кожуре, без масла</text>
+<text x="405" y="787" font-size="11.4" font-weight="400" fill="#59665c">93 ккал / 100 г</text>
+<rect x="404" y="801" width="107" height="23" rx="9" fill="#eef1ed"/>
+<text x="457.5" y="817" font-size="10.3" font-weight="500" fill="#59665c" text-anchor="middle">Проверено YFC</text>
+<polygon points="643.0,741.0 646.0,747.9 653.5,748.6 647.9,753.6 649.5,760.9 643.0,757.1 636.5,760.9 638.1,753.6 632.5,748.6 640.0,747.9" fill="none" stroke="#59665c" stroke-width="1.7" stroke-linejoin="round"/>
+<text x="532" y="888" font-size="12" font-weight="600" fill="#c6d1ca" text-anchor="middle">Светлая тема</text>
+</svg>
