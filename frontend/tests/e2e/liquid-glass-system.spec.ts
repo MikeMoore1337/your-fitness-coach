@@ -46,9 +46,16 @@ for (const theme of ['light', 'dark'] as const) {
 
       const add = page.getByRole('button', { name: 'Быстро добавить', exact: true });
       await add.hover();
-      await expect
-        .poll(() => add.evaluate((element) => element.style.getPropertyValue('--glass-x')))
-        .not.toBe('');
+      if (width < 900) {
+        await expect
+          .poll(() => nav.evaluate((element) => element.style.getPropertyValue('--glass-x')))
+          .not.toBe('');
+        await expect(add).toHaveClass(/app-bottom-nav__quick-add/);
+      } else {
+        await expect
+          .poll(() => add.evaluate((element) => element.style.getPropertyValue('--glass-x')))
+          .not.toBe('');
+      }
       await add.focus();
       await page.keyboard.press('Enter');
       const sheet = page.getByRole('dialog', { name: 'Что добавить?' });

@@ -55,14 +55,28 @@ export const DEFAULT_QUICK_ADD_ACTIONS: ReadonlyArray<QuickAddAction> = [
   },
 ];
 
-export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
+export function QuickAddTrigger({
+  inNavigation = false,
+  onOpen,
+}: {
+  inNavigation?: boolean;
+  onOpen(): void;
+}) {
+  const className = [
+    'app-quick-add-trigger',
+    inNavigation
+      ? 'app-bottom-nav__btn app-bottom-nav__quick-add'
+      : 'app-quick-add-trigger--floating',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return (
     <button
       aria-haspopup="dialog"
       aria-label="Быстро добавить"
-      {...glassProps('tinted', true)}
-      data-glass-accent="lime"
-      className="app-quick-add-trigger"
+      {...(inNavigation ? {} : glassProps('tinted', true))}
+      {...(!inNavigation ? { 'data-glass-accent': 'lime' } : {})}
+      className={className}
       data-testid="quick-add-trigger"
       type="button"
       onClick={(event) => {
@@ -70,8 +84,16 @@ export function QuickAddTrigger({ onOpen }: { onOpen(): void }) {
         onOpen();
       }}
     >
-      <Icon name="plus" className="app-quick-add-trigger__plus" />
-      <span className="app-quick-add-trigger__label">Добавить</span>
+      {inNavigation ? (
+        <span aria-hidden="true" className="app-bottom-nav__icon">
+          <Icon name="plus" size={24} />
+        </span>
+      ) : (
+        <Icon name="plus" size={20} className="app-quick-add-trigger__plus" />
+      )}
+      <span className={inNavigation ? 'app-bottom-nav__label' : 'app-quick-add-trigger__label'}>
+        Добавить
+      </span>
     </button>
   );
 }

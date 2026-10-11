@@ -23,21 +23,21 @@
   cursor: pointer;
 }
 
-.app-quick-add-trigger:hover {
+.app-quick-add-trigger--floating:hover {
   border-color: var(--v2-lime-hover);
   background: var(--v2-lime-hover);
 }
 
 /* Во время отдыха tablet FAB не перекрывает кнопки таймера. */
 @media (min-width: 521px) and (max-width: 899px) {
-  body:has(.active-workout-rest) .app-quick-add-trigger {
+  body:has(.active-workout-rest) .app-quick-add-trigger--floating {
     bottom: calc(176px + max(8px, var(--yfc-layout-safe-bottom, 0px)));
   }
 }
 
 @media (max-width: 899px) {
-  html[data-yfc-keyboard='visible'] .app-quick-add-trigger,
-  body:has(.active-workout--design-v2) .app-quick-add-trigger {
+  html[data-yfc-keyboard='visible'] .app-quick-add-trigger--floating,
+  body:has(.active-workout--design-v2) .app-quick-add-trigger--floating {
     visibility: hidden;
     pointer-events: none;
   }
@@ -828,7 +828,7 @@
 }
 
 @media (min-width: 900px) {
-  .app-quick-add-trigger {
+  .app-quick-add-trigger--floating {
     right: 30px;
     bottom: 28px;
   }
@@ -854,7 +854,7 @@
 }
 
 @media (max-width: 520px) {
-  .app-quick-add-trigger {
+  .app-quick-add-trigger--floating {
     right: max(12px, var(--yfc-layout-safe-right, 0px));
     width: 48px;
     height: 48px;
@@ -905,7 +905,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-quick-add-trigger,
+  .app-quick-add-trigger--floating,
   .app-quick-add-action {
     transition: none;
   }
@@ -1384,7 +1384,7 @@
 }
 
 @media (max-width: 899px) {
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav {
     inset: auto calc(max(12px, var(--yfc-layout-safe-right)) + 60px + var(--space-4))
       calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
       max(12px, var(--yfc-layout-safe-left));
@@ -1394,7 +1394,7 @@
     border: 1px solid var(--v2-border);
     border-radius: 22px;
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav__btn {
     min-width: 44px;
     min-height: 52px;
     padding: 4px 2px;
@@ -1403,20 +1403,21 @@
     box-shadow: none;
     color: var(--v2-text-primary);
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav__btn.is-active {
     color: var(--v2-accent-text);
     background: var(--v2-lime-soft);
     box-shadow: none;
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn.is-active::before {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating)
+    .app-bottom-nav__btn.is-active::before {
     content: none;
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__label {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav__label {
     font-size: 0.75rem;
     font-weight: 500;
     line-height: 1;
   }
-  .app-shell--design-v2 .app-quick-add-trigger {
+  .app-shell--design-v2 .app-quick-add-trigger--floating {
     right: max(12px, var(--yfc-layout-safe-right));
     bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
     width: 60px;
@@ -1459,14 +1460,98 @@
 }
 
 @media (max-width: 359px) {
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__btn {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav__btn {
     padding-inline: 0;
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav__label {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav__label {
     font-size: 0.6875rem;
   }
-  .app-shell--design-v2:has(.app-quick-add-trigger) .app-bottom-nav--demo {
+  .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav--demo {
     right: calc(max(12px, var(--yfc-layout-safe-right)) + 60px);
+  }
+}
+
+/* The personal mobile dock owns the add action; the floating trigger remains for desktop and demos. */
+@media (max-width: 899px) {
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    inset: auto max(10px, var(--yfc-layout-safe-right))
+      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
+      max(10px, var(--yfc-layout-safe-left));
+    gap: 2px;
+    padding: 6px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__btn {
+    min-width: 0;
+    min-height: 52px;
+    gap: 3px;
+    padding: 4px 2px;
+    border: 0;
+    border-radius: 18px;
+    background: transparent;
+    box-shadow: none;
+    color: var(--v2-text-primary);
+    font-weight: 500;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__btn.is-active {
+    color: var(--v2-accent-text);
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav__btn.is-active::before {
+    content: none;
+  }
+
+  .app-shell--design-v2 .app-bottom-nav__quick-add {
+    position: relative;
+    inset: auto;
+    z-index: auto;
+    width: 100%;
+    height: auto;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__icon {
+    width: 24px;
+    height: 24px;
+    flex-basis: 24px;
+    background: transparent;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__icon
+    svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
+    .app-bottom-nav__label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  @media (max-width: 359px) {
+    .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__btn {
+      padding-inline: 0;
+    }
+
+    .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+      .app-bottom-nav__primary
+      .app-bottom-nav__label {
+      font-size: 0.6875rem;
+    }
   }
 }
 

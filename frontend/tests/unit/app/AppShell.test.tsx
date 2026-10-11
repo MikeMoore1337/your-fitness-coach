@@ -223,6 +223,32 @@ describe('AppShell', () => {
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
   });
 
+  it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {
+    stubViewport(390);
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    const primary = document.querySelector('.app-bottom-nav__primary')!;
+    expect(Array.from(primary.children).map((item) => item.textContent)).toEqual([
+      'Сегодня',
+      'План',
+      'Питание',
+      'Прогресс',
+      'Добавить',
+    ]);
+    const add = within(primary as HTMLElement).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.querySelector('svg[data-icon="plus"]')).toBeInTheDocument();
+    expect(add).not.toHaveAttribute('aria-current');
+    expect(add).not.toHaveClass('is-active');
+    expect(document.querySelector('.app-quick-add-trigger--floating')).toBeNull();
+
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+    expect(add).toHaveFocus();
+  });
+
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {
     stubViewport(390);
     navigation.path = '/app';

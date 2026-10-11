@@ -247,25 +247,23 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
   await expect(page.getByRole('link', { name: 'Открыть дневник питания' })).toHaveCount(0);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-  const [primaryNutritionActionBox, todayBottomNavBox, todayFabBox] = await Promise.all([
+  const [primaryNutritionActionBox, todayBottomNavBox, todayAddBox] = await Promise.all([
     primaryNutritionAction.boundingBox(),
     page.locator('#appBottomNav').boundingBox(),
-    page.locator('.app-quick-add-trigger').boundingBox(),
+    page.locator('.app-bottom-nav__quick-add').boundingBox(),
   ]);
   expect(primaryNutritionActionBox).not.toBeNull();
   expect(todayBottomNavBox).not.toBeNull();
-  expect(todayFabBox).not.toBeNull();
+  expect(todayAddBox).not.toBeNull();
   expect(primaryNutritionActionBox!.height).toBeGreaterThanOrEqual(44);
-  const overlaps = (
-    first: NonNullable<typeof primaryNutritionActionBox>,
-    second: NonNullable<typeof todayFabBox>,
-  ) =>
-    first.x < second.x + second.width &&
-    first.x + first.width > second.x &&
-    first.y < second.y + second.height &&
-    first.y + first.height > second.y;
-  expect(overlaps(primaryNutritionActionBox!, todayFabBox!)).toBe(false);
-  expect(overlaps(primaryNutritionActionBox!, todayBottomNavBox!)).toBe(false);
+  expect(todayAddBox!.x).toBeGreaterThanOrEqual(todayBottomNavBox!.x);
+  expect(todayAddBox!.x + todayAddBox!.width).toBeLessThanOrEqual(
+    todayBottomNavBox!.x + todayBottomNavBox!.width,
+  );
+  expect(primaryNutritionActionBox!.y + primaryNutritionActionBox!.height).toBeLessThanOrEqual(
+    todayBottomNavBox!.y + 1,
+  );
+  await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
   await capture(page, 'today-390-sparse-light.png');
 
@@ -315,15 +313,17 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
     expect(await action.evaluate((element) => (element as HTMLElement).innerText)).toBe(
       'Добавить питание',
     );
-    const [fabBox, bottomNavBox] = await Promise.all([
-      page.locator('.app-quick-add-trigger').boundingBox(),
+    const [addBox, bottomNavBox] = await Promise.all([
+      page.locator('.app-bottom-nav__quick-add').boundingBox(),
       page.locator('#appBottomNav').boundingBox(),
     ]);
-    expect(fabBox).not.toBeNull();
+    expect(addBox).not.toBeNull();
     expect(bottomNavBox).not.toBeNull();
+    expect(addBox!.x).toBeGreaterThanOrEqual(bottomNavBox!.x);
+    expect(addBox!.x + addBox!.width).toBeLessThanOrEqual(bottomNavBox!.x + bottomNavBox!.width);
+    await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
     if (width < 440) {
-      expect(overlaps(actionBox!, fabBox!)).toBe(false);
-      expect(overlaps(actionBox!, bottomNavBox!)).toBe(false);
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(bottomNavBox!.y + 1);
     }
     await expectNoHorizontalOverflow(page);
     if (CAPTURE_EVIDENCE && width !== 400) {
@@ -364,21 +364,18 @@ test('Task 295 keeps empty Today and Progress states distinct from zero', async 
   expect(sparseHeights.every((height) => height >= 44 && height <= 120)).toBe(true);
   const lastMetric = metrics.last();
   await lastMetric.scrollIntoViewIfNeeded();
-  const [lastMetricBox, bottomNavBox, fabBox] = await Promise.all([
+  const [lastMetricBox, bottomNavBox, addBox] = await Promise.all([
     lastMetric.boundingBox(),
     page.locator('#appBottomNav').boundingBox(),
-    page.locator('.app-quick-add-trigger').boundingBox(),
+    page.locator('.app-bottom-nav__quick-add').boundingBox(),
   ]);
   expect(lastMetricBox).not.toBeNull();
   expect(bottomNavBox).not.toBeNull();
-  expect(fabBox).not.toBeNull();
+  expect(addBox).not.toBeNull();
+  expect(addBox!.x).toBeGreaterThanOrEqual(bottomNavBox!.x);
+  expect(addBox!.x + addBox!.width).toBeLessThanOrEqual(bottomNavBox!.x + bottomNavBox!.width);
   expect(lastMetricBox!.y + lastMetricBox!.height).toBeLessThanOrEqual(bottomNavBox!.y + 1);
-  const overlapsFab =
-    lastMetricBox!.x < fabBox!.x + fabBox!.width &&
-    lastMetricBox!.x + lastMetricBox!.width > fabBox!.x &&
-    lastMetricBox!.y < fabBox!.y + fabBox!.height &&
-    lastMetricBox!.y + lastMetricBox!.height > fabBox!.y;
-  expect(overlapsFab).toBe(false);
+  await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
   await capture(page, 'progress-390-sparse-light.png');
 });

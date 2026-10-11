@@ -11,7 +11,7 @@ test.use({ serviceWorkers: 'block' });
 
 for (const width of [320, 360, 393, 430])
   for (const theme of ['dark', 'light'] as const) {
-    test(`approved B navigation and quick add ${width} ${theme}`, async ({ page }) => {
+    test(`approved B navigation and quick add ${width} ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 844 });
       await page.clock.setFixedTime(new Date('2026-10-09T12:00:00+03:00'));
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
@@ -29,9 +29,16 @@ for (const width of [320, 360, 393, 430])
       const trigger = page.getByRole('button', { name: 'Быстро добавить', exact: true });
       const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
       const tabs = navigation.locator('.app-bottom-nav__primary .app-bottom-nav__btn');
-      await expect(tabs).toHaveCount(4);
+      await expect(tabs).toHaveCount(5);
+      await expect(tabs).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс', 'Добавить']);
+      await expect(trigger).toHaveClass(/app-bottom-nav__quick-add/);
+      await expect(trigger).not.toHaveClass(/is-active/);
+      await expect(trigger).not.toHaveAttribute('aria-current');
+      await expect(trigger.locator('svg[data-icon="plus"]')).toBeVisible();
+      await expect(page.locator('.app-quick-add-trigger--floating')).toHaveCount(0);
       await expect(page.locator('.progress-overview')).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
+      await page.screenshot({ path: testInfo.outputPath(`progress-${width}-${theme}.png`) });
       const periods = page.getByRole('tablist', { name: 'Период прогресса' });
       for (const label of ['7 дней', '30 дней', '90 дней']) {
         const period = periods.getByRole('tab', { name: label, exact: true });
@@ -65,16 +72,24 @@ for (const width of [320, 360, 393, 430])
       expect(calorieLines).toEqual([1]);
       const navigationBox = (await navigation.boundingBox())!;
       const triggerBox = (await trigger.boundingBox())!;
-      expect(navigationBox.height).toBe(60);
-      expect(triggerBox.height).toBe(navigationBox.height);
-      expect(triggerBox.y).toBe(navigationBox.y);
+      expect(navigationBox.height).toBeGreaterThanOrEqual(60);
+      expect(navigationBox.height).toBeLessThanOrEqual(76);
+      expect(triggerBox.height).toBeGreaterThanOrEqual(44);
+      expect(triggerBox.y).toBeGreaterThanOrEqual(navigationBox.y);
+      expect(triggerBox.y + triggerBox.height).toBeLessThanOrEqual(
+        navigationBox.y + navigationBox.height,
+      );
       await expect(navigation).toHaveCSS('backdrop-filter', /blur\(12px\)/);
-      await expect(trigger).toHaveCSS('backdrop-filter', /blur\(8px\)/);
-      expect(triggerBox.x - navigationBox.x - navigationBox.width).toBeGreaterThanOrEqual(16);
+      expect(triggerBox.x).toBeGreaterThanOrEqual(navigationBox.x);
+      expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(
+        navigationBox.x + navigationBox.width,
+      );
       for (const tab of await tabs.all()) {
         const box = (await tab.boundingBox())!;
         expect(box.width).toBeGreaterThanOrEqual(44);
         expect(box.height).toBeGreaterThanOrEqual(44);
+        await expect(tab.locator('svg')).toHaveCSS('width', '24px');
+        await expect(tab.locator('svg')).toHaveCSS('height', '24px');
         const labelFits = await tab.locator('.app-bottom-nav__label').evaluate((label) => {
           const bounds = label.getBoundingClientRect();
           const parent = label.parentElement!.getBoundingClientRect();
@@ -119,6 +134,7 @@ for (const width of [320, 360, 393, 430])
           .getByRole('link')
           .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height)),
       ).toEqual([52, 52, 52, 52, 52]);
+      await page.screenshot({ path: testInfo.outputPath(`quick-add-${width}-${theme}.png`) });
       expect(
         await page
           .locator('#appContent')
@@ -174,7 +190,35 @@ for (const width of [320, 360, 393, 430])
         .scrollIntoViewIfNeeded();
       const dock = await page.locator('#appBottomNav').boundingBox();
       const plus = await trigger.boundingBox();
-      expect(dock!.x + dock!.width).toBeLessThan(plus!.x);
+      expect(plus!.x).toBeGreaterThanOrEqual(dock!.x);
+      expect(plus!.x + plus!.width).toBeLessThanOrEqual(dock!.x + dock!.width);
+
+      for (const [section, label] of [
+        ['today', 'Сегодня'],
+        ['programs', 'План'],
+        ['nutrition', 'Питание'],
+        ['progress', 'Прогресс'],
+      ] as const) {
+        await navigation.getByRole('link', { name: label, exact: true }).click();
+        await expect(page.locator(`.app-section--${section}`)).toBeVisible();
+        await expect(navigation.getByRole('link', { name: label, exact: true })).toHaveAttribute(
+          'aria-current',
+          'page',
+        );
+        await expect(tabs).toHaveCount(5);
+        await expect(page.getByText('Загружаем раздел…', { exact: true })).toHaveCount(0);
+        await expect(page.locator('[role="status"][aria-busy="true"]')).toHaveCount(0);
+        await page.evaluate(() => document.fonts.ready);
+        await expectNoHorizontalOverflow(page);
+        await page.screenshot({ path: testInfo.outputPath(`${section}-${width}-${theme}.png`) });
+      }
+      for (const section of ['profile', 'catalog']) {
+        await page.goto(`/app?section=${section}`);
+        await expect(page.locator(`.app-section--${section}`)).toBeVisible();
+        await expect(tabs).toHaveCount(5);
+        await expect(trigger).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+      }
     });
   }
 

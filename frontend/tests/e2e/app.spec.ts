@@ -1466,7 +1466,7 @@ test('desktop app shell centers the brand lockup and navigation surfaces', async
   await expect(page.locator('.app-bottom-nav__brand')).not.toBeVisible();
   await expect(
     page.locator('.app-bottom-nav__primary a:visible, .app-bottom-nav__primary button:visible'),
-  ).toHaveCount(4);
+  ).toHaveCount(5);
 });
 
 test('app shell сохраняет композицию и доступность на целевых viewport', async ({ page }) => {
@@ -1486,7 +1486,7 @@ test('app shell сохраняет композицию и доступност�
     await page.setViewportSize(viewport);
     const primaryNavigation = page.locator('.app-bottom-nav__primary');
     const visibleDestinations = primaryNavigation.locator('a:visible, button:visible');
-    await expect(visibleDestinations).toHaveCount(4);
+    await expect(visibleDestinations).toHaveCount(viewport.width < 900 ? 5 : 4);
     for (const destination of await visibleDestinations.all()) {
       await expect(destination).toBeInViewport();
     }

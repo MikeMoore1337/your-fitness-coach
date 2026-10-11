@@ -250,6 +250,8 @@ export function AppShell({
   const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
   const shellVisible = Boolean(user || demo);
   const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
+  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
+  const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
   const morePresent = moreOpen || morePresence.present;
   const moreSurfacePresent = morePresent && (Boolean(demo) || mobileNavigation);
   const accountDestinations = [
@@ -443,7 +445,7 @@ export function AppShell({
           </header>
         )}
         {showPwaInstallPrompt && <PwaInstallPrompt />}
-        {quickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
+        {floatingQuickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
@@ -461,7 +463,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps()}
+              {...glassProps('regular', true)}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >
@@ -566,6 +568,7 @@ export function AppShell({
                     <span className="app-bottom-nav__label">Сценарии</span>
                   </button>
                 )}
+                {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
               </div>
 
               {!demo && (

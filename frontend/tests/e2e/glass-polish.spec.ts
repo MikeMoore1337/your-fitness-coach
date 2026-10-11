@@ -98,26 +98,28 @@ for (const theme of ['dark', 'light'] as const) {
         ...document.querySelectorAll(
           '#appBottomNav .app-bottom-nav__label, .app-quick-add-action__copy, .app-quick-add-action__icon, .app-quick-add-trigger',
         ),
-      ].map((node) => {
-        const material = node.closest('[data-glass]')!;
-        const style = getComputedStyle(material);
-        const foreground = rgba(getComputedStyle(node).color);
-        const ownBackground = rgba(getComputedStyle(node.parentElement!).backgroundColor);
-        const ratios = [0, 1].map((behind) => {
-          let background = blend(rgba(style.backgroundColor), [behind, behind, behind]);
-          const highlight = Number(style.getPropertyValue('--glass-highlight-opacity'));
-          background = blend([1, 1, 1, highlight], background);
-          background = blend([1, 1, 1, 0.07], background);
-          if (!node.matches('.app-quick-add-trigger'))
-            background = blend(ownBackground, background);
-          return ratio(foreground, background);
+      ]
+        .filter((node) => node.getClientRects().length > 0)
+        .map((node) => {
+          const material = node.closest<HTMLElement>('[data-glass], #appBottomNav')!;
+          const style = getComputedStyle(material);
+          const foreground = rgba(getComputedStyle(node).color);
+          const ownBackground = rgba(getComputedStyle(node.parentElement!).backgroundColor);
+          const ratios = [0, 1].map((behind) => {
+            let background = blend(rgba(style.backgroundColor), [behind, behind, behind]);
+            const highlight = Number(style.getPropertyValue('--glass-highlight-opacity'));
+            background = blend([1, 1, 1, highlight], background);
+            background = blend([1, 1, 1, 0.07], background);
+            if (!node.matches('.app-quick-add-trigger, .app-bottom-nav__quick-add'))
+              background = blend(ownBackground, background);
+            return ratio(foreground, background);
+          });
+          return {
+            text: node.textContent,
+            minimum: Math.min(...ratios),
+            required: node.matches('.app-quick-add-action__icon') ? 3 : 4.5,
+          };
         });
-        return {
-          text: node.textContent,
-          minimum: Math.min(...ratios),
-          required: node.matches('.app-quick-add-action__icon') ? 3 : 4.5,
-        };
-      });
     });
     for (const item of contrast)
       expect(item.minimum, JSON.stringify(item)).toBeGreaterThanOrEqual(item.required);
@@ -152,7 +154,8 @@ for (const theme of ['dark', 'light'] as const) {
       'background-color',
       theme === 'dark' ? 'rgb(32, 37, 37)' : 'rgb(243, 245, 245)',
     );
-    await expect(add).toHaveCSS('background-color', 'rgb(178, 245, 32)');
+    await page.getByRole('heading', { name: 'Прогресс', exact: true }).hover();
+    await expect(add).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 
     await page.reload();
     await expect(page.locator('#appBottomNav')).toHaveCSS('backdrop-filter', /blur\(12px\)/);
@@ -198,7 +201,8 @@ for (const theme of ['dark', 'light'] as const) {
       await page.setViewportSize({ width, height: 844 });
       const dock = page.locator('#appBottomNav');
       await expect(dock).toHaveCSS('backdrop-filter', /blur\(12px\)/);
-      expect((await dock.boundingBox())!.y + 60).toBeLessThanOrEqual(844 - 34 - 12);
+      const dockBox = (await dock.boundingBox())!;
+      expect(dockBox.y + dockBox.height).toBeLessThanOrEqual(844 - 34 - 12);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       const bottom = page
         .locator('#appContent a, #appContent button, #appContent summary')

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { emptyHydrationDay } from './fixtures/platform-api';
 import {
   expectTouchTargets,
   installTelegramHarness,
@@ -272,8 +273,13 @@ async function mockActiveWorkout(
           totals: { energy_kcal: '0', protein_g: '0', fat_g: '0', carbs_g: '0', fiber_g: null },
           targets: null,
           remaining: null,
+          status: 'unlogged',
+          status_is_explicit: false,
         },
       });
+    }
+    if (path.endsWith('/nutrition/hydration')) {
+      return route.fulfill({ json: emptyHydrationDay(today) });
     }
     if (path.endsWith('/programs/exercises/11')) {
       return route.fulfill({
@@ -2411,6 +2417,64 @@ test.describe('#914 rest timer pointer lifecycle', () => {
 
   for (const width of [320, 360, 393, 430]) {
     for (const theme of ['dark', 'light'] as const) {
+      test(`five-item dock preserves the workout across quick add and navigation at ${width}px ${theme}`, async ({
+        page,
+      }, testInfo) => {
+        const pageErrors: string[] = [];
+        page.on('pageerror', (error) => pageErrors.push(error.message));
+        const context = await prepare(page, width, theme);
+        const mutations: string[] = [];
+        page.on('request', (request) => {
+          if (/\/workouts\//.test(request.url()) && request.method() !== 'GET') {
+            mutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+          }
+        });
+        const navigation = page.getByRole('navigation', { name: 'Основная навигация' });
+        const add = navigation.getByRole('button', { name: 'Быстро добавить', exact: true });
+        await expect(
+          navigation.locator('.app-bottom-nav__primary > a, .app-bottom-nav__primary > button'),
+        ).toHaveText(['Сегодня', 'План', 'Питание', 'Прогресс', 'Добавить']);
+        await expect(add).toBeVisible();
+        await context.panel.getByRole('button', { name: '+30 сек' }).tap();
+        await expect(context.panel.getByRole('timer')).toHaveText('1:58');
+        await add.tap();
+        const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
+        await expect(sheet.getByRole('link')).toHaveCount(5);
+        await sheet.getByRole('button', { name: 'Закрыть быстрые действия' }).tap();
+        await expect(add).toBeFocused();
+        await unchanged(page, context);
+        await page.screenshot({
+          path: testInfo.outputPath(`navigation-workout-${width}-${theme}.png`),
+        });
+
+        await navigation.getByRole('link', { name: 'Питание', exact: true }).tap();
+        await expect(page).toHaveURL(/section=nutrition/);
+        await expect(page.locator('.app-section--nutrition')).toBeVisible();
+        await expect(
+          navigation.getByRole('link', { name: 'Питание', exact: true }),
+        ).toHaveAttribute('aria-current', 'page');
+        await navigation.getByRole('link', { name: 'Сегодня', exact: true }).tap();
+        const resume = page.getByRole('button', { name: 'Продолжить тренировку', exact: true });
+        await expect(resume.or(context.current)).toBeVisible();
+        if (await resume.isVisible()) await resume.tap();
+        await expect(context.panel.getByRole('timer')).toHaveText('1:58');
+        await unchanged(page, context);
+        expect(mutations).toEqual([]);
+        expect(pageErrors).toEqual([]);
+        await testInfo.attach('navigation-mutations.json', {
+          body: JSON.stringify({
+            mutations,
+            pageErrors,
+            currentSet: 202,
+            weight: 42.5,
+            reps: 9,
+            rir: 2,
+            rest: '1:58',
+          }),
+          contentType: 'application/json',
+        });
+      });
+
       test(`painted padding blocks the 202→201 PATCH regression at ${width}px ${theme}`, async ({
         page,
       }, testInfo) => {
