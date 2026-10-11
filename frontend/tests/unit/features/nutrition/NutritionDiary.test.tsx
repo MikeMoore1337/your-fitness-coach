@@ -324,7 +324,7 @@ describe('NutritionDiary', () => {
     await screen.findAllByText('Пока без записей');
 
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     const amount = screen.getByRole('spinbutton', { name: 'Количество' });
     fireEvent.change(amount, { target: { value: '2' } });
     fireEvent.click(screen.getByRole('button', { name: 'Добавить в дневник' }));
@@ -375,7 +375,7 @@ describe('NutritionDiary', () => {
     const draftAmount = within(breakfast).getByRole('spinbutton', { name: 'Количество' });
     fireEvent.change(draftAmount, { target: { value: '175' } });
     fireEvent.click(within(breakfast).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     fireEvent.click(screen.getByRole('button', { name: 'Добавить в дневник' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -589,7 +589,7 @@ describe('NutritionDiary', () => {
     const first = renderDiary();
     await screen.findAllByText('Пока без записей');
     fireEvent.click(within(breakfastSection()).getByRole('button', { name: /Добавить/ }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Добавить Овсяная каша' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Количество' }), {
       target: { value: '2.5' },
     });
@@ -695,7 +695,7 @@ describe('NutritionDiary', () => {
     ).toBeVisible();
     fireEvent.click(screen.getByText('Каталог и фильтры', { exact: true }));
     fireEvent.click(screen.getByRole('button', { name: 'Избранное' }));
-    expect(await screen.findByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
   });
 
   it('ignores a stale local search and keeps an unavailable external provider optional', async () => {
@@ -934,7 +934,7 @@ describe('NutritionDiary', () => {
     });
     await act(() => vi.advanceTimersByTimeAsync(250));
 
-    expect(await screen.findByRole('button', { name: 'Добавить Рис домашний' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Выбрать Рис домашний' })).toBeVisible();
     expect(await screen.findByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
     expect(
       screen.getByText(
@@ -999,7 +999,7 @@ describe('NutritionDiary', () => {
     });
     await act(() => vi.advanceTimersByTimeAsync(250));
 
-    expect(await screen.findByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
     expect(
       apiMock.mock.calls.some(([path]) => String(path).includes('include_external=true')),
     ).toBe(false);

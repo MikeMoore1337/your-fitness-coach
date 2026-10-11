@@ -1962,7 +1962,7 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(favoriteButton).toHaveAttribute('aria-pressed', 'true');
   await favoriteButton.focus();
   await expect(favoriteButton).toBeFocused();
-  await page.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
+  await page.getByRole('button', { name: 'Выбрать Овсяная каша' }).click();
   await expect(page.getByRole('spinbutton', { name: 'Количество' })).toHaveValue('1');
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(page.getByRole('dialog')).not.toBeAttached();
@@ -2024,7 +2024,7 @@ test('Russian search supplements local food with USDA generic result and persist
   const search = page.getByRole('searchbox', { name: 'Найти продукт' });
   await search.fill('рис');
 
-  await expect(page.getByRole('button', { name: 'Добавить Рис домашний' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Выбрать Рис домашний' })).toBeVisible();
   await expect(page.getByText('Рис белый приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText('Рис бурый приготовленный, без добавления масла')).toBeVisible();
   await expect(page.getByText('Рис дикий приготовленный, без добавления масла')).toBeVisible();
