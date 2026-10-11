@@ -1,0 +1,19 @@
+{
+  "runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+  "verified_heads": {
+    "907": "9a6594af1d674eaf4ca1bc419b0569c5a5a6c036",
+    "908": "5023563aba71f11cf742a3a6b6d49d9d8bfb105f",
+    "909": "c56cc2b37347d781846bf80566634ba19c900525",
+    "910": "e35b988ecb9ba71f0e169c68596f2d53096f7373",
+    "911": "578f5704cac780c02720e84cff2a96cdb7dd481e",
+    "915": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+    "origin/master": "6598dac6f8cd59df413fcc04ea031c992589b696"
+  },
+  "all_ancestors": true,
+  "independent_prs_modified": false,
+  "merge_performed": false,
+  "deploy_performed": false,
+  "owner_visual_approval": "PENDING",
+  "owner_release_approval": "PENDING",
+  "env_change_required": false
+}

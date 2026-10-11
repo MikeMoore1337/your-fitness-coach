@@ -1,0 +1,140 @@
+{
+  "patches": [
+    {
+      "setId": 201,
+      "method": "PATCH",
+      "endpoint": "/api/v1/workouts/sets/201",
+      "body": {
+        "actual_reps": 9,
+        "actual_weight": 42.5,
+        "rir": "2",
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "expected_version": 1,
+        "mutation_id": "4f2df913-7b6e-44b0-a8c9-3466865e8afe"
+      },
+      "receivedAt": 1791717501790,
+      "status": 200,
+      "response": {
+        "id": 201,
+        "set_number": 1,
+        "actual_reps": 9,
+        "actual_weight": 42.5,
+        "rir": "2",
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "version": 2,
+        "planned_role": "top",
+        "duration_minutes": null,
+        "distance_km": null,
+        "average_heart_rate_bpm": null,
+        "heart_rate_zone": null
+      },
+      "respondedAt": 1791717501790
+    }
+  ],
+  "rests": [
+    {
+      "time": 1791717501810,
+      "detail": {
+        "workoutId": 42,
+        "setId": 201,
+        "seconds": 90,
+        "deadline": 1791717591810
+      }
+    }
+  ],
+  "queue": {
+    "schema_version": 2,
+    "user_id": 7,
+    "workout_id": 42,
+    "queue": [],
+    "workout_snapshot": {
+      "id": 42,
+      "scheduled_date": "2026-10-11",
+      "title": "Силовая база",
+      "status": "in_progress",
+      "day_number": 1,
+      "week_number": 1,
+      "started_at": "2026-10-11T11:06:20.864Z",
+      "completed_at": null,
+      "exercises": [
+        {
+          "id": 101,
+          "exercise_id": 11,
+          "exercise_title": "Жим штанги лёжа",
+          "metric_type": "strength",
+          "sort_order": 1,
+          "prescribed_sets": 3,
+          "prescribed_reps": "8–10",
+          "rest_seconds": 90,
+          "notes": "Сохраняйте устойчивое положение корпуса.",
+          "setup_memory": null,
+          "has_guide": true,
+          "media_state": "approved_animated",
+          "media_thumbnail_url": "/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg",
+          "media_animation_url": "/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif",
+          "sets": [
+            {
+              "id": 201,
+              "set_number": 1,
+              "actual_reps": 9,
+              "actual_weight": 42.5,
+              "rir": "2",
+              "set_kind": "working",
+              "reached_failure": false,
+              "is_completed": true,
+              "version": 2,
+              "planned_role": "top",
+              "duration_minutes": null,
+              "distance_km": null,
+              "average_heart_rate_bpm": null,
+              "heart_rate_zone": null
+            },
+            {
+              "id": 202,
+              "set_number": 2,
+              "actual_reps": null,
+              "actual_weight": null,
+              "rir": null,
+              "set_kind": "working",
+              "reached_failure": null,
+              "is_completed": false,
+              "version": 1,
+              "planned_role": "backoff"
+            },
+            {
+              "id": 203,
+              "set_number": 3,
+              "actual_reps": null,
+              "actual_weight": null,
+              "rir": null,
+              "set_kind": "working",
+              "reached_failure": null,
+              "is_completed": false,
+              "version": 1,
+              "planned_role": "backoff"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "server": {
+    "actual_reps": 9,
+    "actual_weight": 42.5,
+    "rir": "2",
+    "set_kind": "working",
+    "reached_failure": false,
+    "is_completed": true,
+    "version": 2,
+    "planned_role": "top",
+    "duration_minutes": null,
+    "distance_km": null,
+    "average_heart_rate_bpm": null,
+    "heart_rate_zone": null
+  },
+  "currentSet": 202
+}

@@ -1,0 +1,15 @@
+{
+  "material": {
+    "p50": 16,
+    "p95": 17,
+    "framesOver32ms": 0,
+    "visibleBlurPlanes": 1
+  },
+  "withoutMaterial": {
+    "p50": 16,
+    "p95": 17,
+    "framesOver32ms": 0,
+    "visibleBlurPlanes": 0
+  },
+  "note": "Local headless scroll probe; not physical-device FPS or field INP"
+}
