@@ -93,7 +93,7 @@ for (const width of [320, 360, 393, 430])
       expect(triggerBox.y + triggerBox.height).toBeLessThanOrEqual(
         navigationBox.y + navigationBox.height,
       );
-      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(18px\)/);
+      await expect(navigation).toHaveCSS('backdrop-filter', /blur\(20px\)/);
       expect(triggerBox.x).toBeGreaterThanOrEqual(navigationBox.x);
       expect(triggerBox.x + triggerBox.width).toBeLessThanOrEqual(
         navigationBox.x + navigationBox.width,
