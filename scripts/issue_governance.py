@@ -1,4 +1,5 @@
 """Read-only проверки заголовков и аудит Issues (без изменения GitHub)."""
+
 from __future__ import annotations
 
 import argparse
@@ -12,13 +13,28 @@ TITLE_PREFIX = re.compile(
 )
 VERSION_PREFIX = re.compile(r"(?:^|\[)(?:Product\s+v?|V)(1[123])\b", re.IGNORECASE)
 VERSION_CODE = re.compile(r"^V(11|12|13)-\d+\b", re.IGNORECASE)
-LABEL_OPTIONS = frozenset({
-    "area:workout", "area:programs", "area:nutrition", "area:progress",
-    "area:coach-os", "area:profile", "area:landing", "area:telegram",
-    "area:demo", "area:backend", "area:database", "area:infrastructure",
-    "gate:visual-approval", "gate:legal-review", "gate:security-review",
-    "gate:owner-decision", "spike", "regression",
-})
+LABEL_OPTIONS = frozenset(
+    {
+        "area:workout",
+        "area:programs",
+        "area:nutrition",
+        "area:progress",
+        "area:coach-os",
+        "area:profile",
+        "area:landing",
+        "area:telegram",
+        "area:demo",
+        "area:backend",
+        "area:database",
+        "area:infrastructure",
+        "gate:visual-approval",
+        "gate:legal-review",
+        "gate:security-review",
+        "gate:owner-decision",
+        "spike",
+        "regression",
+    }
+)
 
 
 def title_errors(title: str) -> list[str]:
@@ -28,7 +44,7 @@ def title_errors(title: str) -> list[str]:
     match = TITLE_PREFIX.match(title)
     if match is None:
         return ["Нужен ровно один утверждённый префикс в начале названия."]
-    description = title[match.end():].strip()
+    description = title[match.end() :].strip()
     if description.startswith("["):
         return ["Не объединяйте несколько префиксов."]
     if len(description) < 5:
@@ -52,15 +68,20 @@ def suggested_prefix(title: str) -> str | None:
 def audit_items(payload: list[dict[str, Any]]) -> str:
     """Читаемый предварительный снимок, игнорирующий записи Pull Request."""
     issues = [
-        item for item in payload
-        if isinstance(item, dict) and "number" in item
-        and "title" in item and "pull_request" not in item
+        item
+        for item in payload
+        if isinstance(item, dict)
+        and "number" in item
+        and "title" in item
+        and "pull_request" not in item
     ]
     lines = [
-        "# Read-only Issue governance audit", "",
+        "# Read-only Issue governance audit",
+        "",
         f"Количество Issues: {len(issues)}. Существующие данные не изменены.",
         "Подсказка не является разрешением на переименование.",
-        "Priority, Effort, Status и зависимости требуют отдельной проверки.", "",
+        "Priority, Effort, Status и зависимости требуют отдельной проверки.",
+        "",
         "| Issue | Название | Подсказка | Проверка |",
         "|---|---|---|---|",
     ]
