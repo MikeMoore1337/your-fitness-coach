@@ -400,6 +400,7 @@ function ExternalResults({
             fullWidth
             type="button"
             disabled={pendingExternalKey !== null}
+            onPointerDown={(event) => event.preventDefault()}
             onClick={() => onSelect(food)}
           >
             {pendingExternalKey === `${food.source.provider}-${food.external_id}`
@@ -616,6 +617,12 @@ export function FoodPickerDialog({
         frame = null;
         const active = document.activeElement;
         if (!(active instanceof HTMLElement) || !panel?.contains(active)) return;
+        if (
+          !(active instanceof HTMLInputElement) &&
+          !(active instanceof HTMLSelectElement) &&
+          !(active instanceof HTMLTextAreaElement)
+        )
+          return;
         const visibleTop = viewport?.offsetTop ?? 0;
         const visibleBottom = visibleTop + (viewport?.height ?? window.innerHeight);
         const bounds = active.getBoundingClientRect();
@@ -794,7 +801,7 @@ export function FoodPickerDialog({
     });
   };
   const selectExternalFood = (food: ExternalFood) => {
-    if (demoSafeMode) return;
+    if (demoSafeMode || importExternal.isPending) return;
     importExternal.mutate(food, {
       onSuccess: async (savedFood) => {
         await queryClient.invalidateQueries({ queryKey: ['nutrition', 'foods'] });
