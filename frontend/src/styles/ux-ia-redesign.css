@@ -1475,7 +1475,8 @@
     padding: 6px;
   }
 
-  :where(.app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav__primary)
+  .app-shell--design-v2:has(.app-bottom-nav__quick-add)
+    .app-bottom-nav__primary
     .app-bottom-nav__btn {
     min-width: 0;
     min-height: 52px;

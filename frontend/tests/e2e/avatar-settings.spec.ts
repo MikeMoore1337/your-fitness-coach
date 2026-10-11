@@ -3,6 +3,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { installTelegramHarness, TelegramHarness } from './fixtures/mobile-tma';
 import { installPlatformApi, type PlatformApiController } from './fixtures/platform-api';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 const avatarFile = {
   name: 'new-avatar.png',
@@ -233,18 +234,7 @@ test('light mobile keeps avatar actions outlined and current account boundary li
   });
   await expect(accountPanel).toBeVisible();
   await expect(currentProfile).toBeVisible();
-  const boundary = await currentProfile.evaluate((element) => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--v2-lime)';
-    document.body.append(probe);
-    const result = {
-      boxShadow: getComputedStyle(element).boxShadow,
-      lime: getComputedStyle(probe).color,
-    };
-    probe.remove();
-    return result;
-  });
-  expect(boundary.boxShadow).toContain(boundary.lime);
+  await expectSelectedChoice(currentProfile);
   await accountPage.screenshot({
     path: '../.artifacts/screenshots/task-110B/mobile-light-account-boundary.png',
     fullPage: false,

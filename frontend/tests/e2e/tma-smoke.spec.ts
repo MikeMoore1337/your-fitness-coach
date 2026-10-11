@@ -13,6 +13,7 @@ import {
 import { installPlatformApi } from './fixtures/platform-api';
 import { makeProgressReportFixture } from '../fixtures/progress-report';
 import { namedArticle, notificationArticle } from './fixtures/locators';
+import { expectSelectedChoice } from './fixtures/selected-state';
 
 const todayStates = [
   { name: 'planned', options: { workoutStatus: 'planned' as const }, action: 'Начать тренировку' },
@@ -1574,10 +1575,7 @@ test('workout adaptation keeps preview, cancel, apply and conflict recovery in M
   );
   await expect(apply).toHaveCSS('background-color', 'rgb(178, 245, 32)');
   await expect(apply).toHaveCSS('border-radius', '14px');
-  await expect(mobilePage.getByRole('button', { name: '20 мин' })).toHaveCSS(
-    'border-top-color',
-    'rgb(178, 245, 32)',
-  );
+  await expectSelectedChoice(mobilePage.getByRole('button', { name: '20 мин' }));
   await mobilePage.locator('.adaptation-preview').scrollIntoViewIfNeeded();
   await mobilePage.screenshot({
     path: '../.artifacts/screenshots/task-58/desktop-1440-light-preview.png',
@@ -1950,7 +1948,9 @@ test('active workout starts, logs offline and resumes once after reconnect and r
     path: '../.artifacts/screenshots/task-72/mock-tma-390x844-dark-active-workout.png',
   });
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
-  await expect(tmaPage.getByText('Сохранено на устройстве')).toBeVisible();
+  await expect(
+    tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
+  ).toBeVisible();
   expect((await tma.state()).haptics.notifications).toContain('success');
 
   api.setOffline(false);
@@ -2027,7 +2027,9 @@ test('progression guidance applies a configured step once, stays optional and ma
   await tmaGuidance.getByRole('button', { name: 'Применить 42,5 кг' }).dblclick();
   const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
   await expect(weight).toHaveValue('42.5');
-  await expect(tmaPage.getByText('Сохранено на устройстве')).toBeVisible();
+  await expect(
+    tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
+  ).toBeVisible();
 
   api.setOffline(false);
   await setNetworkOffline(tmaPage, false);
@@ -2670,9 +2672,6 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
         return color;
       };
       const save = document.querySelector<HTMLElement>('.nutrition-target-save');
-      const activeMode = document.querySelector<HTMLElement>(
-        '.nutrition-target-mode > button.is-active',
-      );
       const note = document.querySelector<HTMLElement>('.nutrition-target-note');
       const disclosureIcons = Array.from(
         document.querySelectorAll<HTMLElement>('.nutrition-target-history__list .disclosure-icon'),
@@ -2682,7 +2681,6 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
         onLime: tokenColor('--v2-on-lime'),
         saveBackground: save ? getComputedStyle(save).backgroundColor : null,
         saveColor: save ? getComputedStyle(save).color : null,
-        activeModeShadow: activeMode ? getComputedStyle(activeMode).boxShadow : null,
         noteBorder: note ? getComputedStyle(note).borderLeftColor : null,
         disclosureIcons: disclosureIcons.map((icon) => {
           const rect = icon.getBoundingClientRect();
@@ -2696,7 +2694,7 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
     });
     expect(brandContract.saveBackground).toBe(brandContract.lime);
     expect(brandContract.saveColor).toBe(brandContract.onLime);
-    expect(brandContract.activeModeShadow).toContain(brandContract.lime);
+    await expectSelectedChoice(page.locator('.nutrition-target-mode > button.is-active'));
     expect(brandContract.noteBorder).toBe(brandContract.lime);
     expect(brandContract.disclosureIcons.length).toBeGreaterThan(0);
     expect(

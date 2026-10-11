@@ -4623,7 +4623,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   }
 
   body:has(.app-shell--design-v2 #appBottomNav) .toast:not(.hidden) {
-    bottom: calc(82px + max(8px, var(--yfc-layout-safe-bottom)));
+    bottom: calc(
+      var(--app-bottom-nav-height) + 12px + var(--yfc-layout-safe-bottom) +
+        var(--yfc-viewport-bottom, 0px)
+    );
   }
 
   .app-shell--design-v2 .app-bottom-nav {
