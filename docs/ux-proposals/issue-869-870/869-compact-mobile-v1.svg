@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="928" viewBox="0 0 768 928">
+<rect width="768" height="928" fill="#d1d8d2"/>
+<style>text{font-family:Inter,Arial,sans-serif}</style>
+<rect x="22" y="42" width="342" height="832" rx="25" fill="#0a0e0d" stroke="#424b43" stroke-width="1.3"/>
+<rect x="38" y="59" width="42" height="30" rx="14" fill="#171c19" stroke="#424b43" stroke-width="1"/>
+<text x="49" y="80" font-size="11" fill="#b7fb45" font-weight="750">YFC</text>
+<text x="92" y="80" font-size="11" fill="#f8faf6" font-weight="750">YOUR FITNESS COACH</text>
+<text x="40" y="135" font-size="11" fill="#b7fb45" font-weight="750">ЕЖЕДНЕВНЫЙ ДНЕВНИК</text>
+<text x="40" y="181" font-size="39" fill="#f8faf6" font-weight="800">Питание</text>
+<line x1="40" y1="200" x2="346" y2="200" stroke="#424b43" stroke-width="1"/>
+<text x="40" y="234" font-size="12" fill="#bac5ba" font-weight="500">Неделя · 5–11 октября</text>
+<text x="57" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">ПН</text>
+<text x="57" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">5</text>
+<text x="104" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">ВТ</text>
+<text x="104" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">6</text>
+<text x="151" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">СР</text>
+<text x="151" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">7</text>
+<rect x="179" y="246" width="40" height="55" rx="15" fill="#1d2420" stroke="#adf51d" stroke-width="1.6"/>
+<text x="198" y="268" font-size="10" fill="#b7fb45" font-weight="700" text-anchor="middle">ЧТ</text>
+<text x="198" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">8</text>
+<text x="245" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">ПТ</text>
+<text x="245" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">9</text>
+<text x="292" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">СБ</text>
+<text x="292" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">10</text>
+<text x="339" y="268" font-size="10" fill="#bac5ba" font-weight="700" text-anchor="middle">ВС</text>
+<text x="339" y="291" font-size="16" fill="#f8faf6" font-weight="700" text-anchor="middle">11</text>
+<rect x="40" y="317" width="185" height="48" rx="16" fill="#adf51d"/>
+<text x="132" y="346" font-size="13" fill="#152009" font-weight="700" text-anchor="middle">+ Добавить продукт</text>
+<rect x="236" y="317" width="111" height="48" rx="16" fill="#171c19" stroke="#424b43" stroke-width="1"/>
+<text x="291" y="346" font-size="12" fill="#f8faf6" font-weight="700" text-anchor="middle">Быстрый ввод</text>
+<rect x="40" y="385" width="306" height="230" rx="19" fill="#171c19" stroke="#424b43" stroke-width="1"/>
+<text x="56" y="412" font-size="11" fill="#b7fb45" font-weight="750">КБЖУ ЗА ДЕНЬ</text>
+<text x="56" y="438" font-size="18" fill="#f8faf6" font-weight="750">Цель · 2 100 ккал</text>
+<text x="56" y="468" font-size="11" fill="#bac5ba" font-weight="600">Калории</text>
+<text x="328" y="468" font-size="11" fill="#f8faf6" font-weight="650" text-anchor="end">1 480 / 2 100</text>
+<rect x="56" y="476" width="270" height="5" rx="2.5" fill="#2c342d"/>
+<rect x="56" y="476" width="189" height="5" rx="2.5" fill="#adf51d"/>
+<text x="56" y="504" font-size="11" fill="#bac5ba" font-weight="600">Белки</text>
+<text x="328" y="504" font-size="11" fill="#f8faf6" font-weight="650" text-anchor="end">102 / 140 г</text>
+<rect x="56" y="512" width="270" height="5" rx="2.5" fill="#2c342d"/>
+<rect x="56" y="512" width="197" height="5" rx="2.5" fill="#adf51d"/>
+<text x="56" y="540" font-size="11" fill="#bac5ba" font-weight="600">Жиры</text>
+<text x="328" y="540" font-size="11" fill="#f8faf6" font-weight="650" text-anchor="end">42 / 70 г</text>
+<rect x="56" y="548" width="270" height="5" rx="2.5" fill="#2c342d"/>
+<rect x="56" y="548" width="162" height="5" rx="2.5" fill="#adf51d"/>
+<text x="56" y="576" font-size="11" fill="#bac5ba" font-weight="600">Углеводы</text>
+<text x="328" y="576" font-size="11" fill="#f8faf6" font-weight="650" text-anchor="end">164 / 230 г</text>
+<rect x="56" y="584" width="270" height="5" rx="2.5" fill="#2c342d"/>
+<rect x="56" y="584" width="192" height="5" rx="2.5" fill="#adf51d"/>
+<text x="40" y="653" font-size="11" fill="#b7fb45" font-weight="800">ПЛАНИРОВАНИЕ</text>
+<text x="40" y="674" font-size="10" fill="#bac5ba" font-weight="500">Вторичные действия в одной компактной группе</text>
+<rect x="40" y="688" width="306" height="113" rx="17" fill="#1d2420" stroke="#424b43" stroke-width="1"/>
+<text x="56" y="714" font-size="15" fill="#f8faf6" font-weight="700">План питания</text>
+<text x="56" y="732" font-size="11" fill="#bac5ba" font-weight="500">Меню на дни и недели</text>
+<text x="322" y="722" font-size="25" fill="#bac5ba" font-weight="400" text-anchor="middle">›</text>
+<line x1="56" y1="744" x2="329" y2="744" stroke="#424b43" stroke-width="1"/>
+<text x="56" y="768" font-size="15" fill="#f8faf6" font-weight="700">Список покупок</text>
+<text x="56" y="786" font-size="11" fill="#bac5ba" font-weight="500">Продукты по вашему плану</text>
+<text x="322" y="774" font-size="25" fill="#bac5ba" font-weight="400" text-anchor="middle">›</text>
+<rect x="40" y="820" width="306" height="45" rx="25" fill="#343d37" stroke="#424b43" stroke-width="1.5"/>
+<text x="72" y="849" font-size="10" fill="#f8faf6" font-weight="650" text-anchor="middle">Сегодня</text>
+<text x="132" y="849" font-size="10" fill="#f8faf6" font-weight="650" text-anchor="middle">План</text>
+<rect x="163" y="823" width="62" height="39" rx="19" fill="#35442f"/>
+<text x="192" y="849" font-size="10" fill="#b7fb45" font-weight="650" text-anchor="middle">Питание</text>
+<text x="252" y="849" font-size="10" fill="#f8faf6" font-weight="650" text-anchor="middle">Прогресс</text>
+<text x="312" y="849" font-size="10" fill="#f8faf6" font-weight="650" text-anchor="middle">Добавить</text>
+<rect x="404" y="42" width="342" height="832" rx="25" fill="#fdfefd" stroke="#d6ddd7" stroke-width="1.3"/>
+<rect x="420" y="59" width="42" height="30" rx="14" fill="#f2f5f1" stroke="#d6ddd7" stroke-width="1"/>
+<text x="431" y="80" font-size="11" fill="#486b18" font-weight="750">YFC</text>
+<text x="474" y="80" font-size="11" fill="#161c18" font-weight="750">YOUR FITNESS COACH</text>
+<text x="422" y="135" font-size="11" fill="#486b18" font-weight="750">ЕЖЕДНЕВНЫЙ ДНЕВНИК</text>
+<text x="422" y="181" font-size="39" fill="#161c18" font-weight="800">Питание</text>
+<line x1="422" y1="200" x2="728" y2="200" stroke="#d6ddd7" stroke-width="1"/>
+<text x="422" y="234" font-size="12" fill="#59665d" font-weight="500">Неделя · 5–11 октября</text>
+<text x="439" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">ПН</text>
+<text x="439" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">5</text>
+<text x="486" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">ВТ</text>
+<text x="486" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">6</text>
+<text x="533" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">СР</text>
+<text x="533" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">7</text>
+<rect x="561" y="246" width="40" height="55" rx="15" fill="#ffffff" stroke="#99e719" stroke-width="1.6"/>
+<text x="580" y="268" font-size="10" fill="#486b18" font-weight="700" text-anchor="middle">ЧТ</text>
+<text x="580" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">8</text>
+<text x="627" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">ПТ</text>
+<text x="627" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">9</text>
+<text x="674" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">СБ</text>
+<text x="674" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">10</text>
+<text x="721" y="268" font-size="10" fill="#59665d" font-weight="700" text-anchor="middle">ВС</text>
+<text x="721" y="291" font-size="16" fill="#161c18" font-weight="700" text-anchor="middle">11</text>
+<rect x="422" y="317" width="185" height="48" rx="16" fill="#99e719"/>
+<text x="514" y="346" font-size="13" fill="#152009" font-weight="700" text-anchor="middle">+ Добавить продукт</text>
+<rect x="618" y="317" width="111" height="48" rx="16" fill="#f2f5f1" stroke="#d6ddd7" stroke-width="1"/>
+<text x="673" y="346" font-size="12" fill="#161c18" font-weight="700" text-anchor="middle">Быстрый ввод</text>
+<rect x="422" y="385" width="306" height="230" rx="19" fill="#f2f5f1" stroke="#d6ddd7" stroke-width="1"/>
+<text x="438" y="412" font-size="11" fill="#486b18" font-weight="750">КБЖУ ЗА ДЕНЬ</text>
+<text x="438" y="438" font-size="18" fill="#161c18" font-weight="750">Цель · 2 100 ккал</text>
+<text x="438" y="468" font-size="11" fill="#59665d" font-weight="600">Калории</text>
+<text x="710" y="468" font-size="11" fill="#161c18" font-weight="650" text-anchor="end">1 480 / 2 100</text>
+<rect x="438" y="476" width="270" height="5" rx="2.5" fill="#dee4de"/>
+<rect x="438" y="476" width="189" height="5" rx="2.5" fill="#99e719"/>
+<text x="438" y="504" font-size="11" fill="#59665d" font-weight="600">Белки</text>
+<text x="710" y="504" font-size="11" fill="#161c18" font-weight="650" text-anchor="end">102 / 140 г</text>
+<rect x="438" y="512" width="270" height="5" rx="2.5" fill="#dee4de"/>
+<rect x="438" y="512" width="197" height="5" rx="2.5" fill="#99e719"/>
+<text x="438" y="540" font-size="11" fill="#59665d" font-weight="600">Жиры</text>
+<text x="710" y="540" font-size="11" fill="#161c18" font-weight="650" text-anchor="end">42 / 70 г</text>
+<rect x="438" y="548" width="270" height="5" rx="2.5" fill="#dee4de"/>
+<rect x="438" y="548" width="162" height="5" rx="2.5" fill="#99e719"/>
+<text x="438" y="576" font-size="11" fill="#59665d" font-weight="600">Углеводы</text>
+<text x="710" y="576" font-size="11" fill="#161c18" font-weight="650" text-anchor="end">164 / 230 г</text>
+<rect x="438" y="584" width="270" height="5" rx="2.5" fill="#dee4de"/>
+<rect x="438" y="584" width="192" height="5" rx="2.5" fill="#99e719"/>
+<text x="422" y="653" font-size="11" fill="#486b18" font-weight="800">ПЛАНИРОВАНИЕ</text>
+<text x="422" y="674" font-size="10" fill="#59665d" font-weight="500">Вторичные действия в одной компактной группе</text>
+<rect x="422" y="688" width="306" height="113" rx="17" fill="#ffffff" stroke="#d6ddd7" stroke-width="1"/>
+<text x="438" y="714" font-size="15" fill="#161c18" font-weight="700">План питания</text>
+<text x="438" y="732" font-size="11" fill="#59665d" font-weight="500">Меню на дни и недели</text>
+<text x="704" y="722" font-size="25" fill="#59665d" font-weight="400" text-anchor="middle">›</text>
+<line x1="438" y1="744" x2="711" y2="744" stroke="#d6ddd7" stroke-width="1"/>
+<text x="438" y="768" font-size="15" fill="#161c18" font-weight="700">Список покупок</text>
+<text x="438" y="786" font-size="11" fill="#59665d" font-weight="500">Продукты по вашему плану</text>
+<text x="704" y="774" font-size="25" fill="#59665d" font-weight="400" text-anchor="middle">›</text>
+<rect x="422" y="820" width="306" height="45" rx="25" fill="#eef3e8" stroke="#d6ddd7" stroke-width="1.5"/>
+<text x="454" y="849" font-size="10" fill="#161c18" font-weight="650" text-anchor="middle">Сегодня</text>
+<text x="514" y="849" font-size="10" fill="#161c18" font-weight="650" text-anchor="middle">План</text>
+<rect x="545" y="823" width="62" height="39" rx="19" fill="#e0f4c1"/>
+<text x="574" y="849" font-size="10" fill="#486b18" font-weight="650" text-anchor="middle">Питание</text>
+<text x="634" y="849" font-size="10" fill="#161c18" font-weight="650" text-anchor="middle">Прогресс</text>
+<text x="694" y="849" font-size="10" fill="#161c18" font-weight="650" text-anchor="middle">Добавить</text>
+<text x="26" y="23" font-size="16" fill="#152116" font-weight="800">OWNER UI REVIEW #869 - предложение v1 (НЕ УТВЕРЖДЕНО)</text>
+<text x="190" y="902" font-size="12" fill="#364339" font-weight="750">DARK</text>
+<text x="570" y="902" font-size="12" fill="#364339" font-weight="750">LIGHT</text>
+</svg>
