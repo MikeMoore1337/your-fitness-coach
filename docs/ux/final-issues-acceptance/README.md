@@ -10,8 +10,8 @@
 | `IMPLEMENTED_VERIFIED` | 0 |
 | `IMPLEMENTED_NEEDS_ACCEPTANCE` | 7: #859, #860, #867, #868, #903, #904, #905 |
 | `PARTIALLY_IMPLEMENTED` | 3: #865, #869, #870 |
-| `NOT_IMPLEMENTED` | 7: #861, #862, #863, #864, #866, #873, #874 |
-| `BLOCKED_OWNER_INPUT` | 2: #871, #906 |
+| `NOT_IMPLEMENTED` | 0 (remaining unimplemented work is covered by explicit owner gates) |
+| `BLOCKED_OWNER_INPUT` | 9: #861, #862, #863, #864, #866, #871, #873, #874, #906 |
 | `INTENDED_BEHAVIOR` / `NOT_REPRODUCED` | 0 как итоговый статус Issue; отдельные под-критерии отмечены в матрице |
 | `MASTER_SHA` | `297ee2fd87f09ef6b5f7e2bd6753bd1ff7d38a55` |
 | Production | Не изменялась |
