@@ -20,8 +20,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -614,8 +614,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -1208,8 +1208,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -1802,8 +1802,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -2396,8 +2396,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -2990,8 +2990,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -3584,8 +3584,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -4178,8 +4178,8 @@
       "scene": "dock",
       "scenario": "Подходы и нижняя панель после прокрутки",
       "route": "/app",
-      "platform": "linux",
-      "source_runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+      "platform": "windows",
+      "source_runtime": "a6589c4d73e4b14b0d415548ff6c84e8f0f49e79",
       "state": "after",
       "label": "Подходы и нижняя панель после прокрутки",
       "cropped": false
@@ -10957,8 +10957,8 @@
     },
     {
       "path": "after/chromium-320-dark-dock.png",
-      "bytes": 64152,
-      "sha256": "94c26bc5a110c8c4a9b0225350fd55eb11fd61b5b0a7d76d6891fe8738ba397b"
+      "bytes": 67242,
+      "sha256": "7d190a9de2b33078ebc7de33e1eb68c5433a2a03d27323df363703bb13a5ba78"
     },
     {
       "path": "after/chromium-320-dark-nav-detail-nutrition.png",
@@ -11082,8 +11082,8 @@
     },
     {
       "path": "after/chromium-320-light-dock.png",
-      "bytes": 65484,
-      "sha256": "527ce0432df089ea01fb303a0577c326a593f2001010c4b5c2da5d8c9392ea21"
+      "bytes": 68213,
+      "sha256": "6991b8f6009fab83db58786795903a3aa14a5549caaa9b7baafde869c1b36682"
     },
     {
       "path": "after/chromium-320-light-nav-detail-nutrition.png",
@@ -11217,8 +11217,8 @@
     },
     {
       "path": "after/chromium-360-dark-dock.png",
-      "bytes": 67767,
-      "sha256": "635ca9176478d91cc2c3f11f585601e854807d6475a5fab09fc474d943ebdcee"
+      "bytes": 70740,
+      "sha256": "35d96f1a0b8c7cf983607726de8281493c96b5b32c6001a0882c086ffda45d64"
     },
     {
       "path": "after/chromium-360-dark-nav-detail-nutrition.png",
@@ -11347,8 +11347,8 @@
     },
     {
       "path": "after/chromium-360-light-dock.png",
-      "bytes": 70099,
-      "sha256": "73f36d60e2a1a168ff6934f478e6075996955ef7882bb7015a1362e4ee42b5f0"
+      "bytes": 72628,
+      "sha256": "c183f28c231c53fdf9e04f94433e047bd840eb7bea0548c0c3b4965830e2419f"
     },
     {
       "path": "after/chromium-360-light-nav-detail-nutrition.png",
@@ -11467,8 +11467,8 @@
     },
     {
       "path": "after/chromium-393-dark-dock.png",
-      "bytes": 74360,
-      "sha256": "6ee8c35ea1744d9db69d68bc5e194023599e5190eaf1757e277d09dc0b87ddbb"
+      "bytes": 77913,
+      "sha256": "8e6c680a1e5027ca465687669c3aac2182321c4d399cc9dcf9790998d45dfc45"
     },
     {
       "path": "after/chromium-393-dark-glass-content.png",
@@ -11622,8 +11622,8 @@
     },
     {
       "path": "after/chromium-393-light-dock.png",
-      "bytes": 76190,
-      "sha256": "db370e1df9ba95469edbd4ec3b3c08f1e2c585a1cf1498e523c3d11edeb8c85b"
+      "bytes": 79198,
+      "sha256": "3daa6af2cc6aeb50d25018f7d51afefad10e2b4372c22766766f206ea08a34da"
     },
     {
       "path": "after/chromium-393-light-glass-content.png",
@@ -11772,8 +11772,8 @@
     },
     {
       "path": "after/chromium-430-dark-dock.png",
-      "bytes": 77200,
-      "sha256": "7eb8cc0a6d9582bbe72c291f1bad8c3dfbfe611d6b38694b6bd958ba8216c03a"
+      "bytes": 80601,
+      "sha256": "926086e6006e2a97a09b3ff03dae9061229c7681b520862923af26a29fce26cb"
     },
     {
       "path": "after/chromium-430-dark-nav-detail-nutrition.png",
@@ -11892,8 +11892,8 @@
     },
     {
       "path": "after/chromium-430-light-dock.png",
-      "bytes": 78470,
-      "sha256": "439fac682d1bf72cf1cbe12870260ebace5f8f5a8b68863bff9657f7a095ac94"
+      "bytes": 81799,
+      "sha256": "707d92cfe5aa429c3c5f6179f48601a0b06793a01eb398cb87528b23501b13e7"
     },
     {
       "path": "after/chromium-430-light-nav-detail-nutrition.png",
