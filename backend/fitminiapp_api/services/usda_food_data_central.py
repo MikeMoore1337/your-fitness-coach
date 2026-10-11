@@ -14,12 +14,13 @@ from fitminiapp_api.services.food_provider import (
     RequestBudget,
 )
 from fitminiapp_api.services.food_search_aliases import (
-    USDA_RU_DISPLAY_NAMES_V2,
+    USDA_RU_DISPLAY_NAMES_V3,
     generic_food_search_query,
     has_generic_food_alias,
     is_russian_food_query,
     usda_ru_result_ids,
 )
+from fitminiapp_api.services.usda_reviewed_expansion import USDA_REVIEWED_FNDDS_EXPANSION_V3
 
 _API_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
 _SOURCE_BASE_URL = "https://fdc.nal.usda.gov/fdc-app.html#/food-details"
@@ -140,7 +141,13 @@ class USDAFoodDataCentralProvider:
         data_type = cls._text(raw_food.get("dataType"))
         if external_id is None or source_name is None or data_type not in _DATA_TYPES:
             return None
-        russian_name = USDA_RU_DISPLAY_NAMES_V2.get(external_id)
+        russian_name = USDA_RU_DISPLAY_NAMES_V3.get(external_id)
+        reviewed_addition = USDA_REVIEWED_FNDDS_EXPANSION_V3.get(external_id)
+        if reviewed_addition is not None and (
+            data_type != "Survey (FNDDS)" or source_name != reviewed_addition[1]
+        ):
+            # FDC data-type and source-description drift must never inherit a reviewed RU label.
+            russian_name = None
         if require_russian_name and russian_name is None:
             return None
         name = russian_name or source_name

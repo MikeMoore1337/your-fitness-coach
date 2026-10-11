@@ -16,11 +16,14 @@ sys.path.insert(0, str(ROOT / "backend"))
 
 from fitminiapp_api.schemas.food import FoodCatalog  # noqa: E402
 from fitminiapp_api.services.food_search_aliases import (  # noqa: E402
-    USDA_RU_DISPLAY_NAMES_V2,
-    USDA_RU_DISPLAY_VERSION,
+    USDA_RU_DISPLAY_NAMES_V3,
+    USDA_RU_DISPLAY_VERSION_V3,
 )
 from fitminiapp_api.services.usda_food_data_central import (  # noqa: E402
     USDAFoodDataCentralProvider,
+)
+from fitminiapp_api.services.usda_reviewed_expansion import (  # noqa: E402
+    USDA_REVIEWED_FNDDS_EXPANSION_V3,
 )
 
 _API_URL = "https://api.nal.usda.gov/fdc/v1/foods"
@@ -40,10 +43,10 @@ def build_catalog(
 ) -> FoodCatalog:
     """Only import verified FDC identities already bearing reviewed Russian labels."""
 
-    selected = ids if ids is not None else tuple(sorted(USDA_RU_DISPLAY_NAMES_V2, key=int))
+    selected = ids if ids is not None else tuple(sorted(USDA_RU_DISPLAY_NAMES_V3, key=int))
     if not selected or len(selected) != len(set(selected)):
         raise CuratedCatalogError("FDC IDs must be nonempty and unique")
-    if any(item not in USDA_RU_DISPLAY_NAMES_V2 for item in selected):
+    if any(item not in USDA_RU_DISPLAY_NAMES_V3 for item in selected):
         raise CuratedCatalogError("an FDC identity lacks an approved Russian label")
     if not api_key.strip():
         raise CuratedCatalogError("USDA_FDC_API_KEY is required")
@@ -66,7 +69,19 @@ def build_catalog(
         found: set[str] = set()
         for raw in payload:
             food = USDAFoodDataCentralProvider._parse_food(raw, require_russian_name=True)
-            if food is None or food.external_id not in batch or food.external_id in found:
+            if (
+                food is None
+                or food.external_id not in batch
+                or food.external_id in found
+                or (
+                    food.external_id in USDA_REVIEWED_FNDDS_EXPANSION_V3
+                    and (
+                        raw.get("dataType") != "Survey (FNDDS)"
+                        or " ".join(str(raw.get("description", "")).split())
+                        != USDA_REVIEWED_FNDDS_EXPANSION_V3[food.external_id][1]
+                    )
+                )
+            ):
                 raise CuratedCatalogError(
                     "USDA record is unknown, duplicated, or has incomplete nutrients"
                 )
@@ -91,11 +106,11 @@ def build_catalog(
             "schema_version": 1,
             "source": {
                 "name": "usda-fdc-reviewed-ru",
-                "version": USDA_RU_DISPLAY_VERSION,
+                "version": USDA_RU_DISPLAY_VERSION_V3,
                 "source_url": "https://fdc.nal.usda.gov/",
                 "license": "CC0-1.0",
                 "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
-                "reviewed_by": "YFC reviewed Russian FDC alias mapping v2",
+                "reviewed_by": "YFC reviewed Russian FDC alias mapping v3",
                 "reviewed_at": reviewed_at.isoformat(),
                 "license_verified": True,
             },
@@ -115,7 +130,7 @@ def main() -> None:
         parser.error("--limit must be positive")
     key = os.getenv("USDA_FDC_API_KEY", "")
     proxy = os.getenv("USDA_FDC_PROXY_URL", "").strip() or None
-    selected = tuple(sorted(USDA_RU_DISPLAY_NAMES_V2, key=int))
+    selected = tuple(sorted(USDA_RU_DISPLAY_NAMES_V3, key=int))
     if args.limit is not None:
         selected = selected[: args.limit]
     if args.output.exists():
