@@ -21,6 +21,7 @@ for (const width of [320, 360, 393, 430])
         fixedDate: '2026-10-09',
         progressState: 'populated',
         measurementHistory: 'many',
+        programHistory: 'many',
       });
       await page.route(/\/api\/v1\/workouts\/progress\/report(?:\?|$)/, (route) =>
         route.fulfill({ json: makeProgressReportFixture('full') }),
