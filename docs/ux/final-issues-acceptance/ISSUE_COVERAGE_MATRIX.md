@@ -8,6 +8,7 @@
 - `IMPLEMENTED_NEEDS_ACCEPTANCE` — техническая реализация и проверки есть, требуется визуальная или release-приёмка владельца.
 - `PARTIALLY_IMPLEMENTED` — подтверждена только часть критериев.
 - `NOT_IMPLEMENTED` — в актуальном production-коде нет требуемой реализации и отсутствует действующий owner gate, позволяющий начать её в этом пакете.
+- `NOT_IMPLEMENTED_OWNER_GATE` — требуемой production-реализации нет; Issue остановлена зафиксированным owner gate, поэтому локальное предложение/evidence не объявляется AFTER.
 - `BLOCKED_OWNER_INPUT` — дальнейшее поведение требует решения владельца.
 - `NOT_REPRODUCED` — заявленный дефект не воспроизведён в текущем состоянии.
 - `INTENDED_BEHAVIOR` — проверенный сценарий соответствует контракту и не является дефектом.
@@ -37,7 +38,7 @@
 
 ## #861 — Поиск и выбор упражнений: результаты перекрываются и тесны при клавиатуре
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -51,7 +52,7 @@
 
 ## #862 — Редактор программы: крестик, поля, дни и сохранение
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -64,7 +65,7 @@
 
 ## #863 — «План»: иерархия, рекомендации, история и управление
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -76,7 +77,7 @@
 
 ## #864 — «План»: компактное расписание ближайших 8 недель
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -100,7 +101,7 @@
 
 ## #866 — Компактные завершённые упражнения
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -172,7 +173,7 @@
 
 ## #873 — Подробные подразделы Прогресса
 
-**Приоритет:** P2. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P2. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -186,7 +187,7 @@
 
 ## #874 — Отчёт о прогрессе: таблицы, печать/PDF и предупреждения
 
-**Приоритет:** P1. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P1. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт |
 |---|---|---|
@@ -205,12 +206,12 @@
 
 | Критерий | Состояние | PR/commit и проверки | Evidence/остаток |
 |---|---|---|---|
-| Круглая шкала 1–5 без квадратных рамок | Реализовано | [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), source `6d4b061cda0a9272e71876af77e7f2165e51fbf1`; `landing-v10.css` | [E2E spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/13604595ca45c3bdac07edac99a205d3022264e3/frontend/tests/e2e/landing-903.spec.ts), [BEFORE/AFTER evidence](https://github.com/MikeMoore1337/your-fitness-coach/tree/16f88bc0bf5bd1d8d488bbd7b4fa5a934f7e4fc8/docs/ux/final-issues-acceptance/evidence/903) |
+| Круглая шкала 1–5 без квадратных рамок | Реализовано | [PR #936](https://github.com/MikeMoore1337/your-fitness-coach/pull/936), source [`733933a7`](https://github.com/MikeMoore1337/your-fitness-coach/commit/733933a73a3bc27ca596b9efb00751105a539a86); `landing-v10.css` | [E2E spec](https://github.com/MikeMoore1337/your-fitness-coach/blob/c40a64eedb467bb33938a1cf6165d5878ed0d56b/frontend/tests/e2e/landing-903.spec.ts), [BEFORE/AFTER evidence](https://github.com/MikeMoore1337/your-fitness-coach/tree/c40a64eedb467bb33938a1cf6165d5878ed0d56b/docs/ux/final-issues-acceptance/evidence/903) |
 | Selected-state остаётся видимым | Реализовано | Circular lime-tinted selected surface/inset ring | Визуальная приёмка владельца pending |
-| Focus-visible сохраняется | Реализовано | `label:focus-within` outline | Chromium targeted 8 passed (оба публичных маршрута) |
+| Focus-visible сохраняется | Реализовано | `input:focus-visible + span` outline; pointer selection не добавляет focus ring | Chromium и WebKit targeted по 8 passed (оба публичных маршрута) |
 | Native radio semantics | Реализовано | Native inputs retained | Typecheck/lint/build passed |
 | Touch target ≥44×44 | Реализовано | CSS label min dimensions and E2E geometry | Owner visual acceptance pending |
-| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — 8 tests passed locally; PR #936 head `13604595ca45c3bdac07edac99a205d3022264e3` | [required CI run 38157331212](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38157331212) green; owner visual acceptance pending |
+| Dark/light, mobile/desktop, `/` и `/for-athletes` | Реализовано | `landing-903.spec.ts` — Chromium 8 и WebKit 8 passed локально; PR #936 head [`c40a64ee`](https://github.com/MikeMoore1337/your-fitness-coach/commit/c40a64eedb467bb33938a1cf6165d5878ed0d56b) | GitHub Checks для нового head остаются release gate; owner visual acceptance pending |
 
 ## #904 — 403 на GET `/api/v1/coach/inbox` в демо тренера
 
@@ -239,24 +240,41 @@
 
 ## #906 — Hero на 2K-мониторах
 
-**Приоритет:** P2. **Итог:** `BLOCKED_OWNER_INPUT`.
+**Приоритет:** P2. **Итог:** `NOT_IMPLEMENTED_OWNER_GATE`.
 
 | Критерий | Состояние | Факт и дальнейшее действие |
 |---|---|---|
-| Высота Hero, кадрирование лица/объектов, пропорции | Не реализовано | Требуется отдельное visual proposal до production change |
-| 1440×900, 1920×1080, 2560×1440, 3440×1440 | Не проверено как AFTER | Existing Landing CSS inspected; no owner-approved final variant |
-| 320/390/430, zoom 100/125, обе темы и аудитории | Не проверено как AFTER | Не выдавать отсутствие ответа за согласование |
-| Парные BEFORE/AFTER | Не опубликованы | Подготовить proposal package, затем отдельный PR после owner approval |
-| Owner approval | Требуется | Владелец должен выбрать/подтвердить высоту и композицию Hero; остальные независимые задачи не блокируются |
+| Высота Hero, кадрирование лица/объектов, пропорции | Предложено, production не менялся | [Локальное сравнение BEFORE/A/B](evidence/906/README.md); runtime `733933a73a3bc27ca596b9efb00751105a539a86` |
+| 1440×900, 1920×1080, 2560×1440 | Снято как proposal | [Athletes QHD BEFORE/A/B](evidence/906/README.md) · [Trainers QHD BEFORE/A/B](evidence/906/README.md) |
+| Обе темы и обе аудитории | Снято как proposal | Chromium, dark/light, `/for-athletes` и `/for-trainers`; production AFTER отсутствует |
+| Парные BEFORE/A/B | Опубликованы | [evidence/906](evidence/906/README.md) и [provenance](evidence/906/provenance.json) |
+| Owner approval | Требуется | Владелец выбирает A или B и допустимую высоту; до этого не создавать production PR |
 
 ## Исключённая из этого аудита задача
 
 `#872` явно исключена последним запросом владельца. XLSX import без исходного файла и отдельного согласования не начинался.
 
+## Прямой визуальный индекс для частично подтверждённых и owner-gated Issues
+
+Все ссылки ниже закреплены за конкретными SHA. `reference` означает, что кадр показывает существующий маршрут или общий компонент, но не закрывает весь acceptance criterion; такой кадр не повышает статус Issue до реализованной.
+
+| Issue | BEFORE / PROPOSAL / AFTER evidence | Runtime и предел доказательства |
+|---|---|---|
+| #861 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) | Mobile release runtime; search/editor keyboard criteria отсутствуют |
+| #862 | [AFTER reference: Plan 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-programs.png) | Общий Plan reference; editor save/hidden params не доказаны |
+| #863 | [AFTER reference: Plan 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-programs.png) | Общий Plan reference; full hierarchy/history/recommendations не доказаны |
+| #864 | [AFTER reference: Plan 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-programs.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-light-programs.png) | Общий Plan reference; 8-week horizon/last row не доказаны |
+| #865 | [AFTER reference: Progress 320 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-320-light-progress.png) | Compact overview reference; metrics/empty-state acceptance partial |
+| #866 | [AFTER reference: workout 360 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-dark-workout.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-360-light-workout.png) | Active workout reference; completed-exercise acceptance absent |
+| #869 | [AFTER reference: Nutrition 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-nutrition.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-light-nutrition.png) | Nutrition reference; diary/plan/grocery/history remains partial |
+| #870 | [PR #910](https://github.com/MikeMoore1337/your-fitness-coach/pull/910) | No trustworthy profile screenshot in this package; visual acceptance absent |
+| #873 | [AFTER reference: Progress 430 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-dark-progress.png) · [light](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-430-light-progress.png) | Progress reference; detailed subsections/no-data semantics unproven |
+| #874 | [AFTER reference: Progress 393 dark](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/38b302a3b0ea3df3dfa6ffd2c46e68ac08b6d92f/docs/ux/mobile-release-859-914/after/chromium-393-dark-progress.png) · [browser PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/browser-after.pdf) · [server PDF](https://raw.githubusercontent.com/MikeMoore1337/your-fitness-coach/ee92508da30ed5eed5e3e3914754515e4a278c25/docs/ux/mobile-859-glass-polish/pdf/server-after.pdf) | Browser/server artifacts exist, but current full report contract is not proven |
+
 ## Технические gates и ограничения
 
 - #907–#911 не изменялись.
-- `MASTER_SHA=a70fa8a1493c2f1ad0711c3143ab7700c96a92f4`; master не изменялся.
+- `MASTER_SHA=c922851b082dfbacc580d78f9e6e5dc60cb23522`; master не изменялся.
 - `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`, production mutations не выполнялись.
 - #871 (семантика прошедшего часа напоминания) и #906 (visual Hero) требуют решения владельца.
-- #861–#864, #866, #873, #874 имеют реальные недостающие production части; их нельзя объявлять выполненными по общей интеграции #915/#927.
+- #861–#864, #866, #873, #874, #906 имеют реальные недостающие production части и явно помечены `NOT_IMPLEMENTED_OWNER_GATE`; их нельзя объявлять выполненными по общей интеграции #915/#927.
