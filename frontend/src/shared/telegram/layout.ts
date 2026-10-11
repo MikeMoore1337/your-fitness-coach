@@ -4,6 +4,8 @@ export interface MobileViewportSnapshot {
   active: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
+  viewportOffsetTop: number;
+  viewportOffsetBottom: number;
   safeArea: TelegramInsets;
   contentSafeArea: TelegramInsets;
 }
@@ -39,8 +41,11 @@ function normalizedInsets(value: Partial<TelegramInsets> | undefined): TelegramI
 export function readMobileViewportSnapshot(
   telegram: TelegramWebApp | null,
 ): MobileViewportSnapshot {
-  const browserHeight = positiveMetric(window.visualViewport?.height, window.innerHeight);
+  const visualViewport = window.visualViewport;
+  const browserHeight = positiveMetric(visualViewport?.height, window.innerHeight);
   const stableFallback = positiveMetric(window.innerHeight, browserHeight);
+  const viewportOffsetTop = boundedMetric(visualViewport?.offsetTop, 0);
+  const viewportOffsetBottom = Math.max(0, stableFallback - viewportOffsetTop - browserHeight);
   const isMiniApp = Boolean(telegram?.initData);
   const viewportHeight = isMiniApp
     ? Math.min(positiveMetric(telegram?.viewportHeight, browserHeight), browserHeight)
@@ -52,6 +57,8 @@ export function readMobileViewportSnapshot(
     viewportStableHeight: isMiniApp
       ? positiveMetric(telegram?.viewportStableHeight, stableFallback)
       : stableFallback,
+    viewportOffsetTop,
+    viewportOffsetBottom,
     safeArea: isMiniApp ? normalizedInsets(telegram?.safeAreaInset) : normalizedInsets(undefined),
     contentSafeArea: isMiniApp
       ? normalizedInsets(telegram?.contentSafeAreaInset)
@@ -87,10 +94,9 @@ export function applyMobileViewportSnapshot(
   root.dataset.yfcLayoutSurface = telegram?.initData ? 'telegram' : 'browser';
   root.style.setProperty('--yfc-viewport-height', `${snapshot.viewportHeight}px`);
   root.style.setProperty('--yfc-viewport-stable-height', `${snapshot.viewportStableHeight}px`);
-  root.style.setProperty(
-    '--yfc-viewport-bottom',
-    `${Math.max(0, window.innerHeight - snapshot.viewportHeight - (window.visualViewport?.offsetTop ?? 0))}px`,
-  );
+  root.style.setProperty('--yfc-viewport-bottom', String(Math.max(0, window.innerHeight - snapshot.viewportHeight - (window.visualViewport?.offsetTop ?? 0))) + 'px');
+  root.style.setProperty('--yfc-visual-viewport-offset-top', String(snapshot.viewportOffsetTop) + 'px');
+  root.style.setProperty('--yfc-visual-viewport-offset-bottom', String(snapshot.viewportOffsetBottom) + 'px');
 
   for (const side of SIDES) {
     root.style.setProperty(`--yfc-tg-safe-${side}`, `${snapshot.safeArea[side]}px`);

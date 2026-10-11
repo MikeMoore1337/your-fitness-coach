@@ -62,6 +62,16 @@ visual redesigns.
   frosted matte Liquid Glass material/fallback contract based on the rest timer, not the Landing
   header's transparency; never introduce a page-local selected-state system.
 
+## Owner-gated visual delivery
+
+For a new or substantially changed visual composition, use this sequence:
+
+`concrete mockup -> publish in Issue -> explicit owner approval -> implement the approved version 1:1 -> real AFTER evidence -> owner visual acceptance -> separate release approval`.
+
+Approval of the mockup authorizes implementation of the approved scope only; it does not authorize
+merge, deploy or release. Technical fixes that preserve the existing composition follow the normal
+workflow and do not require this visual gate.
+
 ## RUSSIAN_USER_FACING_UI (mandatory)
 
 - All new authenticated Web, Telegram Mini App, athlete-cabinet and trainer-cabinet UI copy is

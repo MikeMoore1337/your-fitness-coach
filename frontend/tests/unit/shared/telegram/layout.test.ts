@@ -28,7 +28,7 @@ describe('Mobile Web/TMA layout adapter', () => {
   });
 
   it('uses the smaller iOS visual viewport while the Telegram keyboard is open', () => {
-    vi.stubGlobal('visualViewport', { height: 392 });
+    vi.stubGlobal('visualViewport', { height: 392, offsetTop: 0 });
     const controller = createTelegramMock({
       viewportHeight: 844,
       viewportStableHeight: 844,
@@ -38,6 +38,8 @@ describe('Mobile Web/TMA layout adapter', () => {
     expect(readMobileViewportSnapshot(controller.webApp)).toMatchObject({
       viewportHeight: 392,
       viewportStableHeight: 844,
+      viewportOffsetTop: 0,
+      viewportOffsetBottom: expect.any(Number),
     });
   });
 
@@ -49,6 +51,8 @@ describe('Mobile Web/TMA layout adapter', () => {
       active: true,
       viewportHeight: 560,
       viewportStableHeight: 844,
+      viewportOffsetTop: 0,
+      viewportOffsetBottom: 0,
       safeArea: { top: 28, right: 2, bottom: 20, left: 2 },
       contentSafeArea: { top: 44, right: 0, bottom: 16, left: 0 },
     });
@@ -61,6 +65,8 @@ describe('Mobile Web/TMA layout adapter', () => {
       `${Math.max(0, window.innerHeight - 560)}px`,
     );
     expect(root.style.getPropertyValue('--yfc-viewport-stable-height')).toBe('844px');
+    expect(root.style.getPropertyValue('--yfc-visual-viewport-offset-top')).toBe('0px');
+    expect(root.style.getPropertyValue('--yfc-visual-viewport-offset-bottom')).toBe('0px');
     expect(root.style.getPropertyValue('--yfc-tg-safe-top')).toBe('28px');
     expect(root.style.getPropertyValue('--yfc-tg-content-safe-top')).toBe('44px');
 

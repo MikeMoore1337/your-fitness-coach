@@ -8847,6 +8847,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .nutrition-picker {
   align-items: center;
 }
+html[data-yfc-keyboard='visible'] .nutrition-picker {
+  inset-block-start: var(--yfc-visual-viewport-offset-top, 0px);
+  inset-block-end: var(--yfc-visual-viewport-offset-bottom, 0px);
+}
 .nutrition-picker__panel {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -8929,6 +8933,10 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   align-content: start;
   gap: 14px;
 }
+.nutrition-picker__search-flow,
+.nutrition-picker__result-content {
+  display: contents;
+}
 .nutrition-picker__search-control {
   position: relative;
   min-width: 0;
@@ -8982,6 +8990,12 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 .nutrition-food-results {
   gap: 7px;
 }
+.nutrition-food-results__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
 .nutrition-food-result {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -8991,45 +9005,70 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   border-radius: var(--radius-control);
   background: var(--surface);
 }
-.nutrition-food-result__select {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+.nutrition-food-result--picker {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  border-radius: 15px;
+}
+.nutrition-food-result--picker > .nutrition-food-result__select {
+  display: grid;
+  align-content: start;
+  gap: 7px;
   width: 100%;
   min-width: 0;
-  padding: 11px 12px;
+  min-height: 72px;
+  padding: 10px 58px 4px 12px;
+  border: 0;
   border-radius: 0;
   background: transparent;
   color: var(--text);
   text-align: left;
 }
-.nutrition-food-result__select-label {
-  flex: 0 0 auto;
-  color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 850;
-  white-space: nowrap;
+.nutrition-food-result--picker > .nutrition-food-result__select:hover:not(:disabled) {
+  background: var(--v2-surface-secondary);
+}
+.nutrition-food-result--picker > .nutrition-food-result__select:active:not(:disabled) {
+  background: var(--v2-surface-strong);
+  color: var(--v2-text-primary);
+}
+.nutrition-food-result--picker > .nutrition-food-result__select:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 3px solid var(--focus-ring);
+  outline-offset: -3px;
+}
+.nutrition-food-result--picker > .nutrition-food-result__select:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
 }
 .nutrition-food-result:hover,
 .nutrition-food-result:focus-within {
   border-color: var(--accent-line);
   background: var(--surface-hover);
 }
-.nutrition-food-result__actions {
+.nutrition-food-result--picker > .nutrition-food-result__meta {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 4px;
-  border-left: 1px solid var(--border);
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px 4px 12px;
 }
-.nutrition-food-result__actions button {
+.nutrition-food-result--picker .nutrition-food-result__meta .ui-badge {
+  max-width: calc(100% - 52px);
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.nutrition-food-result--picker .nutrition-food-result__meta > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 42px;
-  min-height: 44px;
+  flex: 0 0 auto;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);
@@ -9037,18 +9076,22 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   color: var(--muted);
   font-size: 0.72rem;
 }
-.nutrition-food-result__actions .nutrition-food-result__favorite {
+.nutrition-food-result--picker .nutrition-food-result__favorite {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  right: 4px;
   width: 44px;
   min-width: 44px;
   padding: 0;
 }
-.nutrition-food-result__actions button[aria-pressed='true'] {
+.nutrition-food-result--picker .nutrition-food-result__meta > button[aria-pressed='true'] {
   border-color: var(--accent-line);
   color: var(--accent-strong);
   font-size: 1rem;
   background: var(--accent-soft);
 }
-.nutrition-food-result__actions button:focus-visible {
+.nutrition-food-result--picker .nutrition-food-result__meta > button:focus-visible {
   outline-offset: 1px;
 }
 .nutrition-food-result__main {
@@ -9058,23 +9101,20 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
 }
 .nutrition-food-result__main strong,
 .nutrition-food-result__main span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .nutrition-food-result__main strong {
-  font-size: 0.88rem;
+  font-size: 12.7px;
+  font-weight: 700;
+  line-height: 18px;
 }
 .nutrition-food-result__main span {
   color: var(--muted);
-  font-size: 0.73rem;
-}
-.nutrition-food-result__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-  color: var(--accent-strong);
+  font-size: 11.4px;
+  line-height: 16px;
 }
 .nutrition-picker__empty {
   padding: 18px;
@@ -10461,6 +10501,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   .nutrition-picker__panel {
     width: 100%;
     max-width: none;
+    padding: 0;
     max-height: calc(
       var(--yfc-viewport-height, 100dvh) -
         max(8px, var(--yfc-layout-safe-top, env(safe-area-inset-top, 0px)))
@@ -10471,19 +10512,61 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
     border-radius: 20px 20px 0 0;
   }
   .nutrition-picker__header {
-    padding: 15px 14px 12px;
+    padding: 15px max(20px, var(--yfc-layout-safe-right, env(safe-area-inset-right, 0px))) 12px
+      max(20px, var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
   }
   .nutrition-picker__browse,
   .nutrition-picker__quantity {
-    padding: 14px max(14px, var(--yfc-layout-safe-right, env(safe-area-inset-right, 0px)))
+    padding: 14px max(20px, var(--yfc-layout-safe-right, env(safe-area-inset-right, 0px)))
       max(18px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)))
-      max(14px, var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
+      max(20px, var(--yfc-layout-safe-left, env(safe-area-inset-left, 0px)));
+  }
+  html[data-yfc-keyboard='visible'] .nutrition-picker__browse[data-search-active='true'] {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 0;
+    overflow: hidden;
+    padding-block: 8px 0;
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-field {
+    position: sticky;
+    z-index: 3;
+    top: 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-bg);
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-field
+    .ui-field__hint {
+    display: none;
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__search-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    gap: 14px;
+    padding-block: 9px max(18px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  }
+  html[data-yfc-keyboard='visible']
+    .nutrition-picker__browse[data-search-active='true']
+    .nutrition-picker__result-content {
+    display: grid;
+    order: -1;
+    align-content: start;
+    min-width: 0;
+    gap: 14px;
   }
   .nutrition-food-result {
+    grid-template-columns: minmax(0, 1fr);
     min-height: 56px;
-  }
-  .nutrition-food-result__actions {
-    flex-direction: column;
   }
   .nutrition-picker__tools {
     grid-template-columns: 1fr;

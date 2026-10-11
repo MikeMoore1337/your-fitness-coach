@@ -32,6 +32,16 @@ owner approval exploration и owner selection направления до rollou
 Bounded exception к contract записывается в task и получает explicit owner approval; молчание или
 ссылка на App Experience v3 исключением не являются.
 
+## Визуальный lifecycle
+
+Для новой или существенно изменённой visual composition действует последовательность:
+
+`concrete mockup -> publish в Issue -> explicit owner approval -> реализация approved version 1:1 -> real AFTER evidence -> owner visual acceptance -> separate release approval`.
+
+Одобрение макета разрешает реализацию согласованного scope, но не заменяет owner visual
+acceptance, release approval, merge или deploy. Технические исправления без изменения composition
+идут обычным workflow и не требуют этого visual gate.
+
 ## Язык authenticated UI
 
 Authenticated product UI YFC является русскоязычным по умолчанию: весь user-facing текст должен

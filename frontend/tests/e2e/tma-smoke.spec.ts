@@ -2354,7 +2354,7 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
 
   const breakfast = tmaPage.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   const tmaSearch = tmaPage.getByRole('searchbox', { name: 'Найти продукт' });
@@ -2378,16 +2378,16 @@ test('nutrition quick paths recover in TMA and match Mobile Web before core navi
   await expect(tmaSearch).toHaveValue('');
   await expect(tmaSearch).toBeFocused();
   await tmaSearch.fill('овсянка');
-  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
   await tmaPage.screenshot({ path: testInfo.outputPath('tma-nutrition-search-390x844-dark.png') });
-  await tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
+  await tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' }).click();
   await tmaPage.getByRole('button', { name: 'Добавить в дневник' }).click();
   await expect(tmaPage.getByText('Овсяная каша')).toBeVisible();
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
   await expect(tmaPage.getByRole('button', { name: 'Избранное' })).not.toBeVisible();
   await tmaPage.getByText('Каталог и фильтры', { exact: true }).click();
   await tmaPage.getByRole('button', { name: 'Избранное' }).click();
-  await expect(tmaPage.getByRole('button', { name: 'Добавить Овсяная каша' })).toBeVisible();
+  await expect(tmaPage.getByRole('button', { name: 'Выбрать Овсяная каша' })).toBeVisible();
   await tmaPage.getByText('Другие способы добавления', { exact: true }).click();
   await tmaPage
     .getByRole('dialog')
