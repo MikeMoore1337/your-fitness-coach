@@ -34,10 +34,10 @@ playwright-cli install --skills=agents -g
 
 Перед использованием внешних skills проверять их происхождение и исполняемые команды; не копировать сторонние skills в `.agents/skills/` проекта без его существующего security-review gate. При отсутствии установки работает обычный `@playwright/test` и локальный просмотр браузера.
 
-Пример исследовательской сессии на изолированном dev/preview с синтетическими данными:
+Пример исследовательской сессии на изолированном dev/preview с синтетическими данными. На Windows без Google Chrome можно использовать установленный Microsoft Edge с `--browser=msedge` (режим проверен 2026-10-10):
 
 ```powershell
-playwright-cli -s=yfc-dev open http://127.0.0.1:5173
+playwright-cli -s=yfc-dev open http://127.0.0.1:5173 --browser=msedge
 playwright-cli -s=yfc-dev resize 320 740
 playwright-cli -s=yfc-dev snapshot
 playwright-cli -s=yfc-dev screenshot
