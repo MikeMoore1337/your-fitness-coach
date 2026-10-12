@@ -768,12 +768,15 @@ body:has(.app-shell--design-v2) {
 @media print {
   @page {
     size: A4 portrait;
-    margin: 18mm 15mm 20mm;
+    margin: 17mm 16mm 19mm;
+    background: #fff !important;
   }
 
   html,
   body,
   #root,
+  .app-shell--design-v2,
+  #appContent,
   .progress-report-page {
     min-height: auto;
     background: #fff !important;
@@ -801,6 +804,7 @@ body:has(.app-shell--design-v2) {
     --v2-lime: #6b8f20;
     width: auto;
     padding: 0;
+    box-sizing: border-box;
     print-color-adjust: exact;
   }
 
@@ -811,6 +815,7 @@ body:has(.app-shell--design-v2) {
     border: 0;
     border-radius: 0;
     background: #fff;
+    box-sizing: border-box;
   }
 
   .progress-report-print-header {
@@ -11262,6 +11267,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   @page {
     size: A4;
     margin: 17mm 16mm 19mm;
+    background: #fff !important;
   }
   .progress-report-document {
     font-family: var(--font-sans);

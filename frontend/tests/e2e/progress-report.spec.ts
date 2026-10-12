@@ -242,6 +242,94 @@ test('full report keeps a mobile-first preview and print layout', async ({
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.emulateMedia({ media: 'print' });
+  const printContract = await page.evaluate(() => {
+    const pageRules: Array<{ size: string; margin: string; background: string }> = [];
+    const visitRules = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        const nestedRule = rule as CSSRule & {
+          cssRules?: CSSRuleList;
+          style?: CSSStyleDeclaration;
+        };
+        if (nestedRule.cssRules) visitRules(nestedRule.cssRules);
+        if (rule.cssText.startsWith('@page')) {
+          pageRules.push({
+            size: nestedRule.style?.getPropertyValue('size') ?? '',
+            margin: nestedRule.style?.getPropertyValue('margin') ?? '',
+            background: nestedRule.style?.getPropertyValue('background') ?? '',
+          });
+        }
+      }
+    };
+    for (const sheet of Array.from(document.styleSheets)) {
+      try {
+        visitRules(sheet.cssRules);
+      } catch {
+        // Ignore non-readable third-party stylesheets.
+      }
+    }
+
+    const surfaceSelectors = [
+      'html',
+      'body',
+      '#root',
+      '.app-shell--design-v2',
+      '#appContent',
+      '.progress-report-page',
+      '.progress-report-document',
+    ];
+    const surfaces = surfaceSelectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector)).map((element) => ({
+        selector,
+        backgroundColor: getComputedStyle(element).backgroundColor,
+        backgroundImage: getComputedStyle(element).backgroundImage,
+      })),
+    );
+    const boundedSelectors = [
+      '.progress-report-print-header',
+      '.progress-report-document h1',
+      '.progress-report-document h2',
+      '.progress-report-document h3',
+      '.progress-report-document table',
+      '.progress-report-document .data-viz-chart',
+    ];
+    const horizontalBounds = boundedSelectors.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector)).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { selector, left: rect.left, right: rect.right };
+      }),
+    );
+    return {
+      pageRules,
+      surfaces,
+      horizontalBounds,
+      viewportWidth: document.documentElement.clientWidth,
+    };
+  });
+  const a4PageRules = printContract.pageRules.filter(
+    (rule) => rule.size.toLowerCase().includes('a4') && rule.margin.includes('16mm'),
+  );
+  expect(a4PageRules).not.toHaveLength(0);
+  expect(a4PageRules).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        margin: expect.stringContaining('17mm 16mm 19mm'),
+        background: expect.stringContaining('255'),
+      }),
+    ]),
+  );
+  expect(printContract.surfaces).not.toHaveLength(0);
+  for (const surface of printContract.surfaces) {
+    expect(surface.backgroundColor).toBe('rgb(255, 255, 255)');
+    expect(surface.backgroundImage).toBe('none');
+  }
+  for (const bounds of printContract.horizontalBounds) {
+    expect(bounds.left).toBeGreaterThanOrEqual(-0.5);
+    expect(bounds.right).toBeLessThanOrEqual(printContract.viewportWidth + 0.5);
+  }
+  await expect(page.locator('.data-viz-chart__actual').first()).toHaveCSS(
+    'stroke',
+    'rgb(107, 143, 32)',
+  );
   await expect(page.locator('.report-screen-only').first()).toBeHidden();
   await expect(page.locator('.progress-report-print-header')).toHaveCount(4);
   await expect(page.locator('.progress-report-print-header').first()).toBeVisible();
