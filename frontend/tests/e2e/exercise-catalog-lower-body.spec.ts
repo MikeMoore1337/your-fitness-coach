@@ -267,12 +267,16 @@ test('lower-body aliases, compact guide and program selection work on small view
   await page.setViewportSize({ width: 360, height: 800 });
   await page.goto('/app?section=programs&view=manage');
   const builder = page.locator('#program-builder');
-  const picker = builder.getByRole('combobox', { name: 'Поиск упражнения' }).first();
-  await picker.fill('жим ногами на блинах');
-  const option = builder.getByRole('option', { name: /Жим ногами в тренажёре с дисками/ });
+  const picker = builder.getByRole('button', { name: 'Поиск упражнения' }).first();
+  await picker.tap();
+  const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
+  await pickerSheet
+    .getByRole('searchbox', { name: 'Поиск упражнения' })
+    .fill('жим ногами на блинах');
+  const option = pickerSheet.getByRole('button', { name: /^Жим ногами в тренажёре с дисками/ });
   await expect(option).toBeVisible();
   await option.tap();
-  await expect(picker).toHaveValue('Жим ногами в тренажёре с дисками');
+  await expect(picker).toContainText('Жим ногами в тренажёре с дисками');
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: '../.artifacts/screenshots/task-120E/program-picker-mocked-tma-360.png',
@@ -346,15 +350,17 @@ test('lower-body catalog and picker keep Mobile Web and desktop parity', async (
   await page.goto('/app?section=programs&view=manage');
   const picker = page
     .locator('#program-builder')
-    .getByRole('combobox', { name: 'Поиск упражнения' })
+    .getByRole('button', { name: 'Поиск упражнения' })
     .first();
-  await picker.fill('glute drive');
-  const option = page.getByRole('option', {
-    name: /Ягодичный мост в рычажном тренажёре/,
+  await picker.tap();
+  const pickerSheet = page.getByRole('dialog', { name: 'Выбор упражнения' });
+  await pickerSheet.getByRole('searchbox', { name: 'Поиск упражнения' }).fill('glute drive');
+  const option = pickerSheet.getByRole('button', {
+    name: /^Ягодичный мост в рычажном тренажёре/,
   });
   await expect(option).toBeVisible();
   await option.tap();
-  await expect(picker).toHaveValue('Ягодичный мост в рычажном тренажёре');
+  await expect(picker).toContainText('Ягодичный мост в рычажном тренажёре');
   await expectNoHorizontalOverflow(page);
 
   await page.setViewportSize({ width: 1280, height: 900 });

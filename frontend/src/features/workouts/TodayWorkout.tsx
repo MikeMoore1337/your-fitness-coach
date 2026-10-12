@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
@@ -203,6 +203,7 @@ function RirSelector({
             disabled={disabled}
             aria-label={option.label}
             aria-pressed={value === option.value}
+            data-yfc-choice="compact"
             className={value === option.value ? 'is-selected' : ''}
             key={option.value}
             onClick={() => onChange(value === option.value ? null : option.value)}
@@ -347,12 +348,15 @@ function WorkoutSetRow({
   previousResult,
   previousValues,
   restSeconds,
+  userId,
   workoutId,
   workoutExerciseId,
   exerciseTitle,
   hasWarmupRows,
   pending,
+  durable,
   syncing,
+  syncFailed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -364,18 +368,21 @@ function WorkoutSetRow({
   previousResult: string | null;
   previousValues?: PreviousSetValues;
   restSeconds: number;
+  userId?: number;
   workoutId: number;
   workoutExerciseId: number;
   exerciseTitle: string;
   hasWarmupRows: boolean;
   pending?: ActiveWorkoutMutation;
+  durable: boolean;
   syncing: boolean;
+  syncFailed: boolean;
   enqueue: (
     setId: number,
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const [reps, setReps] = useState<string>(
     String(pending?.values.actual_reps ?? set.actual_reps ?? ''),
@@ -390,10 +397,12 @@ function WorkoutSetRow({
   const [reachedFailure, setReachedFailure] = useState(
     pending?.values.reached_failure ?? set.reached_failure ?? false,
   );
-  const [completed, setCompleted] = useState(pending?.values.is_completed ?? set.is_completed);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const [completing, setCompleting] = useState(false);
+  const completionInFlight = useRef(false);
+  const retryCompletion = syncFailed && pending?.values.is_completed;
   const [justConfirmed, setJustConfirmed] = useState(false);
   const editing = useRef(false);
-  const lastCompletionActionAt = useRef(0);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
@@ -411,7 +420,7 @@ function WorkoutSetRow({
     set.planned_role !== 'warmup' &&
     set.planned_role !== 'activation';
 
-  const enqueueSave = (
+  const enqueueSave = async (
     next: Partial<{
       reps: string;
       weight: string;
@@ -422,32 +431,49 @@ function WorkoutSetRow({
     }>,
     immediate = false,
   ) => {
+    if (completionInFlight.current) return;
+    if (immediate) {
+      completionInFlight.current = true;
+      setCompleting(true);
+    }
     const nextReps = next.reps ?? reps;
     const nextWeight = next.weight ?? weight;
     const nextRir = next.rir === undefined ? rir : next.rir;
     const nextSetKind = next.setKind ?? setKind;
     const nextReachedFailure = next.reachedFailure ?? reachedFailure;
     const nextCompleted = next.completed ?? completed;
-    enqueue(
-      set.id,
-      serverVersion,
-      {
-        actual_reps: nextReps === '' ? null : Number(nextReps),
-        actual_weight: nextWeight === '' ? null : Number(nextWeight),
-        rir: nextRir,
-        set_kind: nextSetKind,
-        reached_failure: nextReachedFailure,
-        is_completed: nextCompleted,
-      },
-      immediate,
-    );
-    if (immediate && nextCompleted) {
-      haptic('success');
-    }
-    if (immediate && canStartRest(nextSetKind, nextCompleted)) {
-      window.dispatchEvent(
-        new CustomEvent('fit:rest', { detail: { workoutId, seconds: restSeconds } }),
+    try {
+      const accepted = await enqueue(
+        set.id,
+        serverVersion,
+        {
+          actual_reps: nextReps === '' ? null : Number(nextReps),
+          actual_weight: nextWeight === '' ? null : Number(nextWeight),
+          rir: nextRir,
+          set_kind: nextSetKind,
+          reached_failure: nextReachedFailure,
+          is_completed: nextCompleted,
+        },
+        immediate,
       );
+      if (accepted && immediate && nextCompleted) {
+        haptic('success');
+        setJustConfirmed(true);
+      }
+      if (accepted && immediate && canStartRest(nextSetKind, nextCompleted)) {
+        const deadline = Date.now() + restSeconds * 1000;
+        if (userId) writeStorage(activeWorkoutRestKey(userId, workoutId), deadline);
+        window.dispatchEvent(
+          new CustomEvent('fit:rest', {
+            detail: { workoutId, setId: set.id, seconds: restSeconds, deadline },
+          }),
+        );
+      }
+    } finally {
+      if (immediate) {
+        completionInFlight.current = false;
+        setCompleting(false);
+      }
     }
   };
 
@@ -459,7 +485,6 @@ function WorkoutSetRow({
       setRir(pending.values.rir ?? set.rir ?? null);
       setSetKind(pending.values.set_kind ?? set.set_kind ?? 'working');
       setReachedFailure(pending.values.reached_failure ?? set.reached_failure ?? false);
-      setCompleted(pending.values.is_completed);
     } else {
       if (editing.current) {
         editing.current = false;
@@ -470,7 +495,6 @@ function WorkoutSetRow({
       setRir(set.rir ?? null);
       setSetKind(set.set_kind ?? 'working');
       setReachedFailure(set.reached_failure ?? false);
-      setCompleted(set.is_completed);
     }
   }, [
     pending,
@@ -528,7 +552,8 @@ function WorkoutSetRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> Выполнен
+            {(!pending || durable) && <CheckIcon />}
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнен'}
           </span>
         )}
       </div>
@@ -540,6 +565,7 @@ function WorkoutSetRow({
         <div className="active-workout-set__prefill-actions">
           <button
             className="active-workout-set__prefill"
+            disabled={completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
@@ -557,6 +583,7 @@ function WorkoutSetRow({
           </button>
           <button
             className="active-workout-set__prefill active-workout-set__prefill--commit"
+            disabled={completing}
             type="button"
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
@@ -564,8 +591,6 @@ function WorkoutSetRow({
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
-              setCompleted(true);
-              setJustConfirmed(true);
               enqueueSave({ reps: nextReps, weight: nextWeight, completed: true }, true);
               trackProductEvent({
                 name: 'previous_set_reuse_used',
@@ -589,7 +614,7 @@ function WorkoutSetRow({
       {isCurrent && (
         <RirSelector
           compact
-          disabled={disabled}
+          disabled={disabled || completing}
           value={rir}
           onChange={(nextRir) => {
             editing.current = true;
@@ -604,7 +629,7 @@ function WorkoutSetRow({
           <span>Вес, кг</span>
           <input
             data-workout-field="weight"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="next"
             inputMode="decimal"
@@ -630,7 +655,7 @@ function WorkoutSetRow({
           <span>Повторы</span>
           <input
             data-workout-field="reps"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="done"
             inputMode="numeric"
@@ -654,24 +679,23 @@ function WorkoutSetRow({
         </label>
         <Button
           type="button"
-          disabled={disabled}
-          aria-label={`${completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
+          disabled={disabled || completing}
+          aria-busy={completing || undefined}
+          aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
-          onClick={() => {
-            const now = Date.now();
-            if (now - lastCompletionActionAt.current < 600) return;
-            lastCompletionActionAt.current = now;
-            const nextCompleted = !completed;
+          onClick={(event) => {
+            if (event.detail > 1) return;
+            const nextCompleted = retryCompletion || !completed;
             editing.current = true;
-            setCompleted(nextCompleted);
-            setJustConfirmed(nextCompleted);
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {completed ? (
+          {retryCompletion ? (
+            'Повторить сохранение'
+          ) : completed ? (
             <>
               <CheckIcon /> Готово
             </>
@@ -683,7 +707,7 @@ function WorkoutSetRow({
 
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
-          disabled={disabled}
+          disabled={disabled || completing}
           exerciseTitle={exerciseTitle}
           hasWarmupRows={hasWarmupRows}
           targetSetId={set.id}
@@ -699,7 +723,7 @@ function WorkoutSetRow({
           <label className="active-workout-advanced-field">
             <span>Вид подхода</span>
             <select
-              disabled={disabled}
+              disabled={disabled || completing}
               value={setKind}
               onChange={(event) => {
                 const nextSetKind = event.target.value as SetKind;
@@ -722,7 +746,7 @@ function WorkoutSetRow({
 
           {!isCurrent && (
             <RirSelector
-              disabled={disabled}
+              disabled={disabled || completing}
               value={rir}
               onChange={(nextRir) => {
                 editing.current = true;
@@ -735,7 +759,7 @@ function WorkoutSetRow({
           <label className="active-workout-failure">
             <input
               type="checkbox"
-              disabled={disabled}
+              disabled={disabled || completing}
               checked={reachedFailure}
               onChange={(event) => {
                 const nextReachedFailure = event.target.checked;
@@ -766,7 +790,9 @@ function CardioWorkoutRow({
   previousValues,
   exerciseTitle,
   pending,
+  durable,
   syncing,
+  syncFailed,
   enqueue,
 }: {
   set: WorkoutSet;
@@ -776,13 +802,15 @@ function CardioWorkoutRow({
   previousValues?: PreviousSetValues;
   exerciseTitle: string;
   pending?: ActiveWorkoutMutation;
+  durable: boolean;
   syncing: boolean;
+  syncFailed: boolean;
   enqueue: (
     setId: number,
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
-  ) => void;
+  ) => Promise<boolean>;
 }) {
   const [duration, setDuration] = useState(
     String(pending ? (pending.values.duration_minutes ?? '') : (set.duration_minutes ?? '')),
@@ -798,10 +826,12 @@ function CardioWorkoutRow({
   const [heartRateZone, setHeartRateZone] = useState(
     String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
   );
-  const [completed, setCompleted] = useState(pending?.values.is_completed ?? set.is_completed);
+  const completed = pending?.values.is_completed ?? set.is_completed;
+  const [completing, setCompleting] = useState(false);
+  const completionInFlight = useRef(false);
+  const retryCompletion = syncFailed && pending?.values.is_completed;
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
-  const lastCompletionActionAt = useRef(0);
   const rowRef = useRef<HTMLDivElement | null>(null);
   const serverVersion = set.version ?? 1;
   const canPrefillDuration = duration === '' && previousValues?.duration_minutes != null;
@@ -813,7 +843,7 @@ function CardioWorkoutRow({
     previousResult !== null &&
     (canPrefillDuration || canPrefillDistance);
 
-  const enqueueSave = (
+  const enqueueSave = async (
     next: Partial<{
       duration: string;
       distance: string;
@@ -823,29 +853,41 @@ function CardioWorkoutRow({
     }>,
     immediate = false,
   ) => {
+    if (completionInFlight.current) return;
+    if (immediate) {
+      completionInFlight.current = true;
+      setCompleting(true);
+    }
     const nextDuration = next.duration ?? duration;
     const nextDistance = next.distance ?? distance;
     const nextAverageHeartRate = next.averageHeartRate ?? averageHeartRate;
     const nextHeartRateZone = next.heartRateZone ?? heartRateZone;
     const nextCompleted = next.completed ?? completed;
-    enqueue(
-      set.id,
-      serverVersion,
-      {
-        actual_reps: null,
-        actual_weight: null,
-        duration_minutes: nextDuration === '' ? null : Number(nextDuration),
-        distance_km: nextDistance === '' ? null : Number(nextDistance),
-        average_heart_rate_bpm: nextAverageHeartRate === '' ? null : Number(nextAverageHeartRate),
-        heart_rate_zone: nextHeartRateZone === '' ? null : Number(nextHeartRateZone),
-        rir: null,
-        set_kind: null,
-        reached_failure: null,
-        is_completed: nextCompleted,
-      },
-      immediate,
-    );
-    if (immediate && nextCompleted) haptic('success');
+    try {
+      const accepted = await enqueue(
+        set.id,
+        serverVersion,
+        {
+          actual_reps: null,
+          actual_weight: null,
+          duration_minutes: nextDuration === '' ? null : Number(nextDuration),
+          distance_km: nextDistance === '' ? null : Number(nextDistance),
+          average_heart_rate_bpm: nextAverageHeartRate === '' ? null : Number(nextAverageHeartRate),
+          heart_rate_zone: nextHeartRateZone === '' ? null : Number(nextHeartRateZone),
+          rir: null,
+          set_kind: null,
+          reached_failure: null,
+          is_completed: nextCompleted,
+        },
+        immediate,
+      );
+      if (accepted && immediate && nextCompleted) haptic('success');
+    } finally {
+      if (immediate) {
+        completionInFlight.current = false;
+        setCompleting(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -867,7 +909,6 @@ function CardioWorkoutRow({
     setHeartRateZone(
       String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
     );
-    setCompleted(pending ? pending.values.is_completed : set.is_completed);
   }, [
     pending,
     set.average_heart_rate_bpm,
@@ -909,7 +950,8 @@ function CardioWorkoutRow({
         )}
         {completed && (
           <span className="active-workout-set__complete-label">
-            <CheckIcon /> Выполнено
+            {(!pending || durable) && <CheckIcon />}
+            {pending ? (durable ? 'Сохранено на устройстве' : 'Не сохранено') : 'Выполнено'}
           </span>
         )}
       </div>
@@ -922,6 +964,7 @@ function CardioWorkoutRow({
           <button
             className="active-workout-set__prefill"
             type="button"
+            disabled={disabled || completing}
             onClick={() => {
               const nextDuration = canPrefillDuration
                 ? String(previousValues?.duration_minutes)
@@ -943,6 +986,7 @@ function CardioWorkoutRow({
           <button
             className="active-workout-set__prefill active-workout-set__prefill--commit"
             type="button"
+            disabled={disabled || completing}
             onClick={() => {
               const nextDuration = canPrefillDuration
                 ? String(previousValues?.duration_minutes)
@@ -953,7 +997,6 @@ function CardioWorkoutRow({
               editing.current = true;
               setDuration(nextDuration);
               setDistance(nextDistance);
-              setCompleted(true);
               enqueueSave(
                 { duration: nextDuration, distance: nextDistance, completed: true },
                 true,
@@ -974,7 +1017,7 @@ function CardioWorkoutRow({
           <span>Длительность, мин</span>
           <input
             data-workout-field="duration"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Длительность, ${exerciseTitle}`}
             enterKeyHint="next"
             inputMode="numeric"
@@ -1001,7 +1044,7 @@ function CardioWorkoutRow({
           <span>Дистанция, км</span>
           <input
             data-workout-field="distance"
-            disabled={disabled}
+            disabled={disabled || completing}
             aria-label={`Дистанция, ${exerciseTitle}`}
             enterKeyHint="done"
             inputMode="decimal"
@@ -1025,28 +1068,28 @@ function CardioWorkoutRow({
         </label>
         <Button
           type="button"
-          disabled={disabled}
-          aria-label={`${completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
+          disabled={disabled || completing}
+          aria-busy={completing || undefined}
+          aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
-          onClick={() => {
-            const now = Date.now();
-            if (now - lastCompletionActionAt.current < 600) return;
-            lastCompletionActionAt.current = now;
-            const nextCompleted = !completed;
+          onClick={(event) => {
+            if (event.detail > 1) return;
+            const nextCompleted = retryCompletion || !completed;
             if (nextCompleted && !duration) {
               setValidation('Укажите длительность кардио.');
               return;
             }
             editing.current = true;
             setValidation(null);
-            setCompleted(nextCompleted);
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {completed ? (
+          {retryCompletion ? (
+            'Повторить сохранение'
+          ) : completed ? (
             <>
               <CheckIcon /> Готово
             </>
@@ -1067,7 +1110,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Средний пульс, уд/мин</span>
             <input
-              disabled={disabled}
+              disabled={disabled || completing}
               inputMode="numeric"
               type="number"
               min="30"
@@ -1083,7 +1126,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Зона пульса</span>
             <select
-              disabled={disabled}
+              disabled={disabled || completing}
               value={heartRateZone}
               onChange={(event) => {
                 editing.current = true;
@@ -1105,14 +1148,18 @@ function CardioWorkoutRow({
   );
 }
 
-function RestTimer({
+export function RestTimer({
   userId,
   workoutId,
   nextLabel,
+  nextExercise,
+  nextPosition,
 }: {
   userId: number;
   workoutId: number;
   nextLabel: string;
+  nextExercise: string;
+  nextPosition: string;
 }) {
   const storageKey = activeWorkoutRestKey(userId, workoutId);
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
@@ -1126,18 +1173,29 @@ function RestTimer({
   });
   const [now, setNow] = useState(() => Date.now());
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  const [compact, setCompact] = useState(false);
+  const [dismissRequested, setDismissRequested] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
+  const panel = useRef<HTMLElement>(null);
+  const pressedPointers = useRef(new Set<number>());
+  const layoutAnchor = useRef<{ element: Element; top: number } | null>(null);
   const wasBackgrounded = useRef(
     typeof document !== 'undefined' && document.visibilityState === 'hidden',
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
   useEffect(() => {
     const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ workoutId: number; seconds: number }>).detail;
+      const detail = (
+        event as CustomEvent<{ workoutId: number; seconds: number; deadline?: number }>
+      ).detail;
       if (!detail || detail.workoutId !== workoutId) return;
-      const nextDeadline = Date.now() + detail.seconds * 1000;
+      const nextDeadline = detail.deadline ?? Date.now() + detail.seconds * 1000;
       setNow(Date.now());
       setDeadline(nextDeadline);
       setCompletedNotice(null);
+      setCompact(false);
+      setDismissRequested(false);
+      setAnnouncement('');
       wasBackgrounded.current = document.visibilityState === 'hidden';
       writeStorage(storageKey, nextDeadline);
     };
@@ -1146,19 +1204,31 @@ function RestTimer({
   }, [storageKey, workoutId]);
   useEffect(() => {
     const markBackgrounded = () => {
-      if (document.visibilityState === 'hidden') wasBackgrounded.current = true;
+      if (document.visibilityState === 'hidden') {
+        wasBackgrounded.current = true;
+        pressedPointers.current.clear();
+      }
       setNow(Date.now());
     };
     const markPageHidden = () => {
       wasBackgrounded.current = true;
+      pressedPointers.current.clear();
     };
+    const startPointer = (event: PointerEvent) => pressedPointers.current.add(event.pointerId);
+    const endPointer = (event: PointerEvent) => pressedPointers.current.delete(event.pointerId);
     window.addEventListener('pageshow', markBackgrounded);
     window.addEventListener('pagehide', markPageHidden);
     document.addEventListener('visibilitychange', markBackgrounded);
+    document.addEventListener('pointerdown', startPointer, true);
+    document.addEventListener('pointerup', endPointer, true);
+    document.addEventListener('pointercancel', endPointer, true);
     return () => {
       window.removeEventListener('pageshow', markBackgrounded);
       window.removeEventListener('pagehide', markPageHidden);
       document.removeEventListener('visibilitychange', markBackgrounded);
+      document.removeEventListener('pointerdown', startPointer, true);
+      document.removeEventListener('pointerup', endPointer, true);
+      document.removeEventListener('pointercancel', endPointer, true);
     };
   }, []);
   useEffect(() => {
@@ -1171,6 +1241,8 @@ function RestTimer({
         removeStorage(storageKey);
         setDeadline(0);
         setCompletedNotice(`Отдых завершён · дальше: ${nextLabel}`);
+        setCompact(false);
+        setDismissRequested(false);
         if (
           wasHidden &&
           typeof Notification !== 'undefined' &&
@@ -1194,69 +1266,127 @@ function RestTimer({
       window.removeEventListener('pageshow', update);
     };
   }, [deadline, nextLabel, storageKey, workoutId]);
-  if (!seconds && !completedNotice) return null;
-  if (!seconds && completedNotice) {
-    return (
-      <aside
-        {...glassProps('tinted')}
-        className="active-workout-rest active-workout-rest--complete"
-        role="status"
-        aria-live="polite"
-      >
-        <span className="active-workout-rest__complete-copy">{completedNotice}</span>
-        <div className="active-workout-rest__actions app-action-group">
-          <button
-            {...glassProps('clear', true)}
-            type="button"
-            className="secondary"
-            onClick={() => setCompletedNotice(null)}
-          >
-            Скрыть
-          </button>
-        </div>
-      </aside>
-    );
-  }
+
+  useEffect(() => {
+    if (!completedNotice || (compact && !dismissRequested)) return;
+    const outside = (target: EventTarget | null) =>
+      target instanceof Node && !panel.current?.contains(target);
+    const settle = () => {
+      if (pressedPointers.current.size) return;
+      const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
+      if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
+      if (dismissRequested) setCompletedNotice(null);
+      else setCompact(true);
+    };
+    const click = (event: MouseEvent) => {
+      if (outside(event.target)) settle();
+    };
+    const focus = (event: FocusEvent) => {
+      if (outside(event.target)) settle();
+    };
+    // Keep the old hit surface until a separate outside action or a cancelled scroll gesture.
+    document.addEventListener('click', click);
+    document.addEventListener('focusin', focus);
+    document.addEventListener('pointercancel', settle);
+    document.addEventListener('wheel', settle, { passive: true });
+    return () => {
+      document.removeEventListener('click', click);
+      document.removeEventListener('focusin', focus);
+      document.removeEventListener('pointercancel', settle);
+      document.removeEventListener('wheel', settle);
+    };
+  }, [compact, completedNotice, dismissRequested]);
+  useLayoutEffect(() => {
+    const anchor = layoutAnchor.current;
+    layoutAnchor.current = null;
+    if (anchor?.element.isConnected) {
+      const delta = anchor.element.getBoundingClientRect().top - anchor.top;
+      if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+    }
+  }, [compact, completedNotice]);
+
+  if (!deadline && !completedNotice) return null;
   return (
     <aside
+      ref={panel}
       {...glassProps('tinted')}
-      className="active-workout-rest"
-      role="timer"
-      aria-live="polite"
+      className={`active-workout-rest${completedNotice ? ' active-workout-rest--complete' : ''}${compact ? ' is-compact' : ''}`}
+      aria-label="Отдых между подходами"
+      onMouseDown={(event) => {
+        if (event.target instanceof Element && event.target.closest('button'))
+          event.preventDefault();
+      }}
+      onClick={(event) => event.stopPropagation()}
     >
-      <div className="active-workout-rest__time">
+      <div className="active-workout-rest__time" hidden={compact}>
         <span>Отдых</span>
-        <strong>
+        <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
         </strong>
       </div>
-      <span className="active-workout-rest__next">Дальше: {nextLabel}</span>
-      <div className="active-workout-rest__actions app-action-group">
-        <button
-          {...glassProps('clear', true)}
+      <div className="active-workout-rest__next" hidden={compact}>
+        <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
+        <span>{nextPosition}</span>
+      </div>
+      <div className="active-workout-rest__actions" hidden={compact}>
+        {[30, 60].map((extraSeconds) => (
+          <Button
+            key={extraSeconds}
+            type="button"
+            glass="clear"
+            variant="secondary"
+            aria-disabled={Boolean(completedNotice)}
+            tabIndex={completedNotice ? -1 : undefined}
+            onClick={() => {
+              if (!deadline || completedNotice) return;
+              const currentTime = Date.now();
+              const nextDeadline = Math.max(deadline, currentTime) + extraSeconds * 1000;
+              setNow(currentTime);
+              setDeadline(nextDeadline);
+              writeStorage(storageKey, nextDeadline);
+              setAnnouncement(`К отдыху добавлено ${extraSeconds} секунд`);
+            }}
+          >
+            +{extraSeconds} сек
+          </Button>
+        ))}
+        <Button
           type="button"
-          className="secondary"
+          glass="clear"
+          variant="secondary"
+          aria-disabled={Boolean(completedNotice)}
+          tabIndex={completedNotice ? -1 : undefined}
           onClick={() => {
-            const nextDeadline = deadline + 30_000;
-            setDeadline(nextDeadline);
-            writeStorage(storageKey, nextDeadline);
-          }}
-        >
-          +30 сек
-        </button>
-        <button
-          {...glassProps('clear', true)}
-          type="button"
-          className="secondary"
-          onClick={() => {
+            if (completedNotice) return;
             removeStorage(storageKey);
             setDeadline(0);
-            setCompletedNotice(null);
+            setNow(Date.now());
+            setCompletedNotice(`Отдых пропущен · ${nextPosition}`);
+            setCompact(false);
           }}
         >
           Пропустить
-        </button>
+        </Button>
       </div>
+      {compact && (
+        <>
+          <span className="active-workout-rest__complete-copy">
+            {dismissRequested ? 'Сообщение скрыто' : completedNotice}
+          </span>
+          <Button
+            type="button"
+            variant="secondary"
+            glass="clear"
+            aria-disabled={dismissRequested}
+            onClick={() => setDismissRequested(true)}
+          >
+            {dismissRequested ? 'Скрыто' : 'Скрыть'}
+          </Button>
+        </>
+      )}
+      <span className="sr-only" role="status" aria-atomic="true">
+        {completedNotice ?? announcement}
+      </span>
     </aside>
   );
 }
@@ -1371,18 +1501,92 @@ export function TodayWorkout({
     }
   }, [clearActiveState, pendingActiveCount, user, workout.error]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!currentSetId || completed === 0) return;
-    const currentElement = document.querySelector<HTMLElement>(
-      `[data-workout-set-id="${currentSetId}"]`,
-    );
-    if (!currentElement) return;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const getCurrentElement = () =>
+      document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
+    const currentElement = getCurrentElement();
+    if (!currentElement) return;
     currentElement.scrollIntoView?.({
       behavior: reducedMotion ? 'auto' : 'smooth',
-      block: 'nearest',
+      // Keep the newly active set away from the fixed mobile dock.
+      block: 'center',
     });
+
+    const settleDockClearance = () => {
+      const activeElement = getCurrentElement();
+      if (!activeElement) return;
+      const navigation = document.getElementById('appBottomNav');
+      if (!navigation || window.matchMedia?.('(min-width: 900px)').matches) return;
+      const doneControls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
+      );
+      const currentIndex = doneControls.findIndex((control) => activeElement.contains(control));
+      const nextControl = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
+      const navigationTop = navigation.getBoundingClientRect().top;
+      const currentControls = Array.from(
+        activeElement.querySelectorAll<HTMLElement>('input, button, select, textarea, summary'),
+      ).filter((control) => {
+        const rect = control.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0 && rect.bottom > 0;
+      });
+      const nextRect = nextControl?.getBoundingClientRect();
+      const controlsToClear = [
+        ...currentControls,
+        ...(nextControl && nextRect && nextRect.top < window.innerHeight ? [nextControl] : []),
+      ];
+      if (!controlsToClear.length) return;
+      const overlap = Math.max(
+        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - navigationTop),
+      );
+      if (overlap <= 0) return;
+      window.scrollBy({
+        top: overlap + 8,
+        behavior: reducedMotion ? 'auto' : 'smooth',
+      });
+    };
+    // A pending workout sync can replace the set row before the next frame. Re-querying
+    // there keeps the clearance pass attached to the committed row instead of a detached node.
+    window.requestAnimationFrame(settleDockClearance);
+    window.setTimeout(settleDockClearance, 0);
   }, [completed, currentSetId]);
+
+  // The queue acknowledgement can restore the browser's pre-submit scroll position.
+  // Reconcile the active completion control after that final render while rest is visible.
+  useEffect(() => {
+    if (!currentSetId || completed === 0 || pendingActiveCount !== 0) return;
+    if (!document.querySelector('.active-workout-rest')) return;
+    const frameId = window.requestAnimationFrame(() => {
+      const currentElement = document.querySelector<HTMLElement>(
+        `[data-workout-set-id="${currentSetId}"]`,
+      );
+      const navigation = document.getElementById('appBottomNav');
+      const done = currentElement?.querySelector<HTMLElement>('[data-workout-field="done"]');
+      if (!currentElement || !navigation || !done) return;
+      done.scrollIntoView?.({
+        behavior: 'auto',
+        block: 'center',
+      });
+      const navigationTop = navigation.getBoundingClientRect().top;
+      const safeBottom = navigationTop - 8;
+      const doneControls = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
+      );
+      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
+      const nextDone = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
+      const nextRect = nextDone?.getBoundingClientRect();
+      const controlsToClear = [
+        done,
+        ...(nextDone && nextRect && nextRect.top < window.innerHeight ? [nextDone] : []),
+      ];
+      const overlap = Math.max(
+        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - safeBottom),
+      );
+      if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frameId);
+  }, [completed, currentSetId, pendingActiveCount]);
 
   if (workout.isLoading)
     return (
@@ -1435,20 +1639,19 @@ export function TodayWorkout({
       ? currentSet.exercise.exercise_title
       : `${currentSet.exercise.exercise_title}, подход ${currentSet.set.set_number}`
     : 'завершить тренировку';
-  const syncText =
-    activeSync.syncState === 'syncing'
+  const syncFailed = activeSync.syncState === 'error' || activeSync.syncState === 'conflict';
+  const syncInProgress = activeSync.syncState === 'syncing';
+  const syncOffline = activeSync.syncState === 'offline';
+  const syncText = syncFailed
+    ? 'Требуется действие'
+    : syncInProgress
       ? 'Синхронизация…'
       : activeSync.pendingCount > 0
-        ? activeSync.syncState === 'offline'
+        ? syncOffline
           ? 'Сохранено на устройстве'
-          : activeSync.syncState === 'error' || activeSync.syncState === 'conflict'
-            ? 'Требуется действие'
-            : 'Сохранение…'
+          : 'Сохранение…'
         : 'Синхронизировано';
-  const syncNeedsAction =
-    activeSync.pendingCount > 0 &&
-    activeSync.syncState !== 'syncing' &&
-    activeSync.syncState !== 'pending';
+  const syncNeedsAction = syncFailed || (activeSync.pendingCount > 0 && syncOffline);
   const adaptationEntry =
     data.status === 'planned' || started ? (
       capabilities.canMutatePrograms ? (
@@ -1518,7 +1721,7 @@ export function TodayWorkout({
                 <strong>{syncText}</strong>
                 {activeSync.message && <span>{activeSync.message}</span>}
               </div>
-              {syncNeedsAction && navigator.onLine && (
+              {syncNeedsAction && activeSync.pendingCount > 0 && navigator.onLine && (
                 <button className="secondary" type="button" onClick={() => void activeSync.retry()}>
                   Повторить
                 </button>
@@ -1546,6 +1749,20 @@ export function TodayWorkout({
         />
 
         {!currentSet && adaptationEntry}
+
+        {user && started && (
+          <RestTimer
+            userId={user.id}
+            workoutId={data.id}
+            nextLabel={nextLabel}
+            nextExercise={currentSet?.exercise.exercise_title ?? 'Завершите тренировку'}
+            nextPosition={
+              currentSet
+                ? `Подход ${currentSet.set.set_number} из ${currentSet.exercise.sets.length}`
+                : 'Все подходы отмечены'
+            }
+          />
+        )}
 
         <div className="active-workout-exercises">
           {data.exercises.map((exercise, exerciseIndex) => {
@@ -1802,7 +2019,9 @@ export function TodayWorkout({
                           previousResult={previousResult}
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
+                          syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
                         />
                       ) : (
@@ -1813,6 +2032,7 @@ export function TodayWorkout({
                           setTotal={exercise.sets.length}
                           prescribedReps={exercise.prescribed_reps}
                           restSeconds={exercise.rest_seconds}
+                          userId={user?.id}
                           disabled={!started}
                           workoutId={data.id}
                           workoutExerciseId={exercise.id}
@@ -1824,7 +2044,9 @@ export function TodayWorkout({
                           previousResult={previousResult}
                           previousValues={previousValues}
                           pending={activeSync.pendingBySet.get(set.id)}
+                          durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
+                          syncFailed={syncFailed}
                           enqueue={activeSync.enqueue}
                         />
                       );
@@ -1900,7 +2122,6 @@ export function TodayWorkout({
         )}
       </section>
 
-      {user && started && <RestTimer userId={user.id} workoutId={data.id} nextLabel={nextLabel} />}
       {guide && (
         <ExerciseGuideDialog
           exerciseId={guide.id}

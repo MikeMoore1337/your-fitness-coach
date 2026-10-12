@@ -1,0 +1,62 @@
+{
+  "runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+  "historical": {
+    "startTime": "2026-10-11T10:14:41.261Z",
+    "duration": 523428.283,
+    "expected": 239,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "failures": [
+    {
+      "title": "P1 immediate completion preserves rir and survives a version conflict",
+      "engine": "webkit",
+      "results": [
+        {
+          "status": "failed",
+          "errors": [
+            {
+              "location": {
+                "file": "/tmp/yfc/frontend/tests/e2e/active-workout-experience.spec.ts",
+                "column": 33,
+                "line": 777
+              },
+              "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoMatchObject\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m\n\n\u001b[32m- Expected  - 1\u001b[39m\n\u001b[31m+ Received  + 1\u001b[39m\n\n\u001b[2m  Object {\u001b[22m\n\u001b[2m    \"actual_reps\": null,\u001b[22m\n\u001b[2m    \"actual_weight\": null,\u001b[22m\n\u001b[2m    \"is_completed\": true,\u001b[22m\n\u001b[32m-   \"rir\": \"2\",\u001b[39m\n\u001b[31m+   \"rir\": null,\u001b[39m\n\u001b[2m  }\u001b[22m\n\n  775 |     await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();\n  776 |     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');\n> 777 |     expect(server.readSet(201)).toMatchObject({\n      |                                 ^\n  778 |       is_completed: true,\n  779 |       actual_weight: edit === 'weight' || edit === 'multiple' ? 42.5 : null,\n  780 |       actual_reps: edit === 'reps' || edit === 'multiple' ? 9 : null,\n    at /tmp/yfc/frontend/tests/e2e/active-workout-experience.spec.ts:777:33"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "native_event_log_in_failed_run": false,
+  "exact_historical_cause": "NOT_DETERMINED",
+  "video_observation": "No visible selected RIR 2 before completion; this does not prove loss of an accepted edit.",
+  "diagnostic_followups": {
+    "rir-linux-triage": {
+      "startTime": "2026-10-11T10:35:02.535Z",
+      "duration": 108537.785,
+      "expected": 40,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "rir-linux-triage-200": {
+      "startTime": "2026-10-11T10:43:16.603Z",
+      "duration": 494383.18200000003,
+      "expected": 200,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "final": {
+    "startTime": "2026-10-11T10:52:44.266Z",
+    "duration": 553601.9099999999,
+    "expected": 256,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "test_improvement": "Native click followed by immediate non-retrying aria-pressed assertion; no sleep or second click."
+}

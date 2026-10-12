@@ -107,6 +107,8 @@ describe('WorkoutAdaptation', () => {
 
     await openTimePreview(user);
 
+    expect(screen.getByRole('heading', { name: 'Что изменится' })).toHaveFocus();
+
     const comparison = screen.getByRole('list', { name: 'Сравнение тренировки' });
     expect(within(comparison).getByText('32 мин')).toBeInTheDocument();
     expect(within(comparison).getByText('18 мин')).toBeInTheDocument();
@@ -180,9 +182,9 @@ describe('WorkoutAdaptation', () => {
   });
 
   it('показывает честный missing-alternative state', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify([]), { status: 200 }),
-    );
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify([]), { status: 200 }));
     const user = userEvent.setup();
     renderAdaptation();
 
@@ -194,6 +196,11 @@ describe('WorkoutAdaptation', () => {
     expect(
       await screen.findByText(/Для выбранного оборудования нет проверенной замены/),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Показать изменения' }));
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('Для выбранного оборудования нет проверенной замены.');
+    expect(error).toHaveFocus();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/adaptations/'))).toBe(false);
   });
 
   it('во время тренировки оставляет только controlled safety boundary', async () => {

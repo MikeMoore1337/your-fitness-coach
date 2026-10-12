@@ -1,4 +1,5 @@
 import ast
+import hashlib
 import io
 import json
 import os
@@ -1118,6 +1119,25 @@ def test_aggregate_results_marks_missing_suite_incomplete_with_visible_failure(
         allure_report.finalize(
             metadata_path=metadata_path,
             publication_path=tmp_path / "publication.json",
+        )
+
+
+def test_synthetic_failure_history_is_stable_and_separates_runs_and_issues() -> None:
+    arguments = {
+        "issue": "missing frontend-checks",
+        "run_id": "12345",
+        "run_kind": "daily",
+        "tier": "daily-regression",
+        "now": datetime(2026, 9, 7, tzinfo=UTC),
+    }
+    result = allure_report._synthetic_failure(**arguments)
+    assert result["status"] == "failed"
+    assert result["historyId"] == hashlib.sha256(str(result["uuid"]).encode()).hexdigest()
+    assert allure_report._synthetic_failure(**arguments)["historyId"] == result["historyId"]
+    for changed in ({"run_id": "12346"}, {"issue": "missing mobile-webkit"}):
+        assert (
+            allure_report._synthetic_failure(**(arguments | changed))["historyId"]
+            != result["historyId"]
         )
 
 

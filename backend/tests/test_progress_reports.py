@@ -21,6 +21,14 @@ from fitminiapp_api.services import progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
 
 
+def test_report_fonts_use_packaged_inter_and_oswald_with_cyrillic() -> None:
+    regular, bold, display = progress_report_pdf._register_fonts()
+    for name, family in [(regular, b"Inter"), (bold, b"Inter"), (display, b"Oswald")]:
+        face = progress_report_pdf.pdfmetrics.getFont(name).face
+        assert face.familyName == family
+        assert all(face.charToGlyph.get(ord(char)) for char in "ПрогрессЁёABC123№—−")
+
+
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/dev-login",
@@ -409,3 +417,63 @@ def test_coach_progress_report_download_rechecks_active_relationship(client) -> 
 
     revoked = client.get(file_url)
     assert revoked.status_code == 404
+
+
+def test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_single_record(
+    client, monkeypatch
+) -> None:
+    """Однократный замер нельзя выдавать за изменение; PDF берёт факты из API."""
+
+    headers = _auth(client, 67_073)
+    _seed_report_data(_user_id(67_073))
+    today = today_msk()
+    params = {
+        "period": "custom",
+        "date_from": (today - timedelta(days=6)).isoformat(),
+        "date_to": today.isoformat(),
+    }
+    api_response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+    assert api_response.status_code == 200, api_response.text
+    report = api_response.json()
+    trends = report["body"]["trends"]
+    assert trends, "Тест должен содержать хотя бы один замер"
+    assert all(item["change"] is None for item in trends)
+    assert all(item["first_measured_on"] == item["latest_measured_on"] for item in trends)
+
+    rendered_paragraphs: list[str] = []
+    original_paragraph = progress_report_pdf.Paragraph
+
+    def capture_paragraph(text, style, *args, **kwargs):
+        rendered_paragraphs.append(str(text))
+        return original_paragraph(text, style, *args, **kwargs)
+
+    monkeypatch.setattr(progress_report_pdf, "Paragraph", capture_paragraph)
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params=params,
+        headers=headers,
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.headers["content-type"].startswith("application/pdf")
+    assert downloaded.content.startswith(b"%PDF-")
+
+    rendered = "\n".join(rendered_paragraphs)
+    training = report["training"]
+    assert f"{training['completed_workouts']} / {training['planned_workouts']}" in rendered
+    assert f"Завершено: {training['completed_workouts']}" in rendered
+    assert f"Пропущено: {training['skipped_workouts']}" in rendered
+    assert progress_report_pdf._number(training["external_load_volume_kg"], " кг") in rendered
+    for item in trends:
+        _label, unit = progress_report_pdf._body_metric(
+            item["metric"], label=item.get("label"), unit=item.get("unit")
+        )
+        expected_value = progress_report_pdf._number(item["latest_value"], unit)
+        assert sum(expected_value in paragraph for paragraph in rendered_paragraphs) >= 2
+    assert sum(paragraph == "—" for paragraph in rendered_paragraphs) >= len(trends)
+
+    assert "Содержимое дневника не должно попасть в отчёт" not in rendered
+    assert report["check_ins"][0]["note"] in rendered
+    assert "user_id" not in rendered
+    assert "telegram_user_id" not in rendered

@@ -565,7 +565,6 @@ export default function MiniAppPage({
                 nutritionDate,
                 nutritionMeal,
                 nutritionQuickAdd,
-                nutritionHydrationOpen,
               ])}
               initial={user?.profile?.kbju}
               initialDate={nutritionDate}
@@ -616,6 +615,7 @@ export default function MiniAppPage({
                   aria-label="Разделы профиля"
                 >
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-personal' ? ' is-active' : ''
                     }`}
@@ -639,6 +639,7 @@ export default function MiniAppPage({
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-fitness' ? ' is-active' : ''
                     }`}
@@ -656,6 +657,7 @@ export default function MiniAppPage({
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-trainer' ? ' is-active' : ''
                     }`}
@@ -673,6 +675,7 @@ export default function MiniAppPage({
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-notifications' ? ' is-active' : ''
                     }`}
@@ -690,6 +693,7 @@ export default function MiniAppPage({
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-security' ? ' is-active' : ''
                     }`}
@@ -711,6 +715,7 @@ export default function MiniAppPage({
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
                   <a
+                    data-yfc-choice="compact"
                     className={`profile-settings-nav__item${
                       activeProfileNavTarget === 'profile-ai-coach' ? ' is-active' : ''
                     }`}

@@ -338,6 +338,7 @@ describe('AssignedProgramDetails', () => {
     const reason = await screen.findByLabelText('Причина для истории');
     expect(reason).toBeVisible();
     fireEvent.change(reason, { target: { value: 'Готов перейти к следующему блоку' } });
+    fireEvent.click(screen.getByText('Действия с этапом'));
     fireEvent.click(screen.getByRole('button', { name: 'Перейти к следующему блоку' }));
 
     await waitFor(() =>
@@ -372,6 +373,7 @@ describe('AssignedProgramDetails', () => {
     const reason = await screen.findByLabelText('Причина для истории');
     expect(reason).toBeVisible();
     fireEvent.change(reason, { target: { value: 'Повторить блок с меньшей нагрузкой' } });
+    fireEvent.click(screen.getByText('Действия с этапом'));
     fireEvent.click(screen.getByRole('button', { name: 'Повторить блок' }));
 
     await waitFor(() =>

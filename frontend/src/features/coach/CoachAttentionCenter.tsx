@@ -146,6 +146,8 @@ export function CoachAttentionCenter({
             ).map(([value, label]) => (
               <button
                 className={filter === value ? 'is-active' : undefined}
+                aria-pressed={filter === value}
+                data-yfc-choice="compact"
                 key={value}
                 onClick={() => setFilter(value)}
                 type="button"

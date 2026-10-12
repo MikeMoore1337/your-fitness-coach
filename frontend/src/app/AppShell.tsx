@@ -250,6 +250,8 @@ export function AppShell({
   const resolvedBrandTo = demo ? brandTo : personalDestinationWithTrainerReturn(brandTo, search);
   const shellVisible = Boolean(user || demo);
   const quickAddVisible = shellVisible && (Boolean(demo) || section !== undefined);
+  const embeddedQuickAddVisible = quickAddVisible && mobileNavigation && !demo;
+  const floatingQuickAddVisible = quickAddVisible && !embeddedQuickAddVisible;
   const morePresent = moreOpen || morePresence.present;
   const moreSurfacePresent = morePresent && (Boolean(demo) || mobileNavigation);
   const accountDestinations = [
@@ -443,7 +445,7 @@ export function AppShell({
           </header>
         )}
         {showPwaInstallPrompt && <PwaInstallPrompt />}
-        {quickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
+        {floatingQuickAddVisible && <QuickAddTrigger onOpen={openQuickAdd} />}
         {quickAddVisible && (
           <QuickAddSheet
             actions={quickAddLinks}
@@ -461,7 +463,7 @@ export function AppShell({
           <>
             <nav
               id="appBottomNav"
-              {...glassProps()}
+              {...glassProps('regular', true)}
               className={`app-bottom-nav${demo ? ' app-bottom-nav--demo' : ''}`}
               aria-label="Основная навигация"
             >
@@ -477,6 +479,7 @@ export function AppShell({
                 <div className="app-bottom-nav__profile-slot">
                   <AppLink
                     id="appAccountProfileLink"
+                    data-yfc-choice="compact"
                     to={
                       demo?.accountTo ??
                       personalDestinationWithTrainerReturn('/app?section=profile', search)
@@ -541,7 +544,7 @@ export function AppShell({
                           ? ' app-bottom-nav__btn--mobile-hidden'
                           : ''
                       }`}
-                      {...(active ? glassProps('clear', true) : {})}
+                      data-yfc-choice="capsule"
                       aria-current={active ? 'page' : undefined}
                       onClick={() => {
                         trackSectionNavigation(destinationTo);
@@ -566,6 +569,7 @@ export function AppShell({
                     <span className="app-bottom-nav__label">Сценарии</span>
                   </button>
                 )}
+                {embeddedQuickAddVisible && <QuickAddTrigger inNavigation onOpen={openQuickAdd} />}
               </div>
 
               {!demo && (
@@ -596,7 +600,7 @@ export function AppShell({
                               key={destination.key}
                               to={personalDestinationWithTrainerReturn(destination.to, search)}
                               className={`app-bottom-nav__btn${active ? ' is-active' : ''}`}
-                              {...(active ? glassProps('clear', true) : {})}
+                              data-yfc-choice="compact"
                               aria-current={active ? 'page' : undefined}
                               onClick={() =>
                                 trackSectionNavigation(
@@ -763,6 +767,7 @@ export function AppShell({
                             key={destination.key}
                             to={personalDestinationWithTrainerReturn(destination.to, search)}
                             className="app-more-panel__item"
+                            data-yfc-choice="compact"
                             aria-current={active ? 'page' : undefined}
                             onClick={() => {
                               trackSectionNavigation(

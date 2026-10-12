@@ -1,0 +1,676 @@
+[
+  {
+    "engine": "chromium",
+    "input": "Playwright touchscreen, not physical device",
+    "source_commit": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+    "geometry": {
+      "point": {
+        "x": 101.25,
+        "y": 99.203125
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.203125,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.203125,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.203125,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.203125,
+        "right": 192.5,
+        "bottom": 96.203125,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.078125,
+        "width": 369,
+        "height": 48,
+        "top": 75.078125,
+        "right": 381,
+        "bottom": 123.078125,
+        "left": 12
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Готово",
+        "set": "201"
+      },
+      "pointerEvents": "none"
+    },
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "/api/v1/workouts/sets/201",
+        "body": {
+          "actual_reps": 8,
+          "actual_weight": 40,
+          "rir": null,
+          "set_kind": "working",
+          "reached_failure": false,
+          "is_completed": false,
+          "expected_version": 2
+        }
+      }
+    ],
+    "events": [
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101.25,
+        "y": 99.203125,
+        "scrollY": 1862
+      },
+      {
+        "type": "click",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1862
+      }
+    ]
+  },
+  {
+    "engine": "webkit",
+    "input": "Playwright touchscreen, not physical device",
+    "source_commit": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+    "geometry": {
+      "point": {
+        "x": 101.25,
+        "y": 99.1875
+      },
+      "panel": {
+        "x": 0,
+        "y": 0,
+        "width": 393,
+        "height": 107.1875,
+        "top": 0,
+        "right": 393,
+        "bottom": 107.1875,
+        "left": 0
+      },
+      "button": {
+        "x": 10,
+        "y": 52.1875,
+        "width": 182.5,
+        "height": 44,
+        "top": 52.1875,
+        "right": 192.5,
+        "bottom": 96.1875,
+        "left": 10
+      },
+      "under": {
+        "x": 12,
+        "y": 75.84375,
+        "width": 369,
+        "height": 48,
+        "top": 75.84375,
+        "right": 381,
+        "bottom": 123.84375,
+        "left": 12
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Готово",
+        "set": "201"
+      },
+      "pointerEvents": "none"
+    },
+    "writes": [
+      {
+        "method": "PATCH",
+        "path": "/api/v1/workouts/sets/201",
+        "body": {
+          "actual_reps": 8,
+          "actual_weight": 40,
+          "rir": null,
+          "set_kind": "working",
+          "reached_failure": false,
+          "is_completed": false,
+          "expected_version": 2
+        }
+      }
+    ],
+    "events": [
+      {
+        "type": "pointerdown",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchstart",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "pointerup",
+        "pointerType": "touch",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "touchend",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      },
+      {
+        "type": "click",
+        "pointerType": "mouse",
+        "target": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "hit": {
+          "tag": "BUTTON",
+          "text": "Готово",
+          "class": "ui-button ui-button--secondary active-workout-set__done",
+          "set": "201"
+        },
+        "path": [
+          {
+            "tag": "BUTTON",
+            "text": "Готово",
+            "class": "ui-button ui-button--secondary active-workout-set__done",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "Вес, кгПовторы Готово",
+            "class": "active-workout-set__controls",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-set is-completed",
+            "set": "201"
+          },
+          {
+            "tag": "DIV",
+            "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+            "class": "active-workout-exercise__sets"
+          },
+          {
+            "tag": "DIV",
+            "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+            "class": ""
+          },
+          {
+            "tag": "ARTICLE",
+            "text": "Упражнение 1 из 1Жим штанги лёжа3 × 8–10 · отдых 90 секСохраняйте устойчивое пол",
+            "class": "active-workout-exercise is-current  "
+          }
+        ],
+        "active": "202",
+        "x": 101,
+        "y": 99,
+        "scrollY": 1861
+      }
+    ]
+  }
+]

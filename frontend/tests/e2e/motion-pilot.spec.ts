@@ -382,7 +382,7 @@ test('workout confirmation and Nutrition add keep final production state immedia
       bottom: box.bottom,
     };
   });
-  expect(restGeometry.background).toBe('rgba(248, 250, 250, 0.92)');
+  expect(restGeometry.background).toBe('rgba(248, 250, 250, 0.96)');
   const completedExercise = page.locator('.active-workout-exercise').first();
   await expect(completedExercise.getByRole('button', { name: '1 из 1 сохранено' })).toBeVisible();
   expect(restGeometry.bottom).toBeLessThanOrEqual(
@@ -393,7 +393,7 @@ test('workout confirmation and Nutrition add keep final production state immedia
   await page.getByRole('link', { name: 'Питание', exact: true }).click();
   const breakfast = page.getByRole('region', { name: 'Завтрак' });
   await breakfast.getByRole('button', { name: /Добавить/ }).click();
-  await page.getByRole('button', { name: 'Добавить Овсяная каша' }).click();
+  await page.getByRole('button', { name: 'Выбрать Овсяная каша' }).click();
   await page.getByRole('button', { name: 'Добавить в дневник' }).click();
   const addedEntry = page.locator('.nutrition-entry').filter({ hasText: 'Овсяная каша' });
   await expect(addedEntry).toBeVisible();

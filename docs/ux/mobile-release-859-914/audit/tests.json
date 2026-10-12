@@ -1,0 +1,2267 @@
+{
+  "runtime": "7f78f0d7a28e9db0688fe763556b28ce9ba411a6",
+  "additional_functional_runtime": "4a4d2e5540fac5545645b3ad94fd000096a57f4e",
+  "functional_runtime_logic_equal": true,
+  "functional_runtime_diff": [
+    "frontend/src/styles/liquid-glass.css"
+  ],
+  "stats": {
+    "startTime": "2026-10-11T11:17:56.252Z",
+    "duration": 520135.593,
+    "expected": 208,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "additional": {
+    "mobile-goldens": {
+      "startTime": "2026-10-11T11:26:36.979Z",
+      "duration": 31302.263000000003,
+      "expected": 10,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "ancillary": {
+      "startTime": "2026-10-11T11:27:08.886Z",
+      "duration": 62805.652,
+      "expected": 23,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0
+    },
+    "catalog": {
+      "startTime": "2026-10-11T11:29:50.961Z",
+      "duration": 17057.702,
+      "expected": 2,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "ancillary-initial": {
+      "startTime": "2026-10-11T11:27:08.886Z",
+      "duration": 62805.652,
+      "expected": 23,
+      "skipped": 0,
+      "unexpected": 1,
+      "flaky": 0,
+      "classification": "PRE_EXISTING_PERFORMANCE_FAILURE_OUTSIDE_SCOPE"
+    },
+    "ancillary-rerun": {
+      "expected": 0,
+      "unexpected": 3,
+      "flaky": 0,
+      "classification": "PRE_EXISTING_PERFORMANCE_FAILURE_OUTSIDE_SCOPE",
+      "log": "ancillary-rerun/ancillary-rerun.log"
+    },
+    "p1-stress": {
+      "startTime": "2026-10-11T10:52:44.266Z",
+      "duration": 553601.9099999999,
+      "expected": 256,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "windows-mobile-goldens": {
+      "startTime": "2026-10-11T11:14:46.003Z",
+      "duration": 26559.206,
+      "expected": 10,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "p1-late-read": {
+      "startTime": "2026-10-11T10:17:46.825Z",
+      "duration": 32976.901999999995,
+      "expected": 16,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "p1-protocol": {
+      "expected": 36,
+      "unexpected": 0,
+      "flaky": 0
+    }
+  },
+  "history": "p1-stress-history.json",
+  "cases": [
+    {
+      "title": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3262
+    },
+    {
+      "title": "P1 immediate completion preserves weight and survives a version conflict",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2967
+    },
+    {
+      "title": "P1 immediate completion preserves reps and survives a version conflict",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2809
+    },
+    {
+      "title": "P1 immediate completion preserves rir and survives a version conflict",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2802
+    },
+    {
+      "title": "P1 immediate completion preserves multiple and survives a version conflict",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3662
+    },
+    {
+      "title": "P1 rejected completion does not start rest and retries without undoing the set dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2986
+    },
+    {
+      "title": "P1 rejected completion does not start rest and retries without undoing the set light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2873
+    },
+    {
+      "title": "P1 offline durable working completion restores after reload and reconnect",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4653
+    },
+    {
+      "title": "P1 offline durable warmup completion restores after reload and reconnect",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4597
+    },
+    {
+      "title": "P1 offline durable activation completion restores after reload and reconnect",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4672
+    },
+    {
+      "title": "P1 completion evidence 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2602
+    },
+    {
+      "title": "P1 completion evidence 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2667
+    },
+    {
+      "title": "P1 completion evidence 360px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2807
+    },
+    {
+      "title": "P1 completion evidence 360px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3400
+    },
+    {
+      "title": "P1 completion evidence 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3424
+    },
+    {
+      "title": "P1 completion evidence 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2972
+    },
+    {
+      "title": "P1 completion evidence 430px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2999
+    },
+    {
+      "title": "P1 completion evidence 430px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3496
+    },
+    {
+      "title": "P1 sequential completions reach the final workout set without duplicate timers",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4225
+    },
+    {
+      "title": "P1 completion preserves rest when navigation unmounts the pending workout",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3298
+    },
+    {
+      "title": "P1 storage rejection keeps fields and current set without rest dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3046
+    },
+    {
+      "title": "P1 storage rejection keeps fields and current set without rest light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3009
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2957
+    },
+    {
+      "title": "P1 combined API and storage failure never claims durable completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2950
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3053
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2872
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 360px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2943
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 360px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2873
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2842
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2823
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 430px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2878
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 430px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2810
+    },
+    {
+      "title": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7332
+    },
+    {
+      "title": "P1 immediate completion preserves weight and survives a version conflict",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4072
+    },
+    {
+      "title": "P1 immediate completion preserves reps and survives a version conflict",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3819
+    },
+    {
+      "title": "P1 immediate completion preserves rir and survives a version conflict",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4286
+    },
+    {
+      "title": "P1 immediate completion preserves multiple and survives a version conflict",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4549
+    },
+    {
+      "title": "P1 rejected completion does not start rest and retries without undoing the set dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4589
+    },
+    {
+      "title": "P1 rejected completion does not start rest and retries without undoing the set light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4811
+    },
+    {
+      "title": "P1 offline durable working completion restores after reload and reconnect",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5890
+    },
+    {
+      "title": "P1 offline durable warmup completion restores after reload and reconnect",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6310
+    },
+    {
+      "title": "P1 offline durable activation completion restores after reload and reconnect",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5395
+    },
+    {
+      "title": "P1 completion evidence 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5410
+    },
+    {
+      "title": "P1 completion evidence 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5236
+    },
+    {
+      "title": "P1 completion evidence 360px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5252
+    },
+    {
+      "title": "P1 completion evidence 360px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5447
+    },
+    {
+      "title": "P1 completion evidence 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5458
+    },
+    {
+      "title": "P1 completion evidence 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5395
+    },
+    {
+      "title": "P1 completion evidence 430px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6099
+    },
+    {
+      "title": "P1 completion evidence 430px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5495
+    },
+    {
+      "title": "P1 sequential completions reach the final workout set without duplicate timers",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7753
+    },
+    {
+      "title": "P1 completion preserves rest when navigation unmounts the pending workout",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6377
+    },
+    {
+      "title": "P1 storage rejection keeps fields and current set without rest dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4231
+    },
+    {
+      "title": "P1 storage rejection keeps fields and current set without rest light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4195
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4774
+    },
+    {
+      "title": "P1 combined API and storage failure never claims durable completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4316
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4551
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4736
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 360px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4375
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 360px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4517
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4589
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4674
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 430px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4572
+    },
+    {
+      "title": "resting active workout keeps the next set clear of the dock at 430px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4622
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3461
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2998
+    },
+    {
+      "title": "actions and skip preserve the current set at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3479
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3437
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2824
+    },
+    {
+      "title": "actions and skip preserve the current set at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3369
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3464
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 360px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2891
+    },
+    {
+      "title": "actions and skip preserve the current set at 360px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3460
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3435
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 360px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2868
+    },
+    {
+      "title": "actions and skip preserve the current set at 360px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3360
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3404
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2878
+    },
+    {
+      "title": "actions and skip preserve the current set at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3432
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3429
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2788
+    },
+    {
+      "title": "actions and skip preserve the current set at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3343
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3500
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 430px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2842
+    },
+    {
+      "title": "actions and skip preserve the current set at 430px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3467
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3490
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 430px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2871
+    },
+    {
+      "title": "actions and skip preserve the current set at 430px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3452
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2274
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 320px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3839
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2378
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 320px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3818
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2377
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 393px dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3781
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2346
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 393px light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3724
+    },
+    {
+      "title": "rapid skip alone blocks the 202→201 PATCH regression after the panel closes",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2818
+    },
+    {
+      "title": "expiry retains a pressed control and its hit surface until another gesture",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2959
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6097
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3774
+    },
+    {
+      "title": "actions and skip preserve the current set at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6024
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6320
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3712
+    },
+    {
+      "title": "actions and skip preserve the current set at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7269
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6826
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 360px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3894
+    },
+    {
+      "title": "actions and skip preserve the current set at 360px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7178
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6891
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 360px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4094
+    },
+    {
+      "title": "actions and skip preserve the current set at 360px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6991
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6685
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4009
+    },
+    {
+      "title": "actions and skip preserve the current set at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7413
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6676
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4263
+    },
+    {
+      "title": "actions and skip preserve the current set at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7512
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6520
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 430px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4221
+    },
+    {
+      "title": "actions and skip preserve the current set at 430px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 8210
+    },
+    {
+      "title": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7398
+    },
+    {
+      "title": "painted padding blocks the 202→201 PATCH regression at 430px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4183
+    },
+    {
+      "title": "actions and skip preserve the current set at 430px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 8299
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5193
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 320px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5690
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4386
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 320px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5772
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4516
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 393px dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5849
+    },
+    {
+      "title": "TMA resume offline and keyboard retain the set at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4808
+    },
+    {
+      "title": "Web reload restores the scoped timer and current set at 393px light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5382
+    },
+    {
+      "title": "rapid skip alone blocks the 202→201 PATCH regression after the panel closes",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4407
+    },
+    {
+      "title": "expiry retains a pressed control and its hit surface until another gesture",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5090
+    },
+    {
+      "title": "цветовая система сохраняет иерархию в светлой и тёмной темах",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2474
+    },
+    {
+      "title": "цветовая система сохраняет иерархию в светлой и тёмной темах",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 2429
+    },
+    {
+      "title": "approved B navigation and quick add 320 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 7105
+    },
+    {
+      "title": "approved B navigation and quick add 320 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 6536
+    },
+    {
+      "title": "approved B navigation and quick add 360 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 7500
+    },
+    {
+      "title": "approved B navigation and quick add 360 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 7376
+    },
+    {
+      "title": "approved B navigation and quick add 393 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 6900
+    },
+    {
+      "title": "approved B navigation and quick add 393 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 6392
+    },
+    {
+      "title": "approved B navigation and quick add 430 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 6983
+    },
+    {
+      "title": "approved B navigation and quick add 430 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 7230
+    },
+    {
+      "title": "approved B quick add fits short TMA viewport and native Back restores focus",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1013
+    },
+    {
+      "title": "approved B mobile picker preserves editor draft and supports keyboard search",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1858
+    },
+    {
+      "title": "approved B completed exercise keeps inset content and a compact empty setup",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1586
+    },
+    {
+      "title": "approved B navigation and quick add 320 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 13577
+    },
+    {
+      "title": "approved B navigation and quick add 320 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 13351
+    },
+    {
+      "title": "approved B navigation and quick add 360 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 13688
+    },
+    {
+      "title": "approved B navigation and quick add 360 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 13590
+    },
+    {
+      "title": "approved B navigation and quick add 393 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 14208
+    },
+    {
+      "title": "approved B navigation and quick add 393 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 14203
+    },
+    {
+      "title": "approved B navigation and quick add 430 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 15087
+    },
+    {
+      "title": "approved B navigation and quick add 430 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 15014
+    },
+    {
+      "title": "approved B quick add fits short TMA viewport and native Back restores focus",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 2777
+    },
+    {
+      "title": "approved B mobile picker preserves editor draft and supports keyboard search",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5484
+    },
+    {
+      "title": "approved B completed exercise keeps inset content and a compact empty setup",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3024
+    },
+    {
+      "title": "unified selected controls in Coach OS 320 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2026
+    },
+    {
+      "title": "unified selected controls in Coach OS 320 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2008
+    },
+    {
+      "title": "unified selected controls in Coach OS 360 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1988
+    },
+    {
+      "title": "unified selected controls in Coach OS 360 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1995
+    },
+    {
+      "title": "unified selected controls in Coach OS 393 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2010
+    },
+    {
+      "title": "unified selected controls in Coach OS 393 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2028
+    },
+    {
+      "title": "unified selected controls in Coach OS 430 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2048
+    },
+    {
+      "title": "unified selected controls in Coach OS 430 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2111
+    },
+    {
+      "title": "unified selected controls in Coach OS 1280 dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2166
+    },
+    {
+      "title": "unified selected controls in Coach OS 1280 light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2202
+    },
+    {
+      "title": "операционный roster даёт факты и не загружает полную историю заранее",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2597
+    },
+    {
+      "title": "unified selected controls in Coach OS 320 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3806
+    },
+    {
+      "title": "unified selected controls in Coach OS 320 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3338
+    },
+    {
+      "title": "unified selected controls in Coach OS 360 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3158
+    },
+    {
+      "title": "unified selected controls in Coach OS 360 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3190
+    },
+    {
+      "title": "unified selected controls in Coach OS 393 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3309
+    },
+    {
+      "title": "unified selected controls in Coach OS 393 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3271
+    },
+    {
+      "title": "unified selected controls in Coach OS 430 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3175
+    },
+    {
+      "title": "unified selected controls in Coach OS 430 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 3705
+    },
+    {
+      "title": "unified selected controls in Coach OS 1280 dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4693
+    },
+    {
+      "title": "unified selected controls in Coach OS 1280 light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5278
+    },
+    {
+      "title": "операционный roster даёт факты и не загружает полную историю заранее",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6714
+    },
+    {
+      "title": "glass contrast, progress clarity and material fallbacks dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2589
+    },
+    {
+      "title": "glass TMA safe areas, keyboard and reachable bottom content dark",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 16801
+    },
+    {
+      "title": "glass contrast, progress clarity and material fallbacks light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2467
+    },
+    {
+      "title": "glass TMA safe areas, keyboard and reachable bottom content light",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 16708
+    },
+    {
+      "title": "glass contrast, progress clarity and material fallbacks dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 8117
+    },
+    {
+      "title": "glass TMA safe areas, keyboard and reachable bottom content dark",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 12598
+    },
+    {
+      "title": "glass contrast, progress clarity and material fallbacks light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6563
+    },
+    {
+      "title": "glass TMA safe areas, keyboard and reachable bottom content light",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 10404
+    },
+    {
+      "title": "liquid controls light 390",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 6156
+    },
+    {
+      "title": "liquid controls light 768",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3104
+    },
+    {
+      "title": "liquid controls light 1440",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3495
+    },
+    {
+      "title": "liquid controls dark 390",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 5929
+    },
+    {
+      "title": "liquid controls dark 768",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3357
+    },
+    {
+      "title": "liquid controls dark 1440",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 3028
+    },
+    {
+      "title": "liquid controls light 390",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 10789
+    },
+    {
+      "title": "liquid controls light 768",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7079
+    },
+    {
+      "title": "liquid controls light 1440",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7817
+    },
+    {
+      "title": "liquid controls dark 390",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 10872
+    },
+    {
+      "title": "liquid controls dark 768",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6297
+    },
+    {
+      "title": "liquid controls dark 1440",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 7670
+    },
+    {
+      "title": "dark nutrition uses the shared lime status and progress accents",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1075
+    },
+    {
+      "title": "dark nutrition uses the shared lime status and progress accents",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 2296
+    },
+    {
+      "title": "Task 295 keeps Today compact, factual and one-column on mobile",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4217
+    },
+    {
+      "title": "Task 295 keeps empty Today and Progress states distinct from zero",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 10677
+    },
+    {
+      "title": "Task 295 lets populated Progress cards use their content height on mobile and desktop",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 1834
+    },
+    {
+      "title": "Task 295 keeps Profile shortcuts title-first and untruncated at narrow widths",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 4238
+    },
+    {
+      "title": "Task 295 keeps Today compact, factual and one-column on mobile",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 5794
+    },
+    {
+      "title": "Task 295 keeps empty Today and Progress states distinct from zero",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 12077
+    },
+    {
+      "title": "Task 295 lets populated Progress cards use their content height on mobile and desktop",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 2082
+    },
+    {
+      "title": "Task 295 keeps Profile shortcuts title-first and untruncated at narrow widths",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 6296
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2882
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2863
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2907
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2907
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2933
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2989
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2952
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "status": "passed",
+      "duration_ms": 2963
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4076
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4015
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4162
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4053
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4099
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4314
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4192
+    },
+    {
+      "title": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "status": "passed",
+      "duration_ms": 4085
+    }
+  ],
+  "diagnostics": [
+    {
+      "test": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "chromium",
+      "path": "audit/chromium-000-held-autosave.json"
+    },
+    {
+      "test": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "chromium",
+      "path": "audit/chromium-001-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves weight and survives a version conflict",
+      "engine": "chromium",
+      "path": "audit/chromium-002-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves reps and survives a version conflict",
+      "engine": "chromium",
+      "path": "audit/chromium-003-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves rir and survives a version conflict",
+      "engine": "chromium",
+      "path": "audit/chromium-004-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves multiple and survives a version conflict",
+      "engine": "chromium",
+      "path": "audit/chromium-005-completion-network.json"
+    },
+    {
+      "test": "P1 rejected completion does not start rest and retries without undoing the set dark",
+      "engine": "chromium",
+      "path": "audit/chromium-006-completion-network.json"
+    },
+    {
+      "test": "P1 rejected completion does not start rest and retries without undoing the set light",
+      "engine": "chromium",
+      "path": "audit/chromium-007-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable working completion restores after reload and reconnect",
+      "engine": "chromium",
+      "path": "audit/chromium-008-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable warmup completion restores after reload and reconnect",
+      "engine": "chromium",
+      "path": "audit/chromium-009-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable activation completion restores after reload and reconnect",
+      "engine": "chromium",
+      "path": "audit/chromium-010-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-011-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-012-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-013-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-014-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-015-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-016-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-017-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-018-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-019-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-020-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-021-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-022-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-023-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-024-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-025-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-026-completion-network.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-027-late-read.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-028-resting-dock-320-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-029-resting-dock-320-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-030-resting-dock-360-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-031-resting-dock-360-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-032-resting-dock-393-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-033-resting-dock-393-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-034-resting-dock-430-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-035-resting-dock-430-light.json"
+    },
+    {
+      "test": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "webkit",
+      "path": "audit/webkit-036-held-autosave.json"
+    },
+    {
+      "test": "P1 completion waits for acceptance behind an in-flight autosave",
+      "engine": "webkit",
+      "path": "audit/webkit-037-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves weight and survives a version conflict",
+      "engine": "webkit",
+      "path": "audit/webkit-038-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves reps and survives a version conflict",
+      "engine": "webkit",
+      "path": "audit/webkit-039-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves rir and survives a version conflict",
+      "engine": "webkit",
+      "path": "audit/webkit-040-completion-network.json"
+    },
+    {
+      "test": "P1 immediate completion preserves multiple and survives a version conflict",
+      "engine": "webkit",
+      "path": "audit/webkit-041-completion-network.json"
+    },
+    {
+      "test": "P1 rejected completion does not start rest and retries without undoing the set dark",
+      "engine": "webkit",
+      "path": "audit/webkit-042-completion-network.json"
+    },
+    {
+      "test": "P1 rejected completion does not start rest and retries without undoing the set light",
+      "engine": "webkit",
+      "path": "audit/webkit-043-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable working completion restores after reload and reconnect",
+      "engine": "webkit",
+      "path": "audit/webkit-044-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable warmup completion restores after reload and reconnect",
+      "engine": "webkit",
+      "path": "audit/webkit-045-completion-network.json"
+    },
+    {
+      "test": "P1 offline durable activation completion restores after reload and reconnect",
+      "engine": "webkit",
+      "path": "audit/webkit-046-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-047-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-048-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-049-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-050-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-051-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-052-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-053-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-054-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-055-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-056-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-057-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-058-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-059-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-060-completion-network.json"
+    },
+    {
+      "test": "P1 completion evidence 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-061-rest-dock-materials.json"
+    },
+    {
+      "test": "P1 completion evidence 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-062-completion-network.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-063-late-read.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-064-resting-dock-320-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-065-resting-dock-320-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-066-resting-dock-360-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-067-resting-dock-360-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-068-resting-dock-393-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-069-resting-dock-393-light.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-070-resting-dock-430-dark.json"
+    },
+    {
+      "test": "resting active workout keeps the next set clear of the dock at 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-071-resting-dock-430-light.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-072-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-073-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-074-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-075-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-076-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-077-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-078-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-079-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-080-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-081-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-082-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 360px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-083-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-084-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-085-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-086-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 360px light",
+      "engine": "chromium",
+      "path": "audit/chromium-087-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-088-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-089-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-090-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-091-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-092-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-093-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-094-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-095-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-096-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-097-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-098-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 430px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-099-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-100-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-101-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-102-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 430px light",
+      "engine": "chromium",
+      "path": "audit/chromium-103-timer-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 320px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-104-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 320px light",
+      "engine": "chromium",
+      "path": "audit/chromium-105-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 393px dark",
+      "engine": "chromium",
+      "path": "audit/chromium-106-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 393px light",
+      "engine": "chromium",
+      "path": "audit/chromium-107-lifecycle-mutations.json"
+    },
+    {
+      "test": "rapid skip alone blocks the 202→201 PATCH regression after the panel closes",
+      "engine": "chromium",
+      "path": "audit/chromium-108-skip-alone-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-109-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-110-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-111-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-112-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-113-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-114-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-115-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-116-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-117-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-118-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-119-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 360px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-120-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-121-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-122-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-123-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 360px light",
+      "engine": "webkit",
+      "path": "audit/webkit-124-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-125-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-126-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-127-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-128-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-129-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-130-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-131-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-132-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-133-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-134-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-135-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 430px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-136-timer-mutations.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-137-dock-over-cta.json"
+    },
+    {
+      "test": "five-item dock preserves the workout across quick add and navigation at 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-138-navigation-mutations.json"
+    },
+    {
+      "test": "painted padding blocks the 202→201 PATCH regression at 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-139-hit-testing.json"
+    },
+    {
+      "test": "actions and skip preserve the current set at 430px light",
+      "engine": "webkit",
+      "path": "audit/webkit-140-timer-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 320px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-141-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 320px light",
+      "engine": "webkit",
+      "path": "audit/webkit-142-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 393px dark",
+      "engine": "webkit",
+      "path": "audit/webkit-143-lifecycle-mutations.json"
+    },
+    {
+      "test": "TMA resume offline and keyboard retain the set at 393px light",
+      "engine": "webkit",
+      "path": "audit/webkit-144-lifecycle-mutations.json"
+    },
+    {
+      "test": "rapid skip alone blocks the 202→201 PATCH regression after the panel closes",
+      "engine": "webkit",
+      "path": "audit/webkit-145-skip-alone-mutations.json"
+    },
+    {
+      "test": "liquid controls light 390",
+      "engine": "chromium",
+      "path": "audit/chromium-146-material-cost.json"
+    },
+    {
+      "test": "liquid controls dark 390",
+      "engine": "chromium",
+      "path": "audit/chromium-147-material-cost.json"
+    },
+    {
+      "test": "liquid controls light 390",
+      "engine": "webkit",
+      "path": "audit/webkit-148-material-cost.json"
+    },
+    {
+      "test": "liquid controls dark 390",
+      "engine": "webkit",
+      "path": "audit/webkit-149-material-cost.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-150-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-151-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-152-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-153-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-154-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-155-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-156-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "chromium",
+      "path": "audit/chromium-157-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-158-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-159-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-160-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-161-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-162-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-163-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-164-late-read.json"
+    },
+    {
+      "test": "P1 late workout read cannot revert a confirmed completion",
+      "engine": "webkit",
+      "path": "audit/webkit-165-late-read.json"
+    }
+  ],
+  "retries": 0
+}

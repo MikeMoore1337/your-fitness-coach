@@ -608,6 +608,7 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
             type="button"
             variant="secondary"
             aria-pressed={day.status === 'complete'}
+            data-yfc-choice="compact"
             disabled={!hasEntries || update.isPending}
             onClick={() => update.mutate('complete')}
           >
@@ -617,6 +618,7 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
             type="button"
             variant="secondary"
             aria-pressed={day.status === 'incomplete'}
+            data-yfc-choice="compact"
             disabled={update.isPending}
             onClick={() => update.mutate('incomplete')}
           >
@@ -626,6 +628,7 @@ function DayCompleteness({ day, readOnly = false }: { day: FoodDiaryDay; readOnl
             type="button"
             variant="secondary"
             aria-pressed={day.status === 'fasted'}
+            data-yfc-choice="compact"
             disabled={hasEntries || update.isPending}
             onClick={() => update.mutate('fasted')}
           >
