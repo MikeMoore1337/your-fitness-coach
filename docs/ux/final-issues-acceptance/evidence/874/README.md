@@ -4,11 +4,17 @@
 [`tests/fixtures/progress-report-canonical.json`](../../../../tests/fixtures/progress-report-canonical.json).
 Это не production или real-user proof.
 
-## Текущий технический срез и owner-gate
+## Интегрированный срез и owner-gate
 
-Сверка baseline выполнена от контрольного HEAD
-`3e7fb0743df127a11505c25fbc48ddb1687393a8` в отдельном linked worktree PR #963.
-Production UI, формулы, PDF layout и approved navigation в этом срезе не изменялись.
+Контрольный HEAD до интеграции: `98a54cf2d55bb86b2fd33669bfba93b9edee08e6`.
+Утверждённый owner visual package из `.artifacts/tasks/874-visual-proposal-20261012/`
+интегрирован в PR #963 commit `f4ed57e304cace5bd6d113e4a773d3fc7542a142`.
+Owner final visual approval: [comment 6128639269](https://github.com/MikeMoore1337/your-fitness-coach/issues/874#issuecomment-6128639269).
+
+Интегрированы только согласованные изменения: единый блок полноты данных, factual summary,
+one-record и empty circumference states, цветные графики тела/сна/настроения, естественная
+pagination, cohesive «Сон и настроение», readable color/grayscale A4. Бизнес-формулы,
+API-контракты и данные не менялись.
 
 В текущем техническом candidate weekly private notes дополнительно исключены из report API,
 browser report и server PDF. Явный `client_comment` остаётся отдельным необязательным полем
@@ -31,31 +37,30 @@ summary, adherence и data sufficiency. Теперь fixture строится с
 изменении derived coverage без изменения первичных фактов. Backend parity-тест дополнительно
 сверяет серверные значения, а не только наличие PDF.
 
-## Воспроизводимые результаты текущего среза
+## Воспроизводимые результаты интеграционного среза
 
-- `backend/tests/test_progress_reports.py`: `21 passed`;
-- canonical Vitest: `2 passed`;
-- frontend `typecheck`, `lint` и Russian UI guard: зелёные;
-- frontend production `build`: зелёный;
-- targeted Playwright Chromium browser-PDF test: `1 passed`;
-- targeted API/server-PDF test фактически извлекает и сравнивает значения, даты, единицы,
-  период и privacy boundaries.
+- frontend `typecheck`, `lint` с Russian UI guard и `build`: зелёные;
+- изменённые frontend-файлы прошли Prettier check;
+- полный Vitest: `838 passed`;
+- backend report/public-share/wellbeing regression: `28 passed`;
+- targeted backend report tests: `21 passed`;
+- Ruff для `backend bot tests scripts`: зелёный;
+- Playwright progress-report Chromium + WebKit: `16/16 passed`;
+- browser PDF: full `5`, canonical/one-record `4`, partial `5`, empty `3`, grayscale control
+  `5` страниц; числа страниц наблюдаемы и не зафиксированы в тестах жёстко;
+- A4 metadata, rendered PNG, color, grayscale, no orphan headings, no empty pages и private
+  note exclusion проверены локально.
 
-WebKit, полный required CI и final exact-head aggregate для будущего коммита не выдаются за
-пройденные этим локальным срезом проверки.
+`D:/Pet-projects/your-fitness-coach/.venv` full Windows pytest завершился `2308 passed,
+21 skipped, 10 failed`. Эти отказы относятся к Windows-only symlink/`os.chown` ограничениям,
+line-ending/hash baseline и production-host tests вне изменённого отчёта; authoritative
+backend result должен быть подтверждён Linux required CI. Это не объявляется зелёным локальным
+полным backend прогоном.
 
-## Визуальные результаты до owner approval
-
-Аудит текущего production UI подтвердил открытые визуальные критерии: повторяющиеся большие
-карточки полноты данных, повтор первой/последней сессии при одной записи, пустой заголовок
-таблицы окружностей и неэкономную pagination browser PDF. Подготовлен отдельный локальный
-`PROPOSAL ONLY` пакет BEFORE/AFTER с вариантами компактной полноты данных, one-record/empty
-states, цветной диаграммы для print/PDF, grayscale-проверки и pagination storyboard.
-
-Пакет не загружен в публичный репозиторий: он содержит synthetic user evidence и требует
-одного owner approval перед любым изменением production UI. Одобрение общего цветового
-направления PDF (`OWNER_COLOR_PRINT_DIRECTION=APPROVED`) не считается одобрением конкретной
-верстки.
+Targeted mypy обнаружил четыре существующие ошибки в `backend/fitminiapp_api/services/progress.py`
+(строки 986–988, unrelated `CardioSession`/`BodyMeasurement` typing); ошибок в затронутых
+файлах отчёта нет. Full repository format check также содержит baseline-несоответствия вне
+diff; массовое форматирование не выполнялось.
 
 ## Исправление QA-пробела
 
@@ -96,7 +101,8 @@ browser PDF проверял только `%PDF` и размер. В PR #963 д�
   остаётся отдельным handoff-полем и не подставляется автоматически.
 - Browser print PDF: Playwright Chromium/WebKit проверяет mobile/desktop print
   layout, dark/light preview, отсутствие горизонтального overflow и скрытие экранных
-  controls в print media. Chromium создаёт PDF; Poppler подтвердил A4 и страницы.
+  controls в print media. Chromium создаёт PDF; Poppler подтвердил A4 и страницы; observed
+  page counts не являются hard-coded gate.
 - Public share: явный preview → create flow, immutable snapshot, no automatic
   public exposure, `no-store`/`noindex`, revoke и отсутствие private keys,
   nutrition/body в public snapshot.
@@ -108,10 +114,16 @@ browser PDF проверял только `%PDF` и размер. В PR #963 д�
 | Серверный PDF, custom/days-30 fixture | [PDF](server/server-progress-report-days-30.pdf) | [1](server/server-progress-report-days-30-1.png), [2](server/server-progress-report-days-30-2.png) |
 | Browser print PDF, Chromium | [PDF](browser/browser-progress-report.pdf) | [1](browser/browser-progress-report-1.png), [2](browser/browser-progress-report-2.png), [3](browser/browser-progress-report-3.png), [4](browser/browser-progress-report-4.png), [5](browser/browser-progress-report-5.png) |
 
+Актуальные ignored local AFTER/PDF находятся в `.artifacts/tasks/874-visual-proposal-20261012/`:
+`browser-pdf/final/` содержит screenshots, full/canonical/partial/empty/grayscale browser PDF,
+а `server-final/` — свежий server PDF и rendered pages. Synthetic evidence не публикуется как
+production proof.
+
 ## Observed metadata
 
-- Серверный PDF: A4, 2 страницы, 40,496 bytes, ReportLab 5.0.1 runtime.
-- Browser PDF: A4, 5 страниц, 424,682 bytes, Chromium/Skia PDF.
+- Серверный PDF: A4, 2 страницы, ReportLab runtime.
+- Browser PDF: A4; full 5, canonical 4, partial 5, empty 3, grayscale control 5 страниц;
+  Chromium/Skia PDF. Это наблюдение, а не жёсткий тестовый threshold.
 - В серверный PDF добавлена единица `мин` для значения «Минуты кардио»; формулы
   и canonical calculations не менялись.
 - Screen-only controls («Показать период», «Скачать PDF», «Состав и отправка
@@ -119,10 +131,13 @@ browser PDF проверял только `%PDF` и размер. В PR #963 д�
 
 ## Reproducible checks
 
-- `backend/tests/test_progress_reports.py`: `19 passed`.
-- `backend/tests/test_public_shares.py`: `3 passed`.
-- `frontend/tests/unit/pages/ProgressReportPage.test.tsx`: `13 passed`.
-- `frontend/tests/e2e/progress-report.spec.ts`: `12 passed` total — Chromium `6`,
-  WebKit `6`.
+- `backend/tests/test_progress_reports.py`: `21 passed`;
+- report/public-share/wellbeing regression: `28 passed`;
+- `frontend/tests/unit/pages/ProgressReportPage.test.tsx` and `DataConfidence`: `18 passed`;
+- `frontend/tests/e2e/progress-report.spec.ts`: `16 passed` total — Chromium `8`, WebKit `8`;
+- `npm run typecheck`, `npm run lint`, Russian UI guard, targeted Prettier and `npm run build`:
+  passed;
+- server PDF and browser PDF parity/privacy checks: passed on the canonical fixture.
 
-Source/evidence commit: `f7a900a743a6ecbc71b97a954d3ed2e036ef8404`.
+Integration source commit: `f4ed57e304cace5bd6d113e4a773d3fc7542a142`.
+Final exact HEAD и required Checks публикуются в PR #963 после завершения CI.
