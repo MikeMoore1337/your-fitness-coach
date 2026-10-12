@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { makeProgressReportFixture } from '../fixtures/progress-report';
 import {
   expectNoHorizontalOverflow,
@@ -158,6 +160,11 @@ test('full report keeps a mobile-first preview and print layout', async ({
     });
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(10_000);
+    const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+    if (evidenceDirectory) {
+      await mkdir(evidenceDirectory, { recursive: true });
+      await writeFile(resolve(evidenceDirectory, 'browser-progress-report.pdf'), pdf);
+    }
   }
 });
 

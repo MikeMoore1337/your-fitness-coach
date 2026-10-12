@@ -11012,7 +11012,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     grid-row: 1;
   }
   .app-section--progress .progress-hero__help .contextual-help > summary {
-    max-width: 164px;
+    max-width: 172px;
     min-height: 44px;
   }
   .app-section--progress .progress-experience--bento {

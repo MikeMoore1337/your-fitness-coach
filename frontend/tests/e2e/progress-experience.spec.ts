@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
@@ -30,6 +31,8 @@ const TASK_111_SCREENSHOTS = resolve(
 );
 
 type NutritionReportState = 'partial' | 'no-data' | 'long';
+
+const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -1682,7 +1685,7 @@ test('progress header aligns help and report without clipping the period selecto
     }
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 
-    for (const width of [768, 1280, 1440, 390]) {
+    for (const width of [320, 360, 393, 430, 768, 1280, 1440]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
       const help = page.locator('.progress-hero__help').getByText('О показателях', { exact: true });
       const report = page.getByRole('link', { name: 'Скачать отчёт' });
@@ -1693,6 +1696,22 @@ test('progress header aligns help and report without clipping the period selecto
       await expect(report).toBeVisible();
       await expect(tabs.getByRole('tab')).toHaveCount(4);
       await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
+      if (CAPTURE_PROGRESS_865) {
+        const evidenceDirectory = resolve(
+          process.cwd(),
+          '..',
+          'docs',
+          'ux',
+          'final-issues-acceptance',
+          'evidence',
+          '865',
+          CAPTURE_PROGRESS_865,
+        );
+        await mkdir(evidenceDirectory, { recursive: true });
+        await page.locator('.progress-hero').screenshot({
+          path: resolve(evidenceDirectory, `${test.info().project.name}-${width}-${theme}.png`),
+        });
+      }
       const selectorGeometry = await tabs.evaluate((element) => {
         const tabStyle = getComputedStyle(element);
         const wrapperStyle = getComputedStyle(element.parentElement!);
@@ -1708,6 +1727,38 @@ test('progress header aligns help and report without clipping the period selecto
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
+
+      const helpGeometry = await help.evaluate((element) => {
+        const summary = element.closest('summary');
+        const textNode = summary
+          ? Array.from(summary.childNodes).find((node) => node.nodeType === Node.TEXT_NODE)
+          : null;
+        const range = document.createRange();
+        if (textNode) range.selectNodeContents(textNode);
+        const textRects = textNode ? Array.from(range.getClientRects()) : [];
+        const summaryBox = summary?.getBoundingClientRect();
+        const summaryStyle = summary ? getComputedStyle(summary) : null;
+        return {
+          textRectCount: textRects.length,
+          textWidths: textRects.map((rect) => Math.round(rect.width * 100) / 100),
+          height: summaryBox?.height ?? 0,
+          width: summaryBox?.width ?? 0,
+          x: summaryBox?.x ?? 0,
+          right: summaryBox?.right ?? Infinity,
+          viewportWidth: window.innerWidth,
+          minHeight: summaryStyle ? parseFloat(summaryStyle.minHeight) : 0,
+        };
+      });
+      if (width <= 430 && CAPTURE_PROGRESS_865 !== 'before') {
+        expect(
+          helpGeometry.textRectCount,
+          `wrapped at ${width}px: ${JSON.stringify(helpGeometry)}`,
+        ).toBe(1);
+        expect(helpGeometry.height, `touch target at ${width}px`).toBeGreaterThanOrEqual(44);
+        expect(helpGeometry.right, `overflow at ${width}px`).toBeLessThanOrEqual(
+          helpGeometry.viewportWidth,
+        );
+      }
 
       if (width >= 1280) {
         const [helpBox, reportBox, periodBox] = await Promise.all([

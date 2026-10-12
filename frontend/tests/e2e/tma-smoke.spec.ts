@@ -1140,6 +1140,58 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   );
 });
 
+test('progress contextual help stays one line across Mobile Web/PWA and mocked TMA', async ({
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await mobilePage.addInitScript(() => {
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+  });
+  await installPlatformApi(tmaPage);
+  await installPlatformApi(mobilePage, { browserSession: true });
+  await Promise.all([
+    tmaPage.goto('/app?section=progress'),
+    mobilePage.goto('/app?section=progress'),
+  ]);
+
+  for (const theme of ['light', 'dark'] as const) {
+    await tma.setTheme(theme);
+    await mobilePage.evaluate((value) => {
+      localStorage.setItem('app-theme', value);
+      window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+    }, theme);
+    for (const width of [320, 360, 393, 430]) {
+      await tmaPage.setViewportSize({ width, height: 844 });
+      await tma.setViewport(844, 844);
+      await mobilePage.setViewportSize({ width, height: 844 });
+      for (const page of [mobilePage, tmaPage]) {
+        const help = page.locator('.progress-hero__help summary');
+        await expect(help).toBeVisible();
+        const geometry = await help.evaluate((summary) => {
+          const textNode = Array.from(summary.childNodes).find(
+            (node) => node.nodeType === Node.TEXT_NODE,
+          );
+          const range = document.createRange();
+          if (textNode) range.selectNodeContents(textNode);
+          const box = summary.getBoundingClientRect();
+          return {
+            textRectCount: textNode ? range.getClientRects().length : 0,
+            height: box.height,
+            right: box.right,
+            viewportWidth: window.innerWidth,
+            documentWidth: document.documentElement.scrollWidth,
+          };
+        });
+        expect(geometry.textRectCount, `${theme} ${width}px`).toBe(1);
+        expect(geometry.height, `${theme} ${width}px`).toBeGreaterThanOrEqual(44);
+        expect(geometry.right, `${theme} ${width}px`).toBeLessThanOrEqual(width);
+        expect(geometry.documentWidth, `${theme} ${width}px`).toBeLessThanOrEqual(width);
+      }
+    }
+  }
+});
+
 test('measurement add, edit, history and insufficient trend keep Mobile Web and TMA parity', async ({
   mobilePage,
   tma,

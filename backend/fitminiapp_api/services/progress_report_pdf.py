@@ -290,7 +290,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
             metric_table(
                 [
                     ("Кардио-сессии", _number(cardio["completed_sessions"])),
-                    ("Минуты кардио", _number(cardio["duration_minutes"])),
+                    ("Минуты кардио", _number(cardio["duration_minutes"], " мин")),
                     ("Метрики тела", _number(len(body_report["trends"]))),
                     ("Дни питания", _number(nutrition["summary"].get("logged_days"))),
                 ]

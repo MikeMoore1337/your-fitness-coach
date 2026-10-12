@@ -117,6 +117,58 @@ describe('ProgressReportPage', () => {
     });
   });
 
+  it.each([
+    ['days_7', '7 дней'],
+    ['days_30', '30 дней'],
+    ['days_90', '90 дней'],
+    ['current_month', 'Этот месяц'],
+    ['previous_month', 'Прошлый месяц'],
+  ] as const)('requests the canonical API range for %s', async (period, label) => {
+    installApi();
+    renderPage();
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    if (period !== 'days_30') {
+      vi.mocked(globalThis.fetch).mockClear();
+      fireEvent.click(screen.getByRole('tab', { name: label }));
+    }
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `/api/v1/workouts/progress/report?period=${period}`,
+        expect.anything(),
+      ),
+    );
+    expect(window.location.search).toContain(`period=${period}`);
+  });
+
+  it('keeps canonical numbers and distinguishes missing values from zero', async () => {
+    installApi();
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    expect(document.querySelector('[aria-labelledby="report-training-title"]')).toHaveTextContent(
+      /9.*1.*48\s?620 кг/s,
+    );
+    expect(document.querySelector('.progress-report-cardio')).toHaveTextContent(
+      '5 завершено · 178 мин',
+    );
+    expect(document.querySelector('.progress-report-section--nutrition')).toHaveTextContent(
+      /24 из 30.*2\s?184 ккал.*158 г.*72 г.*226 г/s,
+    );
+
+    cleanup();
+    vi.restoreAllMocks();
+    installApi(makeProgressReportFixture('empty'));
+    renderPage();
+    await screen.findByRole('heading', { name: 'Отчёт о прогрессе' });
+    expect(document.querySelector('[aria-labelledby="report-training-title"]')).toHaveTextContent(
+      'Нет данных кг',
+    );
+    expect(document.querySelector('.progress-report-cardio')).toHaveTextContent(
+      '0 завершено · 0 мин',
+    );
+  });
+
   it('hands a short-lived PDF file to native Telegram download', async () => {
     window.history.replaceState(
       null,
