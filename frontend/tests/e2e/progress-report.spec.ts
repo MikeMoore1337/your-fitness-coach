@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
+  assertCanonicalProgressReportInvariants,
   canonicalFacts,
   makeCanonicalProgressReportFixture,
   makeProgressReportFixture,
@@ -220,7 +221,9 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
       });
       return;
     }
-    await route.fulfill({ json: makeCanonicalProgressReportFixture() });
+    const report = makeCanonicalProgressReportFixture();
+    assertCanonicalProgressReportInvariants(report);
+    await route.fulfill({ json: report });
   });
 
   const period = canonicalFacts.period;
@@ -240,6 +243,11 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
   expect(uiText).toContain('230 г');
   expect(uiText).toContain('79 кг');
   expect(uiText).toContain('89 см');
+  for (const exercise of canonicalFacts.training.exercises) {
+    expect(uiText).toContain(exercise.exercise_title);
+    expect(uiText).toContain(browserDate(exercise.first_performed_on));
+    expect(uiText).toContain(`${browserNumber(exercise.external_load_volume_kg)} кг`);
+  }
   await page.emulateMedia({ media: 'print' });
   const pdfPath = testInfo.outputPath('canonical-browser-progress-report.pdf');
   const pdf = await page.pdf({
@@ -269,6 +277,12 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
     const unit = trend.unit === 'kg' ? 'кг' : 'см';
     expect(extracted).toContain(`${trend.latest_value}${unit}`);
     expect(extracted).toContain(compactPdfText(browserDate(trend.latest_measured_on)));
+  }
+  for (const exercise of canonicalFacts.training.exercises) {
+    expect(extracted).toContain(compactPdfText(exercise.exercise_title));
+    expect(extracted).toContain(
+      compactPdfText(`${browserNumber(exercise.external_load_volume_kg)} кг`),
+    );
   }
   for (const privateValue of canonicalFacts.privacy) {
     expect(extracted).not.toContain(compactPdfText(privateValue));

@@ -272,6 +272,54 @@ def test_progress_report_api_and_server_pdf_share_one_canonical_fact_set(client)
         ):
             assert actual[key] == expected[key]
 
+    assert (
+        report["training"]["frequency_per_week"]
+        == CANONICAL_FACTS["training"]["frequency_per_week"]
+    )
+    assert (
+        report["training"]["volume_recorded_sets"]
+        == CANONICAL_FACTS["training"]["volume_recorded_sets"]
+    )
+    assert (
+        report["training"]["new_personal_records"]
+        == CANONICAL_FACTS["training"]["new_personal_records"]
+    )
+    assert report["training"]["exercises"] == CANONICAL_FACTS["training"]["exercises"]
+    assert report["nutrition"]["summary"]["coverage_percent"] == 3.3
+    assert report["nutrition"]["summary"]["complete_days"] == 1
+    assert report["nutrition"]["summary"]["incomplete_days"] == 0
+    assert report["nutrition"]["summary"]["fasted_days"] == 0
+    assert report["nutrition"]["summary"]["current_day_status"] is None
+    assert len(report["nutrition"]["daily"]) == CANONICAL_FACTS["nutrition"]["eligible_days"]
+    assert report["nutrition"]["summary"]["exact_entry_count"] == 1
+    assert report["adherence"]["overall_percent"] == 50.0
+    assert report["adherence"]["included_components"] == ["workouts", "calories", "protein"]
+    assert report["adherence"]["workouts"] == {
+        "status": "available",
+        "percent": 50.0,
+        "achieved": 1,
+        "evaluated": 2,
+        "weight": 0.4,
+        "reason": None,
+    }
+    assert report["adherence"]["cardio"]["status"] == "not_applicable"
+    assert report["adherence"]["calories"]["achieved"] == 1
+    assert report["adherence"]["protein"]["achieved"] == 0
+    assert report["data_sufficiency"]["workout_logging"]["status"] == "sufficient"
+    assert report["data_sufficiency"]["working_sets"]["status"] == "limited"
+    assert report["data_sufficiency"]["working_sets"]["counters"] == {
+        "workout_session_count": 1,
+        "working_set_count": 1,
+        "required_workout_session_count": 2,
+        "required_working_set_count": 6,
+    }
+    assert report["data_sufficiency"]["nutrition_coverage"]["counters"]["coverage_percent"] == 3.3
+    assert report["data_sufficiency"]["weight_trend"]["reason_keys"] == ["too_few_points"]
+    assert report["data_sufficiency"]["anthropometry"]["reason_keys"] == ["too_few_points"]
+    assert report["data_sufficiency"]["schedule_adherence"]["reason_keys"] == [
+        "too_few_evaluable_workouts"
+    ]
+
     link_response = client.post(
         "/api/v1/workouts/progress/report/download-link", params=params, headers=headers
     )
@@ -290,6 +338,9 @@ def test_progress_report_api_and_server_pdf_share_one_canonical_fact_set(client)
     assert "Завершено: 1" in rendered
     assert "Пропущено: 1" in rendered
     assert "400 кг" in rendered
+    for exercise in CANONICAL_FACTS["training"]["exercises"]:
+        assert exercise["exercise_title"] in rendered
+        assert f"{exercise['external_load_volume_kg']} кг" in rendered
     assert "0 мин" in rendered
     assert "2 100 ккал" in rendered
     assert "155 г" in rendered

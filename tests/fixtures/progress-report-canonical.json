@@ -14,8 +14,32 @@
     "planned_workouts": 2,
     "completed_workouts": 1,
     "skipped_workouts": 1,
+    "frequency_per_week": 0.23,
     "completed_working_sets": 1,
-    "external_load_volume_kg": 400
+    "external_load_volume_kg": 400,
+    "volume_recorded_sets": 1,
+    "new_personal_records": 1,
+    "exercises": [
+      {
+        "exercise_title": "Жим лежа",
+        "performed_session_count": 1,
+        "completed_set_count": 1,
+        "first_performed_on": "2026-08-20",
+        "last_performed_on": "2026-08-20",
+        "reps_total": 8,
+        "max_external_load_kg": 50,
+        "external_load_volume_kg": 400,
+        "volume_recorded_sets": 1,
+        "sessions": [
+          {
+            "performed_on": "2026-08-20",
+            "completed_set_count": 1,
+            "max_external_load_kg": 50,
+            "external_load_volume_kg": 400
+          }
+        ]
+      }
+    ]
   },
   "cardio": {
     "completed_sessions": 0,
@@ -25,6 +49,16 @@
     "logged_days": 1,
     "eligible_days": 30,
     "missing_days": 29,
+    "logged_date": "2026-08-23",
+    "target": {
+      "calories": 2200,
+      "protein_g": 160,
+      "fat_g": 70,
+      "carbs_g": 240
+    },
+    "exact_entry_count": 1,
+    "approximate_entry_count": 0,
+    "partial_entry_count": 0,
     "calories_average": 2100,
     "protein_g_average": 155,
     "fat_g_average": 68,

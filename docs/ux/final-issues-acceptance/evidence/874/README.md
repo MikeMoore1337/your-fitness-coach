@@ -4,6 +4,55 @@
 [`tests/fixtures/progress-report-canonical.json`](../../../../tests/fixtures/progress-report-canonical.json).
 Это не production или real-user proof.
 
+## Текущий технический срез и owner-gate
+
+Сверка выполнена от контрольного HEAD
+`c32df59cd47983895fd004c626d40bebe21edf17` в отдельном linked worktree PR #963.
+Production UI, формулы, PDF layout и approved navigation в этом срезе не изменялись.
+
+Прежняя frontend canonical fixture начиналась с `full`-состояния и переопределяла только
+часть полей. Поэтому в одном отчёте одновременно оставались несовместимые значения
+summary, adherence и data sufficiency. Теперь fixture строится с нуля из одного набора фактов:
+
+- custom period `2026-07-26…2026-08-24`, `Europe/Moscow`, две запланированные тренировки,
+  одна завершённая, одна пропущенная, один рабочий подход, объём `400 кг` и один фактический
+  личный рекорд по существующему серверному правилу;
+- один полный день питания из 30, `2100/155/68/230`, цели `2200/160/70/240`, 29 пропущенных
+  дней; исторический период не содержит текущего календарного дня, поэтому
+  `current_day_status=null`;
+- две точки веса и окружности (`80→79 кг`, `90→89 см`) с фактическими датами и статусом
+  `insufficient_points`; adherence и все counters data sufficiency выведены из тех же фактов.
+
+Добавлены `assertCanonicalProgressReportInvariants` и негативный тест, который падает при
+изменении derived coverage без изменения первичных фактов. Backend parity-тест дополнительно
+сверяет серверные значения, а не только наличие PDF.
+
+## Воспроизводимые результаты текущего среза
+
+- `backend/tests/test_progress_reports.py`: `21 passed`;
+- canonical Vitest: `2 passed`;
+- frontend `typecheck`, `lint` и Russian UI guard: зелёные;
+- frontend production `build`: зелёный;
+- targeted Playwright Chromium browser-PDF test: `1 passed`;
+- targeted API/server-PDF test фактически извлекает и сравнивает значения, даты, единицы,
+  период и privacy boundaries.
+
+WebKit, полный required CI и final exact-head aggregate для будущего коммита не выдаются за
+пройденные этим локальным срезом проверки.
+
+## Визуальные результаты до owner approval
+
+Аудит текущего production UI подтвердил открытые визуальные критерии: повторяющиеся большие
+карточки полноты данных, повтор первой/последней сессии при одной записи, пустой заголовок
+таблицы окружностей и неэкономную pagination browser PDF. Подготовлен отдельный локальный
+`PROPOSAL ONLY` пакет BEFORE/AFTER с вариантами компактной полноты данных, one-record/empty
+states, цветной диаграммы для print/PDF, grayscale-проверки и pagination storyboard.
+
+Пакет не загружен в публичный репозиторий: он содержит synthetic user evidence и требует
+одного owner approval перед любым изменением production UI. Одобрение общего цветового
+направления PDF (`OWNER_COLOR_PRINT_DIRECTION=APPROVED`) не считается одобрением конкретной
+верстки.
+
 ## Исправление QA-пробела
 
 QA-комментарий [6120877469](https://github.com/MikeMoore1337/your-fitness-coach/issues/874#issuecomment-6120877469)

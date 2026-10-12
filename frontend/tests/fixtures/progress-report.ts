@@ -9,14 +9,44 @@ type CanonicalFacts = {
     planned_workouts: number;
     completed_workouts: number;
     skipped_workouts: number;
+    frequency_per_week: number;
     completed_working_sets: number;
     external_load_volume_kg: number;
+    volume_recorded_sets: number;
+    new_personal_records: number;
+    exercises: Array<{
+      exercise_title: string;
+      performed_session_count: number;
+      completed_set_count: number;
+      first_performed_on: string;
+      last_performed_on: string;
+      reps_total: number;
+      max_external_load_kg: number;
+      external_load_volume_kg: number;
+      volume_recorded_sets: number;
+      sessions: Array<{
+        performed_on: string;
+        completed_set_count: number;
+        max_external_load_kg: number;
+        external_load_volume_kg: number;
+      }>;
+    }>;
   };
   cardio: { completed_sessions: number; duration_minutes: number };
   nutrition: {
     logged_days: number;
     eligible_days: number;
     missing_days: number;
+    logged_date: string;
+    target: {
+      calories: number;
+      protein_g: number;
+      fat_g: number;
+      carbs_g: number;
+    };
+    exact_entry_count: number;
+    approximate_entry_count: number;
+    partial_entry_count: number;
     calories_average: number;
     protein_g_average: number;
     fat_g_average: number;
@@ -25,7 +55,7 @@ type CanonicalFacts = {
   body: Array<{
     metric: string;
     label: string;
-    unit: string;
+    unit: 'kg' | 'cm';
     first_value: number;
     latest_value: number;
     change: number;
@@ -48,9 +78,9 @@ type SufficiencyReason =
 function signal(
   status: 'sufficient' | 'limited' | 'insufficient',
   counters: Record<string, number>,
-  reason: SufficiencyReason,
+  ...reasonKeys: SufficiencyReason[]
 ) {
-  return { status, counters, reason_keys: [reason] };
+  return { status, counters, reason_keys: reasonKeys };
 }
 
 function component(percent: number | null, achieved: number, evaluated: number, weight: number) {
@@ -490,21 +520,37 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
 }
 
 export function makeCanonicalProgressReportFixture(): ProgressReport {
-  const report = makeProgressReportFixture('full');
+  const report = makeProgressReportFixture('empty');
+  const periodStart = canonicalFacts.period.start;
+  const periodEnd = canonicalFacts.period.end;
+  const periodDays = canonicalFacts.nutrition.eligible_days;
+  const addDays = (value: string, offset: number) => {
+    const date = new Date(`${value}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + offset);
+    return date.toISOString().slice(0, 10);
+  };
+  const percentage = (achieved: number, evaluated: number) =>
+    evaluated > 0 ? Number(((achieved * 100) / evaluated).toFixed(1)) : null;
+
+  report.generated_at = `${periodEnd}T09:30:00+03:00`;
   report.period = canonicalFacts.period.period as ProgressReport['period'];
-  report.period_start = canonicalFacts.period.start;
-  report.period_end = canonicalFacts.period.end;
+  report.period_start = periodStart;
+  report.period_end = periodEnd;
   report.timezone = canonicalFacts.period.timezone;
   report.subject = canonicalFacts.subject as ProgressReport['subject'];
 
   report.training.planned_workouts = canonicalFacts.training.planned_workouts;
   report.training.completed_workouts = canonicalFacts.training.completed_workouts;
   report.training.skipped_workouts = canonicalFacts.training.skipped_workouts;
+  report.training.frequency_per_week = canonicalFacts.training.frequency_per_week;
   report.training.completed_working_sets = canonicalFacts.training.completed_working_sets;
   report.training.external_load_volume_kg = canonicalFacts.training.external_load_volume_kg;
-  report.training.exercises = [];
+  report.training.volume_recorded_sets = canonicalFacts.training.volume_recorded_sets;
+  report.training.new_personal_records = canonicalFacts.training.new_personal_records;
+  report.training.exercises = canonicalFacts.training.exercises;
 
   report.cardio.completed_sessions = canonicalFacts.cardio.completed_sessions;
+  report.cardio.planned_sessions = 0;
   report.cardio.duration_minutes = canonicalFacts.cardio.duration_minutes;
   report.cardio.frequency_per_week = 0;
   report.cardio.distance_km = null;
@@ -520,25 +566,64 @@ export function makeCanonicalProgressReportFixture(): ProgressReport {
     hips_cm: null,
     biceps_cm: null,
     thigh_cm: null,
+    custom_measurements: [],
   };
   report.body.trends = canonicalFacts.body.map((trend) => ({
-    ...trend,
-    interpretation_status: 'insufficient_period',
-    unit: trend.unit as 'kg' | 'cm',
+    metric: trend.metric,
+    label: trend.label,
+    unit: trend.unit,
+    first_value: trend.first_value,
+    latest_value: trend.latest_value,
+    change: trend.change,
+    first_measured_on: trend.first_measured_on,
+    latest_measured_on: trend.latest_measured_on,
+    point_count: trend.point_count,
+    span_days: trend.span_days,
+    interpretation_status:
+      trend.point_count === 1
+        ? 'single_point'
+        : trend.point_count < 3
+          ? 'insufficient_points'
+          : trend.span_days < 14
+            ? 'insufficient_period'
+            : 'available',
     points: [
       { measured_on: trend.first_measured_on, value: trend.first_value },
       { measured_on: trend.latest_measured_on, value: trend.latest_value },
     ],
-  })) as unknown as ProgressReport['body']['trends'];
+  }));
+  report.body.priority = null;
+  report.body.guidance = {
+    comparison_basis: 'self',
+    minimum_points_for_interpretation: 3,
+    minimum_span_days_for_interpretation: 14,
+    consistency_tips: [
+      'Снимайте замеры в похожее время суток и в одинаковых условиях.',
+      'Используйте одну технику и одно место наложения измерительной ленты.',
+      'Оценивайте последовательность замеров, а не отдельное колебание.',
+    ],
+    circumference_limitations: [
+      'Окружность плеча не измеряет отдельно бицепс или трицепс.',
+      'Окружность бедра не измеряет отдельно квадрицепс или другие мышцы бедра.',
+      'Окружности сами по себе не показывают рост конкретной мышцы.',
+    ],
+  };
 
   report.nutrition.period = canonicalFacts.period.period as ProgressReport['nutrition']['period'];
-  report.nutrition.period_start = canonicalFacts.period.start;
-  report.nutrition.period_end = canonicalFacts.period.end;
+  report.nutrition.period_start = periodStart;
+  report.nutrition.period_end = periodEnd;
   report.nutrition.timezone = canonicalFacts.period.timezone;
-  report.nutrition.summary.logged_days = canonicalFacts.nutrition.logged_days;
-  report.nutrition.summary.eligible_days = canonicalFacts.nutrition.eligible_days;
-  report.nutrition.summary.coverage_percent = 3.3;
-  report.nutrition.summary.missing_days = canonicalFacts.nutrition.missing_days;
+  const summary = report.nutrition.summary;
+  summary.logged_days = canonicalFacts.nutrition.logged_days;
+  summary.eligible_days = periodDays;
+  summary.coverage_percent = Number(
+    ((canonicalFacts.nutrition.logged_days * 100) / periodDays).toFixed(1),
+  );
+  summary.complete_days = canonicalFacts.nutrition.logged_days;
+  summary.incomplete_days = 0;
+  summary.fasted_days = 0;
+  summary.missing_days = canonicalFacts.nutrition.missing_days;
+  summary.current_day_status = null;
   for (const [key, value] of [
     ['calories', canonicalFacts.nutrition.calories_average],
     ['protein_g', canonicalFacts.nutrition.protein_g_average],
@@ -549,10 +634,316 @@ export function makeCanonicalProgressReportFixture(): ProgressReport {
     metric.average = value;
     metric.minimum = value;
     metric.maximum = value;
-    metric.sample_days = 1;
+    metric.sample_days = canonicalFacts.nutrition.logged_days;
   }
+  const target = canonicalFacts.nutrition.target;
+  summary.calorie_comparison = {
+    average_actual: canonicalFacts.nutrition.calories_average,
+    average_target: target.calories,
+    average_deviation: canonicalFacts.nutrition.calories_average - target.calories,
+    evaluated_days: canonicalFacts.nutrition.logged_days,
+  };
+  summary.protein_comparison = {
+    average_actual: canonicalFacts.nutrition.protein_g_average,
+    average_target: target.protein_g,
+    average_deviation: canonicalFacts.nutrition.protein_g_average - target.protein_g,
+    evaluated_days: canonicalFacts.nutrition.logged_days,
+  };
+  summary.fat_comparison = {
+    average_actual: canonicalFacts.nutrition.fat_g_average,
+    average_target: target.fat_g,
+    average_deviation: canonicalFacts.nutrition.fat_g_average - target.fat_g,
+    evaluated_days: canonicalFacts.nutrition.logged_days,
+  };
+  summary.carbs_comparison = {
+    average_actual: canonicalFacts.nutrition.carbs_g_average,
+    average_target: target.carbs_g,
+    average_deviation: canonicalFacts.nutrition.carbs_g_average - target.carbs_g,
+    evaluated_days: canonicalFacts.nutrition.logged_days,
+  };
+  summary.days_within_calorie_tolerance = 1;
+  summary.calorie_tolerance_evaluated_days = canonicalFacts.nutrition.logged_days;
+  summary.days_meeting_protein_target = 0;
+  summary.protein_target_evaluated_days = canonicalFacts.nutrition.logged_days;
+  summary.exact_entry_count = canonicalFacts.nutrition.exact_entry_count;
+  summary.approximate_entry_count = canonicalFacts.nutrition.approximate_entry_count;
+  summary.partial_entry_count = canonicalFacts.nutrition.partial_entry_count;
+  report.nutrition.daily = Array.from({ length: periodDays }, (_, offset) => {
+    const diaryDate = addDays(periodStart, offset);
+    const logged = diaryDate === canonicalFacts.nutrition.logged_date;
+    return {
+      diary_date: diaryDate,
+      status: logged ? 'complete' : 'missing',
+      is_current_day: false,
+      calories: logged ? canonicalFacts.nutrition.calories_average : null,
+      protein_g: logged ? canonicalFacts.nutrition.protein_g_average : null,
+      fat_g: logged ? canonicalFacts.nutrition.fat_g_average : null,
+      carbs_g: logged ? canonicalFacts.nutrition.carbs_g_average : null,
+      fiber_g: null,
+      target_calories: target.calories,
+      target_protein_g: target.protein_g,
+      target_fat_g: target.fat_g,
+      target_carbs_g: target.carbs_g,
+      calorie_deviation: logged
+        ? canonicalFacts.nutrition.calories_average - target.calories
+        : null,
+      protein_deviation_g: logged
+        ? canonicalFacts.nutrition.protein_g_average - target.protein_g
+        : null,
+      fat_deviation_g: logged ? canonicalFacts.nutrition.fat_g_average - target.fat_g : null,
+      carbs_deviation_g: logged ? canonicalFacts.nutrition.carbs_g_average - target.carbs_g : null,
+      within_calorie_tolerance: logged ? true : null,
+      meets_protein_target: logged ? false : null,
+      target_changed: false,
+      hydration_ml: null,
+      hydration_target_ml: null,
+      hydration_progress_percent: null,
+    };
+  });
   report.nutrition.target_changes = [];
-  report.program = null;
-  report.check_ins = [];
+  report.nutrition.insights = [];
+  report.adherence = {
+    formula_version: 'adherence-v1',
+    overall_percent: 50,
+    included_components: ['workouts', 'calories', 'protein'],
+    workouts: component(
+      percentage(
+        canonicalFacts.training.completed_workouts,
+        canonicalFacts.training.planned_workouts,
+      ),
+      canonicalFacts.training.completed_workouts,
+      canonicalFacts.training.planned_workouts,
+      0.4,
+    ),
+    cardio: {
+      status: 'not_applicable',
+      percent: null,
+      achieved: 0,
+      evaluated: 0,
+      weight: 0.2,
+      reason: 'cardio_not_planned',
+    },
+    calories: component(
+      100,
+      summary.days_within_calorie_tolerance,
+      summary.calorie_tolerance_evaluated_days,
+      0.2,
+    ),
+    protein: component(
+      0,
+      summary.days_meeting_protein_target,
+      summary.protein_target_evaluated_days,
+      0.2,
+    ),
+  };
+  report.data_sufficiency = {
+    ruleset_version: 'data-sufficiency-v1',
+    workout_logging: signal(
+      'sufficient',
+      {
+        completed_workout_count: canonicalFacts.training.completed_workouts,
+        prescribed_set_count: canonicalFacts.training.completed_working_sets,
+        logged_set_count: canonicalFacts.training.completed_working_sets,
+        coverage_percent: 100,
+      },
+      'thresholds_met',
+    ),
+    working_sets: signal(
+      'limited',
+      {
+        workout_session_count: canonicalFacts.training.completed_workouts,
+        working_set_count: canonicalFacts.training.completed_working_sets,
+        required_workout_session_count: 2,
+        required_working_set_count: 6,
+      },
+      'too_few_working_sets',
+      'too_few_workout_sessions',
+    ),
+    rir_coverage: signal(
+      'insufficient',
+      {
+        working_set_count: canonicalFacts.training.completed_working_sets,
+        recorded_set_count: 0,
+        required_recorded_set_count: 3,
+        coverage_percent: 0,
+        required_coverage_percent: 50,
+      },
+      'no_rir_observations',
+    ),
+    nutrition_coverage: signal(
+      'limited',
+      {
+        logged_day_count: canonicalFacts.nutrition.logged_days,
+        eligible_day_count: canonicalFacts.nutrition.eligible_days,
+        required_logged_day_count: 7,
+        coverage_percent: summary.coverage_percent,
+        exact_entry_count: canonicalFacts.nutrition.exact_entry_count,
+        approximate_entry_count: canonicalFacts.nutrition.approximate_entry_count,
+        partial_entry_count: canonicalFacts.nutrition.partial_entry_count,
+      },
+      'below_required_coverage',
+    ),
+    weight_trend: signal(
+      'limited',
+      {
+        point_count: weightTrend.point_count,
+        span_days: weightTrend.span_days,
+        required_point_count: 3,
+        required_span_days: 14,
+      },
+      'too_few_points',
+    ),
+    anthropometry: signal(
+      'limited',
+      {
+        measured_metric_count: 1,
+        sufficient_metric_count: 0,
+        maximum_point_count: waistTrend.point_count,
+        maximum_span_days: waistTrend.span_days,
+        required_point_count_per_metric: 3,
+        required_span_days_per_metric: 14,
+      },
+      'too_few_points',
+    ),
+    schedule_adherence: signal(
+      'limited',
+      {
+        evaluable_workout_count: canonicalFacts.training.planned_workouts,
+        required_evaluable_workout_count: 3,
+      },
+      'too_few_evaluable_workouts',
+    ),
+  };
+  report.program = {
+    title: 'Текущая программа',
+    status: 'active',
+    start_date: '2026-07-27',
+    duration_weeks: 8,
+    active_block: null,
+    changes: [],
+  };
+  report.check_ins = [
+    {
+      week_start: '2026-08-18',
+      week_end: periodEnd,
+      submitted_on: canonicalFacts.nutrition.logged_date,
+      status: 'completed',
+      training_load: 4,
+      recovery: 3,
+      hunger: 2,
+      adherence_difficulty: 2,
+      note: 'Фактическая заметка пользователя очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная ',
+    },
+  ];
+  report.wellbeing = null;
   return report;
+}
+
+export function assertCanonicalProgressReportInvariants(report: ProgressReport): void {
+  const inclusiveDays =
+    (Date.parse(`${report.period_end}T12:00:00Z`) -
+      Date.parse(`${report.period_start}T12:00:00Z`)) /
+      86_400_000 +
+    1;
+  const { training, nutrition, body, adherence, data_sufficiency: sufficiency } = report;
+
+  if (report.period_start !== canonicalFacts.period.start) throw new Error('period start drift');
+  if (report.period_end !== canonicalFacts.period.end) throw new Error('period end drift');
+  if (report.timezone !== canonicalFacts.period.timezone) throw new Error('timezone drift');
+  if (training.planned_workouts !== training.completed_workouts + training.skipped_workouts) {
+    throw new Error('training totals drift');
+  }
+  if (
+    training.frequency_per_week !==
+    Number(((training.completed_workouts * 7) / inclusiveDays).toFixed(2))
+  ) {
+    throw new Error('training frequency drift');
+  }
+  const exerciseVolume = training.exercises.reduce(
+    (total, exercise) => total + (exercise.external_load_volume_kg ?? 0),
+    0,
+  );
+  const exerciseSets = training.exercises.reduce(
+    (total, exercise) => total + exercise.volume_recorded_sets,
+    0,
+  );
+  if (
+    training.external_load_volume_kg !== exerciseVolume ||
+    training.volume_recorded_sets !== exerciseSets
+  ) {
+    throw new Error('training exercise totals drift');
+  }
+  for (const exercise of training.exercises) {
+    if (exercise.performed_session_count !== exercise.sessions.length) {
+      throw new Error('exercise session count drift');
+    }
+    if (
+      exercise.sessions[0]?.performed_on !== exercise.first_performed_on ||
+      exercise.sessions.at(-1)?.performed_on !== exercise.last_performed_on
+    ) {
+      throw new Error('exercise dates drift');
+    }
+  }
+  if (nutrition.summary.eligible_days !== inclusiveDays) throw new Error('nutrition period drift');
+  if (
+    nutrition.summary.logged_days + nutrition.summary.missing_days !==
+    nutrition.summary.eligible_days
+  ) {
+    throw new Error('nutrition day totals drift');
+  }
+  if (
+    nutrition.summary.coverage_percent !==
+    Number(((nutrition.summary.logged_days * 100) / nutrition.summary.eligible_days).toFixed(1))
+  ) {
+    throw new Error('nutrition coverage drift');
+  }
+  if (nutrition.daily.length !== nutrition.summary.eligible_days) {
+    throw new Error('nutrition daily detail drift');
+  }
+  if (
+    nutrition.daily[0]?.diary_date !== report.period_start ||
+    nutrition.daily.at(-1)?.diary_date !== report.period_end ||
+    nutrition.daily.some((point) => point.is_current_day)
+  ) {
+    throw new Error('nutrition daily dates drift');
+  }
+  for (const trend of body.trends) {
+    const expectedTrend = canonicalFacts.body.find((item) => item.metric === trend.metric);
+    if (!expectedTrend || trend.unit !== expectedTrend.unit) throw new Error('body unit drift');
+    if (trend.points.length !== trend.point_count) throw new Error('body point count drift');
+    if (trend.points[0]?.measured_on !== trend.first_measured_on) {
+      throw new Error('body first date drift');
+    }
+    if (trend.points.at(-1)?.measured_on !== trend.latest_measured_on) {
+      throw new Error('body latest date drift');
+    }
+    if (trend.change !== null && trend.change !== trend.latest_value - trend.first_value) {
+      throw new Error('body change drift');
+    }
+  }
+  if (
+    adherence.workouts.achieved !== training.completed_workouts ||
+    adherence.workouts.evaluated !== training.planned_workouts ||
+    adherence.calories.achieved !== nutrition.summary.days_within_calorie_tolerance ||
+    adherence.protein.achieved !== nutrition.summary.days_meeting_protein_target
+  ) {
+    throw new Error('adherence components drift');
+  }
+  const availableAdherence = [adherence.workouts, adherence.calories, adherence.protein];
+  const adherenceWeight = availableAdherence.reduce((total, item) => total + item.weight, 0);
+  const expectedOverall = Number(
+    (
+      availableAdherence.reduce((total, item) => total + (item.percent ?? 0) * item.weight, 0) /
+      adherenceWeight
+    ).toFixed(1),
+  );
+  if (adherence.overall_percent !== expectedOverall) throw new Error('adherence overall drift');
+  if (
+    sufficiency.working_sets.counters.working_set_count !== training.completed_working_sets ||
+    sufficiency.nutrition_coverage.counters.logged_day_count !== nutrition.summary.logged_days ||
+    sufficiency.weight_trend.counters.point_count !==
+      body.trends.find((trend) => trend.metric === 'weight_kg')?.point_count
+  ) {
+    throw new Error('data sufficiency drift');
+  }
 }
