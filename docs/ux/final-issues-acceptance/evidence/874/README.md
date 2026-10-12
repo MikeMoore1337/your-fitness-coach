@@ -44,4 +44,4 @@ production или real-user proof.
 - `frontend/tests/e2e/progress-report.spec.ts`: `12 passed` total — Chromium `6`,
   WebKit `6`.
 
-The source/evidence commit SHA is recorded here after commit creation.
+Source/evidence commit: `f7a900a743a6ecbc71b97a954d3ed2e036ef8404`.

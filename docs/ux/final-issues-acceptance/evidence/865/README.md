@@ -27,7 +27,7 @@ The same run also keeps `768/1280/1440px` reference crops in both directories.
 ## Evidence
 
 - BEFORE UI baseline: local integration commit `ede84193`.
-- AFTER UI/evidence commit: fill in after the final local commit is created.
+- AFTER UI/evidence commit: `f7a900a743a6ecbc71b97a954d3ed2e036ef8404`.
 - Regression: `frontend/tests/e2e/progress-experience.spec.ts` checks one text
   line, a minimum `44px` touch target and no right-edge overflow at each required
   mobile width.
