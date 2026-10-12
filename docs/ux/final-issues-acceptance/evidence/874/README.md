@@ -6,9 +6,13 @@
 
 ## Текущий технический срез и owner-gate
 
-Сверка выполнена от контрольного HEAD
-`c32df59cd47983895fd004c626d40bebe21edf17` в отдельном linked worktree PR #963.
+Сверка baseline выполнена от контрольного HEAD
+`3e7fb0743df127a11505c25fbc48ddb1687393a8` в отдельном linked worktree PR #963.
 Production UI, формулы, PDF layout и approved navigation в этом срезе не изменялись.
+
+В текущем техническом candidate weekly private notes дополнительно исключены из report API,
+browser report и server PDF. Явный `client_comment` остаётся отдельным необязательным полем
+handoff; `check_ins[].note` не передаётся и автоматически не подставляется.
 
 Прежняя frontend canonical fixture начиналась с `full`-состояния и переопределяла только
 часть полей. Поэтому в одном отчёте одновременно оставались несовместимые значения
@@ -88,8 +92,8 @@ browser PDF проверял только `%PDF` и размер. В PR #963 д�
 - UI: Vitest проверяет те же canonical facts, поддерживаемые периоды и различие
   `null` («Нет данных») от числового нуля.
 - Серверный PDF: pytest проверяет фактический `%PDF`, отображение чисел и единиц,
-  отсутствие controls и diary free text. Разрешённая заметка weekly check-in
-  сохраняется по текущему контракту.
+  отсутствие controls, diary free text и weekly private notes. Явный `client_comment`
+  остаётся отдельным handoff-полем и не подставляется автоматически.
 - Browser print PDF: Playwright Chromium/WebKit проверяет mobile/desktop print
   layout, dark/light preview, отсутствие горизонтального overflow и скрытие экранных
   controls в print media. Chromium создаёт PDF; Poppler подтвердил A4 и страницы.

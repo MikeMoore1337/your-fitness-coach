@@ -432,8 +432,7 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
         for item in check_ins:
             story.append(
                 Paragraph(
-                    f"{_date(item['week_start'])} — {_date(item['week_end'])}: {_safe(_label(item['status']))}"
-                    + (f" · {_safe(item['note'])}" if item.get("note") else ""),
+                    f"{_date(item['week_start'])} — {_date(item['week_end'])}: {_safe(_label(item['status']))}",
                     body,
                 )
             )

@@ -14761,8 +14761,6 @@ export interface components {
             hunger?: number | null;
             /** Adherence Difficulty */
             adherence_difficulty?: number | null;
-            /** Note */
-            note?: string | null;
         };
         /** ProgressReportDownloadLinkResponse */
         ProgressReportDownloadLinkResponse: {

@@ -217,6 +217,7 @@ def test_progress_report_reuses_canonical_facts_without_internal_ids(client) -> 
     assert payload["nutrition"]["target_changes"] == []
     assert payload["program"]["title"] == "Текущая программа"
     assert payload["check_ins"][0]["recovery"] == 3
+    assert "note" not in payload["check_ins"][0]
     assert "food_name" not in response.text
     assert "Содержимое дневника" not in response.text
     assert "user_id" not in response.text
@@ -662,7 +663,8 @@ def test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_sing
     assert sum(paragraph == "—" for paragraph in rendered_paragraphs) >= len(trends)
 
     assert "Содержимое дневника не должно попасть в отчёт" not in rendered
-    assert report["check_ins"][0]["note"] in rendered
+    assert "note" not in report["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in rendered
     assert "user_id" not in rendered
     assert "telegram_user_id" not in rendered
 
@@ -786,7 +788,8 @@ def test_progress_report_pdf_keeps_api_numbers_and_excludes_screen_controls(
     ):
         assert progress_report_pdf._number(nutrition[key]["average"], suffix) in rendered
     assert "Содержимое дневника не должно попасть в отчёт" not in rendered
-    assert report["check_ins"][0]["note"] in rendered
+    assert "note" not in report["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in rendered
     for screen_control in ("Показать период", "Скачать PDF", "Состав и отправка отчёта"):
         assert screen_control not in rendered
 

@@ -429,7 +429,6 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
             recovery: 3,
             hunger: 2,
             adherence_difficulty: 2,
-            note: 'Неделя прошла ровно. В длинной пользовательской заметке проверяем перенос строк, отсутствие clipping и сохранение фактической формулировки без диагностических выводов.',
           },
         ]
       : [],
@@ -832,7 +831,6 @@ export function makeCanonicalProgressReportFixture(): ProgressReport {
       recovery: 3,
       hunger: 2,
       adherence_difficulty: 2,
-      note: 'Фактическая заметка пользователя очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная очень длинная ',
     },
   ];
   report.wellbeing = null;

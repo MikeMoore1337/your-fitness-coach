@@ -802,7 +802,6 @@ function ReportContent({
                     <dd>{checkInValue(checkIn.adherence_difficulty)}</dd>
                   </div>
                 </dl>
-                {checkIn.note && <p>{checkIn.note}</p>}
               </article>
             ))
           ) : (

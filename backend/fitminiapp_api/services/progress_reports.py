@@ -110,7 +110,6 @@ def _check_ins(
             "recovery": row.recovery,
             "hunger": row.hunger,
             "adherence_difficulty": row.adherence_difficulty,
-            "note": row.note,
         }
         for row in rows
     ]
