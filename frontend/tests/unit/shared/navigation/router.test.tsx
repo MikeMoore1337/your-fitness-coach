@@ -7,6 +7,7 @@ import {
   focusedContextReturn,
   NavigationProvider,
   safeTrainerReturnPath,
+  progressReportReturn,
 } from '../../../../src/shared/navigation/router';
 
 describe('NavigationProvider Telegram BackButton', () => {
@@ -99,6 +100,24 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(
       focusedContextReturn('?section=progress&progress_period=days_90&progress_view=nutrition'),
     ).toBe('/app?section=progress&progress_period=days_90');
+  });
+
+  it('сохраняет раздел и период при возврате из личного отчёта без внешнего перехода', () => {
+    expect(progressReportReturn('?period=days_90&progress_view=history')).toBe(
+      '/app?section=progress&progress_view=history&progress_period=90',
+    );
+    expect(
+      progressReportReturn(
+        '?period=custom&date_from=2026-10-01&date_to=2026-10-09&progress_view=body',
+      ),
+    ).toBe(
+      '/app?section=progress&progress_view=body&progress_period=custom&progress_from=2026-10-01&progress_to=2026-10-09',
+    );
+    expect(
+      progressReportReturn(
+        '?progress_view=https://evil.example&return_to=https://evil.example&period=custom&date_from=bad&date_to=bad',
+      ),
+    ).toBe('/app?section=progress');
   });
 
   it('возвращает из публичного demo на landing без запуска защищённого TMA auth', async () => {

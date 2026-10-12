@@ -362,9 +362,14 @@ export function ProfileForm() {
                 <select
                   id="profile-goal"
                   aria-label="Цель"
+                  title={profileGoals.find((option) => option.value === form.goal)?.label}
                   value={form.goal ?? ''}
                   aria-invalid={Boolean(validationErrors.goal)}
-                  aria-describedby={validationErrors.goal ? 'profile-goal-error' : undefined}
+                  aria-describedby={
+                    validationErrors.goal
+                      ? 'profile-goal-value profile-goal-error'
+                      : 'profile-goal-value'
+                  }
                   onChange={(event) =>
                     updateField('goal', event.target.value as UserProfileUpdate['goal'])
                   }
@@ -378,6 +383,10 @@ export function ProfileForm() {
                     </option>
                   ))}
                 </select>
+                <small className="field-hint" id="profile-goal-value" aria-live="polite">
+                  {profileGoals.find((option) => option.value === form.goal)?.label ??
+                    'Выберите цель из списка.'}
+                </small>
                 {validationErrors.goal && (
                   <small className="field-error" id="profile-goal-error" role="alert">
                     {validationErrors.goal}

@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { installPlatformApi } from './fixtures/platform-api';
 import { expectNoHorizontalOverflow, installTelegramHarness } from './fixtures/mobile-tma';
 
-async function expectReadableGlass(panel: Locator) {
+async function expectReadableGlass(panel: Locator, opaque = false) {
   await expect(panel).toBeVisible();
   const contrast = await panel.evaluate((element) => {
     const style = getComputedStyle(element);
@@ -27,7 +27,8 @@ async function expectReadableGlass(panel: Locator) {
     return { alpha, minimum: Math.min(...ratios) };
   });
   expect(contrast.alpha).toBeGreaterThan(0.5);
-  expect(contrast.alpha).toBeLessThan(1);
+  if (opaque) expect(contrast.alpha).toBe(1);
+  else expect(contrast.alpha).toBeLessThan(1);
   expect(contrast.minimum).toBeGreaterThanOrEqual(4.5);
 }
 

@@ -292,11 +292,13 @@ export async function installPlatformApi(
   let adaptationApplyCalls = 0;
   let adaptationApplyMode: 'success' | 'conflict' | 'error' = 'success';
   const progressionOutcome = options.progressionOutcome ?? 'review';
-  const providerAvatar =
-    'data:image/svg+xml;charset=utf-8,' +
-    encodeURIComponent(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="#d8f799"/><circle cx="64" cy="48" r="24" fill="#43631f"/><path d="M22 122c4-31 20-46 42-46s38 15 42 46" fill="#43631f"/></svg>',
-    );
+  const providerAvatar = 'https://provider.example.test/avatar.svg';
+  await page.route(providerAvatar, (route) =>
+    route.fulfill({
+      contentType: 'image/svg+xml',
+      body: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" fill="#d8f799"/><circle cx="64" cy="48" r="24" fill="#43631f"/><path d="M22 122c4-31 20-46 42-46s38 15 42 46" fill="#43631f"/></svg>',
+    }),
+  );
   const customAvatarUpdatedAt = '2030-01-02T12:00:00Z';
   const currentUser = () => ({
     id: 7,

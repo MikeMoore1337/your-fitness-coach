@@ -1,0 +1,33 @@
+name: "Spike"
+description: "Ограниченное исследование и техническое решение"
+body:
+  - type: markdown
+    attributes:
+      value: "Начните название с одного утверждённого префикса. Добавьте метку spike после создания; не записывайте секреты в Issue."
+  - type: textarea
+    id: question
+    attributes:
+      label: "Исследовательский вопрос"
+      placeholder: "Что необходимо выяснить?"
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: "Границы и ограничения"
+      placeholder: "Что не исследуем? Какие запреты и зависимости действуют?"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Варианты и источники"
+    validations:
+      required: false
+  - type: textarea
+    id: output
+    attributes:
+      label: "Ожидаемый результат"
+      placeholder: "Сравнение вариантов, проверенные факты, рекомендация и открытые вопросы."
+    validations:
+      required: true

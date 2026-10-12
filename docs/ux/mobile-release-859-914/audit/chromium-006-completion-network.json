@@ -1,0 +1,91 @@
+[
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": false,
+      "expected_version": 1,
+      "mutation_id": "dce602d5-22e7-4aef-8ee6-b710c9fa7fc6"
+    },
+    "receivedAt": 1791717486196,
+    "status": 200,
+    "response": {
+      "id": 201,
+      "set_number": 1,
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": false,
+      "version": 2,
+      "planned_role": "top",
+      "duration_minutes": null,
+      "distance_km": null,
+      "average_heart_rate_bpm": null,
+      "heart_rate_zone": null
+    },
+    "respondedAt": 1791717486196
+  },
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "expected_version": 2,
+      "mutation_id": "6e8afc44-2ee8-426b-9ae3-4f324852c7b9"
+    },
+    "receivedAt": 1791717486430,
+    "status": 503,
+    "response": {
+      "detail": "Сервис временно недоступен"
+    },
+    "respondedAt": 1791717486430
+  },
+  {
+    "setId": 201,
+    "method": "PATCH",
+    "endpoint": "/api/v1/workouts/sets/201",
+    "body": {
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "expected_version": 2,
+      "mutation_id": "03ac320a-d7b1-45d3-96ff-3a70a7153f28"
+    },
+    "receivedAt": 1791717486585,
+    "status": 200,
+    "response": {
+      "id": 201,
+      "set_number": 1,
+      "actual_reps": 9,
+      "actual_weight": 42.5,
+      "rir": "2",
+      "set_kind": "working",
+      "reached_failure": false,
+      "is_completed": true,
+      "version": 3,
+      "planned_role": "top",
+      "duration_minutes": null,
+      "distance_km": null,
+      "average_heart_rate_bpm": null,
+      "heart_rate_zone": null
+    },
+    "respondedAt": 1791717486585
+  }
+]

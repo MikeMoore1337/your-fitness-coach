@@ -153,7 +153,7 @@ function todayReturn(value: string | null): string | null {
   }
 }
 
-function progressReportReturn(search: string): string {
+export function progressReportReturn(search: string): string {
   const params = new URLSearchParams(search);
   const handoffId = params.get('handoff_id');
   if (handoffId && /^\d+$/.test(handoffId) && Number(handoffId) > 0) {
@@ -163,7 +163,23 @@ function progressReportReturn(search: string): string {
   if (clientId && /^\d+$/.test(clientId) && Number(clientId) > 0) {
     return `/coach?client_id=${clientId}`;
   }
-  return '/app?section=progress';
+  const view = params.get('progress_view');
+  const target = new URLSearchParams({ section: 'progress' });
+  if (view && ['body', 'training', 'nutrition', 'cardio', 'wellbeing', 'history'].includes(view))
+    target.set('progress_view', view);
+  const period = params.get('period');
+  if (period && ['days_7', 'days_30', 'days_90'].includes(period))
+    target.set('progress_period', period.slice(5));
+  if (period === 'custom') {
+    const from = params.get('date_from');
+    const to = params.get('date_to');
+    if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      target.set('progress_period', 'custom');
+      target.set('progress_from', from);
+      target.set('progress_to', to);
+    }
+  }
+  return `/app?${target}`;
 }
 
 function progressOverviewReturn(search: string): string {

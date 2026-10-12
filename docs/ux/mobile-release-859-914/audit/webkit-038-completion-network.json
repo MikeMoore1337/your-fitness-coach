@@ -1,0 +1,167 @@
+{
+  "patches": [
+    {
+      "setId": 201,
+      "method": "PATCH",
+      "endpoint": "/api/v1/workouts/sets/201",
+      "body": {
+        "actual_reps": null,
+        "actual_weight": 42.5,
+        "rir": null,
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "expected_version": 1,
+        "mutation_id": "1a0d1d06-37dd-46fb-b4bc-9d1567a5ea36"
+      },
+      "receivedAt": 1791717674794,
+      "status": 409,
+      "response": {
+        "detail": {
+          "code": "workout_set_version_conflict",
+          "current": {
+            "id": 201,
+            "actual_reps": null,
+            "actual_weight": null,
+            "rir": null,
+            "set_kind": "working",
+            "reached_failure": null,
+            "is_completed": false,
+            "version": 2,
+            "planned_role": "top"
+          }
+        }
+      },
+      "respondedAt": 1791717674794
+    },
+    {
+      "setId": 201,
+      "method": "PATCH",
+      "endpoint": "/api/v1/workouts/sets/201",
+      "body": {
+        "actual_reps": null,
+        "actual_weight": 42.5,
+        "rir": null,
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "expected_version": 2,
+        "mutation_id": "1a0d1d06-37dd-46fb-b4bc-9d1567a5ea36"
+      },
+      "receivedAt": 1791717674875,
+      "status": 200,
+      "response": {
+        "id": 201,
+        "set_number": 1,
+        "actual_reps": null,
+        "actual_weight": 42.5,
+        "rir": null,
+        "set_kind": "working",
+        "reached_failure": false,
+        "is_completed": true,
+        "version": 3,
+        "planned_role": "top",
+        "duration_minutes": null,
+        "distance_km": null,
+        "average_heart_rate_bpm": null,
+        "heart_rate_zone": null
+      },
+      "respondedAt": 1791717674875
+    }
+  ],
+  "events": [
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844,
+      "y": 524,
+      "scrollY": 0,
+      "time": 1214
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844,
+      "y": 524,
+      "scrollY": 0,
+      "time": 1215
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 844,
+      "y": 524,
+      "scrollY": 0,
+      "time": 1215
+    },
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532,
+      "y": 446,
+      "scrollY": 0,
+      "time": 3149
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532,
+      "y": 446,
+      "scrollY": 0,
+      "time": 3163
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": null,
+      "pressed": null,
+      "x": 532,
+      "y": 446,
+      "scrollY": 0,
+      "time": 3163
+    },
+    {
+      "type": "pointerdown",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000,
+      "y": 359,
+      "scrollY": 1304,
+      "time": 3478
+    },
+    {
+      "type": "pointerup",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000,
+      "y": 359,
+      "scrollY": 1304,
+      "time": 3489
+    },
+    {
+      "type": "click",
+      "target": "BUTTON",
+      "label": "Завершить: Жим штанги лёжа, подход 1",
+      "pressed": "false",
+      "setId": "201",
+      "x": 1000,
+      "y": 359,
+      "scrollY": 1304,
+      "time": 3489
+    }
+  ]
+}

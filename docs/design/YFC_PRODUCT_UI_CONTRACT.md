@@ -32,6 +32,16 @@ owner approval exploration и owner selection направления до rollou
 Bounded exception к contract записывается в task и получает explicit owner approval; молчание или
 ссылка на App Experience v3 исключением не являются.
 
+## Визуальный lifecycle
+
+Для новой или существенно изменённой visual composition действует последовательность:
+
+`concrete mockup -> publish в Issue -> explicit owner approval -> реализация approved version 1:1 -> real AFTER evidence -> owner visual acceptance -> separate release approval`.
+
+Одобрение макета разрешает реализацию согласованного scope, но не заменяет owner visual
+acceptance, release approval, merge или deploy. Технические исправления без изменения composition
+идут обычным workflow и не требуют этого visual gate.
+
 ## Язык authenticated UI
 
 Authenticated product UI YFC является русскоязычным по умолчанию: весь user-facing текст должен
@@ -95,6 +105,24 @@ Approved #387 trainer pattern сохраняет trainer-first entry, явный
 context-specific navigation.
 
 ## CTA и action hierarchy
+
+### Единая система выбора
+
+Owner decision от 11.10.2026: `UNIFIED_YFC_SELECTED_STATES`. Канонические правила и исключения:
+[component-states-v2.1.md](component-states-v2.1.md#unified-yfc-selected-states).
+Используй shared `--v2-selected-*` и явный `data-yfc-choice` для семантических controls выбора.
+Полная либо компактная капсула содержит различимую поверхность, внутреннюю световую грань,
+мягкий рельеф и лаймовый акцент в обеих темах. Не ограничивай выбор цветом текста/подчёркиванием.
+Сохраняй ARIA/native semantics; focus, hover, pressed, disabled и смысловые статусы независимы.
+Новые компоненты переиспользуют этот контракт автоматически. Page-local selected-система,
+массовая стилизация `.is-active` и превращение обычных карточек/CTA в капсулы запрещены.
+Baseline активируется при успешной согласованной доставке общего релиза PR #927.
+До нового визуального и release approval PR #927 не сливается и не развёртывается.
+Нижняя вкладка использует полный `--v2-selected-radius-pill` независимо от breakpoint.
+Нижняя мобильная навигация использует матовый Liquid Glass по принципу панели таймера отдыха.
+Детали контента за ней не конкурируют с подписями и иконками. Плотность, blur и fallback заданы
+существующими glass-токенами по каноническому контракту состояний. Материал landing-v10 header
+остаётся самостоятельным; одинаковая прозрачность всех стеклянных поверхностей не требуется.
 
 Если у card/surface одно primary action:
 

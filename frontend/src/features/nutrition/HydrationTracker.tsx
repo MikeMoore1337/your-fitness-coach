@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { HydrationDay, HydrationEntry, HydrationPreset, User } from '../../shared/api/types';
@@ -175,6 +175,8 @@ export function HydrationTracker({
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
   const [expanded, setExpanded] = useState(initialExpanded);
+  const quickAddRef = useRef<HTMLDivElement>(null);
+  const addInFlightRef = useRef(false);
   const [customVolume, setCustomVolume] = useState('');
   const [beverageType, setBeverageType] = useState('water');
   const [undoEntry, setUndoEntry] = useState<HydrationEntry | null>(null);
@@ -193,6 +195,27 @@ export function HydrationTracker({
     queryKey: ['me'],
     queryFn: () => api<User>('/api/v1/me'),
   });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (
+      !initialExpanded ||
+      !hydration.data ||
+      !quickAddRef.current ||
+      url.searchParams.get('hydration') !== 'quick'
+    ) {
+      return;
+    }
+    setExpanded(true);
+    quickAddRef.current.querySelector('button')?.focus({ preventScroll: true });
+    quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
+    url.searchParams.delete('hydration');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, [initialExpanded, hydration.data]);
   const loadedGoal = hydration.data?.goal;
   const loadedGoalIsReference = loadedGoal?.source === 'national_academies_beverages';
   const goalMode = goalModeDraft ?? (loadedGoal && !loadedGoalIsReference ? 'manual' : 'reference');
@@ -245,7 +268,15 @@ export function HydrationTracker({
       haptic('success');
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
+    onSettled: () => {
+      addInFlightRef.current = false;
+    },
   });
+  const submitAdd = (payload: Parameters<typeof add.mutate>[0]) => {
+    if (addInFlightRef.current || add.isPending) return;
+    addInFlightRef.current = true;
+    add.mutate(payload);
+  };
   const undo = useMutation({
     mutationFn: (entryId: number) =>
       api<void>(`/api/v1/nutrition/hydration/entries/${entryId}`, { method: 'DELETE' }),
@@ -367,15 +398,16 @@ export function HydrationTracker({
       >
         <span style={{ width: `${progress}%` }} />
       </div>
-      <div className="hydration-presets" aria-label="Быстро добавить напиток">
+      <div ref={quickAddRef} className="hydration-presets" aria-label="Быстро добавить напиток">
         {data.presets.map((preset) => (
           <Button
             variant="secondary"
+            aria-label={`${preset.label}, добавить ${preset.volume_ml} мл`}
             disabled={add.isPending}
             key={`${preset.id ?? 'default'}-${preset.label}`}
             type="button"
             onClick={() =>
-              add.mutate({
+              submitAdd({
                 volume: preset.volume_ml,
                 kind: preset.beverage_type,
                 source: 'quick_preset',
@@ -399,7 +431,7 @@ export function HydrationTracker({
       {add.isError && add.variables && (
         <div className="hydration-mutation-error" role="alert">
           <span>{add.error.message}</span>
-          <Button variant="secondary" type="button" onClick={() => add.mutate(add.variables)}>
+          <Button variant="secondary" type="button" onClick={() => submitAdd(add.variables)}>
             Повторить без дубля
           </Button>
         </div>
@@ -446,7 +478,7 @@ export function HydrationTracker({
                 disabled={add.isPending || !customVolume}
                 type="button"
                 onClick={() =>
-                  add.mutate({
+                  submitAdd({
                     volume: Number(customVolume),
                     kind: beverageType,
                     source: 'manual',

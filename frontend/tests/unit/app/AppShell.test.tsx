@@ -202,20 +202,51 @@ describe('AppShell', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Что добавить?' });
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole('link', { name: /Добавить еду/ })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'Еда' })).toHaveAttribute(
       'href',
       '/app?section=nutrition&quick_add=food',
     );
-    expect(within(dialog).getAllByRole('link')).toHaveLength(5);
+    expect(
+      within(dialog)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Еда', 'Вода', 'Кардио', 'Замер', 'Самочувствие']);
+    expect(document.getElementById('appContent')?.inert).toBe(true);
     expect(
       within(dialog).queryByRole('link', { name: /Открыть AI Coach/ }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('link', { name: /Добавить еду/ }));
+    fireEvent.click(within(dialog).getByRole('link', { name: 'Еда' }));
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+  });
+
+  it('встраивает добавление пятым действием мобильного dock и возвращает на него фокус', () => {
+    stubViewport(390);
+    navigation.path = '/app';
+    render(<AppShell section="today">Содержимое</AppShell>);
+
+    const primary = document.querySelector('.app-bottom-nav__primary')!;
+    expect(Array.from(primary.children).map((item) => item.textContent)).toEqual([
+      'Сегодня',
+      'План',
+      'Питание',
+      'Прогресс',
+      'Добавить',
+    ]);
+    const add = within(primary as HTMLElement).getByRole('button', { name: 'Быстро добавить' });
+    expect(add.querySelector('svg[data-icon="plus"]')).toBeInTheDocument();
+    expect(add).not.toHaveAttribute('aria-current');
+    expect(add).not.toHaveClass('is-active');
+    expect(document.querySelector('.app-quick-add-trigger--floating')).toBeNull();
+
+    fireEvent.click(add);
+    expect(screen.getByRole('dialog', { name: 'Что добавить?' })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog', { name: 'Что добавить?' })).not.toBeInTheDocument();
+    expect(add).toHaveFocus();
   });
 
   it('открывает доступное mobile-меню с secondary navigation и завершает exit после возврата фокуса', async () => {
@@ -388,16 +419,21 @@ describe('AppShell', () => {
       updated_at: '2030-01-02T12:00:00',
     };
     user.photo_url = 'https://provider.example.test/avatar.jpg';
-    vi.stubGlobal('URL', {
-      ...URL,
-      createObjectURL: vi.fn(() => 'blob:private-avatar'),
-      revokeObjectURL: vi.fn(),
-    });
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = vi.fn(() => `blob:${window.location.origin}/private-avatar`);
+        static revokeObjectURL = vi.fn();
+      },
+    );
 
     const { container } = render(<AppShell>Содержимое</AppShell>);
     const avatar = container.querySelector('.app-desktop-account-entry__avatar');
     await waitFor(() =>
-      expect(avatar?.querySelector('img')).toHaveAttribute('src', 'blob:private-avatar'),
+      expect(avatar?.querySelector('img')).toHaveAttribute(
+        'src',
+        `blob:${window.location.origin}/private-avatar`,
+      ),
     );
     const privateImage = avatar?.querySelector('img');
     expect(privateImage).not.toBeNull();

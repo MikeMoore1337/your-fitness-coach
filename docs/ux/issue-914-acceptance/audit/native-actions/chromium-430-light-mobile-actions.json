@@ -1,0 +1,1611 @@
+{
+  "engine": "chromium",
+  "width": 430,
+  "theme": "light",
+  "scene": "mobile-actions",
+  "before": {
+    "active": "202",
+    "weight": "42.5",
+    "reps": "9",
+    "rir": "2",
+    "previousCompleted": "true",
+    "focus": "Повторы, Жим штанги лёжа, подход 2",
+    "scrollY": 2026,
+    "overflow": false
+  },
+  "beforeSkip": {
+    "active": "202",
+    "weight": "42.5",
+    "reps": "9",
+    "rir": "2",
+    "previousCompleted": "true",
+    "focus": "Повторы, Жим штанги лёжа, подход 2",
+    "scrollY": 1990,
+    "overflow": false
+  },
+  "after": {
+    "active": "202",
+    "weight": "42.5",
+    "reps": "9",
+    "rir": "2",
+    "previousCompleted": "true",
+    "focus": "Повторы, Жим штанги лёжа, подход 2",
+    "scrollY": 1990,
+    "overflow": false
+  },
+  "material": {
+    "background": "rgba(248, 250, 250, 0.96)",
+    "filter": "blur(20px) saturate(1.12) brightness(1.03)",
+    "font": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "pointerEvents": "auto",
+    "position": "sticky",
+    "top": "0px"
+  },
+  "targets": [
+    {
+      "action": 30,
+      "box": {
+        "x": 23,
+        "y": 56,
+        "width": 122.65625,
+        "height": 44
+      }
+    },
+    {
+      "action": 60,
+      "box": {
+        "x": 153.65625,
+        "y": 56,
+        "width": 122.671875,
+        "height": 44
+      }
+    }
+  ],
+  "point": {
+    "x": 345.65625,
+    "y": 78,
+    "previous": {
+      "x": 12,
+      "y": 54.1875,
+      "width": 406,
+      "height": 48,
+      "top": 54.1875,
+      "right": 418,
+      "bottom": 102.1875,
+      "left": 12
+    },
+    "panel": {
+      "x": 12,
+      "y": 0,
+      "width": 406,
+      "height": 110,
+      "top": 0,
+      "right": 418,
+      "bottom": 110,
+      "left": 12
+    }
+  },
+  "writes": [],
+  "events": [
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:28Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропустить",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 84.31999969482422,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:28Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропустить",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 84.31999969482422,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:28Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропустить",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 84.31999969482422,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:28Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропустить",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 84.31999969482422,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+30 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+30 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:28Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропустить",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 84,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+60 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 214.99000549316406,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+60 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 214.99000549316406,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+60 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 214.99000549316406,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+60 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 214.99000549316406,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "+60 сек",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "+60 сек",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых1:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 215,
+      "y": 78,
+      "scrollY": 2026
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых2:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых2:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых2:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых2:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых2:58Далее: Жим штанги лёжаПодход 2 из 3+30 сек+60 секПропуститьК отдыху доб",
+          "class": "active-workout-rest"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 346,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 346,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 345.65625,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "hit": {
+        "tag": "BUTTON",
+        "text": "Пропустить",
+        "class": "ui-button ui-button--secondary"
+      },
+      "path": [
+        {
+          "tag": "BUTTON",
+          "text": "Пропустить",
+          "class": "ui-button ui-button--secondary"
+        },
+        {
+          "tag": "DIV",
+          "text": "+30 сек+60 секПропустить",
+          "class": "active-workout-rest__actions"
+        },
+        {
+          "tag": "ASIDE",
+          "text": "Отдых0:00Отдых пропущенПодход 2 из 3+30 сек+60 секПропуститьОтдых пропущен · Под",
+          "class": "active-workout-rest active-workout-rest--complete"
+        },
+        {
+          "tag": "SECTION",
+          "text": "Тренировка · день 1Силовая база2026-10-10 · 0:00В процессеПрогресс тренировки1 и",
+          "class": "active-workout active-workout--design-v2 is-embedded"
+        },
+        {
+          "tag": "DIV",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "today-workout-focus"
+        },
+        {
+          "tag": "SECTION",
+          "text": "К сводкеСиловая базаТекущая тренировкаДень 1 · В процессеТренировка · день 1Сило",
+          "class": "page-stack"
+        }
+      ],
+      "active": "202",
+      "x": 346,
+      "y": 78,
+      "scrollY": 1990
+    },
+    {
+      "type": "pointerdown",
+      "pointerType": "touch",
+      "target": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "hit": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "path": [
+        {
+          "tag": "INPUT",
+          "text": "",
+          "class": "",
+          "set": "202"
+        },
+        {
+          "tag": "LABEL",
+          "text": "Повторы",
+          "class": "active-workout-input",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "Вес, кгПовторыЗавершить подход",
+          "class": "active-workout-set__controls",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "2Подход 2 из 3Сначала вес, затем повторыОблегчённый подходПредыдущий подход: 40 ",
+          "class": "active-workout-set is-current",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+          "class": "active-workout-exercise__sets"
+        },
+        {
+          "tag": "DIV",
+          "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+          "class": ""
+        }
+      ],
+      "active": "202",
+      "x": 309.5,
+      "y": 388.17999267578125,
+      "scrollY": 2039
+    },
+    {
+      "type": "touchstart",
+      "target": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "hit": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "path": [
+        {
+          "tag": "INPUT",
+          "text": "",
+          "class": "",
+          "set": "202"
+        },
+        {
+          "tag": "LABEL",
+          "text": "Повторы",
+          "class": "active-workout-input",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "Вес, кгПовторыЗавершить подход",
+          "class": "active-workout-set__controls",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "2Подход 2 из 3Сначала вес, затем повторыОблегчённый подходПредыдущий подход: 40 ",
+          "class": "active-workout-set is-current",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+          "class": "active-workout-exercise__sets"
+        },
+        {
+          "tag": "DIV",
+          "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+          "class": ""
+        }
+      ],
+      "active": "202",
+      "x": 309.5,
+      "y": 388.179931640625,
+      "scrollY": 2039
+    },
+    {
+      "type": "pointerup",
+      "pointerType": "touch",
+      "target": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "hit": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "path": [
+        {
+          "tag": "INPUT",
+          "text": "",
+          "class": "",
+          "set": "202"
+        },
+        {
+          "tag": "LABEL",
+          "text": "Повторы",
+          "class": "active-workout-input",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "Вес, кгПовторыЗавершить подход",
+          "class": "active-workout-set__controls",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "2Подход 2 из 3Сначала вес, затем повторыОблегчённый подходПредыдущий подход: 40 ",
+          "class": "active-workout-set is-current",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+          "class": "active-workout-exercise__sets"
+        },
+        {
+          "tag": "DIV",
+          "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+          "class": ""
+        }
+      ],
+      "active": "202",
+      "x": 309.5,
+      "y": 388.17999267578125,
+      "scrollY": 2039
+    },
+    {
+      "type": "touchend",
+      "target": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "hit": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "path": [
+        {
+          "tag": "INPUT",
+          "text": "",
+          "class": "",
+          "set": "202"
+        },
+        {
+          "tag": "LABEL",
+          "text": "Повторы",
+          "class": "active-workout-input",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "Вес, кгПовторыЗавершить подход",
+          "class": "active-workout-set__controls",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "2Подход 2 из 3Сначала вес, затем повторыОблегчённый подходПредыдущий подход: 40 ",
+          "class": "active-workout-set is-current",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+          "class": "active-workout-exercise__sets"
+        },
+        {
+          "tag": "DIV",
+          "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+          "class": ""
+        }
+      ],
+      "active": "202",
+      "x": 309.5,
+      "y": 388.179931640625,
+      "scrollY": 2039
+    },
+    {
+      "type": "click",
+      "pointerType": "touch",
+      "target": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "hit": {
+        "tag": "INPUT",
+        "text": "",
+        "class": "",
+        "set": "202"
+      },
+      "path": [
+        {
+          "tag": "INPUT",
+          "text": "",
+          "class": "",
+          "set": "202"
+        },
+        {
+          "tag": "LABEL",
+          "text": "Повторы",
+          "class": "active-workout-input",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "Вес, кгПовторыЗавершить подход",
+          "class": "active-workout-set__controls",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "2Подход 2 из 3Сначала вес, затем повторыОблегчённый подходПредыдущий подход: 40 ",
+          "class": "active-workout-set is-current",
+          "set": "202"
+        },
+        {
+          "tag": "DIV",
+          "text": "1Подход 1Тяжёлый подход ВыполненВес, кгПовторы ГотовоДополнительноВид подходаРаб",
+          "class": "active-workout-exercise__sets"
+        },
+        {
+          "tag": "DIV",
+          "text": "Последний рабочий результат40 кг × 8Расчётный максимум на 1 повтор50 кг1Подход 1",
+          "class": ""
+        }
+      ],
+      "active": "202",
+      "x": 310,
+      "y": 388,
+      "scrollY": 2039
+    }
+  ],
+  "errors": [],
+  "status": "PASS"
+}

@@ -1,0 +1,32 @@
+{
+  "issue": 906,
+  "variant": "B",
+  "runtimeBaseSha": "c0316efc48f65e268329ba300734f6ff69d97249",
+  "capture": {
+    "server": "Vite local runtime at http://127.0.0.1:4173",
+    "browser": "Playwright Chromium headless",
+    "reducedMotion": true,
+    "themes": ["dark", "light"],
+    "routes": ["/for-athletes", "/for-trainers"],
+    "desktopViewports": ["1440x900", "1920x1080", "2560x1440", "3440x1440"],
+    "mobileViewports": ["320x844", "390x844", "430x932"],
+    "zoom": [
+      "100%",
+      "125% surrogate via documentElement CSS zoom for qhd125 capture"
+    ],
+    "fontState": "document.fonts.status=loaded",
+    "fixture": "public landing; no authenticated data"
+  },
+  "before": {
+    "sourceSha": "c0316efc48f65e268329ba300734f6ff69d97249",
+    "manifest": "before-manifest.json"
+  },
+  "after": {
+    "sourceSha": "7393ef1ad107da6239f01b87d58b82dc1289f0be",
+    "manifest": "after-manifest.json"
+  },
+  "notes": [
+    "The 125% capture is a deterministic CSS zoom diagnostic; native browser zoom remains a separate manual acceptance check.",
+    "Screenshots are real browser captures, not proposal mockups."
+  ]
+}

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: "Сообщить об уязвимости конфиденциально"
+    url: "https://github.com/MikeMoore1337/your-fitness-coach/security/advisories/new"
+    about: "Не публикуйте подробности уязвимостей в открытых Issues."

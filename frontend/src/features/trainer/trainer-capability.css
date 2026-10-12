@@ -218,12 +218,6 @@
   text-decoration: none;
 }
 
-.trainer-mode-switch a.is-active {
-  background: var(--v2-surface);
-  box-shadow: inset 0 -3px 0 var(--v2-lime);
-  color: var(--v2-text-primary);
-}
-
 @media (max-width: 680px) {
   .trainer-capability__activate,
   .trainer-capability__disable .btn-danger,

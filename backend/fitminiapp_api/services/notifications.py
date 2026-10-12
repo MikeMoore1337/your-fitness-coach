@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime, time, timedelta
+from hashlib import sha256
 from typing import Literal, cast
 from urllib.parse import parse_qs, urlsplit
 
@@ -95,6 +96,16 @@ class NotificationDeliveryError(RuntimeError):
         self.code = code
         self.retry_after = retry_after
         self.terminal_status = terminal_status
+
+
+class ManualNotificationScheduleError(ValueError):
+    """The requested personal reminder is no longer a future local wall time."""
+
+
+PAST_NOTIFICATION_DATE_MESSAGE = "Выберите сегодняшнюю или будущую дату."
+PAST_NOTIFICATION_TODAY_MESSAGE = (
+    "Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля."
+)
 
 
 def can_scheduler_reactivate_cancelled_notification(notification: Notification) -> bool:
@@ -1122,23 +1133,60 @@ def create_manual_notification(
     scheduled_for: datetime,
     channel: str = "telegram",
 ) -> Notification:
+    # Serialize manual reminder creation per account so the final wall-clock check and
+    # unique key cover retries and requests racing the minute/day boundary.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    local_scheduled_for = to_user_timezone_naive(scheduled_for, user)
+
+    def ensure_future_schedule(now_local: datetime) -> None:
+        if local_scheduled_for.date() < now_local.date():
+            raise ManualNotificationScheduleError(PAST_NOTIFICATION_DATE_MESSAGE)
+        if local_scheduled_for.date() == now_local.date() and local_scheduled_for <= now_local:
+            raise ManualNotificationScheduleError(PAST_NOTIFICATION_TODAY_MESSAGE)
+
+    ensure_future_schedule(now_for_user_naive(user))
+    title = title.strip()
+    body = body.strip()
+    dedupe_key = "custom:{}:{}".format(
+        user.id,
+        sha256(
+            "\x1f".join(
+                (channel, title, body, local_scheduled_for.isoformat()),
+            ).encode("utf-8")
+        ).hexdigest(),
+    )
+    existing = db.query(Notification).filter(Notification.dedupe_key == dedupe_key).first()
+    if existing is not None:
+        return existing
+
     notification = Notification(
         user_id=user.id,
         channel=channel,
         category="custom_reminder",
         event_kind="reminder",
-        title=title.strip(),
-        body=body.strip(),
-        scheduled_for=to_user_timezone_naive(scheduled_for, user),
-        scheduled_for_utc=(
-            scheduled_for.astimezone(UTC).replace(tzinfo=None)
-            if scheduled_for.tzinfo is not None
-            else user_local_naive_to_utc_naive(scheduled_for, user)
-        ),
+        title=title,
+        body=body,
+        scheduled_for=local_scheduled_for,
+        scheduled_for_utc=user_local_naive_to_utc_naive(local_scheduled_for, user),
         status="queued",
+        dedupe_key=dedupe_key,
     )
     db.add(notification)
-    db.commit()
+    try:
+        db.flush()
+        # The first check can pass just before the selected minute expires. Recheck while
+        # the per-user transaction lock is still held, before making the row visible.
+        ensure_future_schedule(now_for_user_naive(user))
+        db.commit()
+    except ManualNotificationScheduleError:
+        db.rollback()
+        raise
+    except IntegrityError:
+        db.rollback()
+        existing = db.query(Notification).filter(Notification.dedupe_key == dedupe_key).first()
+        if existing is None:
+            raise
+        return existing
     db.refresh(notification)
     return notification
 

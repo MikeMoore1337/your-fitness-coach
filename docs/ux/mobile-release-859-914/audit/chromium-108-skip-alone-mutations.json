@@ -1,0 +1,27 @@
+{
+  "writes": [],
+  "point": {
+    "x": 314.828125,
+    "y": 78,
+    "panel": {
+      "x": 12,
+      "y": 0,
+      "width": 369,
+      "height": 110,
+      "top": 0,
+      "right": 381,
+      "bottom": 110,
+      "left": 12
+    },
+    "previous": {
+      "x": 12,
+      "y": 54.078125,
+      "width": 369,
+      "height": 48,
+      "top": 54.078125,
+      "right": 381,
+      "bottom": 102.078125,
+      "left": 12
+    }
+  }
+}

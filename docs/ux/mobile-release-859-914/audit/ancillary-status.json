@@ -1,0 +1,19 @@
+{
+  "initial": {
+    "startTime": "2026-10-11T11:27:08.886Z",
+    "duration": 62805.652,
+    "expected": 23,
+    "skipped": 0,
+    "unexpected": 1,
+    "flaky": 0
+  },
+  "rerun": {
+    "expected": 0,
+    "unexpected": 3,
+    "flaky": 0,
+    "classification": "PRE_EXISTING_PERFORMANCE_FAILURE_OUTSIDE_SCOPE",
+    "log": "ancillary-rerun/ancillary-rerun.log"
+  },
+  "classification": "PRE_EXISTING_PERFORMANCE_FAILURE_OUTSIDE_SCOPE",
+  "reason": "WebKit Pulse completion p95 frame-gap exceeded the unchanged 34 ms threshold on the prior and current runtime; no application runtime path for this task changed the Pulse completion surface."
+}

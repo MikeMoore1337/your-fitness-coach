@@ -546,6 +546,7 @@ function ChatMessage({
         <div className="ai-coach-message__feedback" aria-label="Оценка ответа">
           <button
             aria-pressed={feedback === 'helpful'}
+            data-yfc-choice="compact"
             aria-label="Полезно"
             className={feedback === 'helpful' ? 'is-selected' : ''}
             title="Полезно"
@@ -556,6 +557,7 @@ function ChatMessage({
           </button>
           <button
             aria-pressed={feedback === 'not_helpful'}
+            data-yfc-choice="compact"
             aria-label="Не полезно"
             className={feedback === 'not_helpful' ? 'is-selected' : ''}
             title="Не полезно"
@@ -662,6 +664,7 @@ function AiCoachHistoryView({
                     >
                       <button
                         aria-current={active ? 'true' : undefined}
+                        data-yfc-choice="compact"
                         className="ai-coach-history__item-open"
                         disabled={pending}
                         type="button"

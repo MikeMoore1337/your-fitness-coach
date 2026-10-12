@@ -1,0 +1,96 @@
+/* Isolated owner-review overlay. Never imported by frontend/src. */
+.active-workout-rest[data-rest-proposal-source] { display: none; }
+.active-workout-rest[data-rest-proposal] {
+  --glass-tinted-opacity: 0.95;
+  position: sticky;
+  top: var(--yfc-layout-safe-top, 0px);
+  right: auto;
+  bottom: auto;
+  left: auto;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-self: start;
+  gap: 8px 12px;
+  width: 100%;
+  min-height: 109px;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--v2-control-radius);
+  pointer-events: auto;
+  animation: none;
+}
+:root[data-color-scheme='light'] .active-workout-rest[data-rest-proposal] {
+  --glass-tinted-opacity: 0.96;
+}
+[data-rest-proposal] .active-workout-rest__time strong {
+  font: 700 1.5rem/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+[data-rest-proposal] .active-workout-rest__next {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.25;
+  white-space: normal;
+}
+[data-rest-proposal] .active-workout-rest__next strong {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--v2-text-primary);
+}
+[data-rest-proposal] .active-workout-rest__actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+[data-rest-proposal] .active-workout-rest__actions button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 7px 4px;
+  font: 700 0.75rem/1.25 var(--font-body);
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+[data-rest-proposal][data-state='complete'] {
+  display: flex;
+  min-height: 44px;
+  justify-content: space-between;
+  gap: 8px;
+  padding-block: 8px;
+  color: var(--v2-text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+[data-rest-proposal][data-state='complete'] strong {
+  color: var(--v2-text-primary);
+  font-weight: 700;
+}
+[data-rest-proposal] .rest-proposal-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.active-workout:has([data-rest-proposal]) :is(input, .active-workout-input, [data-workout-field='done']) {
+  scroll-margin-block-start: calc(var(--yfc-layout-safe-top, 0px) + 124px);
+}
+@media (min-width: 681px) {
+  .active-workout-rest[data-rest-proposal] {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: min(680px, 100%);
+    min-height: 64px;
+  }
+  [data-rest-proposal] .active-workout-rest__actions {
+    grid-column: auto;
+    grid-template-columns: repeat(3, minmax(88px, 1fr));
+  }
+}

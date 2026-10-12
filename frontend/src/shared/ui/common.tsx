@@ -153,7 +153,7 @@ export function SegmentedControl({
       {options.map((option) => (
         <button
           aria-selected={option.value === value}
-          {...(option.value === value ? glassProps('clear', true) : {})}
+          data-yfc-choice="capsule"
           className="ui-tab"
           disabled={option.disabled}
           key={option.value}

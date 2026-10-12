@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
@@ -30,6 +31,8 @@ const TASK_111_SCREENSHOTS = resolve(
 );
 
 type NutritionReportState = 'partial' | 'no-data' | 'long';
+
+const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -1022,7 +1025,11 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   await expect(body.getByText('Мышцы спины')).toBeVisible();
   await expect(body.getByText('Задняя поверхность тела и ягодичные мышцы')).toBeVisible();
   await expect(body.getByText(/не оценивает тело/)).toBeVisible();
-  await expect(body.getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/)).toBeVisible();
+  await expect(body.locator('.progress-measurement-editor')).not.toHaveAttribute('open');
+  await body.locator('.progress-measurement-editor > summary').click();
+  await expect(
+    body.locator('.measurement-diary').getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/),
+  ).toBeVisible();
   await expect(body.getByText(/разовое изменение не считаем трендом/)).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -1041,7 +1048,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .poll(async () => {
       const mobileTrend = await body.locator('.progress-body-trends').boundingBox();
       const mobileDiary = await body.locator('.progress-body-diary').boundingBox();
-      return Boolean(mobileTrend && mobileDiary && mobileDiary.y < mobileTrend.y);
+      return Boolean(mobileTrend && mobileDiary && mobileDiary.y > mobileTrend.y);
     })
     .toBe(true);
   await expect(body.getByLabel('Вес, кг')).toHaveAttribute('inputmode', 'decimal');
@@ -1126,6 +1133,8 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     report.getByText('Средние значения рассчитаны только по заполненным дням.'),
   ).toBeVisible();
   await expect(report.getByRole('img', { name: /Калории по дням/ })).toBeVisible();
+  await expect(report.getByText('Изменения цели в периоде')).toBeHidden();
+  await report.getByText('История целей питания', { exact: true }).click();
   await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
   await expect(
     report.getByRole('table', {
@@ -1327,7 +1336,10 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   const report = page.locator('#nutrition-period-report');
   await expect(report.getByText('Заполнено 0 из 30 дней')).toBeVisible();
   await expect(report.getByText('Нет заполненных дней за период')).toBeVisible();
-  await expect(report.getByRole('link', { name: 'Открыть дневник питания' })).toBeVisible();
+  await expect(report.getByRole('link', { name: 'Открыть дневник питания' })).toHaveAttribute(
+    'href',
+    '/app?section=nutrition',
+  );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
   await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
@@ -1673,9 +1685,9 @@ test('progress header aligns help and report without clipping the period selecto
     }
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 
-    for (const width of [768, 1280, 1440, 390]) {
+    for (const width of [320, 360, 393, 430, 768, 1280, 1440]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
-      const help = page.locator('.progress-hero__help').getByText('Что это?', { exact: true });
+      const help = page.locator('.progress-hero__help').getByText('О показателях', { exact: true });
       const report = page.getByRole('link', { name: 'Скачать отчёт' });
       const period = page.locator('.progress-hero__period');
       const tabs = period.getByRole('tablist', { name: 'Период прогресса' });
@@ -1684,6 +1696,22 @@ test('progress header aligns help and report without clipping the period selecto
       await expect(report).toBeVisible();
       await expect(tabs.getByRole('tab')).toHaveCount(4);
       await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
+      if (CAPTURE_PROGRESS_865) {
+        const evidenceDirectory = resolve(
+          process.cwd(),
+          '..',
+          'docs',
+          'ux',
+          'final-issues-acceptance',
+          'evidence',
+          '865',
+          CAPTURE_PROGRESS_865,
+        );
+        await mkdir(evidenceDirectory, { recursive: true });
+        await page.locator('.progress-hero').screenshot({
+          path: resolve(evidenceDirectory, `${test.info().project.name}-${width}-${theme}.png`),
+        });
+      }
       const selectorGeometry = await tabs.evaluate((element) => {
         const tabStyle = getComputedStyle(element);
         const wrapperStyle = getComputedStyle(element.parentElement!);
@@ -1699,6 +1727,38 @@ test('progress header aligns help and report without clipping the period selecto
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
+
+      const helpGeometry = await help.evaluate((element) => {
+        const summary = element.closest('summary');
+        const textNode = summary
+          ? Array.from(summary.childNodes).find((node) => node.nodeType === Node.TEXT_NODE)
+          : null;
+        const range = document.createRange();
+        if (textNode) range.selectNodeContents(textNode);
+        const textRects = textNode ? Array.from(range.getClientRects()) : [];
+        const summaryBox = summary?.getBoundingClientRect();
+        const summaryStyle = summary ? getComputedStyle(summary) : null;
+        return {
+          textRectCount: textRects.length,
+          textWidths: textRects.map((rect) => Math.round(rect.width * 100) / 100),
+          height: summaryBox?.height ?? 0,
+          width: summaryBox?.width ?? 0,
+          x: summaryBox?.x ?? 0,
+          right: summaryBox?.right ?? Infinity,
+          viewportWidth: window.innerWidth,
+          minHeight: summaryStyle ? parseFloat(summaryStyle.minHeight) : 0,
+        };
+      });
+      if (width <= 430 && CAPTURE_PROGRESS_865 !== 'before') {
+        expect(
+          helpGeometry.textRectCount,
+          `wrapped at ${width}px: ${JSON.stringify(helpGeometry)}`,
+        ).toBe(1);
+        expect(helpGeometry.height, `touch target at ${width}px`).toBeGreaterThanOrEqual(44);
+        expect(helpGeometry.right, `overflow at ${width}px`).toBeLessThanOrEqual(
+          helpGeometry.viewportWidth,
+        );
+      }
 
       if (width >= 1280) {
         const [helpBox, reportBox, periodBox] = await Promise.all([

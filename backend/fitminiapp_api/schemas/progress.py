@@ -369,7 +369,6 @@ class ProgressReportCheckIn(BaseModel):
     recovery: int | None = Field(default=None, ge=1, le=5)
     hunger: int | None = Field(default=None, ge=1, le=5)
     adherence_difficulty: int | None = Field(default=None, ge=1, le=5)
-    note: str | None = None
 
 
 class ProgressReportResponse(BaseModel):
