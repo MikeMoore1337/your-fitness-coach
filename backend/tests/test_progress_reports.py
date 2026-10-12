@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
+from scripts.extract_pdf_text import extract_pdf_text
 
 from fitminiapp_api.core.timezone import today_msk
 from fitminiapp_api.db.session import get_session_context
@@ -23,6 +25,12 @@ from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services import progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
+
+CANONICAL_FACTS = json.loads(
+    (
+        Path(__file__).resolve().parents[2] / "tests/fixtures/progress-report-canonical.json"
+    ).read_text(encoding="utf-8")
+)
 
 
 def test_report_fonts_use_packaged_inter_and_oswald_with_cyrillic() -> None:
@@ -47,8 +55,8 @@ def _user_id(telegram_user_id: int) -> int:
         return db.query(User.id).filter(User.telegram_user_id == telegram_user_id).scalar()
 
 
-def _seed_report_data(user_id: int) -> None:
-    today = today_msk()
+def _seed_report_data(user_id: int, *, as_of: date | None = None) -> None:
+    today = as_of or today_msk()
     with get_session_context() as db:
         user = db.get(User, user_id)
         assert user is not None and user.profile is not None
@@ -213,6 +221,128 @@ def test_progress_report_reuses_canonical_facts_without_internal_ids(client) -> 
     assert "Содержимое дневника" not in response.text
     assert "user_id" not in response.text
     assert '"id"' not in response.text
+
+
+def test_progress_report_api_and_server_pdf_share_one_canonical_fact_set(client) -> None:
+    headers = _auth(client, 67_061)
+    user_id = _user_id(67_061)
+    period = CANONICAL_FACTS["period"]
+    period_start = date.fromisoformat(period["start"])
+    period_end = date.fromisoformat(period["end"])
+    _seed_report_data(user_id, as_of=period_end)
+
+    params = {
+        "period": period["period"],
+        "date_from": period["start"],
+        "date_to": period["end"],
+    }
+    api_response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+    assert api_response.status_code == 200, api_response.text
+    report = api_response.json()
+
+    assert report["subject"] == CANONICAL_FACTS["subject"]
+    assert report["period_start"] == period["start"]
+    assert report["period_end"] == period["end"]
+    assert report["timezone"] == period["timezone"]
+    for key, value in CANONICAL_FACTS["training"].items():
+        assert report["training"][key] == value
+    for key, value in CANONICAL_FACTS["cardio"].items():
+        assert report["cardio"][key] == value
+    for key in ("logged_days", "eligible_days", "missing_days"):
+        assert report["nutrition"]["summary"][key] == CANONICAL_FACTS["nutrition"][key]
+    for key in ("calories", "protein_g", "fat_g", "carbs_g"):
+        assert (
+            report["nutrition"]["summary"][key]["average"]
+            == CANONICAL_FACTS["nutrition"][f"{key}_average"]
+        )
+    for expected in CANONICAL_FACTS["body"]:
+        actual = next(
+            item for item in report["body"]["trends"] if item["metric"] == expected["metric"]
+        )
+        for key in (
+            "label",
+            "unit",
+            "first_value",
+            "latest_value",
+            "change",
+            "first_measured_on",
+            "latest_measured_on",
+            "point_count",
+            "span_days",
+        ):
+            assert actual[key] == expected[key]
+
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link", params=params, headers=headers
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+
+    rendered = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
+    assert (
+        f"Период: {period_start:%d.%m.%Y} — {period_end:%d.%m.%Y} · Часовой пояс: {period['timezone']}"
+        in rendered
+    )
+    assert "Тренировки" in rendered
+    assert "1 / 2" in rendered
+    assert "Завершено: 1" in rendered
+    assert "Пропущено: 1" in rendered
+    assert "400 кг" in rendered
+    assert "0 мин" in rendered
+    assert "2 100 ккал" in rendered
+    assert "155 г" in rendered
+    assert "68 г" in rendered
+    assert "230 г" in rendered
+    for expected in CANONICAL_FACTS["body"]:
+        unit = "кг" if expected["unit"] == "kg" else "см"
+        assert f"{expected['first_value']} {unit}" in rendered
+        assert f"{expected['latest_value']} {unit}" in rendered
+        assert (
+            f"{expected['first_measured_on'][8:10]}.{expected['first_measured_on'][5:7]}.{expected['first_measured_on'][:4]}"
+            in rendered
+        )
+        assert (
+            f"{expected['latest_measured_on'][8:10]}.{expected['latest_measured_on'][5:7]}.{expected['latest_measured_on'][:4]}"
+            in rendered
+        )
+    for private_value in CANONICAL_FACTS["privacy"]:
+        assert private_value not in rendered
+
+
+def test_progress_report_empty_pdf_has_no_fabricated_facts(client) -> None:
+    headers = _auth(client, 67_062)
+    period = CANONICAL_FACTS["period"]
+    response = client.get(
+        "/api/v1/workouts/progress/report",
+        params={
+            "period": period["period"],
+            "date_from": period["start"],
+            "date_to": period["end"],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["training"]["planned_workouts"] == 0
+    assert report["body"]["trends"] == []
+    assert report["nutrition"]["summary"]["calories"]["average"] is None
+
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params={"period": period["period"], "date_from": period["start"], "date_to": period["end"]},
+        headers=headers,
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+    rendered = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
+    assert "Тренировки 0 / 0" in rendered
+    assert "Нет данных" not in rendered
+    for private_value in CANONICAL_FACTS["privacy"]:
+        assert private_value not in rendered
 
 
 def test_progress_report_download_uses_custom_definition_label_in_pdf(client, monkeypatch) -> None:
@@ -462,6 +592,7 @@ def test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_sing
     assert downloaded.status_code == 200, downloaded.text
     assert downloaded.headers["content-type"].startswith("application/pdf")
     assert downloaded.content.startswith(b"%PDF-")
+    extracted = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
 
     rendered = "\n".join(rendered_paragraphs)
     training = report["training"]
@@ -475,6 +606,8 @@ def test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_sing
         )
         expected_value = progress_report_pdf._number(item["latest_value"], unit)
         assert sum(expected_value in paragraph for paragraph in rendered_paragraphs) >= 2
+        assert expected_value in extracted
+        assert progress_report_pdf._date(item["latest_measured_on"]) in extracted
     assert sum(paragraph == "—" for paragraph in rendered_paragraphs) >= len(trends)
 
     assert "Содержимое дневника не должно попасть в отчёт" not in rendered

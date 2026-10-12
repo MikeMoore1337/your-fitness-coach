@@ -1,0 +1,64 @@
+{
+  "period": {
+    "period": "custom",
+    "start": "2026-07-26",
+    "end": "2026-08-24",
+    "timezone": "Europe/Moscow"
+  },
+  "subject": {
+    "name": "Александр Очень-Длинное-Имя Для Отчёта",
+    "role": "self",
+    "goal": "muscle_gain"
+  },
+  "training": {
+    "planned_workouts": 2,
+    "completed_workouts": 1,
+    "skipped_workouts": 1,
+    "completed_working_sets": 1,
+    "external_load_volume_kg": 400
+  },
+  "cardio": {
+    "completed_sessions": 0,
+    "duration_minutes": 0
+  },
+  "nutrition": {
+    "logged_days": 1,
+    "eligible_days": 30,
+    "missing_days": 29,
+    "calories_average": 2100,
+    "protein_g_average": 155,
+    "fat_g_average": 68,
+    "carbs_g_average": 230
+  },
+  "body": [
+    {
+      "metric": "weight_kg",
+      "label": "Вес",
+      "unit": "kg",
+      "first_value": 80,
+      "latest_value": 79,
+      "change": -1,
+      "first_measured_on": "2026-08-04",
+      "latest_measured_on": "2026-08-21",
+      "point_count": 2,
+      "span_days": 17
+    },
+    {
+      "metric": "waist_cm",
+      "label": "Талия",
+      "unit": "cm",
+      "first_value": 90,
+      "latest_value": 89,
+      "change": -1,
+      "first_measured_on": "2026-08-04",
+      "latest_measured_on": "2026-08-21",
+      "point_count": 2,
+      "span_days": 17
+    }
+  ],
+  "privacy": [
+    "Содержимое дневника не должно попасть в отчёт",
+    "user_id",
+    "telegram_user_id"
+  ]
+}

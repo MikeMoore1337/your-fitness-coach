@@ -1,4 +1,45 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { ProgressReport } from '../../src/shared/api/types';
+
+type CanonicalFacts = {
+  period: { period: string; start: string; end: string; timezone: string };
+  subject: { name: string; role: string; goal: string };
+  training: {
+    planned_workouts: number;
+    completed_workouts: number;
+    skipped_workouts: number;
+    completed_working_sets: number;
+    external_load_volume_kg: number;
+  };
+  cardio: { completed_sessions: number; duration_minutes: number };
+  nutrition: {
+    logged_days: number;
+    eligible_days: number;
+    missing_days: number;
+    calories_average: number;
+    protein_g_average: number;
+    fat_g_average: number;
+    carbs_g_average: number;
+  };
+  body: Array<{
+    metric: string;
+    label: string;
+    unit: string;
+    first_value: number;
+    latest_value: number;
+    change: number;
+    first_measured_on: string;
+    latest_measured_on: string;
+    point_count: number;
+    span_days: number;
+  }>;
+  privacy: string[];
+};
+
+export const canonicalFacts = JSON.parse(
+  readFileSync(resolve(process.cwd(), '../tests/fixtures/progress-report-canonical.json'), 'utf8'),
+) as CanonicalFacts;
 
 type ReportState = 'empty' | 'full' | 'partial';
 type SufficiencyReason =
@@ -446,4 +487,72 @@ export function makeProgressReportFixture(state: ReportState = 'full'): Progress
         }
       : null,
   };
+}
+
+export function makeCanonicalProgressReportFixture(): ProgressReport {
+  const report = makeProgressReportFixture('full');
+  report.period = canonicalFacts.period.period as ProgressReport['period'];
+  report.period_start = canonicalFacts.period.start;
+  report.period_end = canonicalFacts.period.end;
+  report.timezone = canonicalFacts.period.timezone;
+  report.subject = canonicalFacts.subject as ProgressReport['subject'];
+
+  report.training.planned_workouts = canonicalFacts.training.planned_workouts;
+  report.training.completed_workouts = canonicalFacts.training.completed_workouts;
+  report.training.skipped_workouts = canonicalFacts.training.skipped_workouts;
+  report.training.completed_working_sets = canonicalFacts.training.completed_working_sets;
+  report.training.external_load_volume_kg = canonicalFacts.training.external_load_volume_kg;
+  report.training.exercises = [];
+
+  report.cardio.completed_sessions = canonicalFacts.cardio.completed_sessions;
+  report.cardio.duration_minutes = canonicalFacts.cardio.duration_minutes;
+  report.cardio.frequency_per_week = 0;
+  report.cardio.distance_km = null;
+  report.cardio.zone_duration = [];
+
+  const weightTrend = canonicalFacts.body[0]!;
+  const waistTrend = canonicalFacts.body[1]!;
+  report.body.latest_measurement = {
+    measured_on: waistTrend.latest_measured_on,
+    weight_kg: weightTrend.latest_value,
+    chest_cm: null,
+    waist_cm: waistTrend.latest_value,
+    hips_cm: null,
+    biceps_cm: null,
+    thigh_cm: null,
+  };
+  report.body.trends = canonicalFacts.body.map((trend) => ({
+    ...trend,
+    interpretation_status: 'insufficient_period',
+    unit: trend.unit as 'kg' | 'cm',
+    points: [
+      { measured_on: trend.first_measured_on, value: trend.first_value },
+      { measured_on: trend.latest_measured_on, value: trend.latest_value },
+    ],
+  })) as unknown as ProgressReport['body']['trends'];
+
+  report.nutrition.period = canonicalFacts.period.period as ProgressReport['nutrition']['period'];
+  report.nutrition.period_start = canonicalFacts.period.start;
+  report.nutrition.period_end = canonicalFacts.period.end;
+  report.nutrition.timezone = canonicalFacts.period.timezone;
+  report.nutrition.summary.logged_days = canonicalFacts.nutrition.logged_days;
+  report.nutrition.summary.eligible_days = canonicalFacts.nutrition.eligible_days;
+  report.nutrition.summary.coverage_percent = 3.3;
+  report.nutrition.summary.missing_days = canonicalFacts.nutrition.missing_days;
+  for (const [key, value] of [
+    ['calories', canonicalFacts.nutrition.calories_average],
+    ['protein_g', canonicalFacts.nutrition.protein_g_average],
+    ['fat_g', canonicalFacts.nutrition.fat_g_average],
+    ['carbs_g', canonicalFacts.nutrition.carbs_g_average],
+  ] as const) {
+    const metric = report.nutrition.summary[key]!;
+    metric.average = value;
+    metric.minimum = value;
+    metric.maximum = value;
+    metric.sample_days = 1;
+  }
+  report.nutrition.target_changes = [];
+  report.program = null;
+  report.check_ins = [];
+  return report;
 }

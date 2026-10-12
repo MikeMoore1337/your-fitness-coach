@@ -28,9 +28,16 @@ The same run also keeps `768/1280/1440px` reference crops in both directories.
 
 - BEFORE UI baseline: local integration commit `ede84193`.
 - AFTER UI/evidence commit: `f7a900a743a6ecbc71b97a954d3ed2e036ef8404`.
+- Required Linux run `38223908839` failed only on the four `progress-390x844-{dark,light}.png`
+  goldens for Chromium/WebKit. Diff inspection showed only the approved `164px → 172px`
+  contextual-help width change and its downstream progress-layout shift; no threshold or
+  unrelated snapshot was changed. The four CI `*-actual.png` files are preserved in the run
+  artifact [playwright-mobile-regression-38223908839](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38223908839).
 - Regression: `frontend/tests/e2e/progress-experience.spec.ts` checks one text
   line, a minimum `44px` touch target and no right-edge overflow at each required
   mobile width.
 - Mobile Web/PWA-like and mocked TMA parity: `frontend/tests/e2e/tma-smoke.spec.ts`,
   Chromium and WebKit, `2 passed`.
-- Owner visual status: `WAITING_OWNER_APPROVAL`.
+- Owner visual status: `OWNER_865_VISUAL_APPROVAL=GRANTED` on 12.10.2026. The approval
+  covers only the one-line «О показателях» correction; release, merge and deploy remain
+  separate gates.

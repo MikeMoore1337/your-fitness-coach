@@ -3077,8 +3077,13 @@ def test_create_notification_and_list(client):
     assert any(row["title"] == "Test напоминание" for row in rows)
 
 
-def test_notification_scheduled_for_is_stored_as_msk_wall_time(client):
+def test_notification_scheduled_for_is_stored_as_msk_wall_time(client, monkeypatch):
     headers = auth(client, telegram_user_id=6501, is_coach=False)
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: datetime(2026, 4, 25, 6),
+    )
 
     response = client.post(
         "/api/v1/notifications",
@@ -3092,6 +3097,90 @@ def test_notification_scheduled_for_is_stored_as_msk_wall_time(client):
 
     assert response.status_code == 201
     assert response.json()["scheduled_for"] == "2026-04-25T10:30:00"
+
+
+def test_manual_notification_rejects_past_profile_time_and_deduplicates(client, monkeypatch):
+    headers = auth(client, telegram_user_id=6502, is_coach=False)
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6502).one()
+        user.profile.timezone = "America/New_York"
+
+    fixed_local_now = datetime(2026, 10, 10, 9, 30)
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: fixed_local_now,
+    )
+    past = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Не создавать",
+            "body": "Время уже прошло",
+            "scheduled_for": "2026-10-10T09:30:00",
+        },
+    )
+    assert past.status_code == 422
+    assert past.json()["detail"] == (
+        "Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля."
+    )
+
+    first = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T09:31:00",
+        },
+    )
+    repeated = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T09:31:00",
+        },
+    )
+    aware_retry = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Одна запись",
+            "body": "Не дублировать",
+            "scheduled_for": "2026-10-10T13:31:00Z",
+        },
+    )
+    assert first.status_code == repeated.status_code == aware_retry.status_code == 201
+    assert repeated.json()["id"] == first.json()["id"] == aware_retry.json()["id"]
+    assert first.json()["scheduled_for"] == "2026-10-10T09:31:00"
+
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6502).one()
+        rows = db.query(Notification).filter(Notification.user_id == user.id).all()
+        assert len(rows) == 1
+
+
+def test_manual_notification_rechecks_time_after_flush_at_boundary(client, monkeypatch):
+    headers = auth(client, telegram_user_id=6503, is_coach=False)
+    moments = iter((datetime(2026, 10, 10, 9, 29), datetime(2026, 10, 10, 9, 31)))
+    monkeypatch.setattr(notifications_service, "now_for_user_naive", lambda _user: next(moments))
+
+    response = client.post(
+        "/api/v1/notifications",
+        headers=headers,
+        json={
+            "title": "Граница",
+            "body": "Не сохранять после смены минуты",
+            "scheduled_for": "2026-10-10T09:30:00",
+        },
+    )
+
+    assert response.status_code == 422
+    with get_session_context() as db:
+        user = db.query(User).filter(User.telegram_user_id == 6503).one()
+        assert db.query(Notification).filter(Notification.user_id == user.id).count() == 0
 
 
 def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypatch):

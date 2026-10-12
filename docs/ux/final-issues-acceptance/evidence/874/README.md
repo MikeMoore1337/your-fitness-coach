@@ -1,7 +1,35 @@
 # #874 — отчёт, PDF и числовая согласованность
 
-Evidence получено на одном фиксированном synthetic наборе данных. Это не
-production или real-user proof.
+Проверки используют один фиксированный synthetic набор данных из
+[`tests/fixtures/progress-report-canonical.json`](../../../../tests/fixtures/progress-report-canonical.json).
+Это не production или real-user proof.
+
+## Исправление QA-пробела
+
+QA-комментарий [6120877469](https://github.com/MikeMoore1337/your-fitness-coach/issues/874#issuecomment-6120877469)
+зафиксировал, что прежние API/UI/browser/server проверки использовали разные fixtures, а
+browser PDF проверял только `%PDF` и размер. В PR #963 добавлена одна воспроизводимая
+сквозная проверка:
+
+- API и server PDF получают один custom-период `2026-07-26…2026-08-24`, профильный timezone
+  `Europe/Moscow`, одинаковые тренировки, кардио, питание и замеры.
+- UI и browser print PDF используют тот же JSON fixture; browser PDF проходит фактическое
+  извлечение текста через `scripts/extract_pdf_text.py`, а не только проверку заголовка файла.
+- Сверяются имя, период, значения, периоды и единицы замеров, даты последних значений,
+  агрегаты и границы приватности (`user_id`, `telegram_user_id`, свободный текст дневника).
+- Отдельно проверены пустой отчёт и one-record сценарий; формулы и production PDF layout не
+  изменялись.
+
+Канонические gates:
+
+- `backend/tests/test_progress_reports.py::test_progress_report_api_and_server_pdf_share_one_canonical_fact_set`;
+- `backend/tests/test_progress_reports.py::test_progress_report_empty_pdf_has_no_fabricated_facts`;
+- `backend/tests/test_progress_reports.py::test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_single_record`;
+- `frontend/tests/e2e/progress-report.spec.ts` — `browser print PDF contains the canonical facts and privacy boundaries`.
+
+Новые PDF генерируются самим тестом из этого fixture и сохраняются как CI artifacts при
+`YFC_PROGRESS_REPORT_*_PDF_EVIDENCE_DIR`. Исторические PDF ниже оставлены для визуального
+сравнения layout и не являются заменой канонической parity-проверки.
 
 ## Проверенная цепочка
 

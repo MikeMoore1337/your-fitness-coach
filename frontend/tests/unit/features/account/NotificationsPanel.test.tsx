@@ -143,11 +143,13 @@ function renderPanel(onNavigate = vi.fn()) {
 }
 
 let failTemplateSave = false;
+let reminderHour = 9;
 
 describe('NotificationsPanel', () => {
   beforeEach(() => {
     localStorage.clear();
     failTemplateSave = false;
+    reminderHour = 9;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const path = String(input);
       if (path === '/api/v1/notifications/web-push/config') {
@@ -166,7 +168,7 @@ describe('NotificationsPanel', () => {
             movement_reminders_enabled: false,
             telegram_enabled: true,
             telegram_linked: true,
-            reminder_hour: 9,
+            reminder_hour: reminderHour,
             quiet_hours_start: null,
             quiet_hours_end: null,
           }),
@@ -202,6 +204,56 @@ describe('NotificationsPanel', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it('не отправляет сегодняшнее прошедшее время и сохраняет данные формы', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-10T07:30:00Z'));
+    renderPanel();
+
+    fireEvent.click(await screen.findByText('Личное напоминание', { selector: 'strong' }));
+    const title = screen.getByRole('textbox', { name: 'Заголовок' });
+    const body = screen.getByRole('textbox', { name: 'Текст внутри приложения' });
+    const dateInput = screen.getByDisplayValue(/2030-01-11/);
+    fireEvent.change(title, { target: { value: 'Проверка времени' } });
+    fireEvent.change(body, { target: { value: 'Сохранить введённое' } });
+    fireEvent.change(dateInput, { target: { value: '2030-01-10' } });
+    fireEvent.submit(dateInput.closest('form')!);
+
+    await screen.findByText(
+      'Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля.',
+      { exact: true },
+    );
+    expect(title).toHaveValue('Проверка времени');
+    expect(body).toHaveValue('Сохранить введённое');
+    expect(dateInput).toHaveValue('2030-01-10');
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      '/api/v1/notifications',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('отправляет сегодняшнее время, если час ещё впереди в часовом поясе профиля', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2030-01-10T07:30:00Z'));
+    reminderHour = 11;
+    renderPanel();
+
+    fireEvent.click(await screen.findByText('Личное напоминание', { selector: 'strong' }));
+    const date = screen.getByDisplayValue(/2030-01-11/);
+    fireEvent.change(date, { target: { value: '2030-01-10' } });
+    fireEvent.submit(date.closest('form')!);
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/v1/notifications',
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.stringContaining('"scheduled_for":"2030-01-10T11:00:00"'),
+        }),
+      ),
+    );
   });
 
   it('разделяет каналы и открывает canonical destination через server resolver', async () => {

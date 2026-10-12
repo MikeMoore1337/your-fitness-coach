@@ -1,7 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import { spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { makeProgressReportFixture } from '../fixtures/progress-report';
+import {
+  canonicalFacts,
+  makeCanonicalProgressReportFixture,
+  makeProgressReportFixture,
+} from '../fixtures/progress-report';
 import {
   expectNoHorizontalOverflow,
   installTelegramHarness,
@@ -10,6 +15,37 @@ import {
 import { installPlatformApi } from './fixtures/platform-api';
 
 type ReportState = Parameters<typeof makeProgressReportFixture>[0];
+
+function extractPdfText(pdfPath: string): string {
+  const repositoryRoot = resolve(process.cwd(), '..');
+  const result = spawnSync(
+    process.execPath,
+    [
+      resolve(repositoryRoot, 'scripts/run_python.mjs'),
+      resolve(repositoryRoot, 'scripts/extract_pdf_text.py'),
+      pdfPath,
+    ],
+    { cwd: repositoryRoot, encoding: 'utf8' },
+  );
+  expect(result.status, result.stderr || 'PDF text extractor failed').toBe(0);
+  return result.stdout;
+}
+
+function compactPdfText(value: string): string {
+  return value.replace(/\s+/g, '');
+}
+
+function browserDate(value: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  }).format(new Date(`${value}T12:00:00`));
+}
+
+function browserNumber(value: number): string {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 1 }).format(value);
+}
 
 async function installReportApi(page: Page, state: ReportState = 'full') {
   await page.route(
@@ -165,6 +201,83 @@ test('full report keeps a mobile-first preview and print layout', async ({
       await mkdir(evidenceDirectory, { recursive: true });
       await writeFile(resolve(evidenceDirectory, 'browser-progress-report.pdf'), pdf);
     }
+  }
+});
+
+test('browser print PDF contains the canonical facts and privacy boundaries', async ({
+  page,
+}, testInfo) => {
+  await installPlatformApi(page, { browserSession: true });
+  await page.route(/\/api\/v1\/workouts\/progress\/report(?:\?|$)/, async (route) => {
+    const url = new URL(route.request().url());
+    if (route.request().method() === 'POST' && url.pathname.endsWith('/download-link')) {
+      await route.fulfill({
+        json: {
+          url: `${url.origin}/api/v1/workouts/progress/report/file/signed-canonical`,
+          filename: 'progress-report-2026-07-26_2026-08-24.pdf',
+          expires_at: '2026-08-29T19:05:00Z',
+        },
+      });
+      return;
+    }
+    await route.fulfill({ json: makeCanonicalProgressReportFixture() });
+  });
+
+  const period = canonicalFacts.period;
+  await page.goto(
+    `/app/report?period=${period.period}&date_from=${period.start}&date_to=${period.end}`,
+  );
+  await expect(page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true })).toBeVisible();
+  const uiText = (await page.locator('.progress-report-document').innerText()).replace(
+    /\u00a0/g,
+    ' ',
+  );
+  expect(uiText).toContain('1 завершено из 2');
+  expect(uiText).toContain('400 кг');
+  expect(uiText).toContain('2 100 ккал');
+  expect(uiText).toContain('155 г');
+  expect(uiText).toContain('68 г');
+  expect(uiText).toContain('230 г');
+  expect(uiText).toContain('79 кг');
+  expect(uiText).toContain('89 см');
+  await page.emulateMedia({ media: 'print' });
+  const pdfPath = testInfo.outputPath('canonical-browser-progress-report.pdf');
+  const pdf = await page.pdf({
+    path: pdfPath,
+    format: 'A4',
+    printBackground: true,
+    preferCSSPageSize: true,
+  });
+  expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+
+  const extracted = compactPdfText(extractPdfText(pdfPath));
+  const expected = [
+    canonicalFacts.subject.name,
+    `Период:${browserDate(period.start)} — ${browserDate(period.end)}`,
+    `Тренировки${canonicalFacts.training.completed_workouts}завершеноиз${canonicalFacts.training.planned_workouts}`,
+    `${canonicalFacts.training.external_load_volume_kg}кг`,
+    `Ручноекардио${canonicalFacts.cardio.completed_sessions}завершено·${canonicalFacts.cardio.duration_minutes}мин`,
+    `${browserNumber(canonicalFacts.nutrition.calories_average)}ккал`,
+    `${browserNumber(canonicalFacts.nutrition.protein_g_average)}г`,
+    `${browserNumber(canonicalFacts.nutrition.fat_g_average)}г`,
+    `${browserNumber(canonicalFacts.nutrition.carbs_g_average)}г`,
+  ];
+  for (const fact of expected) {
+    expect(extracted).toContain(compactPdfText(fact));
+  }
+  for (const trend of canonicalFacts.body) {
+    const unit = trend.unit === 'kg' ? 'кг' : 'см';
+    expect(extracted).toContain(`${trend.latest_value}${unit}`);
+    expect(extracted).toContain(compactPdfText(browserDate(trend.latest_measured_on)));
+  }
+  for (const privateValue of canonicalFacts.privacy) {
+    expect(extracted).not.toContain(compactPdfText(privateValue));
+  }
+
+  const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+  if (evidenceDirectory) {
+    await mkdir(evidenceDirectory, { recursive: true });
+    await writeFile(resolve(evidenceDirectory, 'canonical-browser-progress-report.pdf'), pdf);
   }
 });
 

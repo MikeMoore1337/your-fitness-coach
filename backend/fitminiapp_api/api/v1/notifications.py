@@ -21,6 +21,7 @@ from fitminiapp_api.schemas.notification import (
     WebPushSubscriptionResponse,
 )
 from fitminiapp_api.services.notifications import (
+    ManualNotificationScheduleError,
     create_manual_notification,
     delete_notification_for_user,
     get_or_create_settings,
@@ -256,13 +257,16 @@ def create_notification(
     if not body:
         raise HTTPException(status_code=400, detail="body обязателен")
 
-    row = create_manual_notification(
-        db,
-        current_user,
-        title=title,
-        body=body,
-        scheduled_for=payload.scheduled_for,
-    )
+    try:
+        row = create_manual_notification(
+            db,
+            current_user,
+            title=title,
+            body=body,
+            scheduled_for=payload.scheduled_for,
+        )
+    except ManualNotificationScheduleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return _notification_response(row)
 
 
