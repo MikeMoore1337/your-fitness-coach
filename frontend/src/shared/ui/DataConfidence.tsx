@@ -154,31 +154,34 @@ export function DataConfidence({
   action,
   className = '',
   isStale = false,
+  label,
   kind,
   signal,
 }: {
   action?: ReactNode;
   className?: string;
   isStale?: boolean;
+  label?: string;
   kind: DataConfidenceKind;
   signal: DataConfidenceSignal;
 }) {
   const state = isStale ? 'stale' : signal.status;
   const status = isStale ? 'Показана сохранённая оценка' : statusLabels[signal.status];
+  const labeledStatus = label ? `${label} — ${status}` : status;
   const explanation = isStale
     ? `Новые данные загружаются. ${explanations[kind]}`
     : explanations[kind];
 
   return (
     <section
-      aria-label={`Достаточно ли данных: ${status}`}
+      aria-label={`Достаточно ли данных: ${labeledStatus}`}
       aria-live={isStale ? 'polite' : undefined}
       className={`data-confidence data-confidence--${state} ${className}`.trim()}
       data-confidence-state={state}
     >
       <ConfidenceIcon state={state} />
       <div className="data-confidence__content">
-        <strong className="data-confidence__status">{status}</strong>
+        <strong className="data-confidence__status">{labeledStatus}</strong>
         <p className="data-confidence__basis">{dataConfidenceBasis(kind, signal)}</p>
         <details className="data-confidence__details">
           <summary>

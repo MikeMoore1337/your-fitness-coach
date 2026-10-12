@@ -127,6 +127,53 @@ test('full report keeps a mobile-first preview and print layout', async ({
   expect(reportText).not.toContain('adherence-v1');
   expect(reportText).not.toContain('trainer');
   await expect(page.locator('.progress-report-confidence .data-confidence')).toHaveCount(3);
+  await expect(
+    page.locator('.progress-report-confidence__item .data-confidence__status'),
+  ).toHaveText([
+    'Тренировки — Данных достаточно для оценки',
+    'Питание — Данных достаточно для оценки',
+    'Замеры тела — Данных достаточно для оценки',
+  ]);
+  const wellbeingRows = page.locator(
+    '[aria-label="Распределение: Качество сна"] li[data-wellbeing-value]',
+  );
+  await expect(wellbeingRows).toHaveCount(5);
+  const wellbeingColors = [
+    'rgb(212, 106, 110)',
+    'rgb(227, 154, 69)',
+    'rgb(158, 163, 161)',
+    'rgb(178, 245, 32)',
+    'rgb(74, 199, 104)',
+  ];
+  const wellbeingBarMetrics = await wellbeingRows.evaluateAll((rows) =>
+    rows.map((row) => {
+      const track = row.querySelector('.progress-report-wellbeing-metric__bar');
+      const fill = row.querySelector('i');
+      return {
+        value: row.getAttribute('data-wellbeing-value'),
+        trackWidth: track?.getBoundingClientRect().width ?? 0,
+        fillWidth: fill?.getBoundingClientRect().width ?? 0,
+        color: fill ? getComputedStyle(fill).backgroundColor : null,
+      };
+    }),
+  );
+  expect(wellbeingBarMetrics).toHaveLength(5);
+  expect(wellbeingBarMetrics.map((item) => item.color)).toEqual([
+    null,
+    wellbeingColors[1],
+    wellbeingColors[2],
+    wellbeingColors[3],
+    wellbeingColors[4],
+  ]);
+  expect(wellbeingBarMetrics[0]!.value).toBe('1');
+  expect(wellbeingBarMetrics[0]!.fillWidth).toBe(0);
+  expect(wellbeingBarMetrics[1]!.fillWidth / wellbeingBarMetrics[1]!.trackWidth).toBeGreaterThan(
+    0.4,
+  );
+  expect(wellbeingBarMetrics[1]!.fillWidth / wellbeingBarMetrics[1]!.trackWidth).toBeLessThan(0.6);
+  expect(wellbeingBarMetrics[3]!.fillWidth / wellbeingBarMetrics[3]!.trackWidth).toBeGreaterThan(
+    0.95,
+  );
   await expect(page.locator('.progress-report-document .progress-report-controls')).toHaveCount(1);
   await expect(page.locator('.progress-report-settings .progress-report-controls')).toBeVisible();
   await expect(
@@ -145,6 +192,35 @@ test('full report keeps a mobile-first preview and print layout', async ({
     path: testInfo.outputPath('desktop-1280-dark-full.png'),
     fullPage: true,
   });
+  const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+  if (evidenceDirectory && browserName === 'chromium') {
+    await mkdir(evidenceDirectory, { recursive: true });
+    await page.screenshot({ path: resolve(evidenceDirectory, 'desktop-1280-dark-after.png') });
+    await page
+      .locator('.progress-report-wellbeing-metric')
+      .nth(0)
+      .screenshot({
+        path: resolve(evidenceDirectory, 'wellbeing-sleep-after.png'),
+      });
+    await page
+      .locator('.progress-report-wellbeing-metric')
+      .nth(1)
+      .screenshot({
+        path: resolve(evidenceDirectory, 'wellbeing-mood-after.png'),
+      });
+    await page.evaluate(() => {
+      document.documentElement.dataset.colorScheme = 'light';
+      document.documentElement.dataset.themePreference = 'light';
+    });
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+    await page.screenshot({ path: resolve(evidenceDirectory, 'desktop-1280-light-after.png') });
+    await page.evaluate(() => {
+      localStorage.setItem('app-theme', 'dark');
+      document.documentElement.dataset.colorScheme = 'dark';
+      document.documentElement.dataset.themePreference = 'dark';
+    });
+    await page.reload();
+  }
 
   await page.setViewportSize({ width: 360, height: 800 });
   await expectNoHorizontalOverflow(page);
@@ -164,6 +240,7 @@ test('full report keeps a mobile-first preview and print layout', async ({
     path: '../.artifacts/screenshots/task-67/mobile-web-360-nutrition-targets.png',
   });
 
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.emulateMedia({ media: 'print' });
   await expect(page.locator('.report-screen-only').first()).toBeHidden();
   await expect(page.locator('.progress-report-print-header')).toHaveCount(4);
@@ -197,16 +274,80 @@ test('full report keeps a mobile-first preview and print layout', async ({
     });
     expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
     expect(pdf.length).toBeGreaterThan(10_000);
-    const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+    const extracted = compactPdfText(extractPdfText(testInfo.outputPath('progress-report.pdf')));
+    expect(extracted).toContain(compactPdfText('Качество сна'));
+    expect(extracted).toContain(compactPdfText('Настроение'));
+    expect(extracted).not.toContain(compactPdfText('Добавить отметку'));
+    expect(extracted).not.toContain(compactPdfText('Печать / Сохранить как PDF'));
     if (evidenceDirectory) {
       await mkdir(evidenceDirectory, { recursive: true });
       await writeFile(resolve(evidenceDirectory, 'browser-progress-report.pdf'), pdf);
+      if (browserName === 'chromium') {
+        await page.addStyleTag({
+          content: '.progress-report-page { filter: grayscale(1) !important; }',
+        });
+        const grayscalePdf = await page.pdf({
+          path: testInfo.outputPath('grayscale-progress-report.pdf'),
+          format: 'A4',
+          printBackground: true,
+          preferCSSPageSize: true,
+        });
+        await writeFile(
+          resolve(evidenceDirectory, 'grayscale-browser-progress-report.pdf'),
+          grayscalePdf,
+        );
+      }
+    }
+  }
+});
+
+test('report stays readable across the requested mobile viewport matrix', async ({
+  page,
+  browserName,
+}, testInfo) => {
+  await installPlatformApi(page, { browserSession: true });
+  await installReportApi(page);
+
+  for (const width of [320, 360, 393, 430]) {
+    for (const colorScheme of ['light', 'dark'] as const) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await page.goto('/app/report?period=days_30');
+      await page.evaluate((theme) => localStorage.setItem('app-theme', theme), colorScheme);
+      await page.reload();
+
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', colorScheme);
+      await expect(
+        page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('.progress-report-confidence')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Печать / Сохранить как PDF' })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+      await page.screenshot({
+        path: testInfo.outputPath(`mobile-report-${width}-${colorScheme}.png`),
+        fullPage: true,
+      });
+      if (
+        process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR &&
+        browserName === 'chromium' &&
+        width === 360
+      ) {
+        await mkdir(process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(
+            process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR,
+            `mobile-360-${colorScheme}-after.png`,
+          ),
+          fullPage: true,
+        });
+      }
     }
   }
 });
 
 test('browser print PDF contains the canonical facts and privacy boundaries', async ({
   page,
+  browserName,
 }, testInfo) => {
   await installPlatformApi(page, { browserSession: true });
   await page.route(/\/api\/v1\/workouts\/progress\/report(?:\?|$)/, async (route) => {
@@ -235,6 +376,7 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
     /\u00a0/g,
     ' ',
   );
+  expect(uiText).not.toContain('Скрытая заметка еженедельной отметки');
   expect(uiText).toContain('1 завершено из 2');
   expect(uiText).toContain('400 кг');
   expect(uiText).toContain('2 100 ккал');
@@ -243,11 +385,18 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
   expect(uiText).toContain('230 г');
   expect(uiText).toContain('79 кг');
   expect(uiText).toContain('89 см');
+  await expect(
+    page.getByText('Сравнение недоступно: за выбранный период записана одна сессия.'),
+  ).toBeVisible();
+  await expect(
+    page.locator('.progress-report-exercises').getByText('Первая сессия', { exact: true }),
+  ).toHaveCount(0);
   for (const exercise of canonicalFacts.training.exercises) {
     expect(uiText).toContain(exercise.exercise_title);
     expect(uiText).toContain(browserDate(exercise.first_performed_on));
     expect(uiText).toContain(`${browserNumber(exercise.external_load_volume_kg)} кг`);
   }
+  if (browserName !== 'chromium') return;
   await page.emulateMedia({ media: 'print' });
   const pdfPath = testInfo.outputPath('canonical-browser-progress-report.pdf');
   const pdf = await page.pdf({
@@ -284,19 +433,25 @@ test('browser print PDF contains the canonical facts and privacy boundaries', as
       compactPdfText(`${browserNumber(exercise.external_load_volume_kg)} кг`),
     );
   }
+  const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+  if (evidenceDirectory) {
+    await mkdir(evidenceDirectory, { recursive: true });
+    await page.screenshot({
+      path: resolve(evidenceDirectory, 'canonical-one-record-after.png'),
+      fullPage: true,
+    });
+  }
   for (const privateValue of canonicalFacts.privacy) {
     expect(extracted).not.toContain(compactPdfText(privateValue));
   }
 
-  const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
   if (evidenceDirectory) {
-    await mkdir(evidenceDirectory, { recursive: true });
     await writeFile(resolve(evidenceDirectory, 'canonical-browser-progress-report.pdf'), pdf);
   }
 });
 
 for (const state of ['partial', 'empty'] as const) {
-  test(`${state} data stays factual and printable`, async ({ page }) => {
+  test(`${state} data stays factual and printable`, async ({ page, browserName }, testInfo) => {
     await installPlatformApi(page, { browserSession: true });
     await installReportApi(page, state);
     await page.goto('/app/report?period=days_90');
@@ -313,8 +468,36 @@ for (const state of ['partial', 'empty'] as const) {
     });
     if (state === 'empty') {
       await expect(page.getByText('Нет замеров массы за период', { exact: true })).toBeVisible();
+      await expect(
+        page.getByText('За выбранный период окружности не записаны.', { exact: true }),
+      ).toBeVisible();
+      await expect(page.locator('.progress-report-section--body table')).toHaveCount(0);
       await expect(page.getByText('Отсутствующие дни не интерполируются.')).toBeVisible();
       await expect(page.getByText('Активной программы на дату формирования нет.')).toBeVisible();
+      const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+      if (evidenceDirectory) {
+        await mkdir(evidenceDirectory, { recursive: true });
+        await page.screenshot({
+          path: resolve(evidenceDirectory, 'empty-circumference-after.png'),
+          fullPage: true,
+        });
+      }
+    }
+    if (browserName === 'chromium') {
+      await page.emulateMedia({ media: 'print' });
+      const pdf = await page.pdf({
+        path: testInfo.outputPath(`progress-report-${state}.pdf`),
+        format: 'A4',
+        printBackground: true,
+        preferCSSPageSize: true,
+      });
+      expect(pdf.subarray(0, 4).toString()).toBe('%PDF');
+      expect(pdf.length).toBeGreaterThan(10_000);
+      const evidenceDirectory = process.env.YFC_PROGRESS_REPORT_BROWSER_PDF_EVIDENCE_DIR;
+      if (evidenceDirectory) {
+        await mkdir(evidenceDirectory, { recursive: true });
+        await writeFile(resolve(evidenceDirectory, `browser-progress-report-${state}.pdf`), pdf);
+      }
     }
   });
 }

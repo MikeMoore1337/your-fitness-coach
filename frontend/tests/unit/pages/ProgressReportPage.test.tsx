@@ -78,6 +78,9 @@ describe('ProgressReportPage', () => {
     expect(await screen.findByRole('heading', { name: 'Отчёт о прогрессе' })).toBeVisible();
     expect(screen.getByText('84')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Фактическая сводка' })).toBeVisible();
+    expect(screen.getByText('Тренировки — Данных достаточно для оценки')).toBeVisible();
+    expect(screen.getByText('Питание — Данных достаточно для оценки')).toBeVisible();
+    expect(screen.getByText('Замеры тела — Данных достаточно для оценки')).toBeVisible();
     expect(screen.getAllByText('Живот').length).toBeGreaterThan(0);
     expect(screen.getByText(/Живот: 84 см/)).toBeVisible();
     expect(screen.getByRole('table', { name: 'Таблица замеров массы' })).toBeVisible();

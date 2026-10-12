@@ -483,14 +483,17 @@ body:has(.app-shell--design-v2) {
 }
 
 .progress-report-factual-summary dl {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
-  gap: 1px;
-  background: var(--v2-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  background: transparent;
 }
 
 .progress-report-factual-summary dl > div {
+  flex: 1 1 280px;
   min-width: 0;
   padding: 12px;
+  border: 1px solid var(--v2-border);
   background: var(--v2-surface);
 }
 
@@ -779,6 +782,7 @@ body:has(.app-shell--design-v2) {
 
   body {
     margin: 0;
+    padding: 0;
   }
 
   .report-screen-only,
@@ -4360,20 +4364,36 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   grid-column: 1 / -1;
 }
 
-.progress-report-section--wellbeing > header {
+.progress-report-wellbeing-overview > header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--v2-space-4);
 }
 
-.progress-report-section--wellbeing > header > div:first-child {
+.progress-report-wellbeing-overview > header > div:first-child {
   display: grid;
   gap: 4px;
 }
 
-.progress-report-section--wellbeing > header :where(h2, p) {
+.progress-report-wellbeing-overview > header :where(h2, p) {
   margin: 0;
+}
+
+.progress-report-section--wellbeing {
+  --progress-report-wellbeing-category-1: #d46a6e;
+  --progress-report-wellbeing-category-2: #e39a45;
+  --progress-report-wellbeing-category-3: #9ea3a1;
+  --progress-report-wellbeing-category-4: var(--v2-lime);
+  --progress-report-wellbeing-category-5: #4ac768;
+}
+
+html[data-color-scheme='light'] .progress-report-section--wellbeing {
+  --progress-report-wellbeing-category-1: #b93838;
+  --progress-report-wellbeing-category-2: #c56f16;
+  --progress-report-wellbeing-category-3: #707674;
+  --progress-report-wellbeing-category-4: #7ea51d;
+  --progress-report-wellbeing-category-5: #1f8a45;
 }
 
 .progress-report-wellbeing-grid {
@@ -4427,11 +4447,28 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 .progress-report-wellbeing-metric li {
+  --progress-report-wellbeing-bar-color: var(--progress-report-wellbeing-category-3);
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(70px, 1.2fr) 2ch;
   align-items: center;
   gap: 8px;
   font-size: 0.78rem;
+}
+
+.progress-report-wellbeing-metric li[data-wellbeing-value='1'] {
+  --progress-report-wellbeing-bar-color: var(--progress-report-wellbeing-category-1);
+}
+
+.progress-report-wellbeing-metric li[data-wellbeing-value='2'] {
+  --progress-report-wellbeing-bar-color: var(--progress-report-wellbeing-category-2);
+}
+
+.progress-report-wellbeing-metric li[data-wellbeing-value='4'] {
+  --progress-report-wellbeing-bar-color: var(--progress-report-wellbeing-category-4);
+}
+
+.progress-report-wellbeing-metric li[data-wellbeing-value='5'] {
+  --progress-report-wellbeing-bar-color: var(--progress-report-wellbeing-category-5);
 }
 
 .progress-report-wellbeing-metric__bar {
@@ -4446,7 +4483,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--semantic-wellbeing-accent);
+  background: var(--progress-report-wellbeing-bar-color);
 }
 
 .progress-report-wellbeing-metric li strong {
@@ -4476,7 +4513,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 @media (max-width: 640px) {
-  .progress-report-section--wellbeing > header {
+  .progress-report-wellbeing-overview > header {
     display: grid;
   }
 
@@ -11246,9 +11283,13 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     position: static;
     top: auto;
     bottom: auto;
-    margin-top: 4mm;
+    min-height: 0;
+    margin-top: 0;
+    padding: 0 2mm;
+    break-before: avoid;
     break-inside: avoid;
-    font-size: 9pt;
+    font-size: 7.5pt;
+    line-height: 1;
   }
   .progress-report-factual-summary {
     display: block;
@@ -11258,16 +11299,73 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .progress-report-factual-summary dl {
     display: block;
     margin-top: 3mm;
+    background: transparent;
   }
   .progress-report-factual-summary dl > div {
     grid-template-columns: 32mm minmax(0, 1fr);
     padding: 2mm;
+    border: 0;
+    border-bottom: 0.25mm solid var(--v2-border);
     break-inside: avoid;
   }
+  .progress-report-factual-summary dl > div:last-child {
+    border-bottom: 0;
+  }
   .progress-report-exercises article,
-  .progress-report-checkin,
   .progress-report-document .data-viz-chart {
     break-inside: avoid;
+  }
+  .progress-report-checkin {
+    break-inside: avoid;
+    padding-block: 3mm;
+  }
+  .progress-report-checkin dl {
+    break-inside: avoid;
+  }
+  .progress-report-section--wellbeing {
+    break-before: auto;
+    break-inside: auto;
+    padding-block: 3mm;
+  }
+  .progress-report-wellbeing-overview {
+    break-inside: avoid;
+  }
+  .progress-report-wellbeing-grid {
+    gap: 2mm;
+    margin-block: 3mm;
+  }
+  .progress-report-wellbeing-metric {
+    padding: 2.5mm;
+  }
+  .progress-report-wellbeing-metric > header {
+    margin-bottom: 2mm;
+  }
+  .progress-report-wellbeing-metric ul {
+    gap: 5px;
+  }
+  .progress-report-wellbeing-metric {
+    break-inside: avoid;
+  }
+  .progress-report-section--nutrition {
+    break-before: page;
+    page-break-before: always;
+    padding-block: 3mm;
+  }
+  .progress-report-section > header {
+    break-inside: avoid;
+  }
+  .progress-report-section--nutrition .progress-report-facts {
+    margin-block: 3mm;
+  }
+  .progress-report-section--nutrition .progress-report-facts > div {
+    min-height: 13mm;
+    padding: 2mm;
+  }
+  .progress-report-section[aria-labelledby='report-checkins-title'] {
+    padding-block: 3mm;
+  }
+  .progress-report-checkin {
+    padding-block: 2mm;
   }
   .progress-report-overview {
     grid-template-columns: minmax(0, 1fr);
@@ -11295,6 +11393,9 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     display: block;
     padding-block: 4mm;
   }
+  .progress-report-methodology {
+    padding-block: 2mm;
+  }
   .progress-report-facts {
     break-inside: avoid;
   }
@@ -11308,6 +11409,119 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     display: table-header-group;
   }
   .progress-report-document :is(table, th, td) {
+    font-size: 10pt;
+  }
+
+  .progress-report-page .data-viz-chart {
+    color: #59605b;
+    --data-viz-accent: #6b8f20;
+    --data-viz-muted: #59605b;
+    --data-viz-grid: #c9cdc8;
+    --data-viz-surface: #fff;
+  }
+
+  .progress-report-page .data-viz-chart__area {
+    display: block;
+  }
+
+  .progress-report-page .data-viz-chart__actual {
+    stroke-width: 2.5;
+  }
+
+  .progress-report-page .data-viz-chart__point-ring {
+    stroke-width: 2.4;
+  }
+
+  .progress-report-page .data-viz-chart__point-core {
+    fill: var(--data-viz-accent);
+  }
+
+  .progress-report-section--wellbeing {
+    --progress-report-wellbeing-category-1: #b93838;
+    --progress-report-wellbeing-category-2: #c56f16;
+    --progress-report-wellbeing-category-3: #707674;
+    --progress-report-wellbeing-category-4: #6b8f20;
+    --progress-report-wellbeing-category-5: #218647;
+    break-before: auto;
+    break-inside: auto;
+  }
+  .progress-report-wellbeing-overview {
+    break-inside: avoid;
+  }
+}
+
+.progress-report-confidence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  margin-block: 28px;
+  padding: 16px;
+  border: 1px solid var(--v2-border);
+  border-left: 3px solid var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.progress-report-confidence__header {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+}
+
+.progress-report-confidence__header :where(h2, p) {
+  margin: 0;
+}
+
+.progress-report-confidence__header p {
+  color: var(--v2-text-secondary);
+}
+
+.progress-report-confidence__items {
+  display: grid;
+  border-top: 1px solid var(--v2-border);
+}
+
+.progress-report-confidence__item.data-confidence {
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  min-height: 0;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.progress-report-confidence__item.data-confidence + .data-confidence {
+  border-top: 1px solid var(--v2-border);
+}
+
+@media (max-width: 600px) {
+  .progress-report-confidence {
+    margin-block: 18px 28px;
+    padding: 12px;
+  }
+
+  .progress-report-confidence__item.data-confidence {
+    grid-template-columns: 28px minmax(0, 1fr);
+  }
+}
+
+@media print {
+  .progress-report-page,
+  .progress-report-page * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .progress-report-confidence {
+    margin-block: 4mm;
+    padding: 3mm;
+  }
+
+  .progress-report-confidence__header {
+    padding-bottom: 2mm;
+  }
+
+  .progress-report-confidence__item.data-confidence {
+    padding: 2mm 0;
     font-size: 10pt;
   }
 }

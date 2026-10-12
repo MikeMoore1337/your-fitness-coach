@@ -218,6 +218,7 @@ def test_progress_report_reuses_canonical_facts_without_internal_ids(client) -> 
     assert payload["program"]["title"] == "Текущая программа"
     assert payload["check_ins"][0]["recovery"] == 3
     assert "note" not in payload["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in response.text
     assert "food_name" not in response.text
     assert "Содержимое дневника" not in response.text
     assert "user_id" not in response.text

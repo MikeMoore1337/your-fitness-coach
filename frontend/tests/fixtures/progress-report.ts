@@ -821,18 +821,18 @@ export function makeCanonicalProgressReportFixture(): ProgressReport {
     active_block: null,
     changes: [],
   };
-  report.check_ins = [
-    {
-      week_start: '2026-08-18',
-      week_end: periodEnd,
-      submitted_on: canonicalFacts.nutrition.logged_date,
-      status: 'completed',
-      training_load: 4,
-      recovery: 3,
-      hunger: 2,
-      adherence_difficulty: 2,
-    },
-  ];
+  const privateCheckIn = {
+    week_start: '2026-08-18',
+    week_end: periodEnd,
+    submitted_on: canonicalFacts.nutrition.logged_date,
+    status: 'completed',
+    training_load: 4,
+    recovery: 3,
+    hunger: 2,
+    adherence_difficulty: 2,
+    note: 'Скрытая заметка еженедельной отметки',
+  };
+  report.check_ins = [privateCheckIn as ProgressReport['check_ins'][number]];
   report.wellbeing = null;
   return report;
 }

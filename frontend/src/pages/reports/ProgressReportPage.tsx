@@ -228,57 +228,61 @@ function DailyWellbeingReportSection({ report }: { report: ProgressReport }) {
       aria-labelledby="report-wellbeing-title"
       className="progress-report-section progress-report-section--wellbeing"
     >
-      <header>
-        <div>
-          <span className="eyebrow">Самооценка</span>
-          <h2 id="report-wellbeing-title">Сон и настроение</h2>
+      <div className="progress-report-wellbeing-overview">
+        <header>
+          <div>
+            <span className="eyebrow">Самооценка</span>
+            <h2 id="report-wellbeing-title">Сон и настроение</h2>
+          </div>
+          <AppLink
+            className="button-link secondary-link report-screen-only"
+            to={`/app?section=today&wellbeing=1&wellbeing_date=${wellbeing.period_end}`}
+          >
+            Добавить отметку
+          </AppLink>
+        </header>
+        <dl className="progress-report-facts">
+          <div>
+            <dt>Покрытие</dt>
+            <dd>
+              {wellbeing.recorded_days} из {wellbeing.eligible_days} дней
+            </dd>
+          </div>
+          <div>
+            <dt>Процент периода</dt>
+            <dd>{formatNumber(wellbeing.coverage_percent)}%</dd>
+          </div>
+        </dl>
+        <div className="progress-report-wellbeing-grid">
+          {metrics.map(([key, label]) => {
+            const metric = wellbeing[key];
+            const maxCount = Math.max(1, ...metric.distribution.map((item) => item.count));
+            return (
+              <article className="progress-report-wellbeing-metric" key={key}>
+                <header>
+                  <div>
+                    <h3>{label}</h3>
+                    <p>{metric.recorded_days} отдельных отметок</p>
+                  </div>
+                  <span>{wellbeingTrendLabels[metric.trend]}</span>
+                </header>
+                <ul aria-label={`Распределение: ${label}`}>
+                  {metric.distribution.map((item) => (
+                    <li key={item.value} data-wellbeing-value={item.value}>
+                      <span>{wellbeingValueLabels[key][item.value]}</span>
+                      <span className="progress-report-wellbeing-metric__bar" aria-hidden="true">
+                        {item.count > 0 && (
+                          <i style={{ width: `${(item.count / maxCount) * 100}%` }} />
+                        )}
+                      </span>
+                      <strong>{item.count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
         </div>
-        <AppLink
-          className="button-link secondary-link report-screen-only"
-          to={`/app?section=today&wellbeing=1&wellbeing_date=${wellbeing.period_end}`}
-        >
-          Добавить отметку
-        </AppLink>
-      </header>
-      <dl className="progress-report-facts">
-        <div>
-          <dt>Покрытие</dt>
-          <dd>
-            {wellbeing.recorded_days} из {wellbeing.eligible_days} дней
-          </dd>
-        </div>
-        <div>
-          <dt>Процент периода</dt>
-          <dd>{formatNumber(wellbeing.coverage_percent)}%</dd>
-        </div>
-      </dl>
-      <div className="progress-report-wellbeing-grid">
-        {metrics.map(([key, label]) => {
-          const metric = wellbeing[key];
-          const maxCount = Math.max(1, ...metric.distribution.map((item) => item.count));
-          return (
-            <article className="progress-report-wellbeing-metric" key={key}>
-              <header>
-                <div>
-                  <h3>{label}</h3>
-                  <p>{metric.recorded_days} отдельных отметок</p>
-                </div>
-                <span>{wellbeingTrendLabels[metric.trend]}</span>
-              </header>
-              <ul aria-label={`Распределение: ${label}`}>
-                {metric.distribution.map((item) => (
-                  <li key={item.value}>
-                    <span>{wellbeingValueLabels[key][item.value]}</span>
-                    <span className="progress-report-wellbeing-metric__bar" aria-hidden="true">
-                      <i style={{ width: `${(item.count / maxCount) * 100}%` }} />
-                    </span>
-                    <strong>{item.count}</strong>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          );
-        })}
       </div>
       <details className="progress-report-wellbeing-days">
         <summary>Дни с фактическими отметками</summary>
@@ -491,10 +495,32 @@ function ReportContent({
 
       {controls}
 
-      <section className="progress-report-confidence" aria-label="Полнота данных отчёта">
-        <DataConfidence kind="training" signal={report.data_sufficiency.working_sets} />
-        <DataConfidence kind="nutrition" signal={report.data_sufficiency.nutrition_coverage} />
-        <DataConfidence kind="weight" signal={report.data_sufficiency.weight_trend} />
+      <section className="progress-report-confidence" aria-labelledby="report-confidence-title">
+        <header className="progress-report-confidence__header">
+          <span className="eyebrow">Надёжность</span>
+          <h2 id="report-confidence-title">Полнота данных</h2>
+          <p>Статусы по ключевым разделам отчёта и основание для каждого из них.</p>
+        </header>
+        <div className="progress-report-confidence__items">
+          <DataConfidence
+            className="progress-report-confidence__item"
+            label="Тренировки"
+            kind="training"
+            signal={report.data_sufficiency.working_sets}
+          />
+          <DataConfidence
+            className="progress-report-confidence__item"
+            label="Питание"
+            kind="nutrition"
+            signal={report.data_sufficiency.nutrition_coverage}
+          />
+          <DataConfidence
+            className="progress-report-confidence__item"
+            label="Замеры тела"
+            kind="weight"
+            signal={report.data_sufficiency.weight_trend}
+          />
+        </div>
       </section>
 
       <section className="progress-report-section" aria-labelledby="report-training-title">
@@ -602,15 +628,29 @@ function ReportContent({
                         <dt>Объём за период</dt>
                         <dd>{formatNumber(exercise.external_load_volume_kg, 0)} кг</dd>
                       </div>
-                      <div>
-                        <dt>Первая сессия</dt>
-                        <dd>{formatNumber(first?.external_load_volume_kg, 0)} кг</dd>
-                      </div>
-                      <div>
-                        <dt>Последняя сессия</dt>
-                        <dd>{formatNumber(latest?.external_load_volume_kg, 0)} кг</dd>
-                      </div>
+                      {chronological.length === 1 ? (
+                        <div>
+                          <dt>Сессия за период</dt>
+                          <dd>{formatNumber(first?.external_load_volume_kg, 0)} кг</dd>
+                        </div>
+                      ) : (
+                        <>
+                          <div>
+                            <dt>Первая сессия</dt>
+                            <dd>{formatNumber(first?.external_load_volume_kg, 0)} кг</dd>
+                          </div>
+                          <div>
+                            <dt>Последняя сессия</dt>
+                            <dd>{formatNumber(latest?.external_load_volume_kg, 0)} кг</dd>
+                          </div>
+                        </>
+                      )}
                     </dl>
+                    {chronological.length === 1 && (
+                      <p className="progress-report-limit">
+                        Сравнение недоступно: за выбранный период записана одна сессия.
+                      </p>
+                    )}
                   </article>
                 );
               })
@@ -642,19 +682,19 @@ function ReportContent({
             <h2 id="report-body-title">Изменения только относительно себя</h2>
           </header>
           <WeightChart report={report} />
-          <table>
-            <caption>Окружности с точными датами крайних замеров</caption>
-            <thead>
-              <tr>
-                <th scope="col">Замер</th>
-                <th scope="col">Первый</th>
-                <th scope="col">Последний</th>
-                <th scope="col">Изменение</th>
-              </tr>
-            </thead>
-            <tbody>
-              {circumference.length ? (
-                circumference.map((trend) => (
+          {circumference.length ? (
+            <table>
+              <caption>Окружности с точными датами крайних замеров</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Замер</th>
+                  <th scope="col">Первый</th>
+                  <th scope="col">Последний</th>
+                  <th scope="col">Изменение</th>
+                </tr>
+              </thead>
+              <tbody>
+                {circumference.map((trend) => (
                   <tr key={trend.metric}>
                     <th scope="row">{bodyMetricLabel(trend)}</th>
                     <td>
@@ -671,14 +711,12 @@ function ReportContent({
                         : `${formatNumber(trend.change)} ${bodyMetricUnit(trend)}`}
                     </td>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4}>Нет замеров окружностей за период.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="progress-report-empty">За выбранный период окружности не записаны.</p>
+          )}
           <p className="progress-report-limit">
             Окружности не показывают изменение отдельной мышцы и не используются для «идеальных»
             оценок тела.
