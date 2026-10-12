@@ -180,3 +180,44 @@ publish content, write data or bypass the Hermes manual review process.
 ## Issue governance (2026-10-12 owner-approved)
 
 Use [`docs/ISSUE_GOVERNANCE.md`](docs/ISSUE_GOVERNANCE.md) for approved Issue prefixes, labels, DoR/DoD, Priority/Effort/Status, templates and migration rules; [`docs/PARALLEL_DEVELOPMENT.md`](docs/PARALLEL_DEVELOPMENT.md) for independent three-worktree development. GitHub remains the sole operational source of truth. Migration of existing Issues requires owner review of [`docs/issue-governance-migration-review.md`](docs/issue-governance-migration-review.md). Do not infer owner approval, implement a new controller/queue, or auto-start the next product Issue.
+
+### Mandatory Issue creation and update procedure (ChatGPT, Codex, humans)
+
+1. **Inspect first.** Read the current request, relevant specs and existing open/closed Issues and
+   PRs. Search for duplicates and active implementation before creating or reopening anything.
+   Update the existing Issue if it has the same scope; preserve its number, history, attachments,
+   linked PRs and release. Never relocate V11/V12/V13 work without an owner decision.
+2. **Classify and specify.** Apply exactly one approved title prefix from
+   `docs/ISSUE_GOVERNANCE.md`. Distinguish a broken UI ([Bug]) from a proposed UI enhancement
+   ([UI Backlog]). Pick Task, Epic or Spike, add problem/current-versus-expected behavior,
+   clear scope and exclusions, reproducible steps when relevant, verifiable acceptance criteria,
+   regression/security expectations and sanitized evidence. An urgent P0 report may be partial.
+3. **Write canonical GitHub metadata.** Use only the approved `area:*`, `gate:*`, `spike`
+   and `regression` labels as appropriate. Use native Parent/Sub-issues for epics and
+   Blocked by/Blocking for hard prerequisites. A reference to another Issue is not automatically
+   a blocking dependency. Gates mean approval **is needed**, not approval received.
+4. **Populate the one Project.** Ensure the Issue appears in
+   [YFC Development](https://github.com/users/MikeMoore1337/projects/1), with `Status=Backlog`
+   for new tasks unless there is separately verified evidence for a different status.
+   Set `Priority` (normally P2 for a new nonurgent task) and a justified `Effort` (XS-XL;
+   optional for Epic). Set these Project fields **in GitHub Project**, never as duplicate labels.
+   If the estimate is not defensible, leave Backlog and report the missing field rather than
+   inventing certainty. Auto-add is asynchronous; recheck the live item after it appears.
+5. **Verify after the write.** Re-read the live Issue and Project item, including its labels,
+   Priority/Effort/Status, parent/blockers and PR links. When `gh` has `project` scope, run
+   `python scripts/issue_project_fields.py --issue <NUMBER> --strict` to check Project metadata.
+   If access is unavailable, perform equivalent authenticated GitHub queries or explicitly report
+   verification as incomplete. Never say "fully created/synchronized" based only on a POST.
+6. **Respect lifecycle boundaries.** DoR and owner activation, not metadata alone, permit
+   `Ready` and new coding work. For a revision, change only named scope and re-check new gates,
+   dependencies, tests and metadata. PR creation means Review, not Done. Owner Approval requires
+   an explicit owner decision; closing or merging alone never proves DoD or production smoke.
+   Record verified closeout evidence, then move to Done only if DoD is satisfied.
+7. **Report the result.** Give Issue number/link, classification, Status, Priority, Effort,
+   dependencies, approval gates and any missing facts or access limitations. Do not launch
+   implementation, merge or release unless separately authorized.
+
+Project verification is a stateless **read-only metadata check**, not a controller, background
+worker, release gate or replacement for human DoR/DoD review. The GitHub Actions `GITHUB_TOKEN`
+alone does not authorize reading the user's private Project; do not introduce or copy personal
+tokens into CI to pretend otherwise.
