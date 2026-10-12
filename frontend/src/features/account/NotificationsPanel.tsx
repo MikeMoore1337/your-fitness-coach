@@ -819,13 +819,6 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
             className="stack"
             onSubmit={(event) => {
               event.preventDefault();
-              if (
-                !notificationDraft.scheduledDate ||
-                notificationDraft.scheduledDate < dateInputValue(new Date(), timeZone)
-              ) {
-                toast('Выберите сегодняшнюю или будущую дату.', 'error');
-                return;
-              }
               listMutation.mutate({
                 path: '/api/v1/notifications',
                 method: 'POST',
@@ -866,8 +859,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
                   required
                 />
                 <small className="field-hint">
-                  Дата не раньше сегодняшней. Отправка в{' '}
-                  {String(settings.data?.reminder_hour ?? 9).padStart(2, '0')}:00
+                  Отправка в {String(settings.data?.reminder_hour ?? 9).padStart(2, '0')}:00
                 </small>
               </label>
             </div>
