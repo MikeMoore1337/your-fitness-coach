@@ -3246,7 +3246,12 @@ def test_workout_reminders_are_deduplicated_claimed_and_retried(client, monkeypa
         assert claimed[0].next_attempt_at is not None
 
 
-def test_bot_can_set_user_timezone_and_notifications_use_it(client):
+def test_bot_can_set_user_timezone_and_notifications_use_it(client, monkeypatch):
+    monkeypatch.setattr(
+        notifications_service,
+        "now_for_user_naive",
+        lambda _user: datetime(2026, 4, 25, 8),
+    )
     updated = client.post(
         "/api/v1/bot/timezone",
         headers={"X-Bot-Token": settings.bot_internal_token},
