@@ -5511,6 +5511,14 @@ body:has(.standalone-page--design-v2) {
   border-block: 1px solid var(--v2-border);
 }
 
+/* On a phone, let the page scroll instead of nesting a second scroll area. */
+@media (max-width: 760px) {
+  .app-section--profile .training-preferences-exercise-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
 .training-preferences-choice {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -5558,6 +5566,17 @@ body:has(.standalone-page--design-v2) {
 .profile-form {
   gap: var(--v2-space-5);
   margin-top: var(--v2-space-5);
+}
+
+/* Show the full selected goal below the native select on narrow screens. */
+.app-section--profile #profile-goal-value {
+  display: block;
+  min-width: 0;
+  overflow: visible;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.45;
+  font-weight: 650;
 }
 
 .profile-form-section {

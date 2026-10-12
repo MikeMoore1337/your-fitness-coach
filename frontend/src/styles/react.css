@@ -6511,20 +6511,25 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-presets .ui-button {
-  min-height: 58px;
+  min-height: 72px;
   flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 5px;
+  padding: 8px 4px;
 }
 
 .hydration-presets .ui-button span {
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
   white-space: normal;
+  font-size: 0.76rem;
+  line-height: 1.2;
   text-align: center;
 }
 
 .hydration-presets .ui-button strong {
+  order: -1;
+  white-space: nowrap;
   color: var(--v2-accent-text, var(--accent-strong));
   font-variant-numeric: tabular-nums;
 }
