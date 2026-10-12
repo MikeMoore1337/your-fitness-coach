@@ -83,7 +83,26 @@ async function assertTodayFloatingGeometry(page: Page): Promise<void> {
   const quickAdd = page.getByTestId('quick-add-trigger');
   const bottomNav = page.locator('#appBottomNav');
   const workoutAction = page.locator('.today-workout-actions .today-pulse-action:visible');
-  await expectNoVisibleOverlap(quickAdd, bottomNav, 'Today FAB must not overlap bottom navigation');
+  if (
+    await quickAdd.evaluate((element) => element.classList.contains('app-bottom-nav__quick-add'))
+  ) {
+    await expect(bottomNav.locator('.app-bottom-nav__primary > a')).toHaveCount(4);
+    await expect(bottomNav.getByTestId('quick-add-trigger')).toHaveCount(1);
+    await expectTouchTargets(quickAdd);
+    const [action, dock] = await Promise.all([quickAdd.boundingBox(), bottomNav.boundingBox()]);
+    expect(action).not.toBeNull();
+    expect(dock).not.toBeNull();
+    expect(action!.x).toBeGreaterThanOrEqual(dock!.x);
+    expect(action!.y).toBeGreaterThanOrEqual(dock!.y);
+    expect(action!.x + action!.width).toBeLessThanOrEqual(dock!.x + dock!.width);
+    expect(action!.y + action!.height).toBeLessThanOrEqual(dock!.y + dock!.height);
+  } else {
+    await expectNoVisibleOverlap(
+      quickAdd,
+      bottomNav,
+      'Today FAB must not overlap bottom navigation',
+    );
+  }
   await expectNoVisibleOverlap(
     quickAdd,
     workoutAction,

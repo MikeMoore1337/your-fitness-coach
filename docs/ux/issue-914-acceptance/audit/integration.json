@@ -1,0 +1,12 @@
+{
+  "runtime": "5c8f4743a1afe6559a7db4e8797a96ef9d44053b",
+  "master": "1622aa19decfe4b109dd5f2f891d2c24f3c00c12",
+  "pr915": "e88ba039ec02794c1ec983d3355cf1a46fa9fb06",
+  "pr907_911": "Exact heads are ancestors; source branches not mutated",
+  "merge_conflicts": 0,
+  "env_change_required": false,
+  "merge": false,
+  "deploy": false,
+  "release_gate": "STOP_OWNER_RELEASE_APPROVAL",
+  "runtime_scope": "Production frontend source; mobile dock clearance and scroll-settle for active workouts; evidence generated from this exact HEAD"
+}

@@ -102,3 +102,11 @@ describe('progress period contract', () => {
     ).toBe('/app?section=progress&progress_period=days_90');
   });
 });
+
+describe('report section return', () => {
+  it('keeps the extreme progress section in the report URL', () => {
+    expect(progressReportPath({ kind: 'preset', days: 90 }, 'history')).toBe(
+      '/app/report?period=days_90&progress_view=history',
+    );
+  });
+});

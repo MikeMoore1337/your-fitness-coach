@@ -1,8 +1,20 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it } from 'vitest';
 import { ExerciseMediaAsset } from '../../../../src/features/exercises/ExerciseMediaAsset';
 
 describe('ExerciseMediaAsset', () => {
+  afterEach(cleanup);
+  it('keeps a missing decorative thumbnail out of its button name', () => {
+    render(
+      <button>
+        <ExerciseMediaAsset alt="" thumbnailUrl={null} variant="thumbnail" />
+        Приседание
+      </button>,
+    );
+    expect(screen.getByRole('button', { name: 'Приседание' })).toBeVisible();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
   it('keeps a concise centered missing-media label with the full accessible meaning', () => {
     render(
       <ExerciseMediaAsset

@@ -9,7 +9,12 @@ import type {
   ReminderTemplateUpdate,
 } from '../../shared/api/types';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { addCalendarDays, dateInputValue, detectedTimeZone } from '../../shared/dateTime';
+import {
+  addCalendarDays,
+  dateInputValue,
+  dateTimeInputValue,
+  detectedTimeZone,
+} from '../../shared/dateTime';
 import { usePersistentState } from '../../shared/storage';
 import { notificationDraftStorageKey } from '../../shared/userScopedStorage';
 import { DisclosureIcon, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
@@ -335,6 +340,24 @@ function formatWallTime(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(parsed);
+}
+
+function manualNotificationScheduleError(
+  scheduledDate: string,
+  reminderHour: number,
+  timeZone: string,
+  now = new Date(),
+): string | null {
+  const nowInProfile = dateTimeInputValue(now, timeZone);
+  const today = nowInProfile.slice(0, 10);
+  if (!scheduledDate || scheduledDate < today) return 'Выберите сегодняшнюю или будущую дату.';
+  if (scheduledDate === today) {
+    const scheduledTime = `${String(reminderHour).padStart(2, '0')}:00`;
+    if (scheduledTime <= nowInProfile.slice(11, 16)) {
+      return 'Для сегодняшней даты выберите будущее время сегодня в часовом поясе профиля.';
+    }
+  }
+  return null;
 }
 
 export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string) => void }) {
@@ -819,6 +842,16 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
             className="stack"
             onSubmit={(event) => {
               event.preventDefault();
+              const scheduledHour = settings.data?.reminder_hour ?? 9;
+              const scheduleError = manualNotificationScheduleError(
+                notificationDraft.scheduledDate,
+                scheduledHour,
+                timeZone,
+              );
+              if (scheduleError) {
+                toast(scheduleError, 'error');
+                return;
+              }
               listMutation.mutate({
                 path: '/api/v1/notifications',
                 method: 'POST',
@@ -826,7 +859,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
                   title: notificationDraft.title,
                   body: notificationDraft.body,
                   scheduled_for: `${notificationDraft.scheduledDate}T${String(
-                    settings.data?.reminder_hour ?? 9,
+                    scheduledHour,
                   ).padStart(2, '0')}:00:00`,
                 },
               });

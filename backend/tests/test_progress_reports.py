@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+import json
+import os
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
+
+import pytest
+from scripts.extract_pdf_text import extract_pdf_text
 
 from fitminiapp_api.core.timezone import today_msk
 from fitminiapp_api.db.session import get_session_context
@@ -20,6 +26,20 @@ from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services import progress_report_pdf
 from fitminiapp_api.services.progress_reports import build_progress_report
 
+CANONICAL_FACTS = json.loads(
+    (
+        Path(__file__).resolve().parents[2] / "tests/fixtures/progress-report-canonical.json"
+    ).read_text(encoding="utf-8")
+)
+
+
+def test_report_fonts_use_packaged_inter_and_oswald_with_cyrillic() -> None:
+    regular, bold, display = progress_report_pdf._register_fonts()
+    for name, family in [(regular, b"Inter"), (bold, b"Inter"), (display, b"Oswald")]:
+        face = progress_report_pdf.pdfmetrics.getFont(name).face
+        assert face.familyName == family
+        assert all(face.charToGlyph.get(ord(char)) for char in "ПрогрессЁёABC123№—−")
+
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
@@ -35,8 +55,8 @@ def _user_id(telegram_user_id: int) -> int:
         return db.query(User.id).filter(User.telegram_user_id == telegram_user_id).scalar()
 
 
-def _seed_report_data(user_id: int) -> None:
-    today = today_msk()
+def _seed_report_data(user_id: int, *, as_of: date | None = None) -> None:
+    today = as_of or today_msk()
     with get_session_context() as db:
         user = db.get(User, user_id)
         assert user is not None and user.profile is not None
@@ -197,10 +217,185 @@ def test_progress_report_reuses_canonical_facts_without_internal_ids(client) -> 
     assert payload["nutrition"]["target_changes"] == []
     assert payload["program"]["title"] == "Текущая программа"
     assert payload["check_ins"][0]["recovery"] == 3
+    assert "note" not in payload["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in response.text
     assert "food_name" not in response.text
     assert "Содержимое дневника" not in response.text
     assert "user_id" not in response.text
     assert '"id"' not in response.text
+
+
+def test_progress_report_api_and_server_pdf_share_one_canonical_fact_set(client) -> None:
+    headers = _auth(client, 67_061)
+    user_id = _user_id(67_061)
+    period = CANONICAL_FACTS["period"]
+    period_start = date.fromisoformat(period["start"])
+    period_end = date.fromisoformat(period["end"])
+    _seed_report_data(user_id, as_of=period_end)
+
+    params = {
+        "period": period["period"],
+        "date_from": period["start"],
+        "date_to": period["end"],
+    }
+    api_response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+    assert api_response.status_code == 200, api_response.text
+    report = api_response.json()
+
+    assert report["subject"] == CANONICAL_FACTS["subject"]
+    assert report["period_start"] == period["start"]
+    assert report["period_end"] == period["end"]
+    assert report["timezone"] == period["timezone"]
+    for key, value in CANONICAL_FACTS["training"].items():
+        assert report["training"][key] == value
+    for key, value in CANONICAL_FACTS["cardio"].items():
+        assert report["cardio"][key] == value
+    for key in ("logged_days", "eligible_days", "missing_days"):
+        assert report["nutrition"]["summary"][key] == CANONICAL_FACTS["nutrition"][key]
+    for key in ("calories", "protein_g", "fat_g", "carbs_g"):
+        assert (
+            report["nutrition"]["summary"][key]["average"]
+            == CANONICAL_FACTS["nutrition"][f"{key}_average"]
+        )
+    for expected in CANONICAL_FACTS["body"]:
+        actual = next(
+            item for item in report["body"]["trends"] if item["metric"] == expected["metric"]
+        )
+        for key in (
+            "label",
+            "unit",
+            "first_value",
+            "latest_value",
+            "change",
+            "first_measured_on",
+            "latest_measured_on",
+            "point_count",
+            "span_days",
+        ):
+            assert actual[key] == expected[key]
+
+    assert (
+        report["training"]["frequency_per_week"]
+        == CANONICAL_FACTS["training"]["frequency_per_week"]
+    )
+    assert (
+        report["training"]["volume_recorded_sets"]
+        == CANONICAL_FACTS["training"]["volume_recorded_sets"]
+    )
+    assert (
+        report["training"]["new_personal_records"]
+        == CANONICAL_FACTS["training"]["new_personal_records"]
+    )
+    assert report["training"]["exercises"] == CANONICAL_FACTS["training"]["exercises"]
+    assert report["nutrition"]["summary"]["coverage_percent"] == 3.3
+    assert report["nutrition"]["summary"]["complete_days"] == 1
+    assert report["nutrition"]["summary"]["incomplete_days"] == 0
+    assert report["nutrition"]["summary"]["fasted_days"] == 0
+    assert report["nutrition"]["summary"]["current_day_status"] is None
+    assert len(report["nutrition"]["daily"]) == CANONICAL_FACTS["nutrition"]["eligible_days"]
+    assert report["nutrition"]["summary"]["exact_entry_count"] == 1
+    assert report["adherence"]["overall_percent"] == 50.0
+    assert report["adherence"]["included_components"] == ["workouts", "calories", "protein"]
+    assert report["adherence"]["workouts"] == {
+        "status": "available",
+        "percent": 50.0,
+        "achieved": 1,
+        "evaluated": 2,
+        "weight": 0.4,
+        "reason": None,
+    }
+    assert report["adherence"]["cardio"]["status"] == "not_applicable"
+    assert report["adherence"]["calories"]["achieved"] == 1
+    assert report["adherence"]["protein"]["achieved"] == 0
+    assert report["data_sufficiency"]["workout_logging"]["status"] == "sufficient"
+    assert report["data_sufficiency"]["working_sets"]["status"] == "limited"
+    assert report["data_sufficiency"]["working_sets"]["counters"] == {
+        "workout_session_count": 1,
+        "working_set_count": 1,
+        "required_workout_session_count": 2,
+        "required_working_set_count": 6,
+    }
+    assert report["data_sufficiency"]["nutrition_coverage"]["counters"]["coverage_percent"] == 3.3
+    assert report["data_sufficiency"]["weight_trend"]["reason_keys"] == ["too_few_points"]
+    assert report["data_sufficiency"]["anthropometry"]["reason_keys"] == ["too_few_points"]
+    assert report["data_sufficiency"]["schedule_adherence"]["reason_keys"] == [
+        "too_few_evaluable_workouts"
+    ]
+
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link", params=params, headers=headers
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+
+    rendered = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
+    assert (
+        f"Период: {period_start:%d.%m.%Y} — {period_end:%d.%m.%Y} · Часовой пояс: {period['timezone']}"
+        in rendered
+    )
+    assert "Тренировки" in rendered
+    assert "1 / 2" in rendered
+    assert "Завершено: 1" in rendered
+    assert "Пропущено: 1" in rendered
+    assert "400 кг" in rendered
+    for exercise in CANONICAL_FACTS["training"]["exercises"]:
+        assert exercise["exercise_title"] in rendered
+        assert f"{exercise['external_load_volume_kg']} кг" in rendered
+    assert "0 мин" in rendered
+    assert "2 100 ккал" in rendered
+    assert "155 г" in rendered
+    assert "68 г" in rendered
+    assert "230 г" in rendered
+    for expected in CANONICAL_FACTS["body"]:
+        unit = "кг" if expected["unit"] == "kg" else "см"
+        assert f"{expected['first_value']} {unit}" in rendered
+        assert f"{expected['latest_value']} {unit}" in rendered
+        assert (
+            f"{expected['first_measured_on'][8:10]}.{expected['first_measured_on'][5:7]}.{expected['first_measured_on'][:4]}"
+            in rendered
+        )
+        assert (
+            f"{expected['latest_measured_on'][8:10]}.{expected['latest_measured_on'][5:7]}.{expected['latest_measured_on'][:4]}"
+            in rendered
+        )
+    for private_value in CANONICAL_FACTS["privacy"]:
+        assert private_value not in rendered
+
+
+def test_progress_report_empty_pdf_has_no_fabricated_facts(client) -> None:
+    headers = _auth(client, 67_062)
+    period = CANONICAL_FACTS["period"]
+    response = client.get(
+        "/api/v1/workouts/progress/report",
+        params={
+            "period": period["period"],
+            "date_from": period["start"],
+            "date_to": period["end"],
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    report = response.json()
+    assert report["training"]["planned_workouts"] == 0
+    assert report["body"]["trends"] == []
+    assert report["nutrition"]["summary"]["calories"]["average"] is None
+
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params={"period": period["period"], "date_from": period["start"], "date_to": period["end"]},
+        headers=headers,
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+    rendered = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
+    assert "Тренировки 0 / 0" in rendered
+    assert "Нет данных" not in rendered
+    for private_value in CANONICAL_FACTS["privacy"]:
+        assert private_value not in rendered
 
 
 def test_progress_report_download_uses_custom_definition_label_in_pdf(client, monkeypatch) -> None:
@@ -409,3 +604,198 @@ def test_coach_progress_report_download_rechecks_active_relationship(client) -> 
 
     revoked = client.get(file_url)
     assert revoked.status_code == 404
+
+
+def test_progress_report_pdf_matches_api_metrics_without_exposing_notes_for_single_record(
+    client, monkeypatch
+) -> None:
+    """Однократный замер нельзя выдавать за изменение; PDF берёт факты из API."""
+
+    headers = _auth(client, 67_073)
+    _seed_report_data(_user_id(67_073))
+    today = today_msk()
+    params = {
+        "period": "custom",
+        "date_from": (today - timedelta(days=6)).isoformat(),
+        "date_to": today.isoformat(),
+    }
+    api_response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+    assert api_response.status_code == 200, api_response.text
+    report = api_response.json()
+    trends = report["body"]["trends"]
+    assert trends, "Тест должен содержать хотя бы один замер"
+    assert all(item["change"] is None for item in trends)
+    assert all(item["first_measured_on"] == item["latest_measured_on"] for item in trends)
+
+    rendered_paragraphs: list[str] = []
+    original_paragraph = progress_report_pdf.Paragraph
+
+    def capture_paragraph(text, style, *args, **kwargs):
+        rendered_paragraphs.append(str(text))
+        return original_paragraph(text, style, *args, **kwargs)
+
+    monkeypatch.setattr(progress_report_pdf, "Paragraph", capture_paragraph)
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params=params,
+        headers=headers,
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.headers["content-type"].startswith("application/pdf")
+    assert downloaded.content.startswith(b"%PDF-")
+    extracted = " ".join(extract_pdf_text(downloaded.content).replace("\u00a0", " ").split())
+
+    rendered = "\n".join(rendered_paragraphs)
+    training = report["training"]
+    assert f"{training['completed_workouts']} / {training['planned_workouts']}" in rendered
+    assert f"Завершено: {training['completed_workouts']}" in rendered
+    assert f"Пропущено: {training['skipped_workouts']}" in rendered
+    assert progress_report_pdf._number(training["external_load_volume_kg"], " кг") in rendered
+    for item in trends:
+        _label, unit = progress_report_pdf._body_metric(
+            item["metric"], label=item.get("label"), unit=item.get("unit")
+        )
+        expected_value = progress_report_pdf._number(item["latest_value"], unit)
+        assert sum(expected_value in paragraph for paragraph in rendered_paragraphs) >= 2
+        assert expected_value in extracted
+        assert progress_report_pdf._date(item["latest_measured_on"]) in extracted
+    assert sum(paragraph == "—" for paragraph in rendered_paragraphs) >= len(trends)
+
+    assert "Содержимое дневника не должно попасть в отчёт" not in rendered
+    assert "note" not in report["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in rendered
+    assert "user_id" not in rendered
+    assert "telegram_user_id" not in rendered
+
+
+@pytest.mark.parametrize(
+    ("period", "expected_days"),
+    [
+        (NutritionReportPeriod.DAYS_7, 7),
+        (NutritionReportPeriod.DAYS_30, 30),
+        (NutritionReportPeriod.DAYS_90, 90),
+        (NutritionReportPeriod.CURRENT_MONTH, None),
+        (NutritionReportPeriod.CUSTOM, 5),
+    ],
+)
+def test_progress_report_periods_share_one_inclusive_canonical_range(
+    client,
+    period: NutritionReportPeriod,
+    expected_days: int | None,
+) -> None:
+    headers = _auth(client, 67_500 + list(NutritionReportPeriod).index(period))
+    _seed_report_data(_user_id(67_500 + list(NutritionReportPeriod).index(period)))
+    today = today_msk()
+    params: dict[str, str] = {"period": period.value}
+    if period == NutritionReportPeriod.CUSTOM:
+        params.update(
+            {
+                "date_from": (today - timedelta(days=4)).isoformat(),
+                "date_to": today.isoformat(),
+            }
+        )
+
+    response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+
+    assert response.status_code == 200, response.text
+    report = response.json()
+    start = (
+        today.replace(day=1)
+        if period == NutritionReportPeriod.CURRENT_MONTH
+        else today - timedelta(days=expected_days - 1)
+        if expected_days is not None
+        else today - timedelta(days=4)
+    )
+    days = (today - start).days + 1
+    assert report["period"] == period.value
+    assert report["period_start"] == start.isoformat()
+    assert report["period_end"] == today.isoformat()
+    assert report["timezone"] == "Europe/Moscow"
+    assert report["nutrition"]["summary"]["eligible_days"] == days
+    assert len(report["nutrition"]["daily"]) == days
+    assert report["nutrition"]["summary"]["logged_days"] == 1
+    assert report["nutrition"]["summary"]["missing_days"] == days - 1
+    assert report["training"]["completed_workouts"] == 1
+    assert report["training"]["completed_working_sets"] == 1
+    assert report["training"]["external_load_volume_kg"] == 400.0
+
+
+@pytest.mark.parametrize(
+    "period",
+    [
+        NutritionReportPeriod.DAYS_7,
+        NutritionReportPeriod.DAYS_30,
+        NutritionReportPeriod.DAYS_90,
+        NutritionReportPeriod.CURRENT_MONTH,
+        NutritionReportPeriod.CUSTOM,
+    ],
+)
+def test_progress_report_pdf_keeps_api_numbers_and_excludes_screen_controls(
+    client,
+    monkeypatch,
+    period: NutritionReportPeriod,
+) -> None:
+    telegram_user_id = 67_700 + list(NutritionReportPeriod).index(period)
+    headers = _auth(client, telegram_user_id)
+    _seed_report_data(_user_id(telegram_user_id))
+    today = today_msk()
+    params: dict[str, str] = {"period": period.value}
+    if period == NutritionReportPeriod.CUSTOM:
+        params.update(
+            {
+                "date_from": (today - timedelta(days=4)).isoformat(),
+                "date_to": today.isoformat(),
+            }
+        )
+
+    api_response = client.get("/api/v1/workouts/progress/report", params=params, headers=headers)
+    assert api_response.status_code == 200, api_response.text
+    report = api_response.json()
+    rendered_paragraphs: list[str] = []
+    original_paragraph = progress_report_pdf.Paragraph
+
+    def capture_paragraph(text, style, *args, **kwargs):
+        rendered_paragraphs.append(str(text))
+        return original_paragraph(text, style, *args, **kwargs)
+
+    monkeypatch.setattr(progress_report_pdf, "Paragraph", capture_paragraph)
+    link_response = client.post(
+        "/api/v1/workouts/progress/report/download-link",
+        params=params,
+        headers=headers,
+    )
+    assert link_response.status_code == 200, link_response.text
+    downloaded = client.get(link_response.json()["url"])
+    assert downloaded.status_code == 200, downloaded.text
+    assert downloaded.content.startswith(b"%PDF-")
+    assert len(downloaded.content) > 5_000
+
+    rendered = "\n".join(rendered_paragraphs)
+    training = report["training"]
+    nutrition = report["nutrition"]["summary"]
+    assert f"{training['completed_workouts']} / {training['planned_workouts']}" in rendered
+    assert f"Завершено: {training['completed_workouts']}" in rendered
+    assert f"Пропущено: {training['skipped_workouts']}" in rendered
+    assert progress_report_pdf._number(training["external_load_volume_kg"], " кг") in rendered
+    assert progress_report_pdf._number(report["cardio"]["completed_sessions"]) in rendered
+    assert f"{report['cardio']['duration_minutes']} мин" in rendered
+    for key, suffix in (
+        ("calories", " ккал"),
+        ("protein_g", " г"),
+        ("fat_g", " г"),
+        ("carbs_g", " г"),
+    ):
+        assert progress_report_pdf._number(nutrition[key]["average"], suffix) in rendered
+    assert "Содержимое дневника не должно попасть в отчёт" not in rendered
+    assert "note" not in report["check_ins"][0]
+    assert "Фактическая заметка пользователя" not in rendered
+    for screen_control in ("Показать период", "Скачать PDF", "Состав и отправка отчёта"):
+        assert screen_control not in rendered
+
+    evidence_dir = os.environ.get("YFC_PROGRESS_REPORT_PDF_EVIDENCE_DIR")
+    if evidence_dir and period == NutritionReportPeriod.DAYS_30:
+        evidence_path = Path(evidence_dir) / "server-progress-report-days-30.pdf"
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_bytes(downloaded.content)

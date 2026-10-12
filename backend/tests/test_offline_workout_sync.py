@@ -158,6 +158,42 @@ def test_set_mutations_are_idempotent_and_rebase_after_version_conflict(client) 
         assert db.query(WorkoutSetMutation).count() == 2
 
 
+def test_completion_survives_stale_autosave_and_persisted_reread(client) -> None:
+    headers = _auth(client, 93_603)
+    _, workout_set = _create_started_workout(client, headers)
+    endpoint = f"/api/v1/workouts/sets/{workout_set['id']}"
+    draft = {
+        "actual_reps": 9,
+        "actual_weight": 42.5,
+        "rir": "2",
+        "is_completed": False,
+        "expected_version": 1,
+        "mutation_id": "completion-autosave-0001",
+    }
+    assert client.patch(endpoint, headers=headers, json=draft).status_code == 200
+    completion = {
+        **draft,
+        "is_completed": True,
+        "expected_version": 2,
+        "mutation_id": "completion-accepted-0001",
+    }
+    saved = client.patch(endpoint, headers=headers, json=completion)
+    assert saved.status_code == 200
+    stale = client.patch(
+        endpoint,
+        headers=headers,
+        json={**draft, "expected_version": 2, "mutation_id": "completion-stale-000001"},
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["current"]["is_completed"] is True
+    assert client.patch(endpoint, headers=headers, json=completion).json()["version"] == 3
+    reread = client.get("/api/v1/workouts/today", headers=headers).json()["exercises"][0]["sets"][0]
+    assert reread["is_completed"] is True
+    assert (reread["actual_reps"], reread["actual_weight"], reread["rir"]) == (9, 42.5, "2")
+    with get_session_context() as db:
+        assert db.query(WorkoutSetMutation).count() == 2
+
+
 def test_retry_is_safe_after_finish_and_other_accounts_cannot_replay_it(client) -> None:
     owner_headers = _auth(client, 93_601)
     workout, workout_set = _create_started_workout(client, owner_headers)

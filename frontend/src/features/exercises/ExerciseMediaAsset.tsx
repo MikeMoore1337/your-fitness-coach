@@ -47,8 +47,9 @@ export function ExerciseMediaAsset({
         className={
           className ? `${className} exercise-media-asset--missing` : 'exercise-media-asset--missing'
         }
-        role="img"
-        aria-label={`${alt}. Изображение пока недоступно`}
+        role={alt ? 'img' : undefined}
+        aria-label={alt ? `${alt}. Изображение пока недоступно` : undefined}
+        aria-hidden={alt ? undefined : true}
       >
         <span aria-hidden="true">Нет фото</span>
       </span>

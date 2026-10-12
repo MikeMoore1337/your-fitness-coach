@@ -67,6 +67,7 @@ function StepPicker({
             steps.includes(choice.key) ? ' is-selected' : ''
           }${disabled ? ' is-disabled' : ''}`}
           htmlFor={`${idPrefix}-${choice.key}`}
+          data-yfc-choice="compact"
           key={choice.key}
         >
           <input

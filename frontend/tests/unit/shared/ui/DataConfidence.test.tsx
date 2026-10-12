@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   DataConfidence,
   dataConfidenceBasis,
@@ -19,7 +19,24 @@ function signal(
   };
 }
 
+afterEach(cleanup);
+
 describe('DataConfidence', () => {
+  it('prefixes a report status with its explicit section label', () => {
+    render(
+      <DataConfidence
+        label="Тренировки"
+        kind="training"
+        signal={signal('sufficient', {
+          working_set_count: 8,
+          workout_session_count: 3,
+        })}
+      />,
+    );
+
+    expect(screen.getByText('Тренировки — Данных достаточно для оценки')).toBeInTheDocument();
+  });
+
   it('keeps the plain-language status before a concrete nutrition basis and neutral next step', async () => {
     const user = userEvent.setup();
     const { container } = render(

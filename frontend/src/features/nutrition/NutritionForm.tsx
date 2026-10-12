@@ -177,6 +177,7 @@ export function NutritionForm({
             type="button"
             className={mode === 'calculated' ? 'is-active' : undefined}
             aria-pressed={mode === 'calculated'}
+            data-yfc-choice="capsule"
             onClick={() => setMode('calculated')}
           >
             Рассчитать ориентиры
@@ -185,6 +186,7 @@ export function NutritionForm({
             type="button"
             className={mode === 'manual' ? 'is-active' : undefined}
             aria-pressed={mode === 'manual'}
+            data-yfc-choice="capsule"
             onClick={() => setMode('manual')}
           >
             Указать вручную

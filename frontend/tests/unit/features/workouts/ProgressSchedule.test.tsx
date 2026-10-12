@@ -116,6 +116,7 @@ const schedule = [
     week_number: 1,
   },
 ];
+let scheduleRows = schedule;
 
 const recoveryPreview = {
   status: 'preview',
@@ -330,7 +331,7 @@ const pendingCalibration = {
 
 let calibrationResult: Record<string, unknown> = insufficientCalibration;
 
-function renderPanel(userId: number | 'anonymous' = 'anonymous') {
+function renderPanel(userId: number | 'anonymous' = 'anonymous', focusedWorkoutId?: number) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -338,7 +339,7 @@ function renderPanel(userId: number | 'anonymous' = 'anonymous') {
     <NavigationProvider>
       <QueryClientProvider client={queryClient}>
         <FeedbackProvider>
-          <ProgressSchedule userId={userId} />
+          <ProgressSchedule userId={userId} focusedWorkoutId={focusedWorkoutId} />
         </FeedbackProvider>
       </QueryClientProvider>
     </NavigationProvider>,
@@ -349,6 +350,7 @@ describe('ProgressSchedule', () => {
   beforeEach(() => {
     localStorage.clear();
     schedule[0]!.status = 'planned';
+    scheduleRows = schedule;
     suspiciousLowDays.length = 0;
     calibrationResult = insufficientCalibration;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -398,7 +400,7 @@ describe('ProgressSchedule', () => {
         return new Response(JSON.stringify({ status: 'incomplete' }), { status: 200 });
       }
       if (path === '/api/v1/workouts/schedule' && (!init?.method || init.method === 'GET')) {
-        return new Response(JSON.stringify(schedule), { status: 200 });
+        return new Response(JSON.stringify(scheduleRows), { status: 200 });
       }
       if (path === '/api/v1/workouts/42/recovery/preview' && init?.method === 'POST') {
         return new Response(JSON.stringify(recoveryPreview), { status: 200 });
@@ -423,6 +425,48 @@ describe('ProgressSchedule', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+  });
+
+  it.each([1, 4, 12])(
+    'keeps all %i schedule rows available behind the compact preview',
+    async (count) => {
+      scheduleRows = Array.from({ length: count }, (_, index) => ({
+        ...schedule[0]!,
+        id: 100 + index,
+        title: `Занятие ${index + 1}`,
+      }));
+      renderPanel();
+      await screen.findByText('Занятие 1');
+      fireEvent.click(screen.getByText('Расписание'));
+      expect(screen.getByText('Занятие 1')).toBeVisible();
+      expect(screen.getAllByRole('article', { name: /^Тренировка Занятие/ })).toHaveLength(count);
+      if (count > 4) {
+        expect(
+          screen.getByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+        ).not.toBeVisible();
+        fireEvent.click(screen.getByText('Все восемь недель · ещё 8'));
+        expect(screen.getAllByRole('article', { name: /^Тренировка Занятие/ })).toHaveLength(count);
+        await waitFor(() =>
+          expect(
+            within(
+              screen.getByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+            ).getByRole('button', { name: 'Изменить план' }),
+          ).toBeVisible(),
+        );
+      }
+    },
+  );
+
+  it('opens the full calendar for a deep link to its last workout', async () => {
+    scheduleRows = Array.from({ length: 12 }, (_, index) => ({
+      ...schedule[0]!,
+      id: 100 + index,
+      title: `Занятие ${index + 1}`,
+    }));
+    renderPanel('anonymous', 111);
+    expect(
+      await screen.findByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),
+    ).toHaveFocus();
   });
 
   it('shows progress and applies a reviewed reschedule request', async () => {

@@ -174,7 +174,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
   });
   await completeSet.focus();
   await completeSet.click();
-  await expect(page.getByRole('timer').filter({ hasText: 'Отдых' })).toContainText('1:30');
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toContainText('1:30');
   await expect
     .poll(() =>
       page.evaluate(() => {

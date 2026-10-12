@@ -154,6 +154,23 @@ export function ExerciseSetupMemory({
     });
   };
 
+  if (!editing && !displayMemory && !status) {
+    return (
+      <section
+        className="active-workout-setup-memory active-workout-setup-memory--empty"
+        data-testid={`exercise-setup-memory-${exerciseId}`}
+      >
+        {canEdit ? (
+          <Button type="button" variant="ghost" onClick={openEditor}>
+            Добавить настройку
+          </Button>
+        ) : (
+          <small>Личная настройка доступна после входа.</small>
+        )}
+      </section>
+    );
+  }
+
   return (
     <section
       className="active-workout-setup-memory"

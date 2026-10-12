@@ -2,7 +2,7 @@ import { useEffect, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { WorkoutScheduleItem } from '../../shared/api/types';
-import { formatCalendarDate } from '../../shared/dateTime';
+import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
 import { ProgressExperience } from './ProgressExperience';
@@ -90,14 +90,41 @@ export function SchedulePanel({
     )
       return;
     const row = document.getElementById(`workout-schedule-${focusedWorkoutId}`);
-    const disclosure = row?.closest<HTMLDetailsElement>('details.card-disclosure');
-    if (disclosure) disclosure.open = true;
+    let disclosure = row?.closest<HTMLDetailsElement>('details');
+    while (disclosure) {
+      disclosure.open = true;
+      disclosure = disclosure.parentElement?.closest<HTMLDetailsElement>('details') ?? null;
+    }
     row?.focus({ preventScroll: true });
     row?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }, [focusedWorkoutId, schedule.data]);
 
+  const today = dateInputValue(new Date(), timeZone ?? undefined);
+  const upcoming =
+    schedule.data
+      ?.filter(
+        (item) =>
+          item.status === 'in_progress' ||
+          (item.scheduled_date >= today && item.status !== 'completed'),
+      )
+      .slice(0, 4) ?? [];
+  const primary = upcoming.length ? upcoming : (schedule.data?.slice(0, 4) ?? []);
+  const remaining = schedule.data?.filter((item) => !primary.includes(item)) ?? [];
+  const row = (item: WorkoutScheduleItem) => (
+    <ScheduleRow
+      key={`${item.id}-${item.scheduled_date}-${item.scheduled_time}-${item.status}`}
+      item={item}
+      timeZone={timeZone}
+      focusedCommentId={
+        focusedWorkoutId === item.id && item.status !== 'completed' ? focusedCommentId : null
+      }
+      focusedExerciseId={
+        focusedWorkoutId === item.id && item.status !== 'completed' ? focusedExerciseId : null
+      }
+    />
+  );
   return (
-    <Card title="Расписание" description="Ближайшие восемь недель">
+    <Card title="Расписание" description="Ближайшие тренировки · календарь на восемь недель">
       {schedule.isLoading ? (
         <LoadingState />
       ) : schedule.error ? (
@@ -109,23 +136,13 @@ export function SchedulePanel({
         <EmptyState title="Активного расписания пока нет" />
       ) : (
         <div className="list-grid top-gap">
-          {schedule.data.map((item) => (
-            <ScheduleRow
-              key={`${item.id}-${item.scheduled_date}-${item.scheduled_time}-${item.status}`}
-              item={item}
-              timeZone={timeZone}
-              focusedCommentId={
-                focusedWorkoutId === item.id && item.status !== 'completed'
-                  ? focusedCommentId
-                  : null
-              }
-              focusedExerciseId={
-                focusedWorkoutId === item.id && item.status !== 'completed'
-                  ? focusedExerciseId
-                  : null
-              }
-            />
-          ))}
+          {primary.map(row)}
+          {remaining.length > 0 && (
+            <details className="workout-schedule-all">
+              <summary>Все восемь недель · ещё {remaining.length}</summary>
+              <div className="list-grid">{remaining.map(row)}</div>
+            </details>
+          )}
         </div>
       )}
     </Card>
