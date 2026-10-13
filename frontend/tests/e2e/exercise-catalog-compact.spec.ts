@@ -105,8 +105,34 @@ test('client exercise rows stay compact-first across supported mobile widths', a
     expect(resultBox!.y).toBeLessThan(viewport.height);
     await expectNoHorizontalOverflow(page);
     await page.locator('.exercise-catalog-list').screenshot({
-      path: `../.artifacts/screenshots/task-120D/exercise-catalog-${name}-${viewport.width}.png`,
+      path: `../.artifacts/screenshots/task-120D/${test.info().project.name}-exercise-catalog-${name}-${viewport.width}.png`,
     });
+
+    const structure = await page.evaluate(() => {
+      const filters = document.querySelector('.exercise-catalog__filters');
+      const count = document.querySelector('.exercise-catalog__count');
+      const list = document.querySelector('.exercise-catalog-list');
+      if (!filters || !count || !list) {
+        throw new Error('Exercise catalog search structure is incomplete');
+      }
+      const follows = (before: Element, after: Element) =>
+        Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return {
+        filtersBeforeCount: follows(filters, count),
+        countBeforeResults: follows(count, list),
+      };
+    });
+    expect(structure).toEqual({ filtersBeforeCount: true, countBeforeResults: true });
+
+    const filterControls = page.locator('.exercise-catalog__filters select');
+    await expect(filterControls).toHaveCount(3);
+    await search.press('Tab');
+    await expect(filterControls.nth(0)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(filterControls.nth(1)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(filterControls.nth(2)).toBeFocused();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   }
 
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -123,7 +149,7 @@ test('client exercise rows stay compact-first across supported mobile widths', a
   expect(desktopFiltersBox!.y).toBeLessThan(desktopResultBox!.y);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-120D/exercise-catalog-desktop-1280.png',
+    path: `../.artifacts/screenshots/task-120D/${test.info().project.name}-exercise-catalog-desktop-1280.png`,
     fullPage: true,
   });
 });
