@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { PNG } from './fixtures/landing-pixels';
 import type {
   FoodDiaryEntry,
   HydrationEntry,
@@ -9,6 +12,18 @@ import { installTelegramHarness } from './fixtures/mobile-tma';
 import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
+
+const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
+const ISSUE_974_AFTER_DIR = resolve(
+  process.cwd(),
+  '..',
+  'docs',
+  'ux',
+  'final-issues-acceptance',
+  'evidence',
+  '869-contrast-rework-20261013',
+  'after',
+);
 
 const zeroNutrition = {
   energy_kcal: '0.00',
@@ -259,6 +274,8 @@ async function mockNutritionApi(
   page: Page,
   hydrationState: 'data' | 'empty' | 'error' | 'loading' = 'data',
   profileSex: 'female' | null = 'female',
+  hydrationPercent?: number,
+  hydrationGoalEnabled = true,
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -460,7 +477,11 @@ async function mockNutritionApi(
       if (hydrationState === 'error') {
         return route.fulfill({ status: 503, json: { detail: 'Гидратация временно недоступна' } });
       }
-      const totalMl = hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0);
+      const targetMl = hydrationPercent == null ? 2200 : 1000;
+      const totalMl =
+        hydrationPercent == null
+          ? hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0)
+          : Math.round((targetMl * hydrationPercent) / 100);
       return route.fulfill({
         json: {
           diary_date: url.searchParams.get('diary_date') || '2026-08-19',
@@ -471,8 +492,8 @@ async function mockNutritionApi(
               ? null
               : {
                   id: 1,
-                  enabled: true,
-                  target_ml: 2200,
+                  enabled: hydrationGoalEnabled,
+                  target_ml: hydrationGoalEnabled ? targetMl : null,
                   source: 'national_academies_beverages',
                   method_version: 'nasem-ai-2005-observed-beverages-v1',
                   reference_scope: 'beverages',
@@ -483,8 +504,10 @@ async function mockNutritionApi(
                   created_at: '2026-08-19T08:00:00',
                 },
           progress_percent:
-            hydrationState === 'empty' ? null : Math.round((totalMl * 1000) / 2200) / 10,
-          entries: hydrationEntries,
+            hydrationState === 'empty' || !hydrationGoalEnabled
+              ? null
+              : (hydrationPercent ?? Math.round((totalMl * 1000) / targetMl) / 10),
+          entries: hydrationPercent == null ? hydrationEntries : [],
           presets: [
             { id: null, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
             {
@@ -1388,10 +1411,130 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
+  const orbText = hydration.locator('.hydration-orb strong');
+  await expect(orbText).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await expect(orbText).toHaveCSS('-webkit-text-stroke-width', '0.75px');
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
   });
+});
+
+test.describe('#974 hydration orb contrast candidate', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    for (const percent of [0, 25, 50, 75, 100, 103]) {
+      test(`${theme} ${percent}% remains readable across the fill boundary`, async ({
+        page,
+      }, info) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockNutritionApi(page, 'data', 'female', percent);
+        await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const orb = hydration.locator('.hydration-orb');
+        const text = orb.locator('strong');
+        const fill = orb.locator(':scope > span');
+        await expect(text).toHaveText(`${percent}%`);
+        await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+        await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+        expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe(
+          `${Math.min(percent, 100)}%`,
+        );
+
+        const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+        const orbBox = boxes[0];
+        const textBox = boxes[1];
+        if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+        expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+        expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+        expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+        expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+        const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+        const brightPixels = screenshot.data.reduce((count, channel, index) => {
+          if (index % 4 !== 0) return count;
+          const green = screenshot.data[index + 1] ?? 0;
+          const blue = screenshot.data[index + 2] ?? 0;
+          return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+        }, 0);
+        expect(brightPixels).toBeGreaterThan(8);
+
+        if (CAPTURE_974_AFTER) {
+          await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+          await orb.screenshot({
+            path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-${percent}.png`),
+            scale: 'device',
+          });
+        }
+      });
+    }
+  }
+});
+
+test.describe('#974 hydration orb H₂O without an enabled goal', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`${theme} H₂O remains readable with a disabled goal`, async ({ page }, info) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockNutritionApi(page, 'data', 'female', undefined, false);
+
+      const hydrationResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return (
+          url.pathname === '/api/v1/nutrition/hydration' && response.request().method() === 'GET'
+        );
+      });
+      await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+      const hydrationPayload = await (await hydrationResponse).json();
+      expect(hydrationPayload.goal).toMatchObject({ enabled: false, target_ml: null });
+      expect(hydrationPayload.progress_percent).toBeNull();
+
+      const hydration = page.getByRole('region', { name: 'Гидратация' });
+      const orb = hydration.locator('.hydration-orb');
+      const text = orb.locator('strong');
+      const fill = orb.locator(':scope > span');
+      await expect(text).toHaveText('H₂O');
+      await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+      await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+      await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();
+      expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe('0%');
+
+      const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+      const orbBox = boxes[0];
+      const textBox = boxes[1];
+      if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+      expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+      expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+      expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+      expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+      const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+      const brightPixels = screenshot.data.reduce((count, channel, index) => {
+        if (index % 4 !== 0) return count;
+        const green = screenshot.data[index + 1] ?? 0;
+        const blue = screenshot.data[index + 2] ?? 0;
+        return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+      }, 0);
+      expect(brightPixels).toBeGreaterThan(8);
+
+      if (CAPTURE_974_AFTER) {
+        await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+        await orb.screenshot({
+          path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-h2o-disabled.png`),
+          scale: 'device',
+        });
+      }
+    });
+  }
 });
 
 for (const mode of ['light', 'dark'] as const) {
