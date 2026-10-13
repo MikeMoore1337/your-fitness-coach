@@ -72,6 +72,327 @@ def _assigned_program(
     return response.json()["assigned_program_id"], exercises
 
 
+def _template_edit_payload(template: dict, *, exercise_id: int, expected_revision: int) -> dict:
+    day = template["days"][0]
+    source = day["exercises"][0]
+    return {
+        "title": f"{template['title']} — обновлена",
+        "goal": template["goal"],
+        "level": template["level"],
+        "mode": "self",
+        "assign_after_create": False,
+        "duration_weeks": 1,
+        "schedule_weekdays": [0],
+        "expected_revision_number": expected_revision,
+        "days": [
+            {
+                "title": "Силовая — обновлена",
+                "exercises": [
+                    {
+                        "exercise_id": exercise_id,
+                        "prescribed_sets": 4,
+                        "prescribed_reps": "10-12",
+                        "prescribed_duration_minutes": source["prescribed_duration_minutes"],
+                        "rest_seconds": 120,
+                        "notes": "Новая рабочая схема",
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_template_edit_applies_only_to_future_planned_workouts(client):
+    headers = _auth(client, 93000)
+    program_id, exercises = _assigned_program(client, headers, duration_weeks=3)
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template_id = program.template_id
+        workouts = sorted(program.workouts, key=lambda item: item.scheduled_date)
+        completed, in_progress, future = workouts
+        completed.status = "completed"
+        completed.completed_at = now_msk_naive()
+        completed_set = completed.exercises[0].sets[0]
+        completed_set.actual_reps = 11
+        completed_set.actual_weight = 50
+        completed_set.is_completed = True
+        in_progress.status = "in_progress"
+        in_progress.started_at = now_msk_naive()
+        in_progress_before = (
+            in_progress.exercises[0].prescribed_sets,
+            in_progress.exercises[0].prescribed_reps,
+            in_progress.exercises[0].rest_seconds,
+        )
+        future_id = future.id
+        db.commit()
+
+    template = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert template.status_code == 200, template.text
+    payload = _template_edit_payload(
+        template.json(), exercise_id=exercises[1]["id"], expected_revision=1
+    )
+    updated = client.patch(
+        f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["assigned_program_updated"] is True
+    assert updated.json()["future_workouts_updated"] == 1
+    assert updated.json()["assigned_program_revision_number"] == 2
+    assert updated.json()["current_revision_number"] == 2
+
+    stale = client.patch(f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload)
+    assert stale.status_code == 409
+    assert stale.json()["detail"] == "Program revision conflict"
+
+    refreshed = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert refreshed.status_code == 200, refreshed.text
+    assert refreshed.json()["current_revision_number"] == 2
+    assert refreshed.json()["days"][0]["exercises"][0]["prescribed_sets"] == 4
+
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        completed = next(item for item in program.workouts if item.status == "completed")
+        in_progress = next(item for item in program.workouts if item.status == "in_progress")
+        future = next(item for item in program.workouts if item.id == future_id)
+        assert program.current_revision_number == 2
+        assert db.query(ProgramRevision).filter_by(user_program_id=program_id).count() == 2
+        assert completed.status == "completed"
+        assert completed.completed_at is not None
+        assert completed.exercises[0].sets[0].actual_reps == 11
+        assert completed.exercises[0].sets[0].actual_weight == 50
+        assert in_progress.status == "in_progress"
+        assert in_progress.started_at is not None
+        assert (
+            in_progress.exercises[0].prescribed_sets,
+            in_progress.exercises[0].prescribed_reps,
+            in_progress.exercises[0].rest_seconds,
+        ) == in_progress_before
+        assert future.id == future_id
+        assert future.status == "planned"
+        assert future.exercises[0].exercise_id == exercises[1]["id"]
+        assert future.exercises[0].prescribed_sets == 4
+        assert future.exercises[0].prescribed_reps == "10-12"
+        assert future.exercises[0].rest_seconds == 120
+        assert len(future.exercises[0].sets) == 4
+
+
+def test_template_edit_without_active_assignment_only_updates_the_template(client):
+    headers = _auth(client, 93009)
+    exercises = [
+        item
+        for item in client.get("/api/v1/programs/exercises", headers=headers).json()
+        if item["metric_type"] == "strength"
+    ]
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Шаблон без назначения",
+            "goal": "recomposition",
+            "level": "intermediate",
+            "mode": "self",
+            "assign_after_create": False,
+            "days": [
+                {
+                    "title": "Силовая",
+                    "exercises": [
+                        {
+                            "exercise_id": exercises[0]["id"],
+                            "prescribed_sets": 2,
+                            "prescribed_reps": "8-10",
+                            "rest_seconds": 90,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    template = created.json()["template"]
+    payload = _template_edit_payload(
+        template,
+        exercise_id=exercises[1]["id"],
+        expected_revision=1,
+    )
+    payload.pop("expected_revision_number")
+
+    updated = client.patch(
+        f"/api/v1/programs/templates/{template['id']}",
+        headers=headers,
+        json=payload,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["assigned_program_updated"] is False
+    assert updated.json()["future_workouts_updated"] == 0
+    assert updated.json()["assigned_program_revision_number"] is None
+    assert updated.json()["days"][0]["exercises"][0]["exercise_id"] == exercises[1]["id"]
+
+
+def test_coach_template_edit_updates_client_future_workouts(client):
+    coach_headers = _auth(client, 93010, is_coach=True)
+    client_headers = _auth(client, 93011)
+    with get_session_context() as db:
+        coach_user = db.query(User).filter(User.telegram_user_id == 93010).one()
+        client_user = db.query(User).filter(User.telegram_user_id == 93011).one()
+        db.add(
+            CoachClient(
+                coach_user_id=coach_user.id,
+                client_user_id=client_user.id,
+                status="active",
+                accepted_at=now_msk_naive(),
+            )
+        )
+        db.commit()
+
+    program_id, exercises = _assigned_program(
+        client,
+        coach_headers,
+        duration_weeks=2,
+        mode="coach",
+        target_telegram_user_id=93011,
+    )
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template_id = program.template_id
+        schedule_weekdays = list(program.schedule_weekdays)
+
+    template = client.get(f"/api/v1/programs/templates/{template_id}", headers=coach_headers)
+    assert template.status_code == 200, template.text
+    payload = _template_edit_payload(
+        template.json(),
+        exercise_id=exercises[1]["id"],
+        expected_revision=1,
+    )
+    payload.update(
+        {
+            "mode": "coach",
+            "target_telegram_user_id": 93011,
+            "schedule_weekdays": schedule_weekdays,
+        }
+    )
+    updated = client.patch(
+        f"/api/v1/programs/templates/{template_id}",
+        headers=coach_headers,
+        json=payload,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["assigned_program_updated"] is True
+    assert updated.json()["future_workouts_updated"] == 2
+    assert updated.json()["assigned_program_revision_number"] == 2
+
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        assert program.current_revision_number == 2
+        assert all(
+            workout.exercises[0].exercise_id == exercises[1]["id"] for workout in program.workouts
+        )
+
+    client_template = client.get(
+        f"/api/v1/programs/templates/{template_id}", headers=client_headers
+    )
+    assert client_template.status_code == 200, client_template.text
+    assert client_template.json()["current_revision_number"] == 2
+
+
+def test_template_edit_can_add_and_remove_future_program_days_without_deleting_rows(client):
+    headers = _auth(client, 93008)
+    program_id, exercises = _assigned_program(client, headers, duration_weeks=2)
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template_id = program.template_id
+        first_weekday = program.start_date.weekday()
+
+    template = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert template.status_code == 200, template.text
+    source = template.json()
+    first_day = source["days"][0]
+    first_exercise = first_day["exercises"][0]
+    add_day_payload = {
+        "title": source["title"],
+        "goal": source["goal"],
+        "level": source["level"],
+        "mode": "self",
+        "assign_after_create": False,
+        "duration_weeks": 1,
+        "schedule_weekdays": [first_weekday, (first_weekday + 1) % 7],
+        "expected_revision_number": 1,
+        "days": [
+            {
+                "title": first_day["title"],
+                "exercises": [
+                    {
+                        "exercise_id": first_exercise["exercise_id"],
+                        "prescribed_sets": first_exercise["prescribed_sets"],
+                        "prescribed_reps": first_exercise["prescribed_reps"],
+                        "rest_seconds": first_exercise["rest_seconds"],
+                    }
+                ],
+            },
+            {
+                "title": "Дополнительная тренировка",
+                "exercises": [
+                    {
+                        "exercise_id": exercises[1]["id"],
+                        "prescribed_sets": 3,
+                        "prescribed_reps": "8",
+                        "rest_seconds": 90,
+                    }
+                ],
+            },
+        ],
+    }
+    added = client.patch(
+        f"/api/v1/programs/templates/{template_id}",
+        headers=headers,
+        json=add_day_payload,
+    )
+    assert added.status_code == 200, added.text
+    assert added.json()["future_workouts_updated"] == 4
+
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.week_number, UserWorkout.day_number)
+            .all()
+        )
+        assert len(workouts) == 4
+        assert {workout.day_number for workout in workouts} == {1, 2}
+        assert all(workout.status == "planned" for workout in workouts)
+        assert all(
+            any(item.exercise_id == exercises[1]["id"] for item in workout.exercises)
+            for workout in workouts
+            if workout.day_number == 2
+        )
+
+    remove_day_payload = {
+        **add_day_payload,
+        "expected_revision_number": 2,
+        "schedule_weekdays": [first_weekday],
+        "days": [add_day_payload["days"][0]],
+    }
+    removed = client.patch(
+        f"/api/v1/programs/templates/{template_id}",
+        headers=headers,
+        json=remove_day_payload,
+    )
+    assert removed.status_code == 200, removed.text
+
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.week_number, UserWorkout.day_number)
+            .all()
+        )
+        assert len(workouts) == 4
+        assert [workout.status for workout in workouts if workout.day_number == 2] == [
+            "cancelled",
+            "cancelled",
+        ]
+        assert all(workout.status == "planned" for workout in workouts if workout.day_number == 1)
+
+
 def test_revision_history_conflict_and_completed_workout_immutability(client):
     headers = _auth(client, 93001)
     program_id, exercises = _assigned_program(client, headers)

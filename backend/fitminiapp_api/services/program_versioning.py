@@ -6,7 +6,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import now_msk_naive, today_for_user
-from fitminiapp_api.models.exercise import Muscle
+from fitminiapp_api.models.exercise import Exercise, Muscle
 from fitminiapp_api.models.program import (
     ProgramRevision,
     ProgramTemplate,
@@ -828,6 +828,131 @@ def _ensure_program_mutable(program: UserProgram) -> None:
         raise ProgramError("Assigned program is not editable")
 
 
+def _replace_workout_exercises_from_template(
+    db: Session,
+    workout: UserWorkout,
+    day: ProgramTemplateDay,
+    visible_by_id: dict[int, Exercise],
+) -> None:
+    for previous in list(workout.exercises):
+        for previous_set in list(previous.sets):
+            db.delete(previous_set)
+        db.delete(previous)
+    db.flush()
+    for template_exercise in sorted(day.exercises, key=lambda item: item.sort_order):
+        weekly = next(
+            (
+                item
+                for item in template_exercise.weekly_prescriptions
+                if item.week_number == workout.week_number
+            ),
+            None,
+        )
+        exercise_id = weekly.exercise_id if weekly is not None else template_exercise.exercise_id
+        exercise = visible_by_id.get(exercise_id)
+        if exercise is None:
+            raise ProgramError("Imported exercise is not available for program owner")
+        prescription = weekly or template_exercise
+        plan, projection = ensure_plan(
+            prescription.prescription or template_exercise.prescription,
+            metric_type=exercise_metric_type(exercise),
+            prescribed_sets=prescription.prescribed_sets,
+            prescribed_reps=prescription.prescribed_reps,
+            prescribed_duration_minutes=prescription.prescribed_duration_minutes,
+            rest_seconds=prescription.rest_seconds,
+        )
+        if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
+            raise ProgramError("Strength rest must be at least 15 seconds")
+        has_structured_plan = template_exercise.prescription is not None or (
+            weekly is not None and weekly.prescription is not None
+        )
+        group_id = (
+            template_exercise.group_id
+            if template_exercise.group_id is not None
+            else template_exercise.superset_group
+        )
+        group_kind = template_exercise.group_kind or (
+            "superset" if template_exercise.superset_group is not None else None
+        )
+        group_order = (
+            template_exercise.group_order
+            if template_exercise.group_order is not None
+            else template_exercise.superset_order
+        )
+        workout_exercise = UserWorkoutExercise(
+            workout_id=workout.id,
+            exercise_id=exercise_id,
+            source_template_exercise_id=template_exercise.id,
+            source_weekly_prescription_id=weekly.id if weekly is not None else None,
+            metric_type=exercise_metric_type(exercise),
+            sort_order=template_exercise.sort_order,
+            prescribed_sets=projection.prescribed_sets,
+            prescribed_reps=projection.prescribed_reps,
+            prescribed_duration_minutes=projection.prescribed_duration_minutes,
+            rest_seconds=projection.rest_seconds,
+            notes=template_exercise.notes,
+            superset_group=template_exercise.superset_group,
+            superset_order=template_exercise.superset_order,
+            group_id=group_id,
+            group_kind=group_kind,
+            group_order=group_order,
+            prescription=plan.model_dump(mode="json") if has_structured_plan else None,
+        )
+        db.add(workout_exercise)
+        groups = {item.group_id: item.kind for item in plan.groups}
+        for set_number, segment in enumerate(plan.segments, start=1):
+            db.add(
+                UserWorkoutSet(
+                    workout_exercise=workout_exercise,
+                    set_number=set_number,
+                    actual_reps=None,
+                    actual_weight=None,
+                    set_kind="working",
+                    reached_failure=None,
+                    is_completed=False,
+                    planned_role=segment.role if has_structured_plan else None,
+                    planned_group_id=segment.group_id if has_structured_plan else None,
+                    planned_group_kind=(
+                        groups.get(segment.group_id)
+                        if has_structured_plan and segment.group_id is not None
+                        else None
+                    ),
+                    planned_position=segment.position if has_structured_plan else None,
+                    planned_round=segment.round_number if has_structured_plan else None,
+                )
+            )
+
+
+def _schedule_offsets_for_program(
+    program: UserProgram,
+    day_numbers: list[int],
+    schedule_weekdays: list[int] | None,
+) -> tuple[dict[int, int], int]:
+    if len(day_numbers) > 7:
+        if schedule_weekdays is not None:
+            raise ProgramError("An eight-day cycle uses automatic sequential scheduling")
+        return {day_number: index for index, day_number in enumerate(day_numbers)}, 0
+    weekdays = schedule_weekdays
+    if weekdays is not None:
+        if len(weekdays) != len(day_numbers):
+            raise ProgramError("Choose one weekday for every program day")
+        offsets = [(weekday - weekdays[0]) % 7 for weekday in weekdays]
+        if offsets != sorted(offsets):
+            raise ProgramError("Program weekdays must follow the order of program days")
+    if weekdays is None or len(weekdays) != len(day_numbers):
+        weekdays = list(program.schedule_weekdays)
+    if len(weekdays) != len(day_numbers):
+        weekdays = [(program.start_date.weekday() + index) % 7 for index in range(len(day_numbers))]
+    first_weekday = weekdays[0]
+    return (
+        {
+            day_number: (weekday - first_weekday) % 7
+            for day_number, weekday in zip(day_numbers, weekdays, strict=True)
+        },
+        (first_weekday - program.start_date.weekday()) % 7,
+    )
+
+
 def apply_imported_template_revision(
     db: Session,
     actor: User,
@@ -838,13 +963,20 @@ def apply_imported_template_revision(
     import_id: str,
     rollout_id: str | None = None,
     reason: str | None = None,
+    allow_structure_changes: bool = False,
+    schedule_weekdays: list[int] | None = None,
+    send_notification: bool = True,
+    operation: str | None = None,
 ) -> tuple[UserProgram, int, int]:
     program, role = get_program_for_actor(db, actor, program_id, lock=True)
     _ensure_program_mutable(program)
     _ensure_expected_revision(program, expected_revision_number)
-    if program.duration_weeks != template.effective_duration_weeks:
+    if program.duration_weeks != template.effective_duration_weeks and not (
+        allow_structure_changes and template.effective_duration_weeks == 1
+    ):
         raise ProgramError("Imported duration must match the assigned program")
 
+    db.flush()
     loaded_template = (
         db.query(ProgramTemplate)
         .options(
@@ -853,23 +985,25 @@ def apply_imported_template_revision(
             .selectinload(ProgramTemplateExercise.weekly_prescriptions)
         )
         .filter(ProgramTemplate.id == template.id)
+        .populate_existing()
         .one()
     )
     days_by_number = {day.day_number: day for day in loaded_template.days}
-    expected_pairs = {
-        (week_number, day_number)
-        for week_number in range(1, program.duration_weeks + 1)
-        for day_number in days_by_number
-    }
     all_workouts = (
         db.query(UserWorkout)
         .filter(UserWorkout.user_program_id == program.id)
         .order_by(UserWorkout.week_number, UserWorkout.day_number)
         .all()
     )
-    actual_pairs = {(row.week_number, row.day_number) for row in all_workouts}
-    if actual_pairs != expected_pairs or len(actual_pairs) != len(all_workouts):
-        raise ProgramError("Imported days and weeks must match the assigned program schedule")
+    if not allow_structure_changes:
+        expected_pairs = {
+            (week_number, day_number)
+            for week_number in range(1, program.duration_weeks + 1)
+            for day_number in days_by_number
+        }
+        actual_pairs = {(row.week_number, row.day_number) for row in all_workouts}
+        if actual_pairs != expected_pairs or len(actual_pairs) != len(all_workouts):
+            raise ProgramError("Imported days and weeks must match the assigned program schedule")
 
     target_user = db.query(User).filter(User.id == program.user_id).one()
     visible_by_id = {
@@ -882,103 +1016,84 @@ def apply_imported_template_revision(
         .filter(
             UserWorkout.user_program_id == program.id,
             UserWorkout.status == "planned",
+            UserWorkout.started_at.is_(None),
             UserWorkout.scheduled_date >= today_for_user(target_user),
         )
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
-    for workout in future_workouts:
-        day = days_by_number[workout.day_number]
-        workout.title = day.title
-        for previous in list(workout.exercises):
-            for previous_set in list(previous.sets):
-                db.delete(previous_set)
-            db.delete(previous)
-        db.flush()
-        for template_exercise in sorted(day.exercises, key=lambda item: item.sort_order):
-            weekly = next(
-                (
-                    item
-                    for item in template_exercise.weekly_prescriptions
-                    if item.week_number == workout.week_number
-                ),
-                None,
+    workouts_updated = 0
+    if allow_structure_changes:
+        day_numbers = sorted(days_by_number)
+        schedule_offsets, cycle_start_offset = _schedule_offsets_for_program(
+            program,
+            day_numbers,
+            schedule_weekdays,
+        )
+        cycle_span_days = 8 if len(day_numbers) > 7 else 7
+        today = today_for_user(target_user)
+        existing_by_pair: dict[tuple[int, int], UserWorkout] = {}
+        for row in all_workouts:
+            pair = (row.week_number, row.day_number)
+            if pair in existing_by_pair:
+                raise ProgramError("Assigned program contains duplicate workout days")
+            existing_by_pair[pair] = row
+
+        for workout in future_workouts:
+            day = days_by_number.get(workout.day_number)
+            if day is None:
+                workout.status = "cancelled"
+                cancel_workout_reminder(db, workout.id)
+                workouts_updated += 1
+                continue
+            desired_date = program.start_date + timedelta(
+                days=cycle_start_offset
+                + (workout.week_number - 1) * cycle_span_days
+                + schedule_offsets[workout.day_number]
             )
-            exercise_id = (
-                weekly.exercise_id if weekly is not None else template_exercise.exercise_id
-            )
-            exercise = visible_by_id.get(exercise_id)
-            if exercise is None:
-                raise ProgramError("Imported exercise is not available for program owner")
-            prescription = weekly or template_exercise
-            plan, projection = ensure_plan(
-                prescription.prescription or template_exercise.prescription,
-                metric_type=exercise_metric_type(exercise),
-                prescribed_sets=prescription.prescribed_sets,
-                prescribed_reps=prescription.prescribed_reps,
-                prescribed_duration_minutes=prescription.prescribed_duration_minutes,
-                rest_seconds=prescription.rest_seconds,
-            )
-            if exercise_metric_type(exercise) == "strength" and projection.rest_seconds < 15:
-                raise ProgramError("Strength rest must be at least 15 seconds")
-            has_structured_plan = template_exercise.prescription is not None or (
-                weekly is not None and weekly.prescription is not None
-            )
-            group_id = (
-                template_exercise.group_id
-                if template_exercise.group_id is not None
-                else template_exercise.superset_group
-            )
-            group_kind = template_exercise.group_kind or (
-                "superset" if template_exercise.superset_group is not None else None
-            )
-            group_order = (
-                template_exercise.group_order
-                if template_exercise.group_order is not None
-                else template_exercise.superset_order
-            )
-            workout_exercise = UserWorkoutExercise(
-                workout_id=workout.id,
-                exercise_id=exercise_id,
-                source_template_exercise_id=template_exercise.id,
-                source_weekly_prescription_id=weekly.id if weekly is not None else None,
-                metric_type=exercise_metric_type(exercise),
-                sort_order=template_exercise.sort_order,
-                prescribed_sets=projection.prescribed_sets,
-                prescribed_reps=projection.prescribed_reps,
-                prescribed_duration_minutes=projection.prescribed_duration_minutes,
-                rest_seconds=projection.rest_seconds,
-                notes=template_exercise.notes,
-                superset_group=template_exercise.superset_group,
-                superset_order=template_exercise.superset_order,
-                group_id=group_id,
-                group_kind=group_kind,
-                group_order=group_order,
-                prescription=plan.model_dump(mode="json") if has_structured_plan else None,
-            )
-            db.add(workout_exercise)
-            groups = {item.group_id: item.kind for item in plan.groups}
-            for set_number, segment in enumerate(plan.segments, start=1):
-                db.add(
-                    UserWorkoutSet(
-                        workout_exercise=workout_exercise,
-                        set_number=set_number,
-                        actual_reps=None,
-                        actual_weight=None,
-                        set_kind="working",
-                        reached_failure=None,
-                        is_completed=False,
-                        planned_role=segment.role if has_structured_plan else None,
-                        planned_group_id=segment.group_id if has_structured_plan else None,
-                        planned_group_kind=(
-                            groups.get(segment.group_id)
-                            if has_structured_plan and segment.group_id is not None
-                            else None
-                        ),
-                        planned_position=segment.position if has_structured_plan else None,
-                        planned_round=segment.round_number if has_structured_plan else None,
-                    )
+            if desired_date >= today:
+                workout.scheduled_date = desired_date
+            workout.title = day.title
+            _replace_workout_exercises_from_template(db, workout, day, visible_by_id)
+            workouts_updated += 1
+
+        for week_number in range(1, program.duration_weeks + 1):
+            for day_number in day_numbers:
+                pair = (week_number, day_number)
+                if pair in existing_by_pair:
+                    continue
+                desired_date = program.start_date + timedelta(
+                    days=cycle_start_offset
+                    + (week_number - 1) * cycle_span_days
+                    + schedule_offsets[day_number]
                 )
+                if desired_date < today:
+                    continue
+                day = days_by_number[day_number]
+                workout = UserWorkout(
+                    user_program_id=program.id,
+                    scheduled_date=desired_date,
+                    day_number=day_number,
+                    week_number=week_number,
+                    title=day.title,
+                    status="planned",
+                )
+                db.add(workout)
+                db.flush()
+                _replace_workout_exercises_from_template(db, workout, day, visible_by_id)
+                workouts_updated += 1
+        if len(day_numbers) <= 7:
+            program.schedule_weekdays = [
+                program.start_date.weekday() + cycle_start_offset + schedule_offsets[day_number]
+                for day_number in day_numbers
+            ]
+            program.schedule_weekdays = [weekday % 7 for weekday in program.schedule_weekdays]
+    else:
+        for workout in future_workouts:
+            day = days_by_number[workout.day_number]
+            workout.title = day.title
+            _replace_workout_exercises_from_template(db, workout, day, visible_by_id)
+        workouts_updated = len(future_workouts)
 
     prior_template_id = program.template_id
     program.template_id = loaded_template.id
@@ -990,11 +1105,12 @@ def apply_imported_template_revision(
         change_kind="plan_updated",
         reason=reason or "Импорт новой ревизии программы",
         changed_fields={
-            "operation": "program_rollout" if rollout_id is not None else "program_import_revision",
+            "operation": operation
+            or ("program_rollout" if rollout_id is not None else "program_import_revision"),
             "import_id": import_id,
             "previous_template_id": prior_template_id,
             "template_id": loaded_template.id,
-            "workouts_updated": len(future_workouts),
+            "workouts_updated": workouts_updated,
             **({"rollout_id": rollout_id} if rollout_id is not None else {}),
         },
     )
@@ -1005,6 +1121,8 @@ def apply_imported_template_revision(
         action=(
             "coach.program_rollout.applied"
             if rollout_id is not None
+            else "program.template_revision_applied"
+            if operation == "template_update"
             else "program_import.revision_confirmed"
         ),
         resource_type="user_program",
@@ -1015,7 +1133,7 @@ def apply_imported_template_revision(
             **({"rollout_id": rollout_id} if rollout_id is not None else {}),
         },
     )
-    if role == "trainer":
+    if role == "trainer" and send_notification:
         queue_notification(
             db,
             target_user,
@@ -1025,7 +1143,7 @@ def apply_imported_template_revision(
             action_url="/app?section=programs",
         )
     db.flush()
-    return program, len(future_workouts), revision.revision_number
+    return program, workouts_updated, revision.revision_number
 
 
 def _validate_block_dates(
