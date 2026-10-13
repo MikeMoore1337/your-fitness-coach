@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from uuid import uuid4
 
 from sqlalchemy import or_
-from sqlalchemy.orm import Session, aliased, contains_eager, joinedload
+from sqlalchemy.orm import Session, aliased, contains_eager, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import (
     DEFAULT_TIMEZONE,
@@ -52,7 +52,10 @@ from fitminiapp_api.services.prescription_semantics import (
     ensure_plan,
 )
 from fitminiapp_api.services.program_common import MAX_PROGRAM_DURATION_WEEKS, ProgramError
-from fitminiapp_api.services.program_versioning import record_program_revision
+from fitminiapp_api.services.program_versioning import (
+    apply_imported_template_revision,
+    record_program_revision,
+)
 from fitminiapp_api.services.root_admin import has_verified_root_identity
 from fitminiapp_api.services.workout_metrics import (
     ExercisePrescription,
@@ -146,6 +149,9 @@ def _serialize_template_with_context(
         "assigned_program_status": assignment.status if assignment else None,
         "assigned_program_start_date": assignment.start_date if assignment else None,
         "assigned_program_duration_weeks": assignment.duration_weeks if assignment else None,
+        "assigned_program_schedule_weekdays": (
+            list(assignment.schedule_weekdays) if assignment else None
+        ),
         "current_revision_number": assignment.current_revision_number if assignment else None,
         "days": [
             {
@@ -1149,18 +1155,19 @@ def update_template_for_user(
     current_user: User,
     template_id: int,
     payload: ProgramTemplateCreate,
-) -> ProgramTemplate:
+) -> tuple[ProgramTemplate, dict[str, object]]:
     template = (
         db.query(ProgramTemplate)
         .options(
-            joinedload(ProgramTemplate.days)
-            .joinedload(ProgramTemplateDay.exercises)
+            selectinload(ProgramTemplate.days)
+            .selectinload(ProgramTemplateDay.exercises)
             .joinedload(ProgramTemplateExercise.weekly_prescriptions),
         )
         .filter(
             ProgramTemplate.id == template_id,
             ProgramTemplate.slug != LEGACY_DEMO_TEMPLATE_SLUG,
         )
+        .with_for_update()
         .first()
     )
     if not template:
@@ -1187,6 +1194,23 @@ def update_template_for_user(
     visible_by_effective_id = {
         _effective_exercise_id(ex): ex for ex in _load_visible_exercise_rows(db, target_user)
     }
+    expected_revision_number = payload.expected_revision_number
+    active_program = (
+        db.query(UserProgram)
+        .filter(
+            UserProgram.user_id == target_user.id,
+            UserProgram.template_id == template.id,
+            UserProgram.is_active.is_(True),
+            UserProgram.status.in_({"scheduled", "active"}),
+        )
+        .with_for_update()
+        .first()
+    )
+    if active_program is not None:
+        if expected_revision_number is None:
+            raise ProgramError("Active program revision is required")
+        if active_program.current_revision_number != expected_revision_number:
+            raise ProgramError("Program revision conflict")
 
     is_periodized = template.effective_duration_weeks > 1 or any(
         exercise.weekly_prescriptions for day in template.days for exercise in day.exercises
@@ -1300,8 +1324,35 @@ def update_template_for_user(
             action_url="/app?section=programs",
         )
 
+    db.flush()
+    apply_result: dict[str, object] = {
+        "assigned_program_updated": False,
+        "future_workouts_updated": 0,
+        "assigned_program_revision_number": None,
+    }
+    if active_program is not None:
+        assert expected_revision_number is not None
+        _program, workouts_updated, revision_number = apply_imported_template_revision(
+            db,
+            current_user,
+            active_program.id,
+            template,
+            expected_revision_number=expected_revision_number,
+            import_id=f"template-update:{template.id}:{expected_revision_number}",
+            reason="Редактирование назначенной программы",
+            allow_structure_changes=True,
+            schedule_weekdays=payload.schedule_weekdays,
+            send_notification=False,
+            operation="template_update",
+        )
+        apply_result = {
+            "assigned_program_updated": True,
+            "future_workouts_updated": workouts_updated,
+            "assigned_program_revision_number": revision_number,
+        }
+
     db.commit()
-    return get_template_for_user(db, current_user, template.id)
+    return get_template_for_user(db, current_user, template.id), apply_result
 
 
 def replace_template_exercise_for_user(

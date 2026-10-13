@@ -139,15 +139,22 @@ export function ProgramBuilder({
   );
   const [startDate, setStartDate, clearStartDateDraft] = usePersistentState(
     programDraftStorageKey('start', draftScope),
-    defaultStartDate,
+    editingTemplate?.assigned_program_start_date ?? defaultStartDate,
   );
   const [durationWeeks, setDurationWeeks, clearDurationDraft] = usePersistentState<number>(
     programDraftStorageKey('duration', draftScope),
-    SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+    editingTemplate?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
   );
   const [scheduleWeekdays, setScheduleWeekdays, clearScheduleDraft] = usePersistentState<number[]>(
     programDraftStorageKey('weekdays', draftScope),
-    [],
+    editingTemplate?.assigned_program_schedule_weekdays ?? [],
+  );
+  const activeProgramEdit = Boolean(
+    editingTemplate &&
+    !saveAsCopy &&
+    editingTemplate.is_active_for_current_user &&
+    editingTemplate.assigned_program_id != null &&
+    editingTemplate.current_revision_number != null,
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
   const snapshot = JSON.stringify([
@@ -195,7 +202,7 @@ export function ProgramBuilder({
 
   const mutation = useMutation({
     mutationFn: ({ replaceActive }: { replaceActive: boolean }) =>
-      api(updateTemplatePath ?? '/api/v1/programs/templates', {
+      api<ProgramTemplate>(updateTemplatePath ?? '/api/v1/programs/templates', {
         method: updateTemplatePath ? 'PATCH' : 'POST',
         body: {
           title,
@@ -208,6 +215,9 @@ export function ProgramBuilder({
           start_date: startDate,
           duration_weeks: durationWeeks,
           schedule_weekdays: scheduleWeekdaysForSave(days.length, effectiveScheduleWeekdays),
+          expected_revision_number: activeProgramEdit
+            ? editingTemplate?.current_revision_number
+            : undefined,
           replace_active: replaceActive,
           days: days.map((day) => ({
             ...day,
@@ -215,7 +225,7 @@ export function ProgramBuilder({
           })),
         } satisfies ProgramTemplateAssignmentCreate,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       if (!editingTemplate) {
         trackGrowthEvent('program_added');
         if (targetTelegramId) {
@@ -231,13 +241,15 @@ export function ProgramBuilder({
         }
       }
       toast(
-        saveAsCopy
-          ? 'Личная копия программы создана'
-          : editingTemplate
-            ? 'Изменения программы сохранены'
-            : targetTelegramId
-              ? 'Программа создана и назначена'
-              : 'Программа создана',
+        result?.assigned_program_updated
+          ? 'Программа сохранена. Будущие тренировки обновлены'
+          : saveAsCopy
+            ? 'Личная копия программы создана'
+            : editingTemplate
+              ? 'Изменения программы сохранены'
+              : targetTelegramId
+                ? 'Программа создана и назначена'
+                : 'Программа создана',
       );
       if (!editingTemplate && !targetTelegramId) {
         setCreationSuccess({
@@ -261,12 +273,15 @@ export function ProgramBuilder({
       );
       clearDaysDraft([blankDay(1)]);
       clearDefaultRestDraft(SIMPLE_PROGRAM_DEFAULTS.restSeconds);
-      clearStartDateDraft(defaultStartDate);
-      clearDurationDraft(SIMPLE_PROGRAM_DEFAULTS.durationWeeks);
-      clearScheduleDraft([]);
+      clearStartDateDraft(result?.assigned_program_start_date ?? defaultStartDate);
+      clearDurationDraft(
+        result?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+      );
+      clearScheduleDraft(result?.assigned_program_schedule_weekdays ?? []);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['templates'] }),
         queryClient.invalidateQueries({ queryKey: ['workout'] }),
+        queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
         queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
         reloadUser(),
       ]);
@@ -292,9 +307,11 @@ export function ProgramBuilder({
         return;
       }
       toast(
-        reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
-          ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
-          : (reason as Error).message,
+        reason instanceof ApiError && reason.status === 409
+          ? 'Программа уже изменилась на другом устройстве. Обновите список и повторите сохранение.'
+          : reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
+            ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
+            : (reason as Error).message,
         'error',
       );
     },
@@ -869,12 +886,15 @@ export function ProgramBuilder({
               >
                 <h3 id="program-schedule-title">Расписание</h3>
                 <p className="muted">
-                  По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.
+                  {activeProgramEdit
+                    ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
+                    : 'По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.'}
                 </p>
                 <div className="form-grid">
                   <label className="field">
                     <span>Начать не раньше</span>
                     <DateInput
+                      disabled={activeProgramEdit}
                       min={defaultStartDate}
                       value={startDate}
                       onChange={(event) => {
@@ -889,6 +909,7 @@ export function ProgramBuilder({
                     <input
                       type="number"
                       inputMode="numeric"
+                      disabled={activeProgramEdit}
                       min="1"
                       max="24"
                       value={durationWeeks}

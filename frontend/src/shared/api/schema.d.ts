@@ -14491,6 +14491,8 @@ export interface components {
             target_full_name?: string | null;
             /** Days */
             days: components["schemas"]["ProgramTemplateDayCreate"][];
+            /** Expected Revision Number */
+            expected_revision_number?: number | null;
             /**
              * Assign After Create
              * @default true
@@ -14687,8 +14689,22 @@ export interface components {
             assigned_program_start_date?: string | null;
             /** Assigned Program Duration Weeks */
             assigned_program_duration_weeks?: number | null;
+            /** Assigned Program Schedule Weekdays */
+            assigned_program_schedule_weekdays?: number[] | null;
             /** Current Revision Number */
             current_revision_number?: number | null;
+            /**
+             * Assigned Program Updated
+             * @default false
+             */
+            assigned_program_updated: boolean;
+            /**
+             * Future Workouts Updated
+             * @default 0
+             */
+            future_workouts_updated: number;
+            /** Assigned Program Revision Number */
+            assigned_program_revision_number?: number | null;
             /**
              * Default Duration Weeks
              * @default 1
