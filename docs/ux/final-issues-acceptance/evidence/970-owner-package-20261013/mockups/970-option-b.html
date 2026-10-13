@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>#970 — мобильная запись цели</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --canvas: #080a09;
+        --surface: #151916;
+        --surface-strong: #202621;
+        --text: #f4f7f1;
+        --muted: #aeb8ad;
+        --border: #465044;
+        --lime: #c8f36a;
+        --on-lime: #152006;
+        --radius: 18px;
+      }
+
+      [data-theme='light'] {
+        color-scheme: light;
+        --canvas: #f6f8f3;
+        --surface: #ffffff;
+        --surface-strong: #edf2e8;
+        --text: #151a16;
+        --muted: #5d675d;
+        --border: #cbd3c7;
+        --lime: #a7d94d;
+        --on-lime: #182107;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        min-width: 320px;
+        margin: 0;
+        padding: 20px 16px 36px;
+        background: var(--canvas);
+        color: var(--text);
+        font: 16px/1.4 Inter, system-ui, sans-serif;
+      }
+      main { width: min(100%, 720px); margin: 0 auto; }
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--lime);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+      }
+      h1 { margin: 0; font: 800 28px/1.08 Oswald, Impact, sans-serif; }
+      .period { margin: 8px 0 24px; color: var(--muted); }
+      .targets {
+        display: grid;
+        gap: 12px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      .target {
+        display: grid;
+        gap: 14px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-left: 3px solid var(--lime);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+      .target__head {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px 16px;
+        align-items: baseline;
+      }
+      .target__date { font-weight: 800; }
+      .target__source { color: var(--muted); font-size: 14px; }
+      .target__values {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin: 0;
+      }
+      .target__values div {
+        min-width: 0;
+        padding: 10px;
+        border-radius: 12px;
+        background: var(--surface-strong);
+      }
+      dt { color: var(--muted); font-size: 12px; }
+      dd { margin: 2px 0 0; font-weight: 800; font-variant-numeric: tabular-nums; }
+      .target__macros { grid-column: 1 / -1; }
+      .note { margin: 18px 0 0; color: var(--muted); font-size: 13px; }
+      @media (min-width: 560px) {
+        .target { grid-template-columns: minmax(0, 1fr) minmax(250px, 1.2fr); align-items: center; }
+        .target__values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .target__macros { grid-column: auto; }
+      }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="title">
+      <p class="eyebrow">Питание · синтетические данные</p>
+      <h1 id="title">Изменения цели за период</h1>
+      <p class="period">8 авг. — 31 авг. 2026 · фактические значения без округления</p>
+      <ol class="targets">
+        <li class="target">
+          <div class="target__head">
+            <time class="target__date" datetime="2026-08-19">19 авг. 2026</time>
+            <span class="target__source">Расчёт приложения</span>
+          </div>
+          <dl class="target__values">
+            <div><dt>Ккал</dt><dd>1 950</dd></div>
+            <div class="target__macros"><dt>Белок / жиры / углеводы</dt><dd>135 / 65 / 210 г</dd></div>
+          </dl>
+        </li>
+        <li class="target">
+          <div class="target__head">
+            <time class="target__date" datetime="2026-08-27">27 авг. 2026</time>
+            <span class="target__source">Цель тренера</span>
+          </div>
+          <dl class="target__values">
+            <div><dt>Ккал</dt><dd>2 200</dd></div>
+            <div class="target__macros"><dt>Белок / жиры / углеводы</dt><dd>160 / 70 / 240 г</dd></div>
+          </dl>
+        </li>
+      </ol>
+      <p class="note">Предложение для owner approval: desktop и A4 PDF сохраняют текущую таблицу; на узком экране каждая запись получает явные подписи и значения.</p>
+    </main>
+    <script>
+      const theme = new URLSearchParams(location.search).get('theme');
+      document.body.dataset.theme = theme === 'light' ? 'light' : 'dark';
+    </script>
+  </body>
+</html>
