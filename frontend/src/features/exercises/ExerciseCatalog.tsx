@@ -318,255 +318,258 @@ export function ExerciseCatalog({
           data-search-active={search.trim() ? 'true' : 'false'}
         >
           <div className="exercise-catalog__filters" aria-label="Фильтры упражнений">
-          <label className="field">
-            <span>Мышцы</span>
-            <select
-              data-glass=""
-              data-glass-variant="tinted"
-              data-glass-interactive=""
-              value={muscle}
-              onChange={(event) => {
-                setMuscle(event.target.value);
-                setVisibleLimit(PAGE_SIZE);
-              }}
-            >
-              <option value="">Все группы</option>
-              {muscleOptions.map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Оборудование</span>
-            <select
-              data-glass=""
-              data-glass-variant="tinted"
-              data-glass-interactive=""
-              value={equipment}
-              onChange={(event) => {
-                setEquipment(event.target.value);
-                setVisibleLimit(PAGE_SIZE);
-              }}
-            >
-              <option value="">Любое</option>
-              {equipmentOptions.map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="field">
-            <span>Опыт</span>
-            <select
-              data-glass=""
-              data-glass-variant="tinted"
-              data-glass-interactive=""
-              value={difficulty}
-              onChange={(event) => {
-                setDifficulty(event.target.value as Exercise['difficulty_level'] | '');
-                setVisibleLimit(PAGE_SIZE);
-              }}
-            >
-              <option value="">Любой</option>
-              {Object.entries(difficultyLabels).map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {(search || muscle || equipment || difficulty) && (
-            <button type="button" className="text-button" onClick={resetFilters}>
-              Сбросить фильтры
-            </button>
-          )}
+            <label className="field">
+              <span>Мышцы</span>
+              <select
+                data-glass=""
+                data-glass-variant="tinted"
+                data-glass-interactive=""
+                value={muscle}
+                onChange={(event) => {
+                  setMuscle(event.target.value);
+                  setVisibleLimit(PAGE_SIZE);
+                }}
+              >
+                <option value="">Все группы</option>
+                {muscleOptions.map(([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Оборудование</span>
+              <select
+                data-glass=""
+                data-glass-variant="tinted"
+                data-glass-interactive=""
+                value={equipment}
+                onChange={(event) => {
+                  setEquipment(event.target.value);
+                  setVisibleLimit(PAGE_SIZE);
+                }}
+              >
+                <option value="">Любое</option>
+                {equipmentOptions.map(([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Опыт</span>
+              <select
+                data-glass=""
+                data-glass-variant="tinted"
+                data-glass-interactive=""
+                value={difficulty}
+                onChange={(event) => {
+                  setDifficulty(event.target.value as Exercise['difficulty_level'] | '');
+                  setVisibleLimit(PAGE_SIZE);
+                }}
+              >
+                <option value="">Любой</option>
+                {Object.entries(difficultyLabels).map(([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {(search || muscle || equipment || difficulty) && (
+              <button type="button" className="text-button" onClick={resetFilters}>
+                Сбросить фильтры
+              </button>
+            )}
           </div>
           {canCreate && (
-          <details className="exercise-create compact-disclosure">
-            <summary>
-              <span>
-                <strong>Создать своё упражнение</strong>
-                <small>
-                  {targetTelegramId
-                    ? 'Персонально для выбранного клиента'
-                    : 'Если подходящего движения нет в каталоге'}
-                </small>
-              </span>
-              <DisclosureIcon />
-            </summary>
-            <form
-              className="exercise-create__form"
-              onSubmit={(event) => {
-                event.preventDefault();
-                mutation.mutate({
-                  path: '/api/v1/programs/exercises',
-                  method: 'POST',
-                  body: {
-                    title: newTitle,
-                    primary_muscle: newMuscle || null,
-                    equipment: newEquipment || null,
-                    difficulty_level: newDifficulty,
-                    metric_type: newMetricType,
-                    target_telegram_user_id: targetTelegramId || null,
-                  },
-                });
-              }}
-            >
-              <label className="field exercise-create__title">
-                <span>Название</span>
-                <input
-                  value={newTitle}
-                  maxLength={128}
-                  onChange={(event) => setNewTitle(event.target.value)}
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>Основная мышечная группа</span>
-                <input
-                  value={newMuscle}
-                  maxLength={64}
-                  onChange={(event) => setNewMuscle(event.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>Оборудование</span>
-                <input
-                  value={newEquipment}
-                  maxLength={64}
-                  onChange={(event) => setNewEquipment(event.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span>Уровень</span>
-                <select
-                  value={newDifficulty}
-                  onChange={(event) =>
-                    setNewDifficulty(event.target.value as Exercise['difficulty_level'])
-                  }
-                >
-                  {Object.entries(difficultyLabels).map(([value, label]) => (
-                    <option value={value} key={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                <span>Как записывать результат</span>
-                <select
-                  value={newMetricType}
-                  onChange={(event) =>
-                    setNewMetricType(event.target.value as 'strength' | 'cardio')
-                  }
-                >
-                  <option value="strength">Вес и повторения</option>
-                  <option value="cardio">Время и дистанция</option>
-                </select>
-              </label>
-              <button disabled={mutation.isPending}>
-                {mutation.isPending ? 'Создаём…' : 'Создать упражнение'}
-              </button>
-            </form>
-          </details>
+            <details className="exercise-create compact-disclosure">
+              <summary>
+                <span>
+                  <strong>Создать своё упражнение</strong>
+                  <small>
+                    {targetTelegramId
+                      ? 'Персонально для выбранного клиента'
+                      : 'Если подходящего движения нет в каталоге'}
+                  </small>
+                </span>
+                <DisclosureIcon />
+              </summary>
+              <form
+                className="exercise-create__form"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  mutation.mutate({
+                    path: '/api/v1/programs/exercises',
+                    method: 'POST',
+                    body: {
+                      title: newTitle,
+                      primary_muscle: newMuscle || null,
+                      equipment: newEquipment || null,
+                      difficulty_level: newDifficulty,
+                      metric_type: newMetricType,
+                      target_telegram_user_id: targetTelegramId || null,
+                    },
+                  });
+                }}
+              >
+                <label className="field exercise-create__title">
+                  <span>Название</span>
+                  <input
+                    value={newTitle}
+                    maxLength={128}
+                    onChange={(event) => setNewTitle(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="field">
+                  <span>Основная мышечная группа</span>
+                  <input
+                    value={newMuscle}
+                    maxLength={64}
+                    onChange={(event) => setNewMuscle(event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Оборудование</span>
+                  <input
+                    value={newEquipment}
+                    maxLength={64}
+                    onChange={(event) => setNewEquipment(event.target.value)}
+                  />
+                </label>
+                <label className="field">
+                  <span>Уровень</span>
+                  <select
+                    value={newDifficulty}
+                    onChange={(event) =>
+                      setNewDifficulty(event.target.value as Exercise['difficulty_level'])
+                    }
+                  >
+                    {Object.entries(difficultyLabels).map(([value, label]) => (
+                      <option value={value} key={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="field">
+                  <span>Как записывать результат</span>
+                  <select
+                    value={newMetricType}
+                    onChange={(event) =>
+                      setNewMetricType(event.target.value as 'strength' | 'cardio')
+                    }
+                  >
+                    <option value="strength">Вес и повторения</option>
+                    <option value="cardio">Время и дистанция</option>
+                  </select>
+                </label>
+                <button disabled={mutation.isPending}>
+                  {mutation.isPending ? 'Создаём…' : 'Создать упражнение'}
+                </button>
+              </form>
+            </details>
           )}
           {!rows.isLoading && !rows.error && (
-          <p className="exercise-catalog__count" aria-live="polite">
-            Найдено: <strong>{filtered.length}</strong>
-          </p>
+            <p className="exercise-catalog__count" aria-live="polite">
+              Найдено: <strong>{filtered.length}</strong>
+            </p>
           )}
           <div className="exercise-catalog__results">
             {rows.isLoading ? (
-          <LoadingState />
-        ) : rows.error ? (
-          <ErrorState message={(rows.error as Error).message} retry={() => void rows.refetch()} />
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            title="Ничего не найдено"
-            text="Попробуйте убрать один из фильтров или изменить запрос."
-          />
+              <LoadingState />
+            ) : rows.error ? (
+              <ErrorState
+                message={(rows.error as Error).message}
+                retry={() => void rows.refetch()}
+              />
+            ) : filtered.length === 0 ? (
+              <EmptyState
+                title="Ничего не найдено"
+                text="Попробуйте убрать один из фильтров или изменить запрос."
+              />
             ) : (
-          <>
-            <div className="exercise-catalog-list" aria-live="polite">
-              {filtered.slice(0, visibleLimit).map((exercise) => (
-                <article className="exercise-catalog-item" key={exercise.id}>
-                  <button
-                    aria-label={`${exercise.has_guide ? 'Техника и детали' : 'Подробнее'}: ${exercise.title}`}
-                    className="exercise-catalog-item__main"
-                    type="button"
-                    onClick={() => setGuide(exercise)}
-                  >
-                    <ExerciseMediaAsset
-                      animationUrl={exercise.media_animation_url}
-                      alt={`${exercise.title}: изображение упражнения`}
-                      className="exercise-catalog-item__thumb"
-                      thumbnailUrl={exercise.media_thumbnail_url}
-                      variant="thumbnail"
-                    />
-                    <span className="exercise-catalog-item__copy">
-                      <strong>{exercise.title}</strong>
-                      <span>
-                        {exercise.primary_muscle || 'Всё тело'} ·{' '}
-                        {exercise.equipment || 'Без оборудования'}
-                      </span>
-                      <span className="exercise-catalog-item__badges">
-                        <Badge>{difficultyLabels[exercise.difficulty_level]}</Badge>
-                        {exercise.metric_type === 'cardio' && <Badge>Время и дистанция</Badge>}
-                        {exercise.is_custom && <Badge>Своё</Badge>}
-                        {!!exercise.alternatives?.length && (
-                          <Badge>{exercise.alternatives.length} проверенных замен</Badge>
-                        )}
-                      </span>
-                    </span>
-                    <DisclosureIcon />
-                  </button>
-                  {canAssign && (
-                    <div className="exercise-catalog-item__actions">
-                      <button type="button" onClick={() => setAssignment(exercise)}>
-                        В программу
-                      </button>
-                    </div>
-                  )}
-                  {exercise.is_custom && (
-                    <details className="exercise-catalog-item__danger">
-                      <summary>Другие действия</summary>
+              <>
+                <div className="exercise-catalog-list" aria-live="polite">
+                  {filtered.slice(0, visibleLimit).map((exercise) => (
+                    <article className="exercise-catalog-item" key={exercise.id}>
                       <button
-                        className="btn-danger"
+                        aria-label={`${exercise.has_guide ? 'Техника и детали' : 'Подробнее'}: ${exercise.title}`}
+                        className="exercise-catalog-item__main"
                         type="button"
-                        onClick={async () => {
-                          if (
-                            await confirm({
-                              title: 'Удалить упражнение?',
-                              message: exercise.title,
-                              confirmText: 'Удалить',
-                            })
-                          )
-                            mutation.mutate({
-                              path: `/api/v1/programs/exercises/${exercise.id}`,
-                              method: 'DELETE',
-                            });
-                        }}
+                        onClick={() => setGuide(exercise)}
                       >
-                        Удалить упражнение
+                        <ExerciseMediaAsset
+                          animationUrl={exercise.media_animation_url}
+                          alt={`${exercise.title}: изображение упражнения`}
+                          className="exercise-catalog-item__thumb"
+                          thumbnailUrl={exercise.media_thumbnail_url}
+                          variant="thumbnail"
+                        />
+                        <span className="exercise-catalog-item__copy">
+                          <strong>{exercise.title}</strong>
+                          <span>
+                            {exercise.primary_muscle || 'Всё тело'} ·{' '}
+                            {exercise.equipment || 'Без оборудования'}
+                          </span>
+                          <span className="exercise-catalog-item__badges">
+                            <Badge>{difficultyLabels[exercise.difficulty_level]}</Badge>
+                            {exercise.metric_type === 'cardio' && <Badge>Время и дистанция</Badge>}
+                            {exercise.is_custom && <Badge>Своё</Badge>}
+                            {!!exercise.alternatives?.length && (
+                              <Badge>{exercise.alternatives.length} проверенных замен</Badge>
+                            )}
+                          </span>
+                        </span>
+                        <DisclosureIcon />
                       </button>
-                    </details>
-                  )}
-                </article>
-              ))}
-            </div>
-            {visibleLimit < filtered.length && (
-              <button
-                type="button"
-                className="secondary exercise-catalog__more"
-                onClick={() => setVisibleLimit((value) => value + PAGE_SIZE)}
-              >
-                Показать ещё {Math.min(PAGE_SIZE, filtered.length - visibleLimit)}
-              </button>
-            )}
-          </>
+                      {canAssign && (
+                        <div className="exercise-catalog-item__actions">
+                          <button type="button" onClick={() => setAssignment(exercise)}>
+                            В программу
+                          </button>
+                        </div>
+                      )}
+                      {exercise.is_custom && (
+                        <details className="exercise-catalog-item__danger">
+                          <summary>Другие действия</summary>
+                          <button
+                            className="btn-danger"
+                            type="button"
+                            onClick={async () => {
+                              if (
+                                await confirm({
+                                  title: 'Удалить упражнение?',
+                                  message: exercise.title,
+                                  confirmText: 'Удалить',
+                                })
+                              )
+                                mutation.mutate({
+                                  path: `/api/v1/programs/exercises/${exercise.id}`,
+                                  method: 'DELETE',
+                                });
+                            }}
+                          >
+                            Удалить упражнение
+                          </button>
+                        </details>
+                      )}
+                    </article>
+                  ))}
+                </div>
+                {visibleLimit < filtered.length && (
+                  <button
+                    type="button"
+                    className="secondary exercise-catalog__more"
+                    onClick={() => setVisibleLimit((value) => value + PAGE_SIZE)}
+                  >
+                    Показать ещё {Math.min(PAGE_SIZE, filtered.length - visibleLimit)}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
