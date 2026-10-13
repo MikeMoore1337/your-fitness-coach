@@ -3919,22 +3919,6 @@ details:not([open]) > :not(summary) {
   .assignment-context {
     grid-template-columns: 1fr;
   }
-  .exercise-catalog--search-active {
-    display: flex;
-    flex-direction: column;
-  }
-  .exercise-catalog--search-active .exercise-catalog__count {
-    order: 1;
-  }
-  .exercise-catalog--search-active :is(.exercise-catalog-list, .exercise-catalog__more, .ui-state) {
-    order: 2;
-  }
-  .exercise-catalog--search-active .exercise-create {
-    order: 3;
-  }
-  .exercise-catalog--search-active .exercise-catalog__filters {
-    order: 4;
-  }
   .exercise-create__form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
