@@ -7,12 +7,28 @@ import { NavigationProvider } from '../../../../src/shared/navigation/router';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import type { ProgramTemplate } from '../../../../src/shared/api/types';
 
-const apiMock = vi.fn();
-const reloadUser = vi.fn();
+const { apiMock, reloadUser } = vi.hoisted(() => ({
+  apiMock: vi.fn(),
+  reloadUser: vi.fn(),
+}));
 
-vi.mock('../../../../src/shared/api/client', async () => {
-  const actual = await vi.importActual('../../../../src/shared/api/client');
-  return { ...actual, api: (...args: unknown[]) => apiMock(...args) };
+vi.mock('../../../../src/shared/api/client', () => {
+  class MockApiError extends Error {
+    status: number;
+    body: unknown;
+
+    constructor(message: string, status: number, body: unknown = null) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.body = body;
+    }
+  }
+
+  return {
+    api: (...args: unknown[]) => apiMock(...args),
+    ApiError: MockApiError,
+  };
 });
 
 vi.mock('../../../../src/app/AuthProvider', () => ({

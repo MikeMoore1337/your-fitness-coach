@@ -828,6 +828,31 @@ def _ensure_program_mutable(program: UserProgram) -> None:
         raise ProgramError("Assigned program is not editable")
 
 
+def _workout_has_recorded_data(workout: UserWorkout) -> bool:
+    """Treat persisted workout facts as immutable even if status is inconsistent."""
+    if workout.started_at is not None or workout.completed_at is not None:
+        return True
+    return any(
+        workout_set.is_completed
+        or workout_set.version > 1
+        or any(
+            value is not None
+            for value in (
+                workout_set.actual_reps,
+                workout_set.actual_weight,
+                workout_set.duration_minutes,
+                workout_set.distance_km,
+                workout_set.average_heart_rate_bpm,
+                workout_set.heart_rate_zone,
+                workout_set.rir,
+                workout_set.reached_failure,
+            )
+        )
+        for exercise in workout.exercises
+        for workout_set in exercise.sets
+    )
+
+
 def _replace_workout_exercises_from_template(
     db: Session,
     workout: UserWorkout,
@@ -1022,6 +1047,9 @@ def apply_imported_template_revision(
         .order_by(UserWorkout.scheduled_date.asc(), UserWorkout.id.asc())
         .all()
     )
+    future_workouts = [
+        workout for workout in future_workouts if not _workout_has_recorded_data(workout)
+    ]
     workouts_updated = 0
     if allow_structure_changes:
         day_numbers = sorted(days_by_number)
@@ -1060,7 +1088,8 @@ def apply_imported_template_revision(
         for week_number in range(1, program.duration_weeks + 1):
             for day_number in day_numbers:
                 pair = (week_number, day_number)
-                if pair in existing_by_pair:
+                existing = existing_by_pair.get(pair)
+                if existing is not None and existing.status != "cancelled":
                     continue
                 desired_date = program.start_date + timedelta(
                     days=cycle_start_offset
@@ -1070,6 +1099,15 @@ def apply_imported_template_revision(
                 if desired_date < today:
                     continue
                 day = days_by_number[day_number]
+                if existing is not None:
+                    if _workout_has_recorded_data(existing):
+                        continue
+                    existing.status = "planned"
+                    existing.scheduled_date = desired_date
+                    existing.title = day.title
+                    _replace_workout_exercises_from_template(db, existing, day, visible_by_id)
+                    workouts_updated += 1
+                    continue
                 workout = UserWorkout(
                     user_program_id=program.id,
                     scheduled_date=desired_date,

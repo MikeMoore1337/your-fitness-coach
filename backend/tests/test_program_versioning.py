@@ -13,6 +13,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import CoachClient, User
+from fitminiapp_api.services.program_common import ProgramError
 
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
@@ -126,10 +127,20 @@ def test_template_edit_applies_only_to_future_planned_workouts(client):
         future_id = future.id
         db.commit()
 
+    history_before = client.get("/api/v1/workouts/history", headers=headers)
+    summary_before = client.get("/api/v1/workouts/history/summary", headers=headers)
+    assert history_before.status_code == 200, history_before.text
+    assert summary_before.status_code == 200, summary_before.text
+
     template = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
     assert template.status_code == 200, template.text
+    concurrent_snapshot = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert concurrent_snapshot.status_code == 200, concurrent_snapshot.text
     payload = _template_edit_payload(
         template.json(), exercise_id=exercises[1]["id"], expected_revision=1
+    )
+    concurrent_payload = _template_edit_payload(
+        concurrent_snapshot.json(), exercise_id=exercises[0]["id"], expected_revision=1
     )
     updated = client.patch(
         f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload
@@ -140,9 +151,16 @@ def test_template_edit_applies_only_to_future_planned_workouts(client):
     assert updated.json()["assigned_program_revision_number"] == 2
     assert updated.json()["current_revision_number"] == 2
 
-    stale = client.patch(f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload)
-    assert stale.status_code == 409
-    assert stale.json()["detail"] == "Program revision conflict"
+    stale_concurrent = client.patch(
+        f"/api/v1/programs/templates/{template_id}",
+        headers=headers,
+        json=concurrent_payload,
+    )
+    assert stale_concurrent.status_code == 409
+    assert stale_concurrent.json()["detail"] == "Program revision conflict"
+    retry = client.patch(f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload)
+    assert retry.status_code == 409
+    assert retry.json()["detail"] == "Program revision conflict"
 
     refreshed = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
     assert refreshed.status_code == 200, refreshed.text
@@ -155,6 +173,7 @@ def test_template_edit_applies_only_to_future_planned_workouts(client):
         in_progress = next(item for item in program.workouts if item.status == "in_progress")
         future = next(item for item in program.workouts if item.id == future_id)
         assert program.current_revision_number == 2
+        assert program.duration_weeks == 3
         assert db.query(ProgramRevision).filter_by(user_program_id=program_id).count() == 2
         assert completed.status == "completed"
         assert completed.completed_at is not None
@@ -174,6 +193,18 @@ def test_template_edit_applies_only_to_future_planned_workouts(client):
         assert future.exercises[0].prescribed_reps == "10-12"
         assert future.exercises[0].rest_seconds == 120
         assert len(future.exercises[0].sets) == 4
+        assert {(item.week_number, item.day_number) for item in program.workouts} == {
+            (1, 1),
+            (2, 1),
+            (3, 1),
+        }
+
+    history_after = client.get("/api/v1/workouts/history", headers=headers)
+    summary_after = client.get("/api/v1/workouts/history/summary", headers=headers)
+    assert history_after.status_code == 200, history_after.text
+    assert summary_after.status_code == 200, summary_after.text
+    assert history_after.json() == history_before.json()
+    assert summary_after.json() == summary_before.json()
 
 
 def test_template_edit_without_active_assignment_only_updates_the_template(client):
@@ -391,6 +422,145 @@ def test_template_edit_can_add_and_remove_future_program_days_without_deleting_r
             "cancelled",
         ]
         assert all(workout.status == "planned" for workout in workouts if workout.day_number == 1)
+        removed_day_ids = {workout.id for workout in workouts if workout.day_number == 2}
+
+    readded = client.patch(
+        f"/api/v1/programs/templates/{template_id}",
+        headers=headers,
+        json={
+            **add_day_payload,
+            "expected_revision_number": 3,
+        },
+    )
+    assert readded.status_code == 200, readded.text
+    assert readded.json()["future_workouts_updated"] == 4
+
+    with get_session_context() as db:
+        workouts = (
+            db.query(UserWorkout)
+            .filter(UserWorkout.user_program_id == program_id)
+            .order_by(UserWorkout.week_number, UserWorkout.day_number)
+            .all()
+        )
+        assert len(workouts) == 4
+        assert {(workout.week_number, workout.day_number) for workout in workouts} == {
+            (1, 1),
+            (1, 2),
+            (2, 1),
+            (2, 2),
+        }
+        assert all(workout.status == "planned" for workout in workouts)
+        assert {workout.id for workout in workouts if workout.day_number == 2} == removed_day_ids
+
+
+def test_active_template_edit_rolls_back_partial_future_update(client, monkeypatch):
+    headers = _auth(client, 93080)
+    program_id, exercises = _assigned_program(client, headers, duration_weeks=4)
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template_id = program.template_id
+        before = {
+            workout.id: (
+                workout.status,
+                workout.scheduled_date,
+                workout.title,
+                workout.exercises[0].exercise_id,
+                workout.exercises[0].prescribed_sets,
+                len(workout.exercises[0].sets),
+            )
+            for workout in program.workouts
+        }
+        assert program.current_revision_number == 1
+
+    template = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert template.status_code == 200, template.text
+    payload = _template_edit_payload(
+        template.json(), exercise_id=exercises[1]["id"], expected_revision=1
+    )
+
+    from fitminiapp_api.services import program_versioning
+
+    original_replace = program_versioning._replace_workout_exercises_from_template
+    calls = 0
+
+    def fail_on_second_replace(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ProgramError("simulated partial failure")
+        return original_replace(*args, **kwargs)
+
+    monkeypatch.setattr(
+        program_versioning,
+        "_replace_workout_exercises_from_template",
+        fail_on_second_replace,
+    )
+    failed = client.patch(
+        f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload
+    )
+    assert failed.status_code == 400, failed.text
+    assert failed.json()["detail"] == "simulated partial failure"
+    assert calls == 2
+
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template = db.query(ProgramTemplate).filter(ProgramTemplate.id == template_id).one()
+        assert program.current_revision_number == 1
+        assert db.query(ProgramRevision).filter_by(user_program_id=program_id).count() == 1
+        assert template.title == "Версионируемая программа"
+        assert {
+            workout.id: (
+                workout.status,
+                workout.scheduled_date,
+                workout.title,
+                workout.exercises[0].exercise_id,
+                workout.exercises[0].prescribed_sets,
+                len(workout.exercises[0].sets),
+            )
+            for workout in program.workouts
+        } == before
+
+
+def test_active_template_edit_preserves_recorded_sets_even_if_workout_is_still_planned(client):
+    headers = _auth(client, 93081)
+    program_id, exercises = _assigned_program(client, headers, duration_weeks=2)
+    with get_session_context() as db:
+        program = db.query(UserProgram).filter(UserProgram.id == program_id).one()
+        template_id = program.template_id
+        protected = max(program.workouts, key=lambda item: item.scheduled_date)
+        protected_exercise = protected.exercises[0]
+        protected_set = protected_exercise.sets[0]
+        protected_id = protected.id
+        protected_exercise_id = protected_exercise.exercise_id
+        protected_set_id = protected_set.id
+        protected_set.actual_reps = 7
+        protected_set.actual_weight = 42.5
+        protected_set.is_completed = True
+        protected_set.version = 2
+        db.commit()
+
+    template = client.get(f"/api/v1/programs/templates/{template_id}", headers=headers)
+    assert template.status_code == 200, template.text
+    payload = _template_edit_payload(
+        template.json(), exercise_id=exercises[1]["id"], expected_revision=1
+    )
+    updated = client.patch(
+        f"/api/v1/programs/templates/{template_id}", headers=headers, json=payload
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["future_workouts_updated"] == 1
+
+    with get_session_context() as db:
+        protected = db.query(UserWorkout).filter(UserWorkout.id == protected_id).one()
+        protected_exercise = protected.exercises[0]
+        protected_set = protected_exercise.sets[0]
+        assert protected.status == "planned"
+        assert protected_exercise.exercise_id == protected_exercise_id
+        assert protected_set.id == protected_set_id
+        assert protected_set.actual_reps == 7
+        assert protected_set.actual_weight == 42.5
+        assert protected_set.is_completed is True
+        assert protected_set.version == 2
 
 
 def test_revision_history_conflict_and_completed_workout_immutability(client):
