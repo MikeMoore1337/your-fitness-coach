@@ -33,6 +33,17 @@ const TASK_111_SCREENSHOTS = resolve(
 type NutritionReportState = 'partial' | 'no-data' | 'long';
 
 const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
+const CAPTURE_970_AFTER = process.env.CAPTURE_970_AFTER === '1';
+const WORKTREE_ROOT = resolve(process.cwd(), '..');
+const ISSUE_970_AFTER_DIR = resolve(
+  WORKTREE_ROOT,
+  'docs',
+  'ux',
+  'final-issues-acceptance',
+  'evidence',
+  '970-report-mobile-20261013',
+  'after',
+);
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -1316,6 +1327,78 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     }
   }
 });
+
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#970 target changes stay readable at ${width}px ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 932 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockProgress(page, 'long');
+      await page.goto('/app?section=progress&progress_period=days_30');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Прогресс' })
+        .click();
+      await page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('link', { name: /^Питание/ })
+        .click();
+
+      const report = page.locator('#nutrition-period-report');
+      await report.getByText('История целей питания', { exact: true }).click();
+      const targetChanges = report
+        .locator('.nutrition-report-targets')
+        .filter({ hasText: 'Изменения цели в периоде' });
+      await expect(targetChanges).toBeVisible();
+      const cards = targetChanges.locator('ol > li');
+      await expect(cards).toHaveCount(1);
+      await expect(cards.getByText('Дата', { exact: true })).toBeVisible();
+      await expect(cards.getByText('Источник', { exact: true })).toBeVisible();
+      await expect(cards.getByText('Калории', { exact: true })).toBeVisible();
+      await expect(cards.getByText('Б / Ж / У', { exact: true })).toBeVisible();
+
+      const geometry = await cards.evaluateAll((elements) => {
+        const viewport = document.documentElement.clientWidth;
+        return {
+          viewport,
+          documentWidth: document.documentElement.scrollWidth,
+          cards: elements.map((element) => {
+            const box = element.getBoundingClientRect();
+            const descendants = [...element.querySelectorAll<HTMLElement>('*')].map((child) => {
+              const childBox = child.getBoundingClientRect();
+              return { left: childBox.left, right: childBox.right };
+            });
+            return {
+              left: box.left,
+              right: box.right,
+              width: box.width,
+              descendants,
+            };
+          }),
+        };
+      });
+      expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
+      for (const card of geometry.cards) {
+        expect(card.width).toBeGreaterThan(0);
+        expect(card.left).toBeGreaterThanOrEqual(-1);
+        expect(card.right).toBeLessThanOrEqual(geometry.viewport + 1);
+        for (const child of card.descendants) {
+          expect(child.left).toBeGreaterThanOrEqual(card.left - 1);
+          expect(child.right).toBeLessThanOrEqual(card.right + 1);
+        }
+      }
+
+      if (CAPTURE_970_AFTER) {
+        await mkdir(ISSUE_970_AFTER_DIR, { recursive: true });
+        await targetChanges.screenshot({
+          path: resolve(ISSUE_970_AFTER_DIR, `${testInfo.project.name}-${theme}-${width}.png`),
+        });
+      }
+    });
+  }
+}
 
 test('nutrition report no-data state keeps missing days distinct from zero', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 932 });

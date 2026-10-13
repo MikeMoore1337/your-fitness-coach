@@ -7014,6 +7014,32 @@ button.notification-row__main:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.nutrition-report-targets__values {
+  min-width: 0;
+}
+
+.nutrition-report-targets__value {
+  min-width: 0;
+}
+
+.nutrition-report-targets__value + .nutrition-report-targets__value::before {
+  content: ' · ';
+}
+
+.nutrition-report-targets__mobile-label {
+  display: none;
+}
+
+.nutrition-report-targets__content {
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.nutrition-report-targets__content--source {
+  color: inherit !important;
+}
+
 .nutrition-report-days {
   border-block: 1px solid var(--v2-border);
 }
@@ -7147,8 +7173,43 @@ button.notification-row__main:focus-visible {
   }
 
   .nutrition-report-targets li {
-    grid-template-columns: 1fr;
-    gap: var(--v2-space-1);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--v2-space-2);
+    min-width: 0;
+    padding: var(--v2-space-3);
+    border: 1px solid var(--v2-border);
+    border-radius: var(--v2-control-radius);
+  }
+
+  .nutrition-report-targets li > :where(time, strong, span),
+  .nutrition-report-targets__values,
+  .nutrition-report-targets__value {
+    min-width: 0;
+  }
+
+  .nutrition-report-targets li > :where(time, strong),
+  .nutrition-report-targets__value {
+    display: grid;
+    grid-template-columns: minmax(64px, max-content) minmax(0, 1fr);
+    gap: var(--v2-space-2);
+    align-items: baseline;
+  }
+
+  .nutrition-report-targets__values {
+    display: grid;
+    gap: var(--v2-space-2);
+  }
+
+  .nutrition-report-targets__value + .nutrition-report-targets__value::before {
+    content: none;
+  }
+
+  .nutrition-report-targets__mobile-label {
+    display: block;
+    color: var(--v2-text-secondary);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.25;
   }
 
   .nutrition-report-days table,

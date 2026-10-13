@@ -1,0 +1,36 @@
+# #970 — мобильная история изменений целей питания
+
+## Результат
+
+Реализован утверждённый владельцем вариант B: на ширинах 320, 360, 393 и 430 CSS px
+история изменений цели отображается карточками с явными подписями «Дата», «Источник»,
+«Калории» и «Б / Ж / У».
+
+На desktop сохранена существующая трёхколоночная таблица. Расчёты, значения, даты,
+источники, API, печатная версия и PDF не изменялись.
+
+## Реальные AFTER
+
+Снимки сделаны Playwright на synthetic fixture без пользовательских данных:
+
+| Движок | Тема | 320 | 360 | 393 | 430 |
+| --- | --- | --- | --- | --- | --- |
+| Chromium | Dark | [открыть](after/chromium-dark-320.png) | [открыть](after/chromium-dark-360.png) | [открыть](after/chromium-dark-393.png) | [открыть](after/chromium-dark-430.png) |
+| Chromium | Light | [открыть](after/chromium-light-320.png) | [открыть](after/chromium-light-360.png) | [открыть](after/chromium-light-393.png) | [открыть](after/chromium-light-430.png) |
+| WebKit | Dark | [открыть](after/webkit-dark-320.png) | [открыть](after/webkit-dark-360.png) | [открыть](after/webkit-dark-393.png) | [открыть](after/webkit-dark-430.png) |
+| WebKit | Light | [открыть](after/webkit-light-320.png) | [открыть](after/webkit-light-360.png) | [открыть](after/webkit-light-393.png) | [открыть](after/webkit-light-430.png) |
+
+## Проверенные критерии
+
+- карточка и все её дочерние элементы находятся внутри viewport;
+- `document.documentElement.scrollWidth` не превышает ширину viewport;
+- слова не разбиваются и содержимое не обрезается;
+- подписи и значения доступны в DOM и видимы в обеих темах;
+- desktop-представление и существующий report/PDF-контракт не менялись.
+
+## Границы приёмки
+
+- выбор варианта B утверждён владельцем 13.10.2026;
+- финальное визуальное согласование этих AFTER остаётся обязательным;
+- merge, auto-merge и production deploy запрещены до отдельного разрешения владельца;
+- физические устройства, Safari на iPhone и VoiceOver этим доказательством не подтверждаются.
