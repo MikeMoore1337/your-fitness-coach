@@ -275,6 +275,7 @@ async function mockNutritionApi(
   hydrationState: 'data' | 'empty' | 'error' | 'loading' = 'data',
   profileSex: 'female' | null = 'female',
   hydrationPercent?: number,
+  hydrationGoalEnabled = true,
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -491,8 +492,8 @@ async function mockNutritionApi(
               ? null
               : {
                   id: 1,
-                  enabled: true,
-                  target_ml: targetMl,
+                  enabled: hydrationGoalEnabled,
+                  target_ml: hydrationGoalEnabled ? targetMl : null,
                   source: 'national_academies_beverages',
                   method_version: 'nasem-ai-2005-observed-beverages-v1',
                   reference_scope: 'beverages',
@@ -503,7 +504,7 @@ async function mockNutritionApi(
                   created_at: '2026-08-19T08:00:00',
                 },
           progress_percent:
-            hydrationState === 'empty'
+            hydrationState === 'empty' || !hydrationGoalEnabled
               ? null
               : (hydrationPercent ?? Math.round((totalMl * 1000) / targetMl) / 10),
           entries: hydrationPercent == null ? hydrationEntries : [],
@@ -1472,6 +1473,67 @@ test.describe('#974 hydration orb contrast candidate', () => {
         }
       });
     }
+  }
+});
+
+test.describe('#974 hydration orb H₂O without an enabled goal', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`${theme} H₂O remains readable with a disabled goal`, async ({ page }, info) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockNutritionApi(page, 'data', 'female', undefined, false);
+
+        const hydrationResponse = page.waitForResponse((response) => {
+          const url = new URL(response.url());
+          return (
+            url.pathname === '/api/v1/nutrition/hydration' && response.request().method() === 'GET'
+          );
+        });
+        await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+        const hydrationPayload = await (await hydrationResponse).json();
+        expect(hydrationPayload.goal).toMatchObject({ enabled: false, target_ml: null });
+        expect(hydrationPayload.progress_percent).toBeNull();
+
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const orb = hydration.locator('.hydration-orb');
+        const text = orb.locator('strong');
+        const fill = orb.locator(':scope > span');
+        await expect(text).toHaveText('H₂O');
+        await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+        await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+        await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();
+        expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe('0%');
+
+        const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+        const orbBox = boxes[0];
+        const textBox = boxes[1];
+        if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+        expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+        expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+        expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+        expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+        const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+        const brightPixels = screenshot.data.reduce((count, channel, index) => {
+          if (index % 4 !== 0) return count;
+          const green = screenshot.data[index + 1] ?? 0;
+          const blue = screenshot.data[index + 2] ?? 0;
+          return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+        }, 0);
+        expect(brightPixels).toBeGreaterThan(8);
+
+        if (CAPTURE_974_AFTER) {
+          await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+          await orb.screenshot({
+            path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-h2o-disabled.png`),
+            scale: 'device',
+          });
+        }
+    });
   }
 });
 
