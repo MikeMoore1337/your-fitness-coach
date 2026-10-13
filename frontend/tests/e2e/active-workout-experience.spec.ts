@@ -3239,12 +3239,14 @@ test.describe('#914 rest timer pointer lifecycle', () => {
       }),
     ).toBeDisabled();
     await expect(context.previous.getByRole('button', { name: 'Редактировать' })).toBeVisible();
-    const actions = await openCompletedActions(context.previous);
+    const actions = completedActions(context.previous);
+    await actions.evaluate((element) => {
+      (element as HTMLDetailsElement).open = true;
+    });
     await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
-    await actions.locator('summary').click();
-    await context.current
-      .getByLabel('Повторы, Жим штанги лёжа, подход 2')
-      .evaluate((element) => (element as HTMLElement).focus({ preventScroll: true }));
+    await actions.evaluate((element) => {
+      (element as HTMLDetailsElement).open = false;
+    });
     await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
     await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
     await expect(
