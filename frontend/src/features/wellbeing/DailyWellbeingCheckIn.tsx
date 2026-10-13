@@ -57,6 +57,15 @@ const emptyForm: WellbeingForm = {
   note: '',
 };
 
+function formsEqual(left: WellbeingForm, right: WellbeingForm): boolean {
+  return (
+    left.sleepQuality === right.sleepQuality &&
+    left.sleepDurationMinutes === right.sleepDurationMinutes &&
+    left.mood === right.mood &&
+    left.note === right.note
+  );
+}
+
 function formFromRecord(record: DailyWellbeingRecord | null | undefined): WellbeingForm {
   return {
     sleepQuality: record?.sleep_quality == null ? '' : String(record.sleep_quality),
@@ -194,11 +203,13 @@ function EmptyWellbeingCard({ onStart }: { onStart(): void }) {
 export function DailyWellbeingCheckIn({
   autoFocus = false,
   initialDate,
+  onExit,
   timeZone,
   userId,
 }: {
   autoFocus?: boolean;
   initialDate?: string;
+  onExit?: () => void;
   timeZone?: string | null;
   userId: number | 'anonymous';
 }) {
@@ -211,7 +222,6 @@ export function DailyWellbeingCheckIn({
   const defaultDate = initialDate || dateInputValue(new Date(), resolvedTimeZone);
   const [localDate, setLocalDate] = useState(defaultDate);
   const [editing, setEditing] = useState(autoFocus);
-  const [dismissed, setDismissed] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [draft, setDraft] = useState<WellbeingForm | null>(null);
   const [lastPayload, setLastPayload] = useState<DailyWellbeingSave | null>(null);
@@ -271,10 +281,33 @@ export function DailyWellbeingCheckIn({
   const today = current.data?.today || dateInputValue(new Date(), resolvedTimeZone);
   const isDateAllowed = localDate <= today;
   const isEmpty = !form.sleepQuality && !form.sleepDurationMinutes && !form.mood;
+  const isDirty = !formsEqual(form, record ? formFromRecord(record) : emptyForm);
   const saveError = save.error ? errorMessage(save.error) : null;
   const removeError = remove.error ? errorMessage(remove.error) : null;
 
-  if (dismissed) return null;
+  const leaveForm = async () => {
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Выйти без сохранения?',
+        message: 'Введённые данные будут потеряны. Можно остаться и сохранить отметку.',
+        confirmText: 'Выйти',
+      }))
+    ) {
+      return;
+    }
+    setDraft(null);
+    setNoteOpen(false);
+    setLastPayload(null);
+    save.reset();
+    remove.reset();
+    if (onExit) {
+      onExit();
+      return;
+    }
+    setEditing(false);
+  };
+
   if (!current.isLoading && !current.error && !record && !editing && !autoFocus) {
     return <EmptyWellbeingCard onStart={() => setEditing(true)} />;
   }
@@ -386,11 +419,24 @@ export function DailyWellbeingCheckIn({
             max={today}
             min={addCalendarDays(today, -90)}
             onChange={(event) => {
-              setLocalDate(event.target.value);
-              setDraft(null);
-              setNoteOpen(false);
-              setEditing(true);
-              setLastPayload(null);
+              const nextDate = event.target.value;
+              void (async () => {
+                if (
+                  isDirty &&
+                  !(await confirm({
+                    title: 'Сменить день без сохранения?',
+                    message: 'Введённые данные для текущего дня будут потеряны.',
+                    confirmText: 'Сменить день',
+                  }))
+                ) {
+                  return;
+                }
+                setLocalDate(nextDate);
+                setDraft(null);
+                setNoteOpen(false);
+                setEditing(true);
+                setLastPayload(null);
+              })();
             }}
             value={localDate}
           />
@@ -508,11 +554,9 @@ export function DailyWellbeingCheckIn({
               {remove.isPending ? 'Удаляем…' : 'Удалить'}
             </Button>
           )}
-          {autoFocus && !record && (
-            <Button onClick={() => setDismissed(true)} type="button" variant="ghost">
-              Не сейчас
-            </Button>
-          )}
+          <Button onClick={() => void leaveForm()} type="button" variant="ghost">
+            {onExit ? 'Вернуться' : record ? 'Отменить изменение' : 'Отмена'}
+          </Button>
         </div>
       </form>
     </Card>

@@ -141,9 +141,24 @@ test('daily wellbeing covers empty, partial, filled, offline and error states on
   await expect(tmaPage.locator('form.daily-wellbeing__form')).not.toBeFocused();
   await expect(tmaPage.getByRole('button', { name: 'Сохранить отметку' })).toBeDisabled();
   await expect(tmaPage.getByText(/заполнение остаётся необязательным/)).toBeVisible();
+  const quickExit = tmaPage.getByRole('button', { name: 'Вернуться' });
+  await expect(quickExit).toBeVisible();
   const firstSleepOption = tmaPage.getByRole('radio', { name: 'Очень плохо' });
   await firstSleepOption.focus();
   await expect(firstSleepOption).toBeFocused();
+  await firstSleepOption.check();
+  await quickExit.click();
+  const discardDialog = tmaPage.getByRole('dialog', { name: 'Выйти без сохранения?' });
+  await expect(discardDialog).toBeVisible();
+  await discardDialog.getByRole('button', { name: 'Отмена' }).click();
+  await expect(firstSleepOption).toBeChecked();
+  await quickExit.click();
+  await discardDialog.getByRole('button', { name: 'Выйти' }).click();
+  await expect(tmaPage).toHaveURL(/\/app\?section=today$/);
+  await expect(tmaPage.locator('form.daily-wellbeing__form')).toHaveCount(0);
+  await expect(tmaPage.locator('[data-testid="quick-add-trigger"]')).toBeFocused();
+  await tmaPage.goto(wellbeingUrl(localDate));
+  await expect(tmaPage.getByRole('button', { name: 'Вернуться' })).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);
   await expectTouchTargets(
     tmaPage.locator('.daily-wellbeing__option, .daily-wellbeing__actions .ui-button'),

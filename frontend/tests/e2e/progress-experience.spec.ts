@@ -1105,6 +1105,71 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .toBe(true);
 });
 
+test('quick measurement can return without losing an unsaved draft', async ({ page }) => {
+  await mockProgress(page);
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const evidenceRoot = resolve(
+    process.cwd(),
+    '..',
+    '.artifacts',
+    'runtime',
+    'tests',
+    'screenshots',
+    'issue-969',
+  );
+  await mkdir(evidenceRoot, { recursive: true });
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: resolve(evidenceRoot, `${test.info().project.name}-measurement-light-390x844.png`),
+  });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.screenshot({
+    fullPage: true,
+    path: resolve(evidenceRoot, `${test.info().project.name}-measurement-light-360x800.png`),
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => window.localStorage.setItem('app-theme', 'dark'));
+  await page.reload();
+  await expect(
+    page.locator('#measurement-diary').getByRole('heading', { name: 'Новый замер' }),
+  ).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: resolve(evidenceRoot, `${test.info().project.name}-measurement-dark-390x844.png`),
+  });
+  await page.setViewportSize({ width: 360, height: 800 });
+  await page.screenshot({
+    fullPage: true,
+    path: resolve(evidenceRoot, `${test.info().project.name}-measurement-dark-360x800.png`),
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const weight = diary.getByLabel('Вес, кг');
+  await weight.fill('70.2');
+  await diary.getByRole('button', { name: 'Вернуться' }).click();
+
+  const discardDialog = page.getByRole('dialog', { name: 'Вернуться без сохранения?' });
+  await expect(discardDialog).toBeVisible();
+  await discardDialog.getByRole('button', { name: 'Отмена' }).click();
+  await expect(weight).toHaveValue('70.2');
+
+  await diary.getByRole('button', { name: 'Вернуться' }).click();
+  await page
+    .getByRole('dialog', { name: 'Вернуться без сохранения?' })
+    .getByRole('button', { name: 'Вернуться' })
+    .click();
+  await expect(page).toHaveURL(/\/app\?section=progress$/);
+  await expect(page.locator('[data-testid="quick-add-trigger"]')).toBeFocused();
+
+  await page.goto('/app?section=progress&focus=measurements');
+  await expect(page.locator('#measurement-diary').getByLabel('Вес, кг')).toHaveValue('70.2');
+});
+
 test('nutrition report preserves truthful period context, daily drill-down and responsive hierarchy', async ({
   page,
 }) => {

@@ -17,15 +17,48 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { invalidateMeasurementMutation, queryKeys } from '../../shared/queryKeys';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 
+const measurementFields = [
+  'weight_kg',
+  'chest_cm',
+  'waist_cm',
+  'hips_cm',
+  'biceps_cm',
+  'thigh_cm',
+] as const;
+
+function hasMeasurementValues(form: BodyMeasurementSave): boolean {
+  return (
+    measurementFields.some((key) => form[key] != null) ||
+    Boolean(form.note?.trim()) ||
+    Boolean(form.custom_values?.some((value) => value.value != null))
+  );
+}
+
+function matchesMeasurement(form: BodyMeasurementSave, record: BodyMeasurement): boolean {
+  return (
+    measurementFields.every((key) => form[key] === record[key]) &&
+    form.note === record.note &&
+    JSON.stringify(form.custom_values ?? []) ===
+      JSON.stringify(
+        (record.custom_values ?? []).map((value) => ({
+          definition_id: value.definition_id,
+          value: value.value,
+        })),
+      )
+  );
+}
+
 export function Diary({
   clientId,
   timeZone: clientTimeZone,
+  onExit,
   onSaved,
   embedded = false,
   readOnly = false,
 }: {
   clientId?: number;
   timeZone?: string | null;
+  onExit?: () => void;
   onSaved?: () => void | Promise<void>;
   embedded?: boolean;
   readOnly?: boolean;
@@ -120,10 +153,36 @@ export function Diary({
     thigh_cm: { min: 0.1, max: 200 },
   };
   const editingMeasurement = rows.data?.find((item) => item.measured_on === editingDate);
-  const resetForm = () => {
+  const isDirty = editingMeasurement
+    ? !matchesMeasurement(form, editingMeasurement)
+    : hasMeasurementValues(form);
+  const resetForm = async () => {
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Отменить изменения?',
+        message: 'Введённые значения не будут записаны в историю.',
+        confirmText: 'Отменить изменения',
+      }))
+    ) {
+      return;
+    }
     setSubmitError(null);
     setEditingDate(null);
     clearDraft({ measured_on: today });
+  };
+  const leaveQuickForm = async () => {
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Вернуться без сохранения?',
+        message: 'Введённые значения останутся в черновике и не попадут в историю.',
+        confirmText: 'Вернуться',
+      }))
+    ) {
+      return;
+    }
+    onExit?.();
   };
   const editMeasurement = (item: BodyMeasurement) => {
     setSubmitError(null);
@@ -185,8 +244,18 @@ export function Diary({
           </p>
         </div>
         {editingMeasurement && (
-          <Button type="button" variant="secondary" disabled={readOnly} onClick={resetForm}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={readOnly}
+            onClick={() => void resetForm()}
+          >
             Отменить изменение
+          </Button>
+        )}
+        {onExit && (
+          <Button type="button" variant="ghost" onClick={() => void leaveQuickForm()}>
+            Вернуться
           </Button>
         )}
       </header>

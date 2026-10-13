@@ -268,6 +268,16 @@ export default function MiniAppPage({
   const focusDailyWellbeing = new URLSearchParams(search).get('wellbeing') === '1';
   const focusCardio = new URLSearchParams(search).get('cardio') === '1';
   const focusMeasurements = requestedMeasurementsFocus(search);
+  const exitQuickMeasurement = () => {
+    navigate('/app?section=progress', true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]')?.focus({
+          preventScroll: true,
+        });
+      });
+    });
+  };
   const progressView = parseProgressView(search, window.location.hash);
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
@@ -474,6 +484,7 @@ export default function MiniAppPage({
                   measurementDiary={
                     <Diary
                       embedded
+                      onExit={focusMeasurements ? exitQuickMeasurement : undefined}
                       onSaved={async () => void (await reloadUser())}
                       readOnly={!capabilities.canMutateProgress}
                     />
