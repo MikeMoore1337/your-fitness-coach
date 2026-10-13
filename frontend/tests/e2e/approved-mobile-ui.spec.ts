@@ -180,6 +180,10 @@ for (const width of [320, 360, 393, 430])
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
       const rail = page.locator('.progress-category-nav__rail');
+      const edgeIcons = await page
+        .locator('.progress-category-nav__edge [data-icon]')
+        .evaluateAll((icons) => icons.map((icon) => icon.getAttribute('data-icon')));
+      expect(edgeIcons).toEqual(['chevron-left', 'chevron-right']);
       const initialRailWidth = (await rail.boundingBox())!.width;
       await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toBeHidden();
       await rail.getByRole('link', { name: /^Тело/ }).click();
