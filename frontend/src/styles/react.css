@@ -8930,6 +8930,18 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   font-size: 0.8rem;
   line-height: 1.45;
 }
+.nutrition-quick-add__primary-fields > .ui-field > :is(.ui-input, .time-control) {
+  height: calc(var(--touch-target) + 2px);
+  min-height: var(--touch-target);
+}
+.nutrition-quick-add__primary-fields > .ui-field > .time-control {
+  display: flex;
+  align-items: center;
+}
+.nutrition-quick-add__primary-fields > .ui-field > .time-control input[type='time'] {
+  height: 100%;
+  min-height: 0;
+}
 .nutrition-quick-add__primary-fields,
 .nutrition-quick-add__macros {
   display: grid;

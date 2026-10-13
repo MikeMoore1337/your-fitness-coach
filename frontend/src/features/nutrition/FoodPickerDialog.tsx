@@ -42,6 +42,7 @@ import {
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
+import { TimeInput } from '../../shared/ui/PickerInput';
 import { BarcodeLookup } from './BarcodeLookup';
 import { FoodEditor } from './FoodEditor';
 import { NutritionLabelScanner } from './NutritionLabelScanner';
@@ -1032,9 +1033,8 @@ export function FoodPickerDialog({
                 />
               </Field>
               <Field label="Время (необязательно)" labelFor="nutrition-quick-time">
-                <Input
+                <TimeInput
                   id="nutrition-quick-time"
-                  type="time"
                   value={quick.loggedAt}
                   onChange={(event) => updateQuick({ loggedAt: event.target.value })}
                 />

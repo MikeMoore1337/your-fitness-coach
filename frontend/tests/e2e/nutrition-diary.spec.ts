@@ -2275,6 +2275,46 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(page.getByRole('dialog')).not.toBeAttached();
 });
 
+test('Quick Add keeps calorie and time controls inside the viewport', async ({ page }) => {
+  await mockNutritionApi(page);
+
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/app?section=nutrition');
+    await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+
+    const calories = page.getByRole('spinbutton', { name: 'Калории' });
+    const time = page.getByLabel('Время (необязательно)');
+    await expect(calories).toBeVisible();
+    await expect(time).toBeVisible();
+    const geometry = await page.evaluate(() => {
+      const inputGeometry = (selector: string, useControl = false) => {
+        const input = document.querySelector<HTMLInputElement>(selector);
+        const element = useControl ? input?.closest('.time-control') : input;
+        const rect = element?.getBoundingClientRect();
+        return rect
+          ? { left: rect.left, right: rect.right, width: rect.width, height: rect.height }
+          : null;
+      };
+      return {
+        viewport: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        calories: inputGeometry('#nutrition-quick-calories'),
+        time: inputGeometry('#nutrition-quick-time', true),
+      };
+    });
+
+    expect(geometry.scrollWidth).toBeLessThanOrEqual(width + 1);
+    expect(geometry.calories).not.toBeNull();
+    expect(geometry.time).not.toBeNull();
+    expect(geometry.calories!.left).toBeGreaterThanOrEqual(0);
+    expect(geometry.time!.right).toBeLessThanOrEqual(width + 1);
+    expect(geometry.calories!.height).toBeGreaterThanOrEqual(44);
+    expect(geometry.time!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(geometry.calories!.height - geometry.time!.height)).toBeLessThanOrEqual(1);
+  }
+});
+
 test('dark nutrition uses the shared lime status and progress accents', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
   await mockNutritionApi(page);
