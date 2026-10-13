@@ -39,6 +39,8 @@ const weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const PAGE_SIZE = 32;
 type AssignmentScope = 'next_workout' | 'current_block' | 'future_program';
 
+const isCardioMetric = (metricType: Exercise['metric_type']) => metricType === 'cardio';
+
 export function ExerciseCatalog({
   canCreate = false,
   canAssign = false,
@@ -503,7 +505,7 @@ export function ExerciseCatalog({
                 </span>
                 <span className="exercise-catalog-item__badges">
                   <Badge>{difficultyLabels[exercise.difficulty_level]}</Badge>
-                  {exercise.metric_type === 'cardio' && <Badge>Время и дистанция</Badge>}
+                  {isCardioMetric(exercise.metric_type) && <Badge>Время и дистанция</Badge>}
                   {exercise.is_custom && <Badge>Своё</Badge>}
                   {!!exercise.alternatives?.length && (
                     <Badge>{exercise.alternatives.length} проверенных замен</Badge>
