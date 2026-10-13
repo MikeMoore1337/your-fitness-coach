@@ -11,4 +11,16 @@
 | Chromium | [PNG](after/chromium-exercise-catalog-baseline-390.png) | [PNG](after/chromium-exercise-catalog-compact-360.png) | [PNG](after/chromium-exercise-catalog-large-430.png) | [PNG](after/chromium-exercise-catalog-desktop-1280.png) |
 | WebKit   | [PNG](after/webkit-exercise-catalog-baseline-390.png)   | [PNG](after/webkit-exercise-catalog-compact-360.png)   | [PNG](after/webkit-exercise-catalog-large-430.png)   | [PNG](after/webkit-exercise-catalog-desktop-1280.png)   |
 
+## Dark AFTER gallery
+
+| Browser  | Mobile compact 360                                      | Mobile baseline 390                                      | Mobile large 430                                      | Desktop 1280                                             |
+| -------- | ------------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------- |
+| Chromium | [PNG](after/chromium-exercise-catalog-dark-compact-360.png) | [PNG](after/chromium-exercise-catalog-dark-baseline-390.png) | [PNG](after/chromium-exercise-catalog-dark-large-430.png) | [PNG](after/chromium-exercise-catalog-dark-desktop-1280.png) |
+| WebKit   | [PNG](after/webkit-exercise-catalog-dark-compact-360.png)   | [PNG](after/webkit-exercise-catalog-dark-baseline-390.png)   | [PNG](after/webkit-exercise-catalog-dark-large-430.png)   | [PNG](after/webkit-exercise-catalog-dark-desktop-1280.png)   |
+
+Тёмные снимки получены существующим Playwright cross-browser harness на dev preview с
+`installPlatformApi` и тем же тестовым fixture. В capture-only запуске тема задавалась через
+временный init-script; после получения PNG патч удалён из spec до commit. Тест сохранил проверки
+функционального поиска, DOM-порядка, Tab/Shift+Tab и горизонтального overflow для всех размеров.
+
 Редактор программы использует отдельный `SearchableExercisePicker` и намеренно не менялся в этом PR. Алгоритм поиска, фильтры, API/DB и миграции не изменялись. Физический iPhone/Safari, настоящий Telegram и VoiceOver этим пакетом не подтверждаются.
