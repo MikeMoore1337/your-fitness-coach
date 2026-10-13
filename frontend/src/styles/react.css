@@ -6482,8 +6482,15 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .hydration-orb strong {
   position: relative;
   z-index: 1;
-  color: var(--v2-on-lime);
+  color: #f5f5f5;
   font-variant-numeric: tabular-nums;
+  -webkit-text-stroke: 0.75px var(--v2-on-lime);
+  paint-order: stroke fill;
+  text-shadow:
+    -0.5px -0.5px 0 var(--v2-on-lime),
+    0.5px -0.5px 0 var(--v2-on-lime),
+    -0.5px 0.5px 0 var(--v2-on-lime),
+    0.5px 0.5px 0 var(--v2-on-lime);
 }
 
 .hydration-progress {
