@@ -398,8 +398,11 @@ function WorkoutSetRow({
     pending?.values.reached_failure ?? set.reached_failure ?? false,
   );
   const completed = pending?.values.is_completed ?? set.is_completed;
+  const { confirm } = useFeedback();
+  const [editingCompleted, setEditingCompleted] = useState(false);
   const [completing, setCompleting] = useState(false);
   const completionInFlight = useRef(false);
+  const reopenInFlight = useRef(false);
   const retryCompletion = syncFailed && pending?.values.is_completed;
   const [justConfirmed, setJustConfirmed] = useState(false);
   const editing = useRef(false);
@@ -413,6 +416,7 @@ function WorkoutSetRow({
     !completed &&
     previousResult !== null &&
     (canPrefillReps || canPrefillWeight);
+  const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
   const canStartRest = (nextSetKind: SetKind, nextCompleted: boolean) =>
     nextCompleted &&
@@ -474,6 +478,24 @@ function WorkoutSetRow({
         completionInFlight.current = false;
         setCompleting(false);
       }
+    }
+  };
+
+  const requestReopen = async () => {
+    if (disabled || completing || reopenInFlight.current || !completed) return;
+    reopenInFlight.current = true;
+    try {
+      const approved = await confirm({
+        title: 'Вернуть подход в работу?',
+        message: `Вернуть подход ${set.set_number} в работу? Статус изменится на „Не завершён“. Сохранённые результаты останутся.`,
+        confirmText: 'Вернуть в работу',
+        danger: false,
+      });
+      if (!approved) return;
+      editing.current = true;
+      await enqueueSave({ completed: false }, true);
+    } finally {
+      reopenInFlight.current = false;
     }
   };
 
@@ -558,6 +580,34 @@ function WorkoutSetRow({
         )}
       </div>
 
+      {completed && (
+        <div
+          className="active-workout-set__completed-actions app-action-group"
+          aria-label="Действия с выполненным подходом"
+        >
+          {!editingCompleted && (
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="edit-completed"
+              variant="ghost"
+              onClick={() => setEditingCompleted(true)}
+            >
+              Редактировать
+            </Button>
+          )}
+          <Button
+            type="button"
+            disabled={disabled || completing}
+            data-workout-action="reopen-completed"
+            variant="secondary"
+            onClick={requestReopen}
+          >
+            Вернуть в работу
+          </Button>
+        </div>
+      )}
+
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
       )}
@@ -614,7 +664,7 @@ function WorkoutSetRow({
       {isCurrent && (
         <RirSelector
           compact
-          disabled={disabled || completing}
+          disabled={completedFieldsDisabled}
           value={rir}
           onChange={(nextRir) => {
             editing.current = true;
@@ -629,7 +679,7 @@ function WorkoutSetRow({
           <span>Вес, кг</span>
           <input
             data-workout-field="weight"
-            disabled={disabled || completing}
+            disabled={completedFieldsDisabled}
             aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="next"
             inputMode="decimal"
@@ -655,7 +705,7 @@ function WorkoutSetRow({
           <span>Повторы</span>
           <input
             data-workout-field="reps"
-            disabled={disabled || completing}
+            disabled={completedFieldsDisabled}
             aria-label={`Повторы, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="done"
             inputMode="numeric"
@@ -679,10 +729,9 @@ function WorkoutSetRow({
         </label>
         <Button
           type="button"
-          disabled={disabled || completing}
+          disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
-          aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Отметить невыполненным' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
-          aria-pressed={completed}
+          aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
@@ -723,7 +772,7 @@ function WorkoutSetRow({
           <label className="active-workout-advanced-field">
             <span>Вид подхода</span>
             <select
-              disabled={disabled || completing}
+              disabled={completedFieldsDisabled}
               value={setKind}
               onChange={(event) => {
                 const nextSetKind = event.target.value as SetKind;
@@ -746,7 +795,7 @@ function WorkoutSetRow({
 
           {!isCurrent && (
             <RirSelector
-              disabled={disabled || completing}
+              disabled={completedFieldsDisabled}
               value={rir}
               onChange={(nextRir) => {
                 editing.current = true;
@@ -759,7 +808,7 @@ function WorkoutSetRow({
           <label className="active-workout-failure">
             <input
               type="checkbox"
-              disabled={disabled || completing}
+              disabled={completedFieldsDisabled}
               checked={reachedFailure}
               onChange={(event) => {
                 const nextReachedFailure = event.target.checked;
@@ -827,8 +876,11 @@ function CardioWorkoutRow({
     String(pending ? (pending.values.heart_rate_zone ?? '') : (set.heart_rate_zone ?? '')),
   );
   const completed = pending?.values.is_completed ?? set.is_completed;
+  const { confirm } = useFeedback();
+  const [editingCompleted, setEditingCompleted] = useState(false);
   const [completing, setCompleting] = useState(false);
   const completionInFlight = useRef(false);
+  const reopenInFlight = useRef(false);
   const retryCompletion = syncFailed && pending?.values.is_completed;
   const [validation, setValidation] = useState<string | null>(null);
   const editing = useRef(false);
@@ -842,6 +894,7 @@ function CardioWorkoutRow({
     !completed &&
     previousResult !== null &&
     (canPrefillDuration || canPrefillDistance);
+  const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
   const enqueueSave = async (
     next: Partial<{
@@ -887,6 +940,24 @@ function CardioWorkoutRow({
         completionInFlight.current = false;
         setCompleting(false);
       }
+    }
+  };
+
+  const requestReopen = async () => {
+    if (disabled || completing || reopenInFlight.current || !completed) return;
+    reopenInFlight.current = true;
+    try {
+      const approved = await confirm({
+        title: 'Вернуть кардио в работу?',
+        message: `Вернуть интервал ${set.set_number} в работу? Статус изменится на „Не завершён“. Сохранённые результаты останутся.`,
+        confirmText: 'Вернуть в работу',
+        danger: false,
+      });
+      if (!approved) return;
+      editing.current = true;
+      await enqueueSave({ completed: false }, true);
+    } finally {
+      reopenInFlight.current = false;
     }
   };
 
@@ -956,6 +1027,34 @@ function CardioWorkoutRow({
         )}
       </div>
 
+      {completed && (
+        <div
+          className="active-workout-set__completed-actions app-action-group"
+          aria-label="Действия с выполненным кардио"
+        >
+          {!editingCompleted && (
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="edit-completed"
+              variant="ghost"
+              onClick={() => setEditingCompleted(true)}
+            >
+              Редактировать
+            </Button>
+          )}
+          <Button
+            type="button"
+            disabled={disabled || completing}
+            data-workout-action="reopen-completed"
+            variant="secondary"
+            onClick={requestReopen}
+          >
+            Вернуть в работу
+          </Button>
+        </div>
+      )}
+
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий интервал: {previousResult}</p>
       )}
@@ -1017,7 +1116,7 @@ function CardioWorkoutRow({
           <span>Длительность, мин</span>
           <input
             data-workout-field="duration"
-            disabled={disabled || completing}
+            disabled={completedFieldsDisabled}
             aria-label={`Длительность, ${exerciseTitle}`}
             enterKeyHint="next"
             inputMode="numeric"
@@ -1044,7 +1143,7 @@ function CardioWorkoutRow({
           <span>Дистанция, км</span>
           <input
             data-workout-field="distance"
-            disabled={disabled || completing}
+            disabled={completedFieldsDisabled}
             aria-label={`Дистанция, ${exerciseTitle}`}
             enterKeyHint="done"
             inputMode="decimal"
@@ -1068,10 +1167,9 @@ function CardioWorkoutRow({
         </label>
         <Button
           type="button"
-          disabled={disabled || completing}
+          disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
-          aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Отметить кардио незавершённым' : 'Завершить кардио'}: ${exerciseTitle}`}
-          aria-pressed={completed}
+          aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Кардио выполнено' : 'Завершить кардио'}: ${exerciseTitle}`}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
@@ -1110,7 +1208,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Средний пульс, уд/мин</span>
             <input
-              disabled={disabled || completing}
+              disabled={completedFieldsDisabled}
               inputMode="numeric"
               type="number"
               min="30"
@@ -1126,7 +1224,7 @@ function CardioWorkoutRow({
           <label className="active-workout-advanced-field">
             <span>Зона пульса</span>
             <select
-              disabled={disabled || completing}
+              disabled={completedFieldsDisabled}
               value={heartRateZone}
               onChange={(event) => {
                 editing.current = true;

@@ -4923,6 +4923,11 @@ button.today-text-link {
   width: 16px;
   height: 16px;
 }
+.active-workout-set__completed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .active-workout-set__previous {
   margin: -3px 0 0 48px;
   color: var(--muted);
