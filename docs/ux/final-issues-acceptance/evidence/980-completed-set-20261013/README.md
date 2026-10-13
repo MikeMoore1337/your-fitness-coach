@@ -32,8 +32,14 @@
 | WebKit   | Light | [PNG](after/webkit-light-strength-editing.png)  | [PNG](after/webkit-light-cardio-editing.png)  |
 
 Для силового подхода открытая панель отдыха остаётся выше строки и не перекрывает строку,
-поля или действия редактирования. Capture использовал временный Playwright-тест с
-`mockActiveWorkout` и был удалён до evidence-only commit.
+поля или действия редактирования. Capture выполнен штатным Playwright-тестом с
+`mockActiveWorkout`; в репозитории остаётся тот же E2E-сценарий как воспроизводимая проверка.
+
+Общая причина нижнего перекрытия исправлена через уже существующий Telegram viewport adapter:
+нижний inset dock и scroll clearance учитывают `--yfc-viewport-bottom` и safe-area. Глобальный
+`overflow-x` для маскировки проблемы не менялся. Geometry regression отдельно проверяет DOM rect
+веса/длительности, реальный focus и Tab/Shift+Tab, RIR и кнопку «Завершить тренировку» на
+320/360/390/393/430 px в Dark/Light; TMA dock regression живёт в PR #976.
 
 ## Проверки
 
@@ -44,7 +50,7 @@
 - отмена подтверждения не создаёт PATCH;
 - после подтверждённого возврата подход становится текущим без запуска нового таймера отдыха;
 - геометрическая проверка подтверждает отсутствие перекрытия строки панелью отдыха;
-- временный capture редактирования: Chromium/WebKit × Dark/Light, 8/8 passed;
+- capture редактирования: Chromium/WebKit × Dark/Light, 4/4 Playwright tests passed;
 - typecheck, lint и Russian UI guard проходят.
 
 Физические устройства, настоящий Telegram и VoiceOver не подтверждены. Финальное visual

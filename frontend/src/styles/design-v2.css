@@ -4602,11 +4602,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
   --app-bottom-nav-height: 0px;
   --yfc-mobile-dock-clearance: max(
     96px,
-    calc(var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)))
+    calc(
+      var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)) +
+        var(--yfc-viewport-bottom, 0px)
+    )
   );
   --yfc-mobile-action-clearance: max(
     104px,
-    calc(var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)))
+    calc(
+      var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)) +
+        var(--yfc-viewport-bottom, 0px)
+    )
   );
 }
 
@@ -4672,7 +4678,8 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
   }
 
   .app-shell--design-v2 .app-bottom-nav {
-    inset: auto max(10px, var(--yfc-layout-safe-right)) max(8px, var(--yfc-layout-safe-bottom))
+    inset: auto max(10px, var(--yfc-layout-safe-right))
+      calc(max(8px, var(--yfc-layout-safe-bottom)) + var(--yfc-viewport-bottom, 0px))
       max(10px, var(--yfc-layout-safe-left));
     width: auto;
     padding: 6px;

@@ -2876,10 +2876,11 @@ test('#980 completed cardio results keep their values through edit and reopen', 
 test.describe('#980 completed set visual candidate', () => {
   for (const theme of ['dark', 'light'] as const) {
     test(`${theme} completed set keeps explicit actions visible`, async ({ page }, info) => {
-      await page.setViewportSize({ width: 390, height: 844 });
+      const captureWidth = Number(process.env.CAPTURE_980_WIDTH ?? 390);
+      await page.setViewportSize({ width: captureWidth, height: 844 });
       await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
       await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
-      const server = await mockActiveWorkout(page);
+      const server = await mockActiveWorkout(page, true);
       await page.goto('/app');
       await page.getByRole('button', { name: 'Клиент' }).click();
       await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
@@ -2926,20 +2927,232 @@ test.describe('#980 completed set visual candidate', () => {
       if (CAPTURE_980_AFTER) {
         await mkdir(ISSUE_980_AFTER_DIR, { recursive: true });
         await page.screenshot({
-          path: resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-completed.png`),
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-completed.png`,
+          ),
         });
       }
+
+      await first.getByRole('button', { name: 'Редактировать' }).click();
+      await expect(first.getByRole('button', { name: 'Сохранить' })).toBeVisible();
+      await first.getByLabel('Вес, Жим штанги лёжа, подход 1').focus();
+      if (CAPTURE_980_AFTER) {
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-strength-editing.png`,
+          ),
+        });
+      }
+      await first.getByRole('button', { name: 'Отмена' }).click();
+
+      const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+      await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+      await cardio.getByLabel('Длительность, Велотренажёр').fill('27');
+      await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
+      await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+      await expect.poll(() => server.readSet(204).is_completed).toBe(true);
+      await cardio.getByRole('button', { name: 'Редактировать' }).click();
+      await cardio.getByLabel('Длительность, Велотренажёр').focus();
+      if (CAPTURE_980_AFTER) {
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-cardio-editing.png`,
+          ),
+        });
+      }
+      await cardio.getByRole('button', { name: 'Отмена' }).click();
 
       const actions = await openCompletedActions(first);
       await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
       await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
       if (CAPTURE_980_AFTER) {
         await page.getByRole('dialog').screenshot({
-          path: resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-confirm.png`),
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-confirm.png`,
+          ),
         });
       }
       await page.getByRole('button', { name: 'Отмена' }).click();
     });
+  }
+});
+
+test.describe('#980 completed-set geometry regression', () => {
+  for (const width of [320, 360, 390, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`keeps completed strength/cardio editing and lower actions inside ${width}px ${theme}`, async ({
+        page,
+      }, info) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        const server = await mockActiveWorkout(page, true);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент' }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const strength = page.locator('[data-workout-set-id="201"]');
+        await strength.getByLabel(/^Вес,/).fill('42.5');
+        await strength.getByLabel(/^Повторы,/).fill('9');
+        await strength.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await strength.getByRole('button', { name: 'Редактировать' }).click();
+        const weight = strength.getByLabel('Вес, Жим штанги лёжа, подход 1');
+        const reps = strength.getByLabel('Повторы, Жим штанги лёжа, подход 1');
+        await weight.focus();
+        await expect(weight).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(reps).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(weight).toBeFocused();
+
+        const strengthGeometry = await page.evaluate(() => {
+          const root = document.documentElement;
+          const app = document.querySelector<HTMLElement>('#appContent');
+          const exercise = document
+            .querySelector<HTMLElement>('[data-workout-set-id="201"]')
+            ?.closest('.active-workout-exercise');
+          const row = document.querySelector<HTMLElement>('[data-workout-set-id="201"]');
+          const input = row?.querySelector<HTMLInputElement>('[data-workout-field="weight"]');
+          const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+          const box = (element: Element | null | undefined) =>
+            element?.getBoundingClientRect().toJSON() ?? null;
+          return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            scroll: { x: window.scrollX, y: window.scrollY },
+            documentWidth: { client: root.clientWidth, scroll: root.scrollWidth },
+            safe: {
+              left: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-left').trim(),
+              right: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-right').trim(),
+            },
+            app: box(app),
+            exercise: box(exercise),
+            row: box(row),
+            controls: box(controls),
+            weight: box(input),
+            active: document.activeElement === input,
+          };
+        });
+        await info.attach('strength-edit-geometry.json', {
+          body: JSON.stringify(strengthGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(strengthGeometry.weight).not.toBeNull();
+        expect(strengthGeometry.exercise).not.toBeNull();
+        expect(strengthGeometry.weight?.left).toBeGreaterThanOrEqual(
+          (strengthGeometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(strengthGeometry.weight?.right).toBeLessThanOrEqual(
+          (strengthGeometry.exercise?.right ?? width) + 0.5,
+        );
+        expect(strengthGeometry.documentWidth.scroll).toBeLessThanOrEqual(width + 1);
+
+        const current = page.locator('[data-workout-set-id="202"]');
+        const rir = current.getByRole('button', { name: /^2 —/ });
+        await rir.scrollIntoViewIfNeeded();
+        const rirGeometry = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>(
+            '[data-workout-set-id="202"] .active-workout-rir__options button',
+          );
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const targetBox = target?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const point = targetBox
+            ? document.elementFromPoint(
+                targetBox.left + targetBox.width / 2,
+                targetBox.top + targetBox.height / 2,
+              )
+            : null;
+          return {
+            target: targetBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            hit: point?.closest('.active-workout-rir__options') !== null,
+            overlap:
+              Boolean(targetBox && dockBox) &&
+              targetBox!.bottom > dockBox!.top &&
+              targetBox!.top < dockBox!.bottom,
+          };
+        });
+        await info.attach('rir-dock-geometry.json', {
+          body: JSON.stringify(rirGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(rirGeometry.overlap).toBe(false);
+        expect(rirGeometry.hit).toBe(true);
+
+        const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+        await finish.scrollIntoViewIfNeeded();
+        const finishGeometry = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>(
+            'button[aria-label="Завершить тренировку"], button:not([aria-label])[type="button"]',
+          );
+          const finishButton = [...document.querySelectorAll<HTMLElement>('button')].find(
+            (button) => button.textContent?.trim() === 'Завершить тренировку',
+          );
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const targetBox = (finishButton ?? target)?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const point = targetBox
+            ? document.elementFromPoint(
+                targetBox.left + targetBox.width / 2,
+                targetBox.top + targetBox.height / 2,
+              )
+            : null;
+          return {
+            target: targetBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            hit:
+              point === finishButton ||
+              Boolean(finishButton && point?.closest('button') === finishButton),
+            overlap:
+              Boolean(targetBox && dockBox) &&
+              targetBox!.bottom > dockBox!.top &&
+              targetBox!.top < dockBox!.bottom,
+          };
+        });
+        await info.attach('finish-dock-geometry.json', {
+          body: JSON.stringify(finishGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(finishGeometry.overlap).toBe(false);
+        expect(finishGeometry.hit).toBe(true);
+
+        const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+        await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+        await cardio.getByLabel('Длительность, Велотренажёр').fill('27');
+        await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
+        await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+        await expect.poll(() => server.readSet(204).is_completed).toBe(true);
+        await cardio.getByRole('button', { name: 'Редактировать' }).click();
+        const duration = cardio.getByLabel('Длительность, Велотренажёр');
+        await duration.focus();
+        await expect(duration).toBeFocused();
+        const cardioGeometry = await duration.evaluate((input) => {
+          const row = input.closest<HTMLElement>('[data-workout-set-id]');
+          const exercise = row?.closest<HTMLElement>('.active-workout-exercise');
+          return {
+            input: input.getBoundingClientRect().toJSON(),
+            row: row?.getBoundingClientRect().toJSON() ?? null,
+            exercise: exercise?.getBoundingClientRect().toJSON() ?? null,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+          };
+        });
+        await info.attach('cardio-edit-geometry.json', {
+          body: JSON.stringify(cardioGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(cardioGeometry.input.left).toBeGreaterThanOrEqual(
+          (cardioGeometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(cardioGeometry.input.right).toBeLessThanOrEqual(
+          (cardioGeometry.exercise?.right ?? width) + 0.5,
+        );
+      });
+    }
   }
 });
 
