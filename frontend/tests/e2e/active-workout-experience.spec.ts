@@ -2931,18 +2931,23 @@ test.describe('#980 completed set visual candidate', () => {
             ISSUE_980_AFTER_DIR,
             `${info.project.name}-${captureWidth}-${theme}-completed.png`,
           ),
+          fullPage: false,
         });
       }
 
       await first.getByRole('button', { name: 'Редактировать' }).click();
       await expect(first.getByRole('button', { name: 'Сохранить' })).toBeVisible();
       await first.getByLabel('Вес, Жим штанги лёжа, подход 1').focus();
+      await first.evaluate((element) => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
       if (CAPTURE_980_AFTER) {
         await page.screenshot({
           path: resolve(
             ISSUE_980_AFTER_DIR,
             `${info.project.name}-${captureWidth}-${theme}-strength-editing.png`,
           ),
+          fullPage: false,
         });
       }
       await first.getByRole('button', { name: 'Отмена' }).click();
@@ -2955,15 +2960,47 @@ test.describe('#980 completed set visual candidate', () => {
       await expect.poll(() => server.readSet(204).is_completed).toBe(true);
       await cardio.getByRole('button', { name: 'Редактировать' }).click();
       await cardio.getByLabel('Длительность, Велотренажёр').focus();
+      await cardio.evaluate((element) => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
       if (CAPTURE_980_AFTER) {
         await page.screenshot({
           path: resolve(
             ISSUE_980_AFTER_DIR,
             `${info.project.name}-${captureWidth}-${theme}-cardio-editing.png`,
           ),
+          fullPage: false,
         });
       }
       await cardio.getByRole('button', { name: 'Отмена' }).click();
+
+      if (CAPTURE_980_AFTER) {
+        const rir = page
+          .locator('[data-workout-set-id="202"] .active-workout-rir__options button')
+          .first();
+        await rir.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-rir-actions.png`,
+          ),
+          fullPage: false,
+        });
+
+        const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+        await finish.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-footer-actions.png`,
+          ),
+          fullPage: false,
+        });
+      }
 
       const actions = await openCompletedActions(first);
       await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
@@ -2996,6 +3033,20 @@ test.describe('#980 completed-set geometry regression', () => {
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
         const strength = page.locator('[data-workout-set-id="201"]');
+        const strengthExercise = page
+          .locator('.active-workout-exercise')
+          .filter({ hasText: 'Жим штанги лёжа' })
+          .first();
+        await expect(strengthExercise.locator('.active-workout-history')).toBeVisible();
+        const historyGap = await strengthExercise.evaluate((exercise) => {
+          const history = exercise.querySelector<HTMLElement>('.active-workout-history');
+          const sets = exercise.querySelector<HTMLElement>('.active-workout-exercise__sets');
+          if (!history || !sets) return null;
+          return sets.getBoundingClientRect().top - history.getBoundingClientRect().bottom;
+        });
+        expect(historyGap).not.toBeNull();
+        expect(historyGap ?? 0).toBeGreaterThanOrEqual(8);
+
         await strength.getByLabel(/^Вес,/).fill('42.5');
         await strength.getByLabel(/^Повторы,/).fill('9');
         await strength.getByRole('button', { name: /^Завершить:/ }).click();
@@ -3029,11 +3080,27 @@ test.describe('#980 completed-set geometry regression', () => {
               left: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-left').trim(),
               right: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-right').trim(),
             },
+            visualViewport: window.visualViewport
+              ? {
+                  width: window.visualViewport.width,
+                  height: window.visualViewport.height,
+                  offsetLeft: window.visualViewport.offsetLeft,
+                  offsetTop: window.visualViewport.offsetTop,
+                }
+              : null,
             app: box(app),
             exercise: box(exercise),
             row: box(row),
             controls: box(controls),
             weight: box(input),
+            weightStyle: input
+              ? {
+                  boxSizing: getComputedStyle(input).boxSizing,
+                  minWidth: getComputedStyle(input).minWidth,
+                  width: getComputedStyle(input).width,
+                  paddingInline: getComputedStyle(input).paddingInline,
+                }
+              : null,
             active: document.activeElement === input,
           };
         });
@@ -3050,10 +3117,72 @@ test.describe('#980 completed-set geometry regression', () => {
           (strengthGeometry.exercise?.right ?? width) + 0.5,
         );
         expect(strengthGeometry.documentWidth.scroll).toBeLessThanOrEqual(width + 1);
+        expect(strengthGeometry.weightStyle?.boxSizing).toBe('border-box');
+
+        const summaryGeometry = await page.evaluate(() =>
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '.active-workout-set__more-actions > summary, .active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
+            ),
+          )
+            .map((summary) => {
+              const style = getComputedStyle(summary);
+              const rect = summary.getBoundingClientRect();
+              return {
+                text: summary.textContent?.trim() ?? '',
+                rect: rect.toJSON(),
+                display: style.display,
+                alignItems: style.alignItems,
+                minHeight: parseFloat(style.minHeight),
+                paddingTop: style.paddingTop,
+                paddingBottom: style.paddingBottom,
+              };
+            })
+            .filter((summary) => summary.rect.width > 0 && summary.rect.height > 0),
+        );
+        expect(summaryGeometry.length).toBeGreaterThan(0);
+        for (const summary of summaryGeometry) {
+          expect(summary.rect.height, summary.text).toBeGreaterThanOrEqual(44);
+          expect(summary.minHeight, summary.text).toBeGreaterThanOrEqual(44);
+          expect(summary.display, summary.text).toBe('flex');
+          expect(summary.alignItems, summary.text).toBe('center');
+          expect(summary.paddingTop, summary.text).toBe('0px');
+          expect(summary.paddingBottom, summary.text).toBe('0px');
+        }
+
+        for (const summary of [
+          strength.locator('.active-workout-set__advanced > summary').first(),
+          page
+            .locator('[data-workout-set-id="202"] .active-workout-set__helpers > summary')
+            .first(),
+        ]) {
+          await expect(summary).toBeVisible();
+          await summary.scrollIntoViewIfNeeded();
+          const summaryGeometry = await summary.evaluate((element) => {
+            const dock = document.querySelector<HTMLElement>('#appBottomNav');
+            const target = element.getBoundingClientRect();
+            const dockRect = dock?.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              target.left + target.width / 2,
+              target.top + target.height / 2,
+            );
+            return {
+              target: target.toJSON(),
+              dock: dockRect?.toJSON() ?? null,
+              hit: hit === element || Boolean(hit?.closest('summary') === element),
+              overlap:
+                Boolean(dockRect) && target.bottom > dockRect!.top && target.top < dockRect!.bottom,
+            };
+          });
+          expect(summaryGeometry.overlap).toBe(false);
+          expect(summaryGeometry.hit).toBe(true);
+        }
 
         const current = page.locator('[data-workout-set-id="202"]');
         const rir = current.getByRole('button', { name: /^2 —/ });
-        await rir.scrollIntoViewIfNeeded();
+        await rir.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
         const rirGeometry = await page.evaluate(() => {
           const target = document.querySelector<HTMLElement>(
             '[data-workout-set-id="202"] .active-workout-rir__options button',
@@ -3151,6 +3280,122 @@ test.describe('#980 completed-set geometry regression', () => {
         expect(cardioGeometry.input.right).toBeLessThanOrEqual(
           (cardioGeometry.exercise?.right ?? width) + 0.5,
         );
+
+        const pulseSummary = cardio.locator('.active-workout-set__advanced > summary');
+        await expect(pulseSummary).toHaveText('Пульс (необязательно)');
+        await pulseSummary.scrollIntoViewIfNeeded();
+        const pulseGeometry = await pulseSummary.evaluate((element) => {
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const target = element.getBoundingClientRect();
+          const dockRect = dock?.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            target.left + target.width / 2,
+            target.top + target.height / 2,
+          );
+          return {
+            target: target.toJSON(),
+            dock: dockRect?.toJSON() ?? null,
+            hit: hit === element || Boolean(hit?.closest('summary') === element),
+            overlap:
+              Boolean(dockRect) && target.bottom > dockRect!.top && target.top < dockRect!.bottom,
+          };
+        });
+        expect(pulseGeometry.overlap).toBe(false);
+        expect(pulseGeometry.hit).toBe(true);
+      });
+    }
+  }
+});
+
+test.describe('#980 completed editing keyboard and safe-area regression', () => {
+  for (const width of [320, 360, 390, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`keeps focused completed weight usable with modeled keyboard at ${width}px ${theme}`, async ({
+        page,
+      }, info) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await installMockedTelegram(page);
+        await page.addInitScript((selectedTheme) => {
+          localStorage.setItem('app-theme', selectedTheme);
+          if (window.Telegram?.WebApp) window.Telegram.WebApp.colorScheme = selectedTheme;
+        }, theme);
+        const server = await mockActiveWorkout(page, true);
+        await page.goto('/app?tgWebAppPlatform=ios');
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const strength = page.locator('[data-workout-set-id="201"]');
+        await strength.getByLabel(/^Вес,/).fill('42.5');
+        await strength.getByLabel(/^Повторы,/).fill('9');
+        await strength.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+        await strength.getByRole('button', { name: 'Редактировать' }).click();
+
+        const weight = strength.getByLabel('Вес, Жим штанги лёжа, подход 1');
+        const reps = strength.getByLabel('Повторы, Жим штанги лёжа, подход 1');
+        await weight.focus();
+        await expect(weight).toBeFocused();
+        await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+        await page.keyboard.press('Tab');
+        await expect(reps).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(weight).toBeFocused();
+
+        const geometry = await page.evaluate(() => {
+          const root = document.documentElement;
+          const input = document.querySelector<HTMLInputElement>(
+            '[data-workout-set-id="201"] [data-workout-field="weight"]',
+          );
+          const exercise = input?.closest<HTMLElement>('.active-workout-exercise');
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const inputBox = input?.getBoundingClientRect();
+          const exerciseBox = exercise?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const style = input ? getComputedStyle(input) : null;
+          const dockStyle = dock ? getComputedStyle(dock) : null;
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            visualViewport: window.visualViewport
+              ? {
+                  width: window.visualViewport.width,
+                  height: window.visualViewport.height,
+                  offsetTop: window.visualViewport.offsetTop,
+                }
+              : null,
+            keyboard: root.getAttribute('data-yfc-keyboard'),
+            viewportHeight: getComputedStyle(root).getPropertyValue('--yfc-viewport-height').trim(),
+            safeBottom: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-bottom').trim(),
+            documentWidth: { client: root.clientWidth, scroll: root.scrollWidth },
+            input: inputBox?.toJSON() ?? null,
+            exercise: exerciseBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            boxSizing: style?.boxSizing ?? null,
+            dockVisible: Boolean(
+              dockBox &&
+              dockBox.width > 0 &&
+              dockBox.height > 0 &&
+              dockStyle?.display !== 'none' &&
+              dockStyle?.visibility !== 'hidden',
+            ),
+          };
+        });
+        await info.attach('completed-weight-keyboard-geometry.json', {
+          body: JSON.stringify(geometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(geometry.keyboard).toBe('visible');
+        expect(geometry.boxSizing).toBe('border-box');
+        expect(geometry.input).not.toBeNull();
+        expect(geometry.exercise).not.toBeNull();
+        expect(geometry.input?.left ?? 0).toBeGreaterThanOrEqual(
+          (geometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(geometry.input?.right ?? width).toBeLessThanOrEqual(
+          (geometry.exercise?.right ?? width) + 0.5,
+        );
+        expect(geometry.documentWidth.scroll).toBeLessThanOrEqual(width + 1);
+        expect(geometry.dockVisible).toBe(false);
       });
     }
   }

@@ -2377,6 +2377,10 @@ body:has(.app-shell--design-v2) {
   border-top: 1px solid var(--v2-border);
 }
 
+.active-workout--design-v2 .active-workout-history + .active-workout-exercise__sets {
+  margin-top: var(--v2-space-3);
+}
+
 .active-workout--design-v2 .progression-guidance {
   display: grid;
   gap: var(--v2-space-2);
@@ -2555,11 +2559,29 @@ body:has(.app-shell--design-v2) {
 
 .active-workout--design-v2 .active-workout-input input,
 .active-workout--design-v2 .active-workout-advanced-field select {
+  box-sizing: border-box;
   border: 1px solid #d3d6d6;
   padding: 12px 6px;
   border-radius: var(--radius-control);
   background: #fff;
   color: #111;
+}
+
+.active-workout--design-v2 .active-workout-set__controls,
+.active-workout--design-v2 .active-workout-set__controls > *,
+.active-workout--design-v2 .active-workout-input,
+.active-workout--design-v2 .active-workout-advanced-field {
+  min-width: 0;
+}
+
+.active-workout--design-v2 .active-workout-set__more-actions > summary,
+.active-workout--design-v2 .active-workout-set__helpers > summary,
+.active-workout--design-v2 .active-workout-set__advanced > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding-block: 0;
+  line-height: 1.3;
 }
 
 .active-workout--design-v2 .active-workout-set.is-current .active-workout-input input {
