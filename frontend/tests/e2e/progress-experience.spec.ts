@@ -1359,14 +1359,22 @@ for (const width of [320, 360, 393, 430]) {
       await expect(cards.getByText('Калории', { exact: true })).toBeVisible();
       await expect(cards.getByText('Б / Ж / У', { exact: true })).toBeVisible();
 
-      const geometry = await cards.evaluateAll((elements) => {
+      const geometry = await targetChanges.evaluate((element) => {
         const viewport = document.documentElement.clientWidth;
+        const heading = element.querySelector<HTMLElement>('h3');
+        const firstCard = element.querySelector<HTMLElement>('ol > li');
+        if (!heading || !firstCard) throw new Error('Target changes geometry is incomplete');
+        const headingBox = heading.getBoundingClientRect();
+        const firstCardBox = firstCard.getBoundingClientRect();
+        const rowGap = Number.parseFloat(getComputedStyle(element).rowGap);
         return {
           viewport,
           documentWidth: document.documentElement.scrollWidth,
-          cards: elements.map((element) => {
-            const box = element.getBoundingClientRect();
-            const descendants = [...element.querySelectorAll<HTMLElement>('*')].map((child) => {
+          rowGap,
+          headingToFirstCard: firstCardBox.top - headingBox.bottom,
+          cards: [...element.querySelectorAll<HTMLElement>('ol > li')].map((cardElement) => {
+            const box = cardElement.getBoundingClientRect();
+            const descendants = [...cardElement.querySelectorAll<HTMLElement>('*')].map((child) => {
               const childBox = child.getBoundingClientRect();
               return { left: childBox.left, right: childBox.right };
             });
@@ -1380,6 +1388,8 @@ for (const width of [320, 360, 393, 430]) {
         };
       });
       expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
+      expect(geometry.rowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.headingToFirstCard).toBeGreaterThanOrEqual(geometry.rowGap - 0.5);
       for (const card of geometry.cards) {
         expect(card.width).toBeGreaterThan(0);
         expect(card.left).toBeGreaterThanOrEqual(-1);

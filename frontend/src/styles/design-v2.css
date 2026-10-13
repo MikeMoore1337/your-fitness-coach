@@ -7181,6 +7181,10 @@ button.notification-row__main:focus-visible {
     border-radius: var(--v2-control-radius);
   }
 
+  .nutrition-report-targets {
+    row-gap: var(--v2-space-3);
+  }
+
   .nutrition-report-targets li > :where(time, strong, span),
   .nutrition-report-targets__values,
   .nutrition-report-targets__value {
