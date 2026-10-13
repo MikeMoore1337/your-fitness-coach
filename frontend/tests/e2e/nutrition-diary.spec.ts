@@ -1388,6 +1388,7 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
+  await expect(hydration.locator('.hydration-orb strong')).toHaveCSS('color', 'rgb(9, 11, 11)');
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
