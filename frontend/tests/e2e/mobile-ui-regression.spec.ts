@@ -376,6 +376,85 @@ test('@critical mocked TMA keeps the dock inside the effective viewport and hit-
   );
 });
 
+for (const width of [320, 360, 390, 393, 430]) {
+  test(`@critical mocked TMA keeps Active Workout RIR and finish controls clear at ${width}px`, async ({
+    page,
+  }) => {
+    const prepared = await preparePage(page, 'dark', 'telegram', { workoutStatus: 'in_progress' });
+    if (!prepared.tma) throw new Error('TMA harness was not installed');
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto('/app?tgWebAppPlatform=ios');
+    await waitForSurface(page, 'today');
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+    const currentSet = page.locator('.active-workout-set.is-current');
+    await expect(currentSet).toBeVisible();
+    const rir = currentSet
+      .locator('.active-workout-rir--quick .active-workout-rir__options button')
+      .first();
+    await rir.scrollIntoViewIfNeeded();
+
+    const measure = async (selector: string) =>
+      page.evaluate((targetSelector) => {
+        const rootStyle = getComputedStyle(document.documentElement);
+        const target = document.querySelector<HTMLElement>(targetSelector);
+        const dock = document.querySelector<HTMLElement>('#appBottomNav');
+        if (!target || !dock) throw new Error(`Missing geometry target: ${targetSelector}`);
+        const targetRect = target.getBoundingClientRect();
+        const dockRect = dock.getBoundingClientRect();
+        const viewportBottom = Number.parseFloat(
+          rootStyle.getPropertyValue('--yfc-viewport-bottom'),
+        );
+        const effectiveBottom = window.innerHeight - viewportBottom;
+        const point = document.elementFromPoint(
+          targetRect.left + targetRect.width / 2,
+          targetRect.top + targetRect.height / 2,
+        );
+        return {
+          target: targetRect.toJSON(),
+          dock: dockRect.toJSON(),
+          viewport: { width: window.innerWidth, height: window.innerHeight, effectiveBottom },
+          documentWidth: {
+            client: document.documentElement.clientWidth,
+            scroll: document.documentElement.scrollWidth,
+          },
+          hit: point === target || Boolean(point?.closest(selector)),
+          overlap: targetRect.bottom > dockRect.top && targetRect.top < dockRect.bottom,
+        };
+      }, selector);
+
+    const rirGeometry = await measure(
+      '.active-workout-set.is-current .active-workout-rir--quick .active-workout-rir__options button',
+    );
+    expect(rirGeometry.target.left).toBeGreaterThanOrEqual(-0.5);
+    expect(rirGeometry.target.right).toBeLessThanOrEqual(width + 0.5);
+    expect(rirGeometry.target.top).toBeGreaterThanOrEqual(-0.5);
+    expect(rirGeometry.target.bottom).toBeLessThanOrEqual(
+      rirGeometry.viewport.effectiveBottom + 0.5,
+    );
+    expect(rirGeometry.overlap).toBe(false);
+    expect(rirGeometry.hit).toBe(true);
+    expect(rirGeometry.documentWidth.scroll).toBeLessThanOrEqual(
+      rirGeometry.documentWidth.client + 1,
+    );
+
+    const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+    await finish.scrollIntoViewIfNeeded();
+    const finishGeometry = await measure('.active-workout-finish button');
+    expect(finishGeometry.target.left).toBeGreaterThanOrEqual(-0.5);
+    expect(finishGeometry.target.right).toBeLessThanOrEqual(width + 0.5);
+    expect(finishGeometry.target.top).toBeGreaterThanOrEqual(-0.5);
+    expect(finishGeometry.target.bottom).toBeLessThanOrEqual(
+      finishGeometry.viewport.effectiveBottom + 0.5,
+    );
+    expect(finishGeometry.overlap).toBe(false);
+    expect(finishGeometry.hit).toBe(true);
+    expect(finishGeometry.documentWidth.scroll).toBeLessThanOrEqual(
+      finishGeometry.documentWidth.client + 1,
+    );
+  });
+}
+
 test('@extended mobile layout stress keeps long content inside viewport', async ({ page }) => {
   await preparePage(page, 'light', 'browser', { longExerciseName: true });
   await page.goto('/app?section=today');
