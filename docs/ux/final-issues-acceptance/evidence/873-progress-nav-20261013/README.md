@@ -2,6 +2,9 @@
 
 Срез подготовлен на синтетических данных в актуальной ветке от `origin/master`.
 
+- `BASE_SHA`: `11cff463834fd41c1392d646f6baaf361ac9bebc`
+- `IMPLEMENTATION_SHA`: `6f49e781c20c6ae516d5cd0d8211940b745d972e`
+
 ## Что изменено
 
 - Крайние кнопки горизонтального rail используют одну утверждённую пару glyph: `chevron-left` / `chevron-right`.
