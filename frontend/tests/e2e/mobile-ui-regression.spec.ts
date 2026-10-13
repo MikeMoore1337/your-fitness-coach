@@ -333,6 +333,49 @@ test('@critical mocked TMA preserves safe areas, lifecycle and Today geometry', 
   expect(state.backButton.visible).toBe(false);
 });
 
+test('@critical mocked TMA keeps the dock inside the effective viewport and hit-testable', async ({
+  page,
+}) => {
+  const prepared = await preparePage(page, 'dark', 'telegram');
+  if (!prepared.tma) throw new Error('TMA harness was not installed');
+  await page.goto('/app?tgWebAppPlatform=android');
+  await waitForSurface(page, 'today');
+
+  const geometry = await page.evaluate(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const dock = document.getElementById('appBottomNav');
+    if (!dock) throw new Error('Mobile dock is missing');
+    const dockRect = dock.getBoundingClientRect();
+    const dockHeight = Number.parseFloat(rootStyle.getPropertyValue('--app-bottom-nav-height'));
+    const viewportBottom = Number.parseFloat(rootStyle.getPropertyValue('--yfc-viewport-bottom'));
+    const layoutSafeBottom = Math.max(
+      Number.parseFloat(rootStyle.getPropertyValue('--yfc-tg-safe-bottom')) || 0,
+      Number.parseFloat(rootStyle.getPropertyValue('--yfc-content-safe-bottom')) || 0,
+    );
+    const effectiveViewportBottom = window.innerHeight - viewportBottom;
+    const dockHit = document.elementFromPoint(
+      dockRect.left + dockRect.width / 2,
+      dockRect.top + dockRect.height / 2,
+    );
+
+    return {
+      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+      dockHeight,
+      dockBottom: dockRect.bottom,
+      dockHit: dockHit?.closest('#appBottomNav') === dock,
+      effectiveViewportBottom,
+      layoutSafeBottom,
+      viewportBottom,
+    };
+  });
+  expect(geometry.viewportBottom).toBeGreaterThan(0);
+  expect(geometry.dockBottom).toBeLessThanOrEqual(geometry.effectiveViewportBottom + 1);
+  expect(geometry.dockHit).toBe(true);
+  expect(geometry.bodyPaddingBottom).toBeGreaterThanOrEqual(
+    geometry.dockHeight + 24 + Math.max(8, geometry.layoutSafeBottom) + geometry.viewportBottom - 1,
+  );
+});
+
 test('@extended mobile layout stress keeps long content inside viewport', async ({ page }) => {
   await preparePage(page, 'light', 'browser', { longExerciseName: true });
   await page.goto('/app?section=today');
