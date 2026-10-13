@@ -215,6 +215,13 @@ describe('NutritionPeriodReport', () => {
     expect(screen.getByText(/Точки — фактические значения/)).toBeVisible();
     fireEvent.click(screen.getByText('История целей питания'));
     expect(screen.getByText('Принятая адаптация')).toBeVisible();
+    const targetChange = document.querySelector('.nutrition-report-targets ol li');
+    expect(
+      targetChange?.querySelector('.nutrition-report-targets__mobile-label')?.textContent,
+    ).toBe('Дата');
+    expect(targetChange?.querySelectorAll('.nutrition-report-targets__value')).toHaveLength(2);
+    expect(targetChange?.textContent).toContain('Калории');
+    expect(targetChange?.textContent).toContain('Б / Ж / У');
     expect(screen.getAllByText('Новая цель').length).toBeGreaterThan(0);
     expect(screen.getByText('2 из 3')).toBeVisible();
     expect(screen.getByText('1 из 3')).toBeVisible();

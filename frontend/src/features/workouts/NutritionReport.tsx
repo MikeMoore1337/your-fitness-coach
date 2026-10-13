@@ -368,11 +368,29 @@ function TargetChanges({ report }: { report: NutritionReport }) {
       <ol>
         {report.target_changes.map((target) => (
           <li key={`${target.effective_from}-${target.source}`}>
-            <time dateTime={target.effective_from}>{formatDate(target.effective_from, true)}</time>
-            <strong>{targetSourceLabels[target.source]}</strong>
-            <span>
-              {target.calories} ккал · Б {target.protein_g} · Ж {target.fat_g} · У {target.carbs_g}{' '}
-              г
+            <time dateTime={target.effective_from}>
+              <span className="nutrition-report-targets__mobile-label">Дата</span>
+              <span className="nutrition-report-targets__content">
+                {formatDate(target.effective_from, true)}
+              </span>
+            </time>
+            <strong>
+              <span className="nutrition-report-targets__mobile-label">Источник</span>
+              <span className="nutrition-report-targets__content nutrition-report-targets__content--source">
+                {targetSourceLabels[target.source]}
+              </span>
+            </strong>
+            <span className="nutrition-report-targets__values">
+              <span className="nutrition-report-targets__value">
+                <span className="nutrition-report-targets__mobile-label">Калории</span>
+                <span className="nutrition-report-targets__content">{target.calories} ккал</span>
+              </span>
+              <span className="nutrition-report-targets__value">
+                <span className="nutrition-report-targets__mobile-label">Б / Ж / У</span>
+                <span className="nutrition-report-targets__content">
+                  Б {target.protein_g} · Ж {target.fat_g} · У {target.carbs_g} г
+                </span>
+              </span>
             </span>
           </li>
         ))}
