@@ -4925,8 +4925,40 @@ button.today-text-link {
 }
 .active-workout-set__completed-actions {
   display: flex;
+  align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+}
+.active-workout-set__more-actions {
+  min-width: 0;
+}
+.active-workout-set__more-actions > summary {
+  min-height: 44px;
+  padding: 8px 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  list-style: none;
+}
+.active-workout-set__more-actions > summary::-webkit-details-marker {
+  display: none;
+}
+.active-workout-set__more-actions > summary::after {
+  content: '+';
+  margin-left: 6px;
+}
+.active-workout-set__more-actions[open] > summary::after {
+  content: '−';
+}
+.active-workout-set__more-actions-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+.active-workout-set__more-actions-body .ui-button {
+  min-height: 44px;
 }
 .active-workout-set__previous {
   margin: -3px 0 0 48px;
