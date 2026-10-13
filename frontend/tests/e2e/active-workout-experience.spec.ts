@@ -3244,7 +3244,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await actions.locator('summary').click();
     await context.current
       .getByLabel('Повторы, Жим штанги лёжа, подход 2')
-      .focus({ preventScroll: true });
+      .evaluate((element) => (element as HTMLElement).focus({ preventScroll: true }));
     await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
     await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
     await expect(
