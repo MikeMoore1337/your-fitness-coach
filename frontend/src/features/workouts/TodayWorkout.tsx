@@ -732,6 +732,7 @@ function WorkoutSetRow({
           disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
           aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
+          aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
@@ -1170,6 +1171,7 @@ function CardioWorkoutRow({
           disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
           aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Кардио выполнено' : 'Завершить кардио'}: ${exerciseTitle}`}
+          aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
           variant={completed ? 'secondary' : 'primary'}
