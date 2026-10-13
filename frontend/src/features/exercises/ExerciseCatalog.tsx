@@ -313,7 +313,11 @@ export function ExerciseCatalog({
             />
           </label>
         </div>
-        <div className="exercise-catalog__filters" aria-label="Фильтры упражнений">
+        <div
+          className="exercise-catalog__content"
+          data-search-active={search.trim() ? 'true' : 'false'}
+        >
+          <div className="exercise-catalog__filters" aria-label="Фильтры упражнений">
           <label className="field">
             <span>Мышцы</span>
             <select
@@ -379,8 +383,8 @@ export function ExerciseCatalog({
               Сбросить фильтры
             </button>
           )}
-        </div>
-        {canCreate && (
+          </div>
+          {canCreate && (
           <details className="exercise-create compact-disclosure">
             <summary>
               <span>
@@ -468,13 +472,14 @@ export function ExerciseCatalog({
               </button>
             </form>
           </details>
-        )}
-        {!rows.isLoading && !rows.error && (
+          )}
+          {!rows.isLoading && !rows.error && (
           <p className="exercise-catalog__count" aria-live="polite">
             Найдено: <strong>{filtered.length}</strong>
           </p>
-        )}
-        {rows.isLoading ? (
+          )}
+          <div className="exercise-catalog__results">
+            {rows.isLoading ? (
           <LoadingState />
         ) : rows.error ? (
           <ErrorState message={(rows.error as Error).message} retry={() => void rows.refetch()} />
@@ -483,7 +488,7 @@ export function ExerciseCatalog({
             title="Ничего не найдено"
             text="Попробуйте убрать один из фильтров или изменить запрос."
           />
-        ) : (
+            ) : (
           <>
             <div className="exercise-catalog-list" aria-live="polite">
               {filtered.slice(0, visibleLimit).map((exercise) => (
@@ -562,7 +567,9 @@ export function ExerciseCatalog({
               </button>
             )}
           </>
-        )}
+            )}
+          </div>
+        </div>
       </Card>
       {visibleGuide && (
         <ExerciseGuideDialog

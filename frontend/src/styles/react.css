@@ -3919,6 +3919,22 @@ details:not([open]) > :not(summary) {
   .assignment-context {
     grid-template-columns: 1fr;
   }
+  .exercise-catalog__content[data-search-active='true'] {
+    display: flex;
+    flex-direction: column;
+  }
+  .exercise-catalog__content[data-search-active='true'] .exercise-catalog__count {
+    order: 1;
+  }
+  .exercise-catalog__content[data-search-active='true'] .exercise-catalog__results {
+    order: 2;
+  }
+  .exercise-catalog__content[data-search-active='true'] .exercise-create {
+    order: 3;
+  }
+  .exercise-catalog__content[data-search-active='true'] .exercise-catalog__filters {
+    order: 4;
+  }
   .exercise-create__form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

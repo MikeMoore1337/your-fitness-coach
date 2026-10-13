@@ -92,8 +92,17 @@ test('client exercise rows stay compact-first across supported mobile widths', a
 
     const search = page.getByRole('searchbox', { name: 'Поиск' });
     await search.fill('goblet squat');
+    await expect(search).toBeFocused();
     await expect(page.locator('.exercise-catalog-item')).toHaveCount(1);
     await expect(page.locator('.exercise-catalog-item')).toContainText('Гоблет-присед с гирей');
+    const [resultBox, filtersBox] = await Promise.all([
+      page.locator('.exercise-catalog-item').first().boundingBox(),
+      page.locator('.exercise-catalog__filters').boundingBox(),
+    ]);
+    expect(resultBox).not.toBeNull();
+    expect(filtersBox).not.toBeNull();
+    expect(resultBox!.y).toBeLessThan(filtersBox!.y);
+    expect(resultBox!.y).toBeLessThan(viewport.height);
     await expectNoHorizontalOverflow(page);
     await page.locator('.exercise-catalog-list').screenshot({
       path: `../.artifacts/screenshots/task-120D/exercise-catalog-${name}-${viewport.width}.png`,
@@ -105,6 +114,13 @@ test('client exercise rows stay compact-first across supported mobile widths', a
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('гоблет');
   await expect(page.locator('.exercise-catalog-item')).toHaveCount(1);
   await expect(page.locator('.exercise-catalog-item')).toContainText('Гоблет-присед с гирей');
+  const [desktopResultBox, desktopFiltersBox] = await Promise.all([
+    page.locator('.exercise-catalog-item').first().boundingBox(),
+    page.locator('.exercise-catalog__filters').boundingBox(),
+  ]);
+  expect(desktopResultBox).not.toBeNull();
+  expect(desktopFiltersBox).not.toBeNull();
+  expect(desktopFiltersBox!.y).toBeLessThan(desktopResultBox!.y);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: '../.artifacts/screenshots/task-120D/exercise-catalog-desktop-1280.png',
