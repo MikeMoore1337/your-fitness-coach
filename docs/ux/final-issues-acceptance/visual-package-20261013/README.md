@@ -12,9 +12,46 @@
 | #861 / PR #973 | Общий Exercise Catalog принят визуально; editor SearchableExercisePicker в PR не менялся | Не закрывать #861; нужна отдельная работа по редакторскому поиску без дубля |
 | #869 / PR #974 | Контраст `H₂O`/процента с белым текстом и тонкой тёмной обводкой принят отдельно | Макет компактной гидратации ещё требует owner design approval; контраст #974 не утверждает новую композицию #869 |
 | #871 | Изолированный макет порядка итогов подготовлен | Owner design approval до любого production-кода |
-| #970 / PR #987 | Утверждён вариант B без дополнительных изменений | Отдельная процедура выпуска; merge/deploy не выполнялись |
+| #970 / #992 / PR #987 | Вариант B сохранён; исправлен только подтверждённый вертикальный ритм первого target-change card | Отдельная процедура выпуска; merge/deploy не выполнялись |
 
 Проверка YFC Development выполнена в режиме чтения: #980, #861, #967, #869 и #970 остаются на `Owner Approval`, #871 — на `Release Check`. Эти статусы не переводились в готовность к merge: для #869 и #871 ещё не пройдены design gates, для остальных требуется финальное решение владельца.
+
+## Сквозной аудит согласованности
+
+Аудит зафиксирован по доступным синтетическим маршрутам и состояниям текущего пакета. `VERIFIED` означает фактический browser/test evidence; `PARTIAL` — проверены только перечисленные состояния; `NOT_VERIFIED` — экран или существенное состояние в этом проходе не открывалось и не подменяется предположением.
+
+| Раздел | Состояние | Что фактически проверено / что осталось |
+| --- | --- | --- |
+| Today | `PARTIAL` | Существующие Today/Active Workout тестовые fixtures и shared navigation; полный набор Today-состояний этого пакета не переснимался |
+| Active Workout | `VERIFIED` для заявленного scope | #980/#867/#914: 140/140 Chromium/WebKit, 320/360/390/393/430, Dark/Light, dock, completed edit, RIR, keyboard/safe-area и rest timer |
+| Workout Completion | `DESIGN_ONLY` | #871 HTML/PNG-прототип; production-композиция не менялась и ждёт design approval |
+| Plan | `NOT_VERIFIED` | В текущем пакете нет изменения Plan UI и полного browser-прохода |
+| Program Editor | `PARTIAL` | ProgramBuilder unit tests и общий picker/catalog evidence; мобильный `SearchableExercisePicker` editor-scope отдельно не закрыт |
+| Exercise Catalog / Search | `VERIFIED` для общего каталога | 2/2 Chromium/WebKit compact test и ранее утверждённые fixed-SHA PNG; editor picker остаётся `NOT_VERIFIED` |
+| Nutrition | `PARTIAL` | Hydration, Nutrition Report и выбранные responsive states; остальные meal/editor/error-состояния не объявляются полностью проверенными |
+| Hydration | `VERIFIED` для targeted scope | 34/34 Chromium/WebKit: quick add, TMA dark, 0–103%, H₂O без цели, touch matrix; compact #869 остаётся прототипом |
+| Nutrition Report | `VERIFIED` для targeted scope | #992: 16/16 target-change matrix и 4/4 canonical/no-data report tests; desktop table/print/PDF code paths не менялись |
+| Progress | `PARTIAL` | Report/progress fixtures и responsive hierarchy; полный визуальный проход всех progress states не заявляется |
+| History | `NOT_VERIFIED` | В этом пакете не открывался полный History flow |
+| Profile / Settings | `NOT_VERIFIED` | В этом пакете не открывался полный Profile/Settings flow |
+| Coach OS | `NOT_VERIFIED` | В этом пакете не открывался полный trainer flow |
+| Landing | `NOT_VERIFIED` | Landing не входит в изменённый runtime scope этого пакета |
+| Общие модальные окна / disclosure / navigation | `PARTIAL` | Проверены затронутые details, picker, dock и keyboard paths; exhaustive inventory всех модалок не выполнялся |
+
+### Матрица дизайн-согласованности
+
+| Область | Найдено и исправлено / подтверждено | Статус и граница доказательств |
+| --- | --- | --- |
+| Fonts / Typography | В затронутых экранах сохранены существующие YFC font/tokens и русская UI-копия; случайной глобальной подмены размеров или font-family не добавлено | `VERIFIED` в targeted paths; полный каталог экранов `NOT_VERIFIED` |
+| Iconography / Chevrons | В затронутых paths сохранены существующие `Icon`/disclosure/native-select паттерны; новые Unicode/CSS-icon overrides не добавлялись | `PARTIAL`; exhaustive audit всех экранов и physical WebKit `NOT_VERIFIED` |
+| Spacing | #992 исправляет мобильный gap target-change block через `--v2-space-3`; Active Workout/dock geometry проверена существующими каноническими правилами | `VERIFIED` для #992/#980/#867; остальные разделы `PARTIAL` |
+| Buttons | Primary/secondary/destructive semantics не менялись; completed-set и нижние CTA проверены на touch/keyboard paths | `VERIFIED` для Active Workout; общий каталог `NOT_VERIFIED` |
+| Inputs | `border-box`, min-width, focus/safe-area и viewport containment покрыты #980; report fix не меняет input/data contracts | `VERIFIED` для затронутых paths |
+| Colors | Палитра не менялась; #974 сохраняет approved near-white `H₂O`/percent contrast и dark/light states | `VERIFIED` для hydration/targeted states |
+| Borders / Radius | Использованы существующие card/control rules; массовых overrides и новых token sources нет | `PARTIAL`; полный экранный inventory `NOT_VERIFIED` |
+| Dark / Light | Targeted E2E прошли в обеих темах; compact hydration/completion имеют отдельные Dark/Light prototypes | `VERIFIED` для перечисленного evidence |
+| Mobile / Desktop | Mobile 320/360/390/393/430 и desktop prototype 1280 покрыты в заявленных paths; #992 ограничен mobile media rule | `PARTIAL`; physical device/native Telegram `NOT_VERIFIED` |
+| Accessibility | Semantic roles, DOM order, Tab/Shift+Tab, focus visibility, 44px controls и no-overflow проверены в затронутых flows | `PARTIAL`; VoiceOver, physical iPhone and real Telegram `NOT_VERIFIED` |
 
 ## Реализация и техническая готовность
 
@@ -25,7 +62,7 @@
 | #861 | [#973](https://github.com/MikeMoore1337/your-fitness-coach/pull/973) | [04f2dbd](https://github.com/MikeMoore1337/your-fitness-coach/commit/04f2dbd255be009de1a29cfb599b02ca6e8912f4) — evidence-only поверх кода [b75e6f7](https://github.com/MikeMoore1337/your-fitness-coach/commit/b75e6f7632bb8c3f8cc5b71ddacb44b44aea97fa) | Общий Exercise Catalog: DOM-порядок, Tab/Shift+Tab и desktop/mobile геометрия; PR не меняет editor `SearchableExercisePicker` | Chromium/WebKit, 360/390/430/desktop, keyboard order и overflow зелёные; CI прежнего code SHA подтверждён ранее | Общий каталог готов к visual acceptance; #861 editor scope остаётся открытым |
 | #967 | [#975](https://github.com/MikeMoore1337/your-fitness-coach/pull/975) | [3ada8a324b02250d900c7e66d02c739c2de86f85](https://github.com/MikeMoore1337/your-fitness-coach/commit/3ada8a324b02250d900c7e66d02c739c2de86f85) | Транзакционное редактирование будущих строк активной программы без потери completed/in-progress, фактических подходов, истории и статистики; revision/409, retry и rollback | 14 backend + 3 ProgramBuilder теста; ruff/mypy/pre-commit; required CI [#2180](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38376694342) зелёный | Готово к owner technical acceptance; V12 не расширялся |
 | #869 | [#974](https://github.com/MikeMoore1337/your-fitness-coach/pull/974) | [f0ed33e3151b9b061f21f6c3096b1ca2ac5f80af](https://github.com/MikeMoore1337/your-fitness-coach/commit/f0ed33e3151b9b061f21f6c3096b1ca2ac5f80af) | Только контраст существующего orb: near-white `H₂O`/percent + тонкая тёмная обводка; геометрия, fill, расчёты, API/БД сохранены | 28/28 Playwright; отдельная `H₂O` goal-disabled fixture; 2 stale Linux light goldens обновлены точечно, thresholds не ослаблены; required CI [#2186](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38379396051) зелёный | Owner visual approval контраста получен; компактная композиция #869 всё ещё требует design approval |
-| #970 | [#987](https://github.com/MikeMoore1337/your-fitness-coach/pull/987) | [d4a81b74af362d0006d22aabe580ea16e3e65cac](https://github.com/MikeMoore1337/your-fitness-coach/commit/d4a81b74af362d0006d22aabe580ea16e3e65cac) | Утверждённый вариант B мобильной истории изменений целей, без новых визуальных решений | 16 AFTER Chromium/WebKit × Dark/Light × 320/360/393/430; required CI [#2174](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38367566606) зелёный | Визуально утверждено; отдельная release procedure |
+| #970 / #992 | [#987](https://github.com/MikeMoore1337/your-fitness-coach/pull/987) | [2f4370bb](https://github.com/MikeMoore1337/your-fitness-coach/commit/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b) | Вариант B сохранён; локальный mobile `row-gap: var(--v2-space-3)` добавлен для расстояния заголовок → первая карточка; данные, формулы, desktop table и API не менялись | 16/16 target-change DOM geometry E2E Chromium/WebKit × Dark/Light × 320/360/393/430; 4/4 canonical/no-data report tests; build/typecheck/unit/lint; exact-head CI [38433524366](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38433524366) зелёный | Готово технически; visual acceptance пакета владельца ещё требуется |
 
 ## #980 / PR #988 — открытое редактирование
 
@@ -115,6 +152,49 @@ Prototype interaction check: Chromium/WebKit × Dark/Light passed opening/collap
 | WebKit / Light | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/d4a81b74af362d0006d22aabe580ea16e3e65cac/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-320.png) | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/d4a81b74af362d0006d22aabe580ea16e3e65cac/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-360.png) | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/d4a81b74af362d0006d22aabe580ea16e3e65cac/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-393.png) | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/d4a81b74af362d0006d22aabe580ea16e3e65cac/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-430.png) |
 
 Прямой evidence README: [970-report-mobile-20261013/README.md](https://github.com/MikeMoore1337/your-fitness-coach/blob/d4a81b74af362d0006d22aabe580ea16e3e65cac/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/README.md).
+
+## #992 / #970 — финальный AFTER вертикального ритма
+
+Вариант B сохранён. Единственное runtime-изменение — локальный mobile `row-gap: var(--v2-space-3)` в `.nutrition-report-targets`, чтобы заголовок «Изменения цели в периоде» и первая карточка имели тот же канонический интервал, что и соседние target/insight blocks. Код — [179df35b](https://github.com/MikeMoore1337/your-fitness-coach/commit/179df35b); полный evidence refresh и AFTER — [2f4370bb](https://github.com/MikeMoore1337/your-fitness-coach/commit/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b). Числа, БЖУ, даты, источники, формулы, desktop table, print/PDF и API не менялись.
+
+| Browser / theme | 320 CSS px | 360 CSS px | 393 CSS px | 430 CSS px |
+| --- | --- | --- | --- | --- |
+| Chromium / Dark | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-dark-320.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-dark-360.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-dark-393.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-dark-430.png) |
+| Chromium / Light | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-light-320.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-light-360.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-light-393.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/chromium-light-430.png) |
+| WebKit / Dark | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-dark-320.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-dark-360.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-dark-393.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-dark-430.png) |
+| WebKit / Light | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-320.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-360.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-393.png) | [AFTER](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/after/webkit-light-430.png) |
+
+Каждый кадр выше — synthetic safe data, подпись содержит browser/theme/viewport. Геометрия проверена в DOM: `row-gap >= 12px` и heading-to-first-card не меньше token gap; 16/16 Chromium/WebKit тестов прошли. Прежние approved B кадры на SHA `d4a81b74...` остаются историческим baseline, новые ссылки выше — единственный финальный AFTER для #992.
+
+Прямой README evidence: [970-report-mobile-20261013/README.md](https://github.com/MikeMoore1337/your-fitness-coach/blob/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b/docs/ux/final-issues-acceptance/evidence/970-report-mobile-20261013/README.md).
+
+## Интеграционный контур текущего master
+
+На detached-контуре от `origin/master` `11cff463...` без конфликтов последовательно проверено наложение #987, #988, #976, #975, #973, #974 и текущего #991: CSS и snapshot-пересечения разрешились штатным Git merge, без двойного применения geometry rules. Результат: frontend build, typecheck, lint/UI-copy guard, targeted Vitest и `test_program_versioning.py` (14/14) зелёные; Active Workout 140/140, report #992 16/16 + canonical 4/4, catalog 2/2, hydration/#974 34/34. Это локальный тестовый контур, не release SHA и не разрешение на merge.
+
+## Итоговая таблица текущего пакета
+
+| Issue | PR | SHA | Исправлено | Проверки | CI | Визуальное состояние | Блокировки |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| #992 / #970 | [#987](https://github.com/MikeMoore1337/your-fitness-coach/pull/987) | [2f4370bb](https://github.com/MikeMoore1337/your-fitness-coach/commit/2f4370bb2cabe3738ef5b1899037bf01b1d62f4b) | Mobile vertical rhythm, option B/data preserved | 16/16 geometry; 4/4 report; build/typecheck/unit/lint | [38433524366](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38433524366), green | Technical ready; final visual package | Owner visual acceptance; separate release approval |
+| #980 | [#988](https://github.com/MikeMoore1337/your-fitness-coach/pull/988) | [aa6809a6](https://github.com/MikeMoore1337/your-fitness-coach/commit/aa6809a66461a86e4719d0bf1cb29a4a3786ef62) | Completed-set edit, inputs, summary rows, footer | 140/140 integrated; prior 40 geometry/keyboard + 4/4 flow; mobile regression | [38420616364](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38420616364), green | Ready for visual acceptance | Owner visual acceptance; no merge |
+| #867 | [#976](https://github.com/MikeMoore1337/your-fitness-coach/pull/976) | [68f80d8e](https://github.com/MikeMoore1337/your-fitness-coach/commit/68f80d8e08e35ff76656d5b439a9abc9fd86505f) | Canonical mobile dock/effective viewport | Integrated Active Workout 140/140; TMA dock evidence | [38407900790](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38407900790), green | Previously approved package, awaiting final acceptance | Shared #980 geometry gate |
+| #967 | [#975](https://github.com/MikeMoore1337/your-fitness-coach/pull/975) | [3ada8a32](https://github.com/MikeMoore1337/your-fitness-coach/commit/3ada8a324b02250d900c7e66d02c739c2de86f85) | Future assigned workouts only; history/revisions/conflict/rollback preserved | 14 backend + ProgramBuilder tests; 14/14 integrated | [38376694342](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38376694342), green | Technical ready, no new UI composition | Separate owner technical/release approval |
+| #861 | [#973](https://github.com/MikeMoore1337/your-fitness-coach/pull/973) | [04f2dbd2](https://github.com/MikeMoore1337/your-fitness-coach/commit/04f2dbd255be009de1a29cfb599b02ca6e8912f4) | General catalog search/compact rows | 2/2 integrated Chromium/WebKit; fixed-SHA catalog evidence | [38388474046](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38388474046), green | General catalog visually approved | Editor `SearchableExercisePicker` remains open/NOT_VERIFIED; do not close issue |
+| #869 | [#974](https://github.com/MikeMoore1337/your-fitness-coach/pull/974) | [f0ed33e3](https://github.com/MikeMoore1337/your-fitness-coach/commit/f0ed33e3151b9b061f21f6c3096b1ca2ac5f80af) | Approved hydration orb contrast only | 34/34 integrated targeted; prior 28/28 evidence | [38379396051](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38379396051), green | Contrast approved; compact design is prototype | Design approval before new production composition |
+| #871 | — | [33c65e7c](https://github.com/MikeMoore1337/your-fitness-coach/commit/33c65e7c3f441d8d37099f5496a2818345ec2027) | Final HTML/PNG completion prototype only | Prototype interaction check Chromium/WebKit × Dark/Light | — | Design-only prototype, not implemented | Owner design approval before PR/code |
+| #959 | — | — | Backlog index only; no scope expansion | No implementation in this package | — | NOT_VERIFIED as a separate screen | Keep as backlog, no duplicate issue |
+| #826 | — | — | Not activated; current-set-first not reimplemented | Accessibility of current working set covered by Active Workout tests | — | Out of scope for V12 | Product V12 owner activation required |
+| #991 | [#991](https://github.com/MikeMoore1337/your-fitness-coach/pull/991) | `ba8d837c` (package update follows) | Single final visual package, matrix, prototypes and fixed-SHA links | Draft PR CI was green before this package update | [38421807739](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38421807739), previous head green | Awaiting owner visual/design decision | Draft only; no merge/deploy/Issue close |
+
+### Классификация на остановке конвейера
+
+- Технически готово: #992/#970, #980, #867, #967, #861 general catalog, #974 contrast — exact code heads и применимые CI зелёные.
+- Ранее утверждено: option B #970, общий catalog #861, hydration contrast #974, существующая Active Workout geometry evidence.
+- Ожидает окончательного visual acceptance: единый пакет #991 и реализации #980/#867/#992.
+- Ожидает design approval до реализации: compact hydration #869 и completed workout #871; editor picker #861 только если потребуется существенная новая композиция.
+- Ожидает отдельного release approval: все технически готовые runtime PR; merge/deploy не выполнялись.
+- `NOT_VERIFIED`: physical iPhone/Safari, native Telegram, VoiceOver, полный exhaustive audit незатронутых экранов и production authenticated data.
 
 ## Оставшиеся блокировки и зависимости
 
