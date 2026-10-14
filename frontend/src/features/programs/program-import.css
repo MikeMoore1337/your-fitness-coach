@@ -51,6 +51,10 @@
   gap: 6px 14px;
 }
 
+.program-import-template-links .text-button {
+  min-height: var(--touch-target);
+}
+
 .program-import-preview__head {
   display: flex;
   align-items: flex-start;

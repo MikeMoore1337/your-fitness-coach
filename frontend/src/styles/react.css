@@ -289,23 +289,6 @@
   gap: 12px;
   align-items: start;
 }
-select:not([multiple]) {
-  -webkit-appearance: none;
-  appearance: none;
-  padding-right: 42px;
-  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
-  background-image: var(--select-chevron);
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 20px 20px;
-}
-@media (forced-colors: active) {
-  select:not([multiple]) {
-    appearance: auto;
-    padding-right: 14px;
-    background-image: none;
-  }
-}
 input[type='number'] {
   -moz-appearance: textfield;
   -webkit-appearance: none;
@@ -816,7 +799,7 @@ input[type='number']::-webkit-outer-spin-button {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 40px;
+  min-height: var(--touch-target);
   cursor: pointer;
   list-style: none;
 }
@@ -842,27 +825,6 @@ input[type='number']::-webkit-outer-spin-button {
 .coach-data-disclosure > summary small,
 .card-disclosure > summary small {
   color: var(--muted);
-}
-.disclosure-icon {
-  display: grid;
-  flex: 0 0 28px;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  margin-left: auto;
-  border-radius: 50%;
-  background: var(--bg-soft);
-  color: var(--muted);
-}
-.disclosure-icon .yfc-icon {
-  display: block;
-  width: 14px;
-  height: 14px;
-  transition: transform var(--motion-state) var(--motion-ease);
-}
-
-details[open] > summary .disclosure-icon .yfc-icon {
-  transform: rotate(90deg);
 }
 .profile-disclosure__body,
 .coach-data-disclosure__body,
@@ -918,6 +880,11 @@ details:not([open]) > :not(summary) {
   border-color: var(--accent);
   background: var(--accent);
   color: var(--button-text, #fff);
+}
+.exercise-guide-trigger > span {
+  color: inherit;
+  /* Inherited color must follow the button immediately, without a second transition. */
+  transition: none;
 }
 .toast > span {
   flex: 1;
@@ -3162,6 +3129,7 @@ details:not([open]) > :not(summary) {
 
 .date-control,
 .time-control {
+  position: relative;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -3192,6 +3160,7 @@ details:not([open]) > :not(summary) {
   box-shadow: none;
   text-align: center;
   text-align-last: center;
+  padding-inline-end: 42px;
 }
 .date-control input[type='date']::-webkit-date-and-time-value,
 .time-control input[type='time']::-webkit-date-and-time-value {
@@ -3200,29 +3169,23 @@ details:not([open]) > :not(summary) {
   text-align: center;
 }
 
-/* Native picker interaction is retained; the touch indicator uses shared Icon. */
-.date-control__icon {
-  display: none;
+/* The transparent native indicator retains its picker click target. */
+.date-control__icon,
+.time-control__icon {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 14px;
+  width: 20px;
+  height: 20px;
+  transform: translateY(-50%);
+  color: var(--text);
+  pointer-events: none;
 }
 
-@media (hover: none) and (pointer: coarse) {
-  .date-control {
-    position: relative;
-  }
-  .date-control > .date-control__icon {
-    display: block;
-    position: absolute;
-    inset-block-start: 50%;
-    inset-inline-end: 14px;
-    width: 18px;
-    height: 18px;
-    transform: translateY(-50%);
-    color: var(--text);
-    pointer-events: none;
-  }
-  .date-control input[type='date']::-webkit-calendar-picker-indicator {
-    opacity: 0;
-  }
+.date-control input[type='date']::-webkit-calendar-picker-indicator,
+.time-control input[type='time']::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  cursor: pointer;
 }
 
 @media (max-width: 640px) {
@@ -3514,7 +3477,7 @@ details:not([open]) > :not(summary) {
 }
 .program-danger-menu > button,
 .exercise-catalog-item__danger > button {
-  min-height: 38px;
+  min-height: var(--touch-target);
   margin-top: 8px;
   padding: 7px 10px;
   font-size: 0.76rem;
@@ -3527,6 +3490,15 @@ details:not([open]) > :not(summary) {
   border-radius: var(--radius-control);
   background: var(--surface-subtle);
   color: var(--text);
+}
+.program-builder-rest-actions > .field {
+  flex: 1 1 8rem;
+  min-width: min(100%, 8rem);
+}
+.program-builder-rest-actions > button {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
 }
 .program-builder-basics h3,
 .program-builder-section h3,
@@ -4922,6 +4894,36 @@ button.today-text-link {
 .active-workout-set__done .ui-icon {
   width: 16px;
   height: 16px;
+}
+.active-workout-set__completed-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.active-workout-set__more-actions {
+  min-width: 0;
+}
+.active-workout-set__more-actions > summary {
+  min-height: 44px;
+  padding: 8px 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  list-style: none;
+}
+.active-workout-set__more-actions > summary::-webkit-details-marker {
+  display: none;
+}
+.active-workout-set__more-actions-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+.active-workout-set__more-actions-body .ui-button {
+  min-height: 44px;
 }
 .active-workout-set__previous {
   margin: -3px 0 0 48px;
@@ -6482,9 +6484,21 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 .hydration-orb strong {
   position: relative;
   z-index: 1;
-  color: var(--text);
+  color: #f5f5f5;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 1px 8px var(--surface);
+  -webkit-text-stroke: 0.75px var(--v2-on-lime);
+  paint-order: stroke fill;
+  text-shadow:
+    -0.5px -0.5px 0 var(--v2-on-lime),
+    0.5px -0.5px 0 var(--v2-on-lime),
+    -0.5px 0.5px 0 var(--v2-on-lime),
+    0.5px 0.5px 0 var(--v2-on-lime);
+}
+
+.hydration-orb strong sub {
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: sub;
 }
 
 .hydration-progress {
@@ -6525,6 +6539,9 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-presets .ui-button strong {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-1);
   color: var(--v2-accent-text, var(--accent-strong));
   font-variant-numeric: tabular-nums;
 }
@@ -7387,7 +7404,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-workload__exercise > summary {
   display: flex;
-  min-height: 36px;
+  min-height: var(--touch-target);
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -8930,17 +8947,14 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   font-size: 0.8rem;
   line-height: 1.45;
 }
+.nutrition-quick-add__primary-fields > .ui-field {
+  grid-template-rows: 1fr auto;
+}
 .nutrition-quick-add__primary-fields > .ui-field > :is(.ui-input, .time-control) {
   height: calc(var(--touch-target) + 2px);
-  min-height: var(--touch-target);
-}
-.nutrition-quick-add__primary-fields > .ui-field > .time-control {
-  display: flex;
-  align-items: center;
 }
 .nutrition-quick-add__primary-fields > .ui-field > .time-control input[type='time'] {
   height: 100%;
-  min-height: 0;
 }
 .nutrition-quick-add__primary-fields,
 .nutrition-quick-add__macros {
@@ -9215,7 +9229,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   background: var(--surface-subtle);
 }
 .nutrition-picker__secondary-tools > summary {
-  min-height: 42px;
+  min-height: var(--touch-target);
   padding: 12px;
   cursor: pointer;
   color: var(--muted);
@@ -9235,7 +9249,7 @@ html[data-yfc-keyboard='visible'] .nutrition-picker :is(input, select, textarea)
   background: var(--surface-subtle);
 }
 .nutrition-picker__catalog-filters > summary {
-  min-height: 42px;
+  min-height: var(--touch-target);
   padding: 12px;
   cursor: pointer;
   color: var(--muted);

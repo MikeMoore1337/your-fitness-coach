@@ -20,6 +20,7 @@ import type {
 } from '../../shared/api/types';
 import { WeekStrip, NUTRITION_WEEK_LEGEND } from '../../shared/ui/WeekStrip';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   ErrorState,
@@ -723,12 +724,13 @@ export function MealPlanner({
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="meal-planner__summary">
+      <summary className="meal-planner__summary yfc-disclosure-summary">
         <span>
           <span className="eyebrow">Планирование питания</span>
           <strong>План питания</strong>
         </span>
         <span className="meal-planner__summary-note">День · неделя · шаблоны</span>
+        <DisclosureIcon />
       </summary>
       <div className="meal-planner__body">
         <div className="meal-planner__toolbar">

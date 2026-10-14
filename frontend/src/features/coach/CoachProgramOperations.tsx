@@ -5,6 +5,7 @@ import type { Client, CoachAssignedProgram, ProgramTemplate } from '../../shared
 import { queryKeys } from '../../shared/queryKeys';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import {
+  DisclosureIcon,
   Button,
   Card,
   EmptyState,
@@ -196,7 +197,10 @@ export function CoachProgramOperations({
       description="Импортируйте исходную программу или выберите базовый шаблон. Каждое назначение и последующие правки хранят отдельную историю клиента."
     >
       <details className="coach-program-operations__import">
-        <summary>Импортировать программу с источником</summary>
+        <summary className="yfc-disclosure-summary">
+          Импортировать программу с источником
+          <DisclosureIcon />
+        </summary>
         <ProgramImportPanel
           onImported={() => void queryClient.invalidateQueries({ queryKey: ['templates'] })}
         />

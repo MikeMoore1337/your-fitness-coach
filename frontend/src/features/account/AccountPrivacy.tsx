@@ -177,7 +177,7 @@ export function AccountPrivacy() {
       </section>
 
       <details className="card profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Способы входа</strong>
             <small>

@@ -1,4 +1,7 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { PNG } from './fixtures/landing-pixels';
 import type {
   FoodDiaryEntry,
   HydrationEntry,
@@ -9,6 +12,21 @@ import { installTelegramHarness } from './fixtures/mobile-tma';
 import { expectSelectedChoice } from './fixtures/selected-state';
 
 test.use({ serviceWorkers: 'block' });
+
+const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
+const ISSUE_974_AFTER_DIR = resolve(
+  process.env.CAPTURE_974_AFTER_DIR ??
+    resolve(
+      process.cwd(),
+      '..',
+      'docs',
+      'ux',
+      'final-issues-acceptance',
+      'evidence',
+      '869-contrast-rework-20261013',
+      'after',
+    ),
+);
 
 const zeroNutrition = {
   energy_kcal: '0.00',
@@ -259,6 +277,8 @@ async function mockNutritionApi(
   page: Page,
   hydrationState: 'data' | 'empty' | 'error' | 'loading' = 'data',
   profileSex: 'female' | null = 'female',
+  hydrationPercent?: number,
+  hydrationGoalEnabled = true,
 ) {
   let releaseHydrationLoading = () => {};
   const hydrationLoading = new Promise<void>((resolve) => {
@@ -460,7 +480,11 @@ async function mockNutritionApi(
       if (hydrationState === 'error') {
         return route.fulfill({ status: 503, json: { detail: 'Гидратация временно недоступна' } });
       }
-      const totalMl = hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0);
+      const targetMl = hydrationPercent == null ? 2200 : 1000;
+      const totalMl =
+        hydrationPercent == null
+          ? hydrationEntries.reduce((sum, entry) => sum + entry.volume_ml, 0)
+          : Math.round((targetMl * hydrationPercent) / 100);
       return route.fulfill({
         json: {
           diary_date: url.searchParams.get('diary_date') || '2026-08-19',
@@ -471,8 +495,8 @@ async function mockNutritionApi(
               ? null
               : {
                   id: 1,
-                  enabled: true,
-                  target_ml: 2200,
+                  enabled: hydrationGoalEnabled,
+                  target_ml: hydrationGoalEnabled ? targetMl : null,
                   source: 'national_academies_beverages',
                   method_version: 'nasem-ai-2005-observed-beverages-v1',
                   reference_scope: 'beverages',
@@ -483,8 +507,10 @@ async function mockNutritionApi(
                   created_at: '2026-08-19T08:00:00',
                 },
           progress_percent:
-            hydrationState === 'empty' ? null : Math.round((totalMl * 1000) / 2200) / 10,
-          entries: hydrationEntries,
+            hydrationState === 'empty' || !hydrationGoalEnabled
+              ? null
+              : (hydrationPercent ?? Math.round((totalMl * 1000) / targetMl) / 10),
+          entries: hydrationPercent == null ? hydrationEntries : [],
           presets: [
             { id: null, label: 'Стакан', volume_ml: 250, beverage_type: 'water', is_default: true },
             {
@@ -1388,10 +1414,132 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
   const hydration = page.getByRole('region', { name: 'Гидратация' });
   await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
+  const orbText = hydration.locator('.hydration-orb strong');
+  await expect(orbText).toHaveCSS('color', 'rgb(245, 245, 245)');
+  await expect(orbText).toHaveCSS('-webkit-text-stroke-width', '0.75px');
   await hydration.scrollIntoViewIfNeeded();
   await page.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81/mock-tma-dark-expanded-reduced-motion.png',
   });
+});
+
+test.describe('#974 hydration orb contrast candidate', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    for (const percent of [0, 25, 50, 75, 100, 103]) {
+      test(`${theme} ${percent}% remains readable across the fill boundary`, async ({
+        page,
+      }, info) => {
+        await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        await mockNutritionApi(page, 'data', 'female', percent);
+        await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+
+        const hydration = page.getByRole('region', { name: 'Гидратация' });
+        const orb = hydration.locator('.hydration-orb');
+        const text = orb.locator('strong');
+        const fill = orb.locator(':scope > span');
+        await expect(text).toHaveText(`${percent}%`);
+        await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+        await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+        expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe(
+          `${Math.min(percent, 100)}%`,
+        );
+
+        const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+        const orbBox = boxes[0];
+        const textBox = boxes[1];
+        if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+        expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+        expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+        expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+        expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+        const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+        const brightPixels = screenshot.data.reduce((count, channel, index) => {
+          if (index % 4 !== 0) return count;
+          const green = screenshot.data[index + 1] ?? 0;
+          const blue = screenshot.data[index + 2] ?? 0;
+          return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+        }, 0);
+        expect(brightPixels).toBeGreaterThan(8);
+
+        if (CAPTURE_974_AFTER) {
+          await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+          await orb.screenshot({
+            path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-${percent}.png`),
+            scale: 'device',
+          });
+        }
+      });
+    }
+  }
+});
+
+test.describe('#974 hydration orb H₂O without an enabled goal', () => {
+  test.use({ deviceScaleFactor: 2 });
+
+  for (const theme of ['dark', 'light'] as const) {
+    test(`${theme} H₂O remains readable with a disabled goal`, async ({ page }, info) => {
+      await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockNutritionApi(page, 'data', 'female', undefined, false);
+
+      const hydrationResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return (
+          url.pathname === '/api/v1/nutrition/hydration' && response.request().method() === 'GET'
+        );
+      });
+      await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
+      const hydrationPayload = await (await hydrationResponse).json();
+      expect(hydrationPayload.goal).toMatchObject({ enabled: false, target_ml: null });
+      expect(hydrationPayload.progress_percent).toBeNull();
+
+      const hydration = page.getByRole('region', { name: 'Гидратация' });
+      const orb = hydration.locator('.hydration-orb');
+      const text = orb.locator('strong');
+      const fill = orb.locator(':scope > span');
+      await expect(text).toHaveText('H2O');
+      await expect(text.locator('sub')).toHaveText('2');
+      await expect(text.locator('sub')).toHaveCSS('vertical-align', 'sub');
+      await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
+      await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
+      await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();
+      expect(await fill.evaluate((element) => (element as HTMLElement).style.height)).toBe('0%');
+
+      const boxes = await Promise.all([orb.boundingBox(), text.boundingBox()]);
+      const orbBox = boxes[0];
+      const textBox = boxes[1];
+      if (!orbBox || !textBox) throw new Error('Hydration orb geometry is unavailable');
+      expect(textBox.x).toBeGreaterThanOrEqual(orbBox.x);
+      expect(textBox.x + textBox.width).toBeLessThanOrEqual(orbBox.x + orbBox.width);
+      expect(textBox.y).toBeGreaterThanOrEqual(orbBox.y);
+      expect(textBox.y + textBox.height).toBeLessThanOrEqual(orbBox.y + orbBox.height);
+
+      const screenshot = PNG.sync.read(await orb.screenshot({ scale: 'css' }));
+      const brightPixels = screenshot.data.reduce((count, channel, index) => {
+        if (index % 4 !== 0) return count;
+        const green = screenshot.data[index + 1] ?? 0;
+        const blue = screenshot.data[index + 2] ?? 0;
+        return channel > 220 && green > 220 && blue > 220 ? count + 1 : count;
+      }, 0);
+      expect(brightPixels).toBeGreaterThan(8);
+
+      if (CAPTURE_974_AFTER) {
+        await mkdir(ISSUE_974_AFTER_DIR, { recursive: true });
+        await orb.screenshot({
+          path: resolve(ISSUE_974_AFTER_DIR, `${info.project.name}-${theme}-h2o-disabled.png`),
+          scale: 'device',
+        });
+      }
+    });
+  }
 });
 
 for (const mode of ['light', 'dark'] as const) {
@@ -2275,56 +2423,141 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await expect(page.getByRole('dialog')).not.toBeAttached();
 });
 
-test('Quick Add keeps calorie and time controls inside the viewport', async ({ page }) => {
-  await mockNutritionApi(page);
-
-  for (const theme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
-    await page.addInitScript((selectedTheme) => {
-      localStorage.setItem('app-theme', selectedTheme);
-    }, theme);
-
-    for (const width of [320, 360, 393, 430]) {
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 390, 393, 430]) {
+    test(`Quick Add geometry ${theme} ${width}px`, async ({ page }, testInfo) => {
+      await mockNutritionApi(page);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((selectedTheme) => {
+        localStorage.setItem('app-theme', selectedTheme);
+      }, theme);
       await page.setViewportSize({ width, height: 844 });
       await page.goto('/app?section=nutrition');
       await page.getByRole('button', { name: /Быстрый ввод/ }).click();
-
       const calories = page.getByRole('spinbutton', { name: 'Калории' });
       const time = page.getByLabel('Время (необязательно)');
       await expect(calories).toBeVisible();
       await expect(time).toBeVisible();
-      const geometry = await page.evaluate(() => {
-        const inputGeometry = (selector: string, useControl = false) => {
-          const input = document.querySelector<HTMLInputElement>(selector);
-          const element = useControl ? input?.closest('.time-control') : input;
-          const rect = element?.getBoundingClientRect();
-          return rect
-            ? { left: rect.left, right: rect.right, width: rect.width, height: rect.height }
-            : null;
-        };
-        return {
-          viewport: window.innerWidth,
-          scrollWidth: document.documentElement.scrollWidth,
-          calories: inputGeometry('#nutrition-quick-calories'),
-          time: inputGeometry('#nutrition-quick-time', true),
-        };
-      });
 
-      expect(geometry.scrollWidth).toBeLessThanOrEqual(width + 1);
-      expect(geometry.calories).not.toBeNull();
-      expect(geometry.time).not.toBeNull();
-      expect(geometry.calories!.left).toBeGreaterThanOrEqual(0);
-      expect(geometry.time!.right).toBeLessThanOrEqual(width + 1);
-      expect(geometry.calories!.height).toBeGreaterThanOrEqual(44);
-      expect(geometry.time!.height).toBeGreaterThanOrEqual(44);
-      expect(Math.abs(geometry.calories!.height - geometry.time!.height)).toBeLessThanOrEqual(1);
-      await page.screenshot({
-        path: `../.artifacts/runtime/tests/screenshots/issue-968/${test.info().project.name}-quick-add-${theme}-${width}.png`,
-        animations: 'disabled',
-      });
-    }
+      for (const state of ['empty', 'filled', 'keyboard-safe-area-long-label'] as const) {
+        if (state === 'empty') {
+          await expect(calories).toHaveValue('');
+          await expect(time).toHaveValue('');
+          await calories.focus();
+        } else {
+          await calories.fill('512.5');
+          await time.fill('23:59');
+          await expect(time).toHaveAttribute('type', 'time');
+          if (state === 'keyboard-safe-area-long-label') {
+            await page.evaluate(() => {
+              const root = document.documentElement;
+              root.style.setProperty('--yfc-layout-safe-left', '24px');
+              root.style.setProperty('--yfc-layout-safe-right', '24px');
+              root.style.setProperty('--yfc-layout-safe-bottom', '20px');
+              document.querySelector('label[for="nutrition-quick-time"]')!.textContent =
+                'Время (необязательно) — можно заполнить позднее';
+            });
+            await page.setViewportSize({ width, height: 420 });
+          }
+          await time.focus();
+          await time.scrollIntoViewIfNeeded();
+          await expect(time).toBeFocused();
+          await expect(calories).toHaveValue('512.5');
+          await expect(time).toHaveValue('23:59');
+        }
+        const geometry = await page.evaluate(() => {
+          const measure = (selector: string) => {
+            const node = document.querySelector<HTMLElement>(selector);
+            if (!node) throw new Error(`Quick Add geometry node missing: ${selector}`);
+            const rect = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height,
+              scrollWidth: node.scrollWidth,
+              clientWidth: node.clientWidth,
+              boxShadow: style.boxShadow,
+              outlineStyle: style.outlineStyle,
+            };
+          };
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            colorScheme: document.documentElement.dataset.colorScheme,
+            keyboard: document.documentElement.dataset.yfcKeyboard,
+            safeLeft: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-left')
+              .trim(),
+            safeRight: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-right')
+              .trim(),
+            page: {
+              scrollWidth: document.documentElement.scrollWidth,
+              clientWidth: document.documentElement.clientWidth,
+            },
+            calories: measure('#nutrition-quick-calories'),
+            time: measure('.nutrition-quick-add__primary-fields .time-control'),
+            nativeTime: measure('#nutrition-quick-time'),
+            timeLabel: measure('label[for="nutrition-quick-time"]'),
+            body: measure('.nutrition-quick-add'),
+          };
+        });
+        await page.screenshot({
+          path: testInfo.outputPath(`quick-add-${state}.png`),
+          animations: 'disabled',
+        });
+        const geometryPath = testInfo.outputPath(`geometry-${state}.json`);
+        await writeFile(
+          geometryPath,
+          JSON.stringify(
+            { browser: testInfo.project.name, theme, width, state, ...geometry },
+            null,
+            2,
+          ),
+        );
+        await testInfo.attach(`geometry-${state}.json`, {
+          path: geometryPath,
+          contentType: 'application/json',
+        });
+
+        expect.soft(geometry.page.scrollWidth).toBeLessThanOrEqual(geometry.page.clientWidth + 1);
+        expect.soft(geometry.colorScheme).toBe(theme);
+        expect.soft(geometry.body.scrollWidth).toBeLessThanOrEqual(geometry.body.clientWidth + 1);
+        for (const control of [geometry.calories, geometry.time, geometry.nativeTime]) {
+          expect.soft(control.left).toBeGreaterThanOrEqual(geometry.body.left + 4);
+          expect.soft(control.right).toBeLessThanOrEqual(geometry.body.right - 4);
+          expect.soft(control.scrollWidth).toBeLessThanOrEqual(control.clientWidth + 1);
+          expect.soft(control.height).toBeGreaterThanOrEqual(44);
+        }
+        expect
+          .soft(Math.abs(geometry.calories.height - geometry.time.height))
+          .toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(geometry.calories.width - geometry.time.width)).toBeLessThanOrEqual(1);
+        if (width > 380) {
+          expect
+            .soft(Math.abs(geometry.calories.bottom - geometry.time.bottom))
+            .toBeLessThanOrEqual(1);
+        }
+        expect.soft(geometry.timeLabel.right).toBeLessThanOrEqual(geometry.body.right - 4);
+        if (state !== 'empty') {
+          expect.soft(geometry.time.boxShadow).not.toBe('none');
+          expect.soft(geometry.time.top).toBeGreaterThanOrEqual(geometry.body.top + 4);
+          expect.soft(geometry.time.bottom).toBeLessThanOrEqual(geometry.body.bottom - 4);
+          if (state === 'keyboard-safe-area-long-label') {
+            expect.soft(geometry.keyboard).toBe('visible');
+            expect.soft(geometry.safeLeft).toBe('24px');
+            expect.soft(geometry.safeRight).toBe('24px');
+          }
+        } else {
+          expect.soft(geometry.calories.outlineStyle).not.toBe('none');
+        }
+      }
+    });
   }
-});
+}
 
 test('dark nutrition uses the shared lime status and progress accents', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));

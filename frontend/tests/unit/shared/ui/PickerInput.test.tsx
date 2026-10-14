@@ -19,6 +19,8 @@ describe('DateInput', () => {
     expect(input).toHaveAttribute('min', '2026-01-01');
     expect(input).toHaveValue('2026-08-11');
     expect(input.parentElement).toHaveClass('date-control', 'custom-date-control');
+    expect(input.parentElement?.querySelector('svg')).toHaveAttribute('data-icon', 'calendar');
+    expect(input.parentElement?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 });
 
@@ -39,5 +41,7 @@ describe('TimeInput', () => {
     expect(input).toHaveAttribute('step', '3600');
     expect(input).toHaveValue('09:00');
     expect(input.parentElement).toHaveClass('time-control', 'custom-time-control');
+    expect(input.parentElement?.querySelector('svg')).toHaveAttribute('data-icon', 'clock');
+    expect(input.parentElement?.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 });

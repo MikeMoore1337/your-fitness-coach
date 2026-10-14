@@ -1,3 +1,4 @@
+import { DisclosureIcon } from '../../shared/ui/common';
 import { useEffect, useState } from 'react';
 import type { NutritionTarget } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
@@ -73,7 +74,10 @@ export function NutritionPage({
         open={settingsOpen}
         onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
       >
-        <summary>Настройки питания</summary>
+        <summary className="yfc-disclosure-summary">
+          Настройки питания
+          <DisclosureIcon />
+        </summary>
         <div className="nutrition-target-settings__body">
           <NutritionForm
             initial={initial}

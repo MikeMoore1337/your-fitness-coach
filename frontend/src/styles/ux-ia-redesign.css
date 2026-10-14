@@ -1725,11 +1725,28 @@
   border-radius: 50%;
   background: var(--v2-surface-secondary);
   color: var(--v2-text-secondary);
-}
-.exercise-picker-sheet > input {
   flex-shrink: 0;
+}
+.exercise-picker-sheet__search {
+  position: relative;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.exercise-picker-sheet__search > input {
+  width: 100%;
   min-height: 48px;
+  padding-inline-end: calc(var(--touch-target) + var(--v2-space-2));
   font-size: 16px;
+}
+.exercise-picker-sheet__search > input::-webkit-search-cancel-button {
+  display: none;
+}
+.exercise-picker-sheet__clear {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: var(--touch-target);
+  height: var(--touch-target);
 }
 .exercise-picker-sheet .exercise-picker__results {
   position: static;
@@ -1896,28 +1913,6 @@
   align-items: center;
   padding: 8px 4px;
   cursor: pointer;
-}
-:is(
-    .workout-schedule-all,
-    .progress-measurement-editor,
-    .progress-overview__review,
-    .program-lifecycle__reason,
-    .program-current-block__actions
-  )
-  > summary::after {
-  content: '+';
-  margin-left: auto;
-  padding-left: 12px;
-}
-:is(
-    .workout-schedule-all,
-    .progress-measurement-editor,
-    .progress-overview__review,
-    .program-lifecycle__reason,
-    .program-current-block__actions
-  )[open]
-  > summary::after {
-  content: '−';
 }
 @media (max-width: 680px) {
   .app-section--programs .program-history {

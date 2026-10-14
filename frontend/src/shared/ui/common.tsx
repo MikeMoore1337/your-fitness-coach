@@ -295,6 +295,7 @@ export function ExpandableCard({
       open={disclosureOpen}
     >
       <summary
+        className="yfc-disclosure-summary"
         aria-controls={bodyId}
         aria-expanded={disclosureOpen}
         onClick={(event) => {
