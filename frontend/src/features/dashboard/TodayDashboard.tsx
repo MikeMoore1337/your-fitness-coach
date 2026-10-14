@@ -1016,6 +1016,16 @@ export function TodayDashboard({
     const nextSearch = params.toString();
     navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
   };
+  const exitQuickWellbeing = () => {
+    navigate('/app?section=today', true);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]')?.focus({
+          preventScroll: true,
+        });
+      });
+    });
+  };
   const calendarContextRef = useRef(`${timeZone}:${today}`);
   const heading =
     selectedDate === today
@@ -1466,6 +1476,7 @@ export function TodayDashboard({
                   key={`${user.id}:${initialWellbeingDate || selectedDate}:${
                     initialWellbeingOpen ? 'open' : 'closed'
                   }`}
+                  onExit={initialWellbeingOpen ? exitQuickWellbeing : undefined}
                   timeZone={timeZone}
                   userId={user.id}
                 />
