@@ -7298,6 +7298,13 @@ button.notification-row__main:focus-visible {
   }
 }
 
+@media screen and (max-width: 899px) {
+  .nutrition-report-targets ol {
+    row-gap: var(--v2-space-3);
+    border-top: 0;
+  }
+}
+
 /* Programs and deterministic selection wizard. */
 .app-section--programs .program-selector-entry {
   overflow: hidden;

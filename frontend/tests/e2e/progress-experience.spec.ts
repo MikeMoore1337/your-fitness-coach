@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
@@ -1385,16 +1385,29 @@ for (const width of [320, 360, 390, 393, 430]) {
       const geometry = await targetChanges.evaluate((element) => {
         const viewport = document.documentElement.clientWidth;
         const heading = element.querySelector<HTMLElement>('h3');
+        const list = element.querySelector<HTMLElement>('ol');
         const firstCard = element.querySelector<HTMLElement>('ol > li');
-        if (!heading || !firstCard) throw new Error('Target changes geometry is incomplete');
+        const secondCard = element.querySelector<HTMLElement>('ol > li:nth-child(2)');
+        if (!heading || !list || !firstCard || !secondCard)
+          throw new Error('Target changes geometry is incomplete');
         const headingBox = heading.getBoundingClientRect();
         const firstCardBox = firstCard.getBoundingClientRect();
+        const secondCardBox = secondCard.getBoundingClientRect();
         const rowGap = Number.parseFloat(getComputedStyle(element).rowGap);
+        const listStyle = getComputedStyle(list);
         return {
           viewport,
           documentWidth: document.documentElement.scrollWidth,
           rowGap,
           headingToFirstCard: firstCardBox.top - headingBox.bottom,
+          cardRowGap: Number.parseFloat(listStyle.rowGap),
+          firstToSecondCard: secondCardBox.top - firstCardBox.bottom,
+          listBorderWidths: [
+            listStyle.borderTopWidth,
+            listStyle.borderRightWidth,
+            listStyle.borderBottomWidth,
+            listStyle.borderLeftWidth,
+          ],
           cards: [...element.querySelectorAll<HTMLElement>('ol > li')].map((cardElement) => {
             const box = cardElement.getBoundingClientRect();
             const descendants = [...cardElement.querySelectorAll<HTMLElement>('*')].map((child) => {
@@ -1413,6 +1426,10 @@ for (const width of [320, 360, 390, 393, 430]) {
       expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
       expect(geometry.rowGap).toBeGreaterThanOrEqual(12);
       expect(geometry.headingToFirstCard).toBeGreaterThanOrEqual(geometry.rowGap - 0.5);
+      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(12);
+      expect(geometry.cardRowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.firstToSecondCard).toBeCloseTo(geometry.cardRowGap, 1);
+      expect(geometry.listBorderWidths).toEqual(['0px', '0px', '0px', '0px']);
       for (const card of geometry.cards) {
         expect(card.width).toBeGreaterThan(0);
         expect(card.left).toBeGreaterThanOrEqual(-1);
@@ -1428,6 +1445,26 @@ for (const width of [320, 360, 390, 393, 430]) {
         await targetChanges.screenshot({
           path: resolve(ISSUE_970_AFTER_DIR, `${testInfo.project.name}-${theme}-${width}.png`),
         });
+        await writeFile(
+          resolve(ISSUE_970_AFTER_DIR, `${testInfo.project.name}-${theme}-${width}-geometry.json`),
+          JSON.stringify(
+            { browser: testInfo.project.name, theme, width, height: 932, geometry },
+            null,
+            2,
+          ) + '\n',
+        );
+      }
+
+      if (width === 390) {
+        const list = targetChanges.locator('ol');
+        await page.emulateMedia({ media: 'print' });
+        await expect(list).toHaveCSS('row-gap', 'normal');
+        await expect(list).toHaveCSS('border-top-width', '1px');
+        await page.emulateMedia({ media: 'screen' });
+        await page.setViewportSize({ width: 1280, height: 932 });
+        await expect(list).toHaveCSS('row-gap', 'normal');
+        await expect(list).toHaveCSS('border-top-width', '1px');
+        await expect(report.locator('.nutrition-report-days table')).toHaveCSS('display', 'table');
       }
     });
   }
