@@ -1396,7 +1396,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await tmaPage.goto('/app?section=progress');
   await tmaPage
     .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('tab', { name: /^Тренировки/ })
+    .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
