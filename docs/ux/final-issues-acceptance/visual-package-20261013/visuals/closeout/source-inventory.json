@@ -1,0 +1,766 @@
+{
+  "source": "Final integrated source; immutable commit is bound by the final package README",
+  "baseline": {
+    "summaryDeclarationSites": 81,
+    "withApprovedChevron": 32,
+    "withoutApprovedChevron": 49
+  },
+  "fixed": {
+    "summaries": 49,
+    "removedCssSymbolRules": 10,
+    "emoji": 2,
+    "publicNavigationArrows": 2,
+    "addActionSymbols": 2,
+    "otherDisclosureTriggers": 6,
+    "nativePickerCallers": 14,
+    "nativePickerCallerFiles": 10,
+    "publicSelectDeclarationSites": 8,
+    "summaryTargetDeclarations": 5,
+    "summaryTargetConfirmedBrowserFindings": 6
+  },
+  "scanned": {
+    "tsxFiles": 159,
+    "cssFiles": 25,
+    "directIconDeclarations": 202,
+    "disclosureIconDeclarations": 82,
+    "summaryDeclarationSites": 81,
+    "summaryWithChevron": 81,
+    "summaryWithSharedMarkerClass": 81,
+    "dateInputDeclarations": 24,
+    "timeInputDeclarations": 11,
+    "rawNativePickerDeclarations": 2,
+    "nativeSearchDeclarations": 11,
+    "cssSvgResources": 2
+  },
+  "summaries": [
+    {
+      "path": "frontend/src/features/account/AccountPrivacy.tsx",
+      "line": 180,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/account/NotificationsPanel.tsx",
+      "line": 674,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/account/NotificationsPanel.tsx",
+      "line": 720,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/account/NotificationsPanel.tsx",
+      "line": 830,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/ai/AiCoachExperience.tsx",
+      "line": 445,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/ai/AiCoachExperience.tsx",
+      "line": 630,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/ai/AiCoachExperience.tsx",
+      "line": 686,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/ai/AiCoachExperience.tsx",
+      "line": 925,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/ai/AiCoachExperience.tsx",
+      "line": 1981,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/cardio/CardioLogging.tsx",
+      "line": 335,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/cardio/CardioLogging.tsx",
+      "line": 536,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/coach/ClientAnalytics.tsx",
+      "line": 301,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/coach/CoachProgramBulkOperations.tsx",
+      "line": 610,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/coach/CoachProgramBulkOperations.tsx",
+      "line": 725,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/coach/CoachProgramBulkOperations.tsx",
+      "line": 913,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/coach/CoachProgramOperations.tsx",
+      "line": 200,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/exercises/ExerciseCatalog.tsx",
+      "line": 381,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/exercises/ExerciseCatalog.tsx",
+      "line": 527,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/exercises/ExerciseCatalog.tsx",
+      "line": 854,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/exercises/ExerciseProgressPanel.tsx",
+      "line": 66,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/FoodPickerDialog.tsx",
+      "line": 1387,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/FoodPickerDialog.tsx",
+      "line": 1446,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/GroceryList.tsx",
+      "line": 305,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/MealPlanner.tsx",
+      "line": 727,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/NaturalFoodInput.tsx",
+      "line": 674,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/NutritionForm.tsx",
+      "line": 575,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/NutritionLabelReview.tsx",
+      "line": 563,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/NutritionPage.tsx",
+      "line": 77,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/nutrition/NutritionTargetHistory.tsx",
+      "line": 108,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/profile/ProfileForm.tsx",
+      "line": 533,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/profile/TrainingPreferencesForm.tsx",
+      "line": 159,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/profile/TrainingPreferencesForm.tsx",
+      "line": 256,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/profile/TrainingPreferencesForm.tsx",
+      "line": 337,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/AssignedProgramDetails.tsx",
+      "line": 690,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/AssignedProgramDetails.tsx",
+      "line": 789,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/AssignedProgramDetails.tsx",
+      "line": 958,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/AssignedProgramDetails.tsx",
+      "line": 1021,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/AssignedProgramDetails.tsx",
+      "line": 1095,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/ProgramBuilder.tsx",
+      "line": 724,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/ProgramBuilder.tsx",
+      "line": 840,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/ProgramImportPanel.tsx",
+      "line": 581,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/TemplatesList.tsx",
+      "line": 343,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/TemplatesList.tsx",
+      "line": 472,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/programs/TemplatesList.tsx",
+      "line": 600,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/wellbeing/DailyWellbeingCheckIn.tsx",
+      "line": 454,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/MuscleWorkload.tsx",
+      "line": 54,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/MuscleWorkload.tsx",
+      "line": 86,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/NutritionReport.tsx",
+      "line": 415,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/NutritionReport.tsx",
+      "line": 794,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 638,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 740,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 834,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 981,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 1066,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 1157,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressExperience.tsx",
+      "line": 1185,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressionGuidance.tsx",
+      "line": 217,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/ProgressSchedule.tsx",
+      "line": 149,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 247,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 690,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 870,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 1231,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 1400,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/WeeklyCheckInCard.tsx",
+      "line": 881,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/WorkoutCompletionSummary.tsx",
+      "line": 205,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/features/workouts/WorkoutFeedback.tsx",
+      "line": 431,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/coach/CoachPage.tsx",
+      "line": 173,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/coach/CoachPage.tsx",
+      "line": 786,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/coach/CoachPage.tsx",
+      "line": 1629,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingPage.tsx",
+      "line": 535,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingPage.tsx",
+      "line": 545,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingPage.tsx",
+      "line": 569,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingV10Faq.tsx",
+      "line": 51,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingV10Scenes.tsx",
+      "line": 247,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/public/PublicNutritionCalculator.tsx",
+      "line": 313,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/reports/ProgressReportPage.tsx",
+      "line": 289,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/pages/reports/ProgressReportPage.tsx",
+      "line": 1071,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/shared/ui/common.tsx",
+      "line": 297,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/shared/ui/ContextualHelp.tsx",
+      "line": 17,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/shared/ui/DataConfidence.tsx",
+      "line": 187,
+      "approved": true,
+      "sharedMarker": true
+    },
+    {
+      "path": "frontend/src/shared/ui/WeekStrip.tsx",
+      "line": 322,
+      "approved": true,
+      "sharedMarker": true
+    }
+  ],
+  "ariaExpandedTriggers": [
+    {
+      "path": "frontend/src/app/AppShell.tsx",
+      "line": 429,
+      "tag": "button",
+      "content": "<button id=\"appProfileButton\" type=\"button\" className={`app-mobile-header__profile${moreOpen || secondaryActive ? ' is-active' : ''}`} aria-expanded={moreOpen} aria-controls=\"appMorePanel\" aria-label=\"Открыть профиль и настройки\" onClick={("
+    },
+    {
+      "path": "frontend/src/app/AppShell.tsx",
+      "line": 560,
+      "tag": "button",
+      "content": "<button id=\"appMoreButton\" type=\"button\" className={`app-bottom-nav__btn app-bottom-nav__more${moreOpen ? ' is-active' : ''}`} aria-expanded={moreOpen} aria-controls=\"appMorePanel\" onClick={(event) => (moreOpen ? closeMore() : openMore(even"
+    },
+    {
+      "path": "frontend/src/features/coach/ClientAnalytics.tsx",
+      "line": 236,
+      "tag": "Button",
+      "content": "<Button aria-expanded={false} variant=\"secondary\" onClick={() => setShowTrainingWorkload(true)} > Показать данные <Icon name=\"chevron-down\" size={16} /> </Button>"
+    },
+    {
+      "path": "frontend/src/features/coach/CoachCheckInTemplates.tsx",
+      "line": 359,
+      "tag": "Button",
+      "content": "<Button aria-expanded={historyTemplate === template.id} aria-controls={`coach-check-in-history-${template.id}`} onClick={() => setHistoryTemplate(historyTemplate === template.id ? null : template.id) } type=\"button\" variant=\"ghost\" > {histo"
+    },
+    {
+      "path": "frontend/src/features/nutrition/HydrationTracker.tsx",
+      "line": 442,
+      "tag": "Button",
+      "content": "<Button aria-expanded={expanded} className=\"hydration-expand\" variant=\"secondary\" type=\"button\" onClick={() => setExpanded((value) => !value)} > {expanded ? 'Скрыть детали' : 'Другой напиток, история и цель'} <Icon name={expanded ? 'chevron"
+    },
+    {
+      "path": "frontend/src/features/nutrition/MealTemplateBrowser.tsx",
+      "line": 663,
+      "tag": "button",
+      "content": "<button type=\"button\" className=\"nutrition-template-card__toggle\" aria-expanded={open} onClick={() => setSelectedTemplateId(open ? null : template.id)} > <span> <strong>{template.name}</strong> <small> {template.items.length} элементов · {n"
+    },
+    {
+      "path": "frontend/src/features/nutrition/NutritionDiary.tsx",
+      "line": 459,
+      "tag": "button",
+      "content": "<button aria-controls={contentId} aria-expanded={expanded} className=\"nutrition-meal__toggle\" onClick={() => onExpandedChange(!expanded)} type=\"button\" > <span>{mealLabels[meal.meal_type as MealType]}</span> <Icon name={expanded ? 'chevron-"
+    },
+    {
+      "path": "frontend/src/features/programs/SearchableExercisePicker.tsx",
+      "line": 198,
+      "tag": "input",
+      "content": "<input ref={inputRef} type=\"search\" role={compact ? 'searchbox' : 'combobox'} aria-label={ariaLabel} aria-autocomplete={compact ? undefined : 'list'} aria-expanded={compact ? undefined : open} aria-haspopup={compact ? undefined : 'listbox'}"
+    },
+    {
+      "path": "frontend/src/features/workouts/TodayWorkout.tsx",
+      "line": 2175,
+      "tag": "button",
+      "content": "<button type=\"button\" className=\"secondary active-workout-exercise__toggle\" aria-expanded={exerciseOpen} aria-controls={`workout-exercise-${exercise.id}-details`} onClick={() => setExpandedExercises((current) => { const next = new Set(curre"
+    },
+    {
+      "path": "frontend/src/pages/demo/DemoCabinet.tsx",
+      "line": 212,
+      "tag": "Button",
+      "content": "<Button aria-expanded={false} onClick={onShow} variant=\"secondary\"> Показать маршрут <Icon name=\"chevron-down\" size={16} /> </Button>"
+    },
+    {
+      "path": "frontend/src/pages/demo/DemoCabinet.tsx",
+      "line": 226,
+      "tag": "Button",
+      "content": "<Button aria-controls=\"demoRouteSteps\" aria-expanded={true} onClick={onHide} variant=\"secondary\" > Скрыть маршрут <Icon name=\"chevron-up\" size={16} /> </Button>"
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingPage.tsx",
+      "line": 247,
+      "tag": "button",
+      "content": "<button ref={menuButtonRef} type=\"button\" className={`landing-menu-toggle${mobileMenuOpen ? ' is-open' : ''}`} aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={mobileMenuOpen} aria-controls=\"landing-navigation\" o"
+    },
+    {
+      "path": "frontend/src/pages/landing/LandingV10Shell.tsx",
+      "line": 161,
+      "tag": "button",
+      "content": "<button ref={menuButtonRef} type=\"button\" className={`landing-menu-toggle${mobileMenuOpen ? ' is-open' : ''}`} aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={mobileMenuOpen} aria-controls=\"landing-navigation\" o"
+    },
+    {
+      "path": "frontend/src/pages/public/PublicContentPage.tsx",
+      "line": 98,
+      "tag": "button",
+      "content": "<button type=\"button\" className={`landing-menu-toggle${menuOpen ? ' is-open' : ''}`} aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'} aria-expanded={menuOpen} aria-controls=\"public-navigation\" onClick={() => setMenuOpen((open) => !op"
+    },
+    {
+      "path": "frontend/src/shared/ui/common.tsx",
+      "line": 297,
+      "tag": "summary",
+      "content": "<summary className=\"yfc-disclosure-summary\" aria-controls={bodyId} aria-expanded={disclosureOpen} onClick={(event) => { event.preventDefault(); setDisclosureOpen((current) => !current); }} > <span> {title && <h2>{title}</h2>} {summary && <s"
+    }
+  ],
+  "rawSvgDeclarations": [
+    {
+      "path": "frontend/src/features/auth/OAuthButtons.tsx",
+      "line": 32
+    },
+    {
+      "path": "frontend/src/features/auth/OAuthButtons.tsx",
+      "line": 38
+    },
+    {
+      "path": "frontend/src/features/auth/OAuthButtons.tsx",
+      "line": 43
+    },
+    {
+      "path": "frontend/src/shared/ui/DataViz.tsx",
+      "line": 293
+    },
+    {
+      "path": "frontend/src/shared/ui/Icon.tsx",
+      "line": 17
+    }
+  ],
+  "cssSvgResources": [
+    {
+      "path": "frontend/src/styles/design-system.css",
+      "resource": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E"
+    },
+    {
+      "path": "frontend/src/styles/design-system.css",
+      "resource": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3Cpath d='m6 6 12 12' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E"
+    }
+  ],
+  "nativePickerDeclarations": [
+    {
+      "path": "frontend/src/shared/ui/PickerInput.tsx",
+      "line": 11
+    },
+    {
+      "path": "frontend/src/shared/ui/PickerInput.tsx",
+      "line": 20
+    }
+  ],
+  "exceptions": [
+    "OAuthButtons contains three existing external-brand SVG logos (Telegram, VK, Apple).",
+    "DataViz uses SVG for actual data visualization, outside semantic icon restrictions.",
+    "Icon is the sole semantic SVG renderer; iconGlyphs is its licensed/original geometry registry.",
+    "Forced-colors uses native select/search affordances to preserve platform high-contrast behavior.",
+    "Desktop/touch viewport automation does not prove physical Telegram devices, Safari/Firefox picker popups or assistive technology.",
+    "Approved navigation menus retain menu/close or nav-more icons and their existing aria-expanded states; dock geometry is preserved."
+  ],
+  "changedFiles": [
+    "frontend/src/features/account/AccountPrivacy.tsx",
+    "frontend/src/features/account/NotificationsPanel.tsx",
+    "frontend/src/features/ai/AiCoachExperience.tsx",
+    "frontend/src/features/ai/ai-coach.css",
+    "frontend/src/features/cardio/CardioLogging.tsx",
+    "frontend/src/features/coach/ClientAnalytics.tsx",
+    "frontend/src/features/coach/CoachCheckInTemplates.tsx",
+    "frontend/src/features/coach/CoachOperationsPanel.tsx",
+    "frontend/src/features/coach/CoachProgramBulkOperations.tsx",
+    "frontend/src/features/coach/CoachProgramOperations.tsx",
+    "frontend/src/features/exercises/ExerciseCatalog.tsx",
+    "frontend/src/features/exercises/ExerciseProgressPanel.tsx",
+    "frontend/src/features/nutrition/CopyDiaryDialog.tsx",
+    "frontend/src/features/nutrition/FoodPickerDialog.tsx",
+    "frontend/src/features/nutrition/GroceryList.tsx",
+    "frontend/src/features/nutrition/HydrationTracker.tsx",
+    "frontend/src/features/nutrition/ManualNutritionTargetForm.tsx",
+    "frontend/src/features/nutrition/MealPlanner.tsx",
+    "frontend/src/features/nutrition/NaturalFoodInput.tsx",
+    "frontend/src/features/nutrition/NutritionForm.tsx",
+    "frontend/src/features/nutrition/NutritionLabelReview.tsx",
+    "frontend/src/features/nutrition/NutritionPage.tsx",
+    "frontend/src/features/nutrition/NutritionTargetHistory.tsx",
+    "frontend/src/features/profile/ProfileForm.tsx",
+    "frontend/src/features/profile/TrainingPreferencesForm.tsx",
+    "frontend/src/features/programs/AssignedProgramDetails.tsx",
+    "frontend/src/features/programs/ProgramBuilder.tsx",
+    "frontend/src/features/programs/ProgramImportPanel.tsx",
+    "frontend/src/features/programs/TemplatesList.tsx",
+    "frontend/src/features/programs/program-import.css",
+    "frontend/src/features/wellbeing/DailyWellbeingCheckIn.tsx",
+    "frontend/src/features/workouts/MuscleWorkload.tsx",
+    "frontend/src/features/workouts/NutritionReport.tsx",
+    "frontend/src/features/workouts/ProgressExperience.tsx",
+    "frontend/src/features/workouts/ProgressSchedule.tsx",
+    "frontend/src/features/workouts/ProgressionGuidance.tsx",
+    "frontend/src/features/workouts/TodayWorkout.tsx",
+    "frontend/src/features/workouts/WeeklyCheckInCard.tsx",
+    "frontend/src/features/workouts/WorkoutCompletionSummary.tsx",
+    "frontend/src/features/workouts/WorkoutFeedback.tsx",
+    "frontend/src/pages/coach/CoachPage.tsx",
+    "frontend/src/pages/demo/DemoCabinet.tsx",
+    "frontend/src/pages/landing/LandingPage.tsx",
+    "frontend/src/pages/landing/LandingV10Faq.tsx",
+    "frontend/src/pages/landing/LandingV10Scenes.tsx",
+    "frontend/src/pages/public/ArticlesPage.tsx",
+    "frontend/src/pages/public/PublicContentPage.tsx",
+    "frontend/src/pages/public/PublicNutritionCalculator.tsx",
+    "frontend/src/pages/public/public-content.css",
+    "frontend/src/pages/reports/ProgressReportPage.tsx",
+    "frontend/src/shared/ui/ContextualHelp.tsx",
+    "frontend/src/shared/ui/DataConfidence.tsx",
+    "frontend/src/shared/ui/PickerInput.tsx",
+    "frontend/src/shared/ui/WeekStrip.tsx",
+    "frontend/src/shared/ui/common.tsx",
+    "frontend/src/shared/ui/iconGlyphs.tsx",
+    "frontend/src/styles/design-system.css",
+    "frontend/src/styles/design-v2.css",
+    "frontend/src/styles/react.css",
+    "frontend/src/styles/ux-ia-redesign.css",
+    "frontend/tests/e2e/project-icons.spec.ts",
+    "frontend/tests/unit/shared/ui/Icon.test.tsx",
+    "frontend/tests/unit/shared/ui/PickerInput.test.tsx",
+    "frontend/tests/unit/shared/ui/iconSystemSource.test.ts"
+  ],
+  "verification": {
+    "targetedUnits": {
+      "files": 8,
+      "tests": 63,
+      "status": "PASS"
+    },
+    "afterSummaryTargetPatch": {
+      "files": 3,
+      "tests": 13,
+      "status": "PASS"
+    },
+    "nativeResourceE2E": {
+      "tests": 8,
+      "projects": [
+        "chromium",
+        "webkit"
+      ],
+      "widths": [
+        390,
+        1440
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "status": "PASS",
+      "source": "Fresh local preview 4187 before the final summary min-height-only patch",
+      "report": "native-inputs-results-final.json"
+    },
+    "sourceEslint": "PASS",
+    "russianUiCopy": "PASS",
+    "formatting": "PASS",
+    "diffWhitespace": "PASS",
+    "initialNativeE2EFailure": "All 8 failed because default platform fixture omitted catalog endpoint; rerun used existing programHistory many fixture and all 8 passed."
+  }
+}

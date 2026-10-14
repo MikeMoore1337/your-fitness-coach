@@ -18,6 +18,7 @@ export function TimeInput({ controlClassName = '', ...props }: PickerInputProps)
   return (
     <div className={`time-control ${controlClassName}`.trim()}>
       <input {...props} type="time" />
+      <Icon className="time-control__icon" name="clock" size={20} />
     </div>
   );
 }

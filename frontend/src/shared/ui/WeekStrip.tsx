@@ -319,7 +319,7 @@ export function WeekStrip(props: WeekStripProps) {
 
       {props.legend && props.legend.length > 0 && (
         <details className="week-strip__legend-disclosure">
-          <summary className="week-strip__legend-summary">
+          <summary className="week-strip__legend-summary yfc-disclosure-summary">
             <span className="week-strip__legend-summary-label">
               <Icon aria-hidden="true" className="week-strip__legend-info" name="info" size={20} />
               <span>Обозначения</span>

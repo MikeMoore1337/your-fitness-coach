@@ -38,7 +38,11 @@ function unlockDocumentScroll() {
   document.body.style.left = originalBodyStyles.left ?? '';
   document.body.style.width = originalBodyStyles.width ?? '';
   if (originalScrollPosition.x !== 0 || originalScrollPosition.y !== 0) {
-    window.scrollTo(originalScrollPosition.x, originalScrollPosition.y);
+    window.scrollTo({
+      left: originalScrollPosition.x,
+      top: originalScrollPosition.y,
+      behavior: 'instant',
+    });
   }
 }
 
@@ -119,7 +123,7 @@ export function useModalA11y<T extends HTMLElement>(
       document.removeEventListener('keydown', onKeyDown);
       const index = modalStack.indexOf(panelRef);
       if (index >= 0) modalStack.splice(index, 1);
-      previousFocus?.focus();
+      previousFocus?.focus({ preventScroll: true });
     };
   }, [initialFocusSelector, open]);
 

@@ -1136,10 +1136,10 @@
 .public-calculator__fields select {
   width: 100%;
   min-height: 52px;
-  padding: 12px 14px;
+  padding: 12px 42px 12px 14px;
   border: 1px solid var(--landing-card-border);
   border-radius: var(--radius-control);
-  background: var(--landing-paper);
+  background-color: var(--landing-paper);
   color: var(--landing-ink);
   font: inherit;
   font-size: 1rem;
@@ -1195,16 +1195,10 @@
   display: none;
 }
 
-.public-calculator__details summary::after {
-  content: '+';
-  float: right;
-  color: var(--landing-kicker);
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.public-calculator__details[open] summary::after {
-  content: '−';
+.public-card-action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--v2-space-1);
 }
 
 .public-calculator__details > p {

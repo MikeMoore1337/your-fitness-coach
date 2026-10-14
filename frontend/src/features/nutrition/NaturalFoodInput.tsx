@@ -18,7 +18,7 @@ import {
   type NutritionPowerOutcome,
   type OnboardingLatencyBucket,
 } from '../../shared/analytics/productEvents';
-import { Button, Field, Input, LoadingState, Select } from '../../shared/ui/common';
+import { DisclosureIcon, Button, Field, Input, LoadingState, Select } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { FoodEditor } from './FoodEditor';
 
@@ -671,7 +671,10 @@ export function NaturalFoodInput({
       )}
       {!demoSafeMode && (
         <details className="nutrition-natural-aliases">
-          <summary>Мои названия продуктов</summary>
+          <summary className="yfc-disclosure-summary">
+            Мои названия продуктов
+            <DisclosureIcon />
+          </summary>
           {aliases.isLoading && <LoadingState label="Загружаем ваши названия…" />}
           {aliases.error && (
             <p className="nutrition-form-error" role="alert">

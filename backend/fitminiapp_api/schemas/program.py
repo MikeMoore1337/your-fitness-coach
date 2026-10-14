@@ -499,6 +499,7 @@ class ProgramTemplateCreate(BaseModel):
     target_telegram_user_id: int | None = Field(default=None, ge=1)
     target_full_name: str | None = Field(default=None, max_length=128)
     days: list[ProgramTemplateDayCreate] = Field(min_length=1, max_length=8)
+    expected_revision_number: int | None = Field(default=None, ge=0)
     assign_after_create: bool = True
     start_date: date | None = None
     duration_weeks: int = Field(default=1, ge=1, le=24)
@@ -577,7 +578,11 @@ class ProgramTemplateResponse(BaseModel):
     assigned_program_status: ProgramLifecycleStatus | None = None
     assigned_program_start_date: date | None = None
     assigned_program_duration_weeks: int | None = None
+    assigned_program_schedule_weekdays: list[int] | None = None
     current_revision_number: int | None = None
+    assigned_program_updated: bool = False
+    future_workouts_updated: int = Field(default=0, ge=0)
+    assigned_program_revision_number: int | None = None
     default_duration_weeks: int = Field(default=1, ge=1, le=24)
     provenance_type: ProgramProvenanceType = "CUSTOM"
     provenance: dict[str, object] | None = None

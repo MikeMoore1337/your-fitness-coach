@@ -4,7 +4,7 @@ import { api } from '../../shared/api/client';
 import type { Workout } from '../../shared/api/types';
 import { formatCalendarDate } from '../../shared/dateTime';
 import { AppLink } from '../../shared/navigation/router';
-import { Badge, Button } from '../../shared/ui/common';
+import { DisclosureIcon, Badge, Button } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useSemanticMotion } from '../../shared/ui/useSemanticMotion';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
@@ -202,7 +202,10 @@ export function WorkoutCompletionSummary({
 
       {!!summary?.exercises.length && (
         <details className="workout-completion__results">
-          <summary>Записанные результаты</summary>
+          <summary className="yfc-disclosure-summary">
+            Записанные результаты
+            <DisclosureIcon />
+          </summary>
           <ul>
             {summary.exercises.map((exercise) => (
               <li key={exercise.workout_exercise_id}>

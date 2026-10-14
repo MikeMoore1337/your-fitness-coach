@@ -1,3 +1,4 @@
+import { TimeInput } from '../../shared/ui/PickerInput';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../app/AuthProvider';
@@ -155,7 +156,7 @@ function ExercisePicker({
   }, [exercises, search, selectedIds]);
   return (
     <details className="training-preferences-disclosure">
-      <summary>
+      <summary className="yfc-disclosure-summary">
         <span>
           <strong>{title}</strong>
           <small>{description}</small>
@@ -252,7 +253,7 @@ export function TrainingPreferencesFields({
       </div>
 
       <details className="training-preferences-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Расписание</strong>
             <small>Дни и длительность · необязательно</small>
@@ -299,8 +300,7 @@ export function TrainingPreferencesFields({
             </label>
             <label className="field">
               <span>Обычное время</span>
-              <input
-                type="time"
+              <TimeInput
                 value={value.preferred_time?.slice(0, 5) ?? ''}
                 onChange={(event) =>
                   onChange({ ...value, preferred_time: event.target.value || null })
@@ -334,7 +334,7 @@ export function TrainingPreferencesFields({
       </details>
 
       <details className="training-preferences-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Места и оборудование</strong>
             <small>Можно сохранить зал, дом и другое место отдельно</small>

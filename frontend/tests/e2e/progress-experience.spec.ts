@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
@@ -33,6 +33,17 @@ const TASK_111_SCREENSHOTS = resolve(
 type NutritionReportState = 'partial' | 'no-data' | 'long';
 
 const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
+const CAPTURE_970_AFTER = process.env.CAPTURE_970_AFTER === '1';
+const WORKTREE_ROOT = resolve(process.cwd(), '..');
+const ISSUE_970_AFTER_DIR = resolve(
+  WORKTREE_ROOT,
+  'docs',
+  'ux',
+  'final-issues-acceptance',
+  'evidence',
+  '970-report-mobile-20261013',
+  'after',
+);
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -67,10 +78,11 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
   );
   const daily = Array.from({ length: dayCount }, (_, index) => {
     const diaryDate = shiftDate(periodStart, index);
-    const targetCalories = diaryDate < targetChangeDate ? 2100 : 1950;
-    const targetProtein = diaryDate < targetChangeDate ? 140 : 135;
-    const targetFat = diaryDate < targetChangeDate ? 70 : 65;
-    const targetCarbs = diaryDate < targetChangeDate ? 230 : 210;
+    const trainerTarget = state === 'long' && diaryDate > targetChangeDate;
+    const targetCalories = diaryDate < targetChangeDate ? 2100 : trainerTarget ? 2000 : 1950;
+    const targetProtein = diaryDate < targetChangeDate ? 140 : trainerTarget ? 140 : 135;
+    const targetFat = diaryDate < targetChangeDate ? 70 : trainerTarget ? 70 : 65;
+    const targetCarbs = diaryDate < targetChangeDate ? 230 : trainerTarget ? 220 : 210;
     const status =
       state === 'no-data'
         ? 'missing'
@@ -215,6 +227,18 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
               fat_g: 65,
               carbs_g: 210,
             },
+            ...(state === 'long'
+              ? [
+                  {
+                    effective_from: shiftDate(targetChangeDate, 1),
+                    source: 'trainer',
+                    calories: 2000,
+                    protein_g: 140,
+                    fat_g: 70,
+                    carbs_g: 220,
+                  },
+                ]
+              : []),
           ],
   };
 }
@@ -1316,6 +1340,135 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     }
   }
 });
+
+for (const width of [320, 360, 390, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#970 target changes stay readable at ${width}px ${theme}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 932 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      await mockProgress(page, 'long');
+      await page.goto('/app?section=progress&progress_period=days_30');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page
+        .getByRole('navigation', { name: 'Основная навигация' })
+        .getByRole('link', { name: 'Прогресс' })
+        .click();
+      await page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('link', { name: /^Питание/ })
+        .click();
+
+      const report = page.locator('#nutrition-period-report');
+      await report.getByText('История целей питания', { exact: true }).click();
+      const targetChanges = report
+        .locator('.nutrition-report-targets')
+        .filter({ hasText: 'Изменения цели в периоде' });
+      await expect(targetChanges).toBeVisible();
+      const cards = targetChanges.locator('ol > li');
+      await expect(cards).toHaveCount(2);
+      await expect(cards.first().getByText('Принятая адаптация', { exact: true })).toBeVisible();
+      await expect(cards.last().getByText('Цель тренера', { exact: true })).toBeVisible();
+      for (const card of await cards.all()) {
+        for (const label of ['Дата', 'Источник', 'Калории', 'Б / Ж / У']) {
+          await expect(card.getByText(label, { exact: true })).toBeVisible();
+        }
+      }
+
+      // Layout stress only: keep valid API enums and model a longer localized label in the DOM.
+      const source = cards.first().locator('.nutrition-report-targets__content--source');
+      await source.evaluate((element) => {
+        element.textContent = 'Принятая адаптация по согласованному индивидуальному плану питания';
+      });
+      await expect(source).toContainText('индивидуальному плану питания');
+
+      const geometry = await targetChanges.evaluate((element) => {
+        const viewport = document.documentElement.clientWidth;
+        const heading = element.querySelector<HTMLElement>('h3');
+        const list = element.querySelector<HTMLElement>('ol');
+        const firstCard = element.querySelector<HTMLElement>('ol > li');
+        const secondCard = element.querySelector<HTMLElement>('ol > li:nth-child(2)');
+        if (!heading || !list || !firstCard || !secondCard)
+          throw new Error('Target changes geometry is incomplete');
+        const headingBox = heading.getBoundingClientRect();
+        const firstCardBox = firstCard.getBoundingClientRect();
+        const secondCardBox = secondCard.getBoundingClientRect();
+        const rowGap = Number.parseFloat(getComputedStyle(element).rowGap);
+        const listStyle = getComputedStyle(list);
+        return {
+          viewport,
+          documentWidth: document.documentElement.scrollWidth,
+          rowGap,
+          headingToFirstCard: firstCardBox.top - headingBox.bottom,
+          cardRowGap: Number.parseFloat(listStyle.rowGap),
+          firstToSecondCard: secondCardBox.top - firstCardBox.bottom,
+          listBorderWidths: [
+            listStyle.borderTopWidth,
+            listStyle.borderRightWidth,
+            listStyle.borderBottomWidth,
+            listStyle.borderLeftWidth,
+          ],
+          cards: [...element.querySelectorAll<HTMLElement>('ol > li')].map((cardElement) => {
+            const box = cardElement.getBoundingClientRect();
+            const descendants = [...cardElement.querySelectorAll<HTMLElement>('*')].map((child) => {
+              const childBox = child.getBoundingClientRect();
+              return { left: childBox.left, right: childBox.right };
+            });
+            return {
+              left: box.left,
+              right: box.right,
+              width: box.width,
+              descendants,
+            };
+          }),
+        };
+      });
+      expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
+      expect(geometry.rowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.headingToFirstCard).toBeGreaterThanOrEqual(geometry.rowGap - 0.5);
+      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(12);
+      expect(geometry.cardRowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.firstToSecondCard).toBeCloseTo(geometry.cardRowGap, 1);
+      expect(geometry.listBorderWidths).toEqual(['0px', '0px', '0px', '0px']);
+      for (const card of geometry.cards) {
+        expect(card.width).toBeGreaterThan(0);
+        expect(card.left).toBeGreaterThanOrEqual(-1);
+        expect(card.right).toBeLessThanOrEqual(geometry.viewport + 1);
+        for (const child of card.descendants) {
+          expect(child.left).toBeGreaterThanOrEqual(card.left - 1);
+          expect(child.right).toBeLessThanOrEqual(card.right + 1);
+        }
+      }
+
+      if (CAPTURE_970_AFTER) {
+        await mkdir(ISSUE_970_AFTER_DIR, { recursive: true });
+        await targetChanges.screenshot({
+          path: resolve(ISSUE_970_AFTER_DIR, `${testInfo.project.name}-${theme}-${width}.png`),
+        });
+        await writeFile(
+          resolve(ISSUE_970_AFTER_DIR, `${testInfo.project.name}-${theme}-${width}-geometry.json`),
+          JSON.stringify(
+            { browser: testInfo.project.name, theme, width, height: 932, geometry },
+            null,
+            2,
+          ) + '\n',
+        );
+      }
+
+      if (width === 390) {
+        const list = targetChanges.locator('ol');
+        await page.emulateMedia({ media: 'print' });
+        await expect(list).toHaveCSS('row-gap', 'normal');
+        await expect(list).toHaveCSS('border-top-width', '1px');
+        await page.emulateMedia({ media: 'screen' });
+        await page.setViewportSize({ width: 1280, height: 932 });
+        await expect(list).toHaveCSS('row-gap', 'normal');
+        await expect(list).toHaveCSS('border-top-width', '1px');
+        await expect(report.locator('.nutrition-report-days table')).toHaveCSS('display', 'table');
+      }
+    });
+  }
+}
 
 test('nutrition report no-data state keeps missing days distinct from zero', async ({ page }) => {
   await page.setViewportSize({ width: 430, height: 932 });
