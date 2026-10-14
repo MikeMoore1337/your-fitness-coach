@@ -687,7 +687,7 @@ export function AssignedProgramDetails({
               open={lifecycleActionsOpen}
               onToggle={(event) => setLifecycleActionsOpen(event.currentTarget.open)}
             >
-              <summary>
+              <summary className="yfc-disclosure-summary">
                 <span>Действия с программой</span>
                 <DisclosureIcon />
               </summary>
@@ -786,7 +786,10 @@ export function AssignedProgramDetails({
           )}
           {primaryBlock.is_deload && <Badge tone="warning">Облегчённый период</Badge>}
           <details className="program-current-block__actions">
-            <summary>Действия с этапом</summary>
+            <summary className="yfc-disclosure-summary">
+              Действия с этапом
+              <DisclosureIcon />
+            </summary>
             {blockActions(primaryBlock)}
           </details>
         </article>
@@ -953,6 +956,7 @@ export function AssignedProgramDetails({
 
       <details className="program-history__disclosure" open={historyOpen}>
         <summary
+          className="yfc-disclosure-summary"
           onClick={(event) => {
             event.preventDefault();
             setHistoryOpen((open) => !open);
@@ -1014,7 +1018,7 @@ export function AssignedProgramDetails({
                   <li className={block.id === primaryBlock?.id ? 'is-current' : ''} key={block.id}>
                     <span className="program-block-timeline__rail" aria-hidden="true" />
                     <details>
-                      <summary>
+                      <summary className="yfc-disclosure-summary">
                         <span className="program-block-timeline__copy">
                           <strong>{block.title}</strong>
                           <small>
@@ -1088,7 +1092,7 @@ export function AssignedProgramDetails({
                             : undefined
                         }
                       >
-                        <summary>
+                        <summary className="yfc-disclosure-summary">
                           <span className="program-revision-timeline__copy">
                             <strong>{revisionChangeLabel(revision)}</strong>
                             <small>

@@ -1,3 +1,4 @@
+import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
@@ -642,22 +643,24 @@ export function CoachOperationsPanel({
               </Select>
             </Field>
             <Field label="Дата" labelFor="crm-session-date">
-              <Input
+              <DateInput
+                className="ui-input"
                 id="crm-session-date"
                 onChange={(event) =>
                   setSessionDraft((current) => ({ ...current, date: event.target.value }))
                 }
-                type="date"
+
                 value={sessionDraft.date}
               />
             </Field>
             <Field label="Время" labelFor="crm-session-time">
-              <Input
+              <TimeInput
+                className="ui-input"
                 id="crm-session-time"
                 onChange={(event) =>
                   setSessionDraft((current) => ({ ...current, time: event.target.value }))
                 }
-                type="time"
+
                 value={sessionDraft.time}
               />
             </Field>
@@ -844,10 +847,11 @@ export function CoachOperationsPanel({
                 </Select>
               </Field>
               <Field label="Срок" labelFor="crm-task-date">
-                <Input
+                <DateInput
+                  className="ui-input"
                   id="crm-task-date"
                   onChange={(event) => setTaskDate(event.target.value)}
-                  type="date"
+
                   value={taskDate}
                 />
               </Field>

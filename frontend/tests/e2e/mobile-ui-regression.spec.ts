@@ -1,4 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import {
   expectDockWithinViewport,
   expectElementsWithinHorizontalViewport,
@@ -332,6 +334,159 @@ test('@critical mocked TMA preserves safe areas, lifecycle and Today geometry', 
   expect(state.expand).toBeGreaterThan(0);
   expect(state.backButton.visible).toBe(false);
 });
+
+test('@critical mocked TMA keeps the dock inside the effective viewport and hit-testable', async ({
+  page,
+}) => {
+  const prepared = await preparePage(page, 'dark', 'telegram');
+  if (!prepared.tma) throw new Error('TMA harness was not installed');
+  await page.goto('/app?tgWebAppPlatform=android');
+  await waitForSurface(page, 'today');
+
+  const geometry = await page.evaluate(() => {
+    const rootStyle = getComputedStyle(document.documentElement);
+    const dock = document.getElementById('appBottomNav');
+    if (!dock) throw new Error('Mobile dock is missing');
+    const dockRect = dock.getBoundingClientRect();
+    const dockHeight = Number.parseFloat(rootStyle.getPropertyValue('--app-bottom-nav-height'));
+    const viewportBottom = Number.parseFloat(rootStyle.getPropertyValue('--yfc-viewport-bottom'));
+    const layoutSafeBottom = Math.max(
+      Number.parseFloat(rootStyle.getPropertyValue('--yfc-tg-safe-bottom')) || 0,
+      Number.parseFloat(rootStyle.getPropertyValue('--yfc-content-safe-bottom')) || 0,
+    );
+    const effectiveViewportBottom = window.innerHeight - viewportBottom;
+    const dockHit = document.elementFromPoint(
+      dockRect.left + dockRect.width / 2,
+      dockRect.top + dockRect.height / 2,
+    );
+
+    return {
+      bodyPaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+      dockHeight,
+      dockBottom: dockRect.bottom,
+      dockHit: dockHit?.closest('#appBottomNav') === dock,
+      effectiveViewportBottom,
+      layoutSafeBottom,
+      viewportBottom,
+    };
+  });
+  expect(geometry.viewportBottom).toBeGreaterThan(0);
+  expect(geometry.dockBottom).toBeLessThanOrEqual(geometry.effectiveViewportBottom + 1);
+  expect(geometry.dockHit).toBe(true);
+  expect(geometry.bodyPaddingBottom).toBeGreaterThanOrEqual(
+    geometry.dockHeight + 24 + Math.max(8, geometry.layoutSafeBottom) + geometry.viewportBottom - 1,
+  );
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  for (const width of [320, 360, 390, 393, 430]) {
+    test(`@critical mocked TMA keeps Active Workout RIR and finish controls clear at ${width}px ${theme}`, async ({
+      page,
+    }, info) => {
+      const prepared = await preparePage(page, theme, 'telegram', { workoutStatus: 'in_progress' });
+      if (!prepared.tma) throw new Error('TMA harness was not installed');
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/app?tgWebAppPlatform=ios');
+      await waitForSurface(page, 'today');
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+      const currentSet = page.locator('.active-workout-set.is-current');
+      await expect(currentSet).toBeVisible();
+      const rir = currentSet
+        .locator('.active-workout-rir--quick .active-workout-rir__options button')
+        .first();
+      await rir.scrollIntoViewIfNeeded();
+
+      const measure = async (selector: string) =>
+        page.evaluate((targetSelector) => {
+          const rootStyle = getComputedStyle(document.documentElement);
+          const target = document.querySelector<HTMLElement>(targetSelector);
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          if (!target || !dock) throw new Error(`Missing geometry target: ${targetSelector}`);
+          const targetRect = target.getBoundingClientRect();
+          const dockRect = dock.getBoundingClientRect();
+          const viewportBottom = Number.parseFloat(
+            rootStyle.getPropertyValue('--yfc-viewport-bottom'),
+          );
+          const effectiveBottom = window.innerHeight - viewportBottom;
+          const point = document.elementFromPoint(
+            targetRect.left + targetRect.width / 2,
+            targetRect.top + targetRect.height / 2,
+          );
+          return {
+            target: targetRect.toJSON(),
+            dock: dockRect.toJSON(),
+            viewport: { width: window.innerWidth, height: window.innerHeight, effectiveBottom },
+            documentWidth: {
+              client: document.documentElement.clientWidth,
+              scroll: document.documentElement.scrollWidth,
+            },
+            hit: point === target || Boolean(point?.closest(selector)),
+            overlap: targetRect.bottom > dockRect.top && targetRect.top < dockRect.bottom,
+          };
+        }, selector);
+
+      const rirGeometry = await measure(
+        '.active-workout-set.is-current .active-workout-rir--quick .active-workout-rir__options button',
+      );
+      expect(rirGeometry.target.left).toBeGreaterThanOrEqual(-0.5);
+      expect(rirGeometry.target.right).toBeLessThanOrEqual(width + 0.5);
+      expect(rirGeometry.target.top).toBeGreaterThanOrEqual(-0.5);
+      expect(rirGeometry.target.bottom).toBeLessThanOrEqual(
+        rirGeometry.viewport.effectiveBottom + 0.5,
+      );
+      expect(rirGeometry.overlap).toBe(false);
+      expect(rirGeometry.hit).toBe(true);
+      expect(rirGeometry.documentWidth.scroll).toBeLessThanOrEqual(
+        rirGeometry.documentWidth.client + 1,
+      );
+      const capture = process.env.CAPTURE_867_AFTER === '1' && width === 390;
+      const afterDir = resolve(
+        process.cwd(),
+        '../docs/ux/final-issues-acceptance/evidence/867-tma-clearance-20261013/after',
+      );
+      if (capture) {
+        await mkdir(afterDir, { recursive: true });
+        await page.screenshot({ path: resolve(afterDir, `${info.project.name}-${theme}-rir.png`) });
+      }
+
+      const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+      await finish.scrollIntoViewIfNeeded();
+      const finishGeometry = await measure('.active-workout-finish button');
+      expect(finishGeometry.target.left).toBeGreaterThanOrEqual(-0.5);
+      expect(finishGeometry.target.right).toBeLessThanOrEqual(width + 0.5);
+      expect(finishGeometry.target.top).toBeGreaterThanOrEqual(-0.5);
+      expect(finishGeometry.target.bottom).toBeLessThanOrEqual(
+        finishGeometry.viewport.effectiveBottom + 0.5,
+      );
+      expect(finishGeometry.overlap).toBe(false);
+      expect(finishGeometry.hit).toBe(true);
+      expect(finishGeometry.documentWidth.scroll).toBeLessThanOrEqual(
+        finishGeometry.documentWidth.client + 1,
+      );
+      if (capture) {
+        await page.screenshot({
+          path: resolve(afterDir, `${info.project.name}-${theme}-footer.png`),
+        });
+        await writeFile(
+          resolve(afterDir, `${info.project.name}-${theme}-geometry.json`),
+          JSON.stringify(
+            {
+              synthetic: true,
+              theme,
+              browser: info.project.name,
+              width,
+              rir: rirGeometry,
+              finish: finishGeometry,
+            },
+            null,
+            2,
+          ),
+        );
+      }
+    });
+  }
+}
 
 test('@extended mobile layout stress keeps long content inside viewport', async ({ page }) => {
   await preparePage(page, 'light', 'browser', { longExerciseName: true });

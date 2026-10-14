@@ -6,7 +6,7 @@ import type {
   NutritionLabelFactsEdit,
 } from '../../shared/api/types';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
-import { Button, Field, Input, Select } from '../../shared/ui/common';
+import { DisclosureIcon, Button, Field, Input, Select } from '../../shared/ui/common';
 import { isValidGtin } from './nutritionFoodUtils';
 
 export const NUTRITION_LABEL_FIELDS = [
@@ -560,7 +560,10 @@ export function NutritionLabelReview({
       </fieldset>
 
       <details className="nutrition-label-review__details" open={sourceFactsWithChoices.length > 0}>
-        <summary>Дополнительные значения и сведения</summary>
+        <summary className="yfc-disclosure-summary">
+          Дополнительные значения и сведения
+          <DisclosureIcon />
+        </summary>
         <div className="nutrition-label-review__details-body">
           <div className="nutrition-label-review__nutrients">
             {NUTRITION_LABEL_FIELDS.filter((field) => !REQUIRED_FIELDS.includes(field)).map(

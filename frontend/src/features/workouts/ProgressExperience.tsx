@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import {
   useEffect,
   useLayoutEffect,
@@ -634,7 +635,10 @@ function WeeklyReviewHub({
         </div>
       </div>
       <details className="progress-review-hub__confidence">
-        <summary>Полнота исходных данных</summary>
+        <summary className="yfc-disclosure-summary">
+          Полнота исходных данных
+          <DisclosureIcon />
+        </summary>
         <DataConfidence kind="training" signal={summary.data_sufficiency.working_sets} />
         <DataConfidence kind="weight" signal={summary.data_sufficiency.weight_trend} />
       </details>
@@ -733,7 +737,7 @@ function SummaryOverview({
           >
             <ProgressInsights summary={summary} />
             <details className="progress-overview__adherence">
-              <summary>
+              <summary className="yfc-disclosure-summary">
                 <span>
                   <strong>Выполнение плана</strong>
                   <small>
@@ -827,7 +831,7 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
     <div className="progress-exercises">
       {analytics.exercises.map((exercise) => (
         <details className="progress-exercise" key={exercise.exercise_id}>
-          <summary>
+          <summary className="yfc-disclosure-summary">
             <span>
               <strong>{exercise.exercise_title}</strong>
               <small>
@@ -974,7 +978,10 @@ function TrainingSection({
             <ExerciseHistory analytics={analytics.data} />
           </div>
           <details className="progress-methodology" id="progress-methodology">
-            <summary>Как читать тренировочные показатели</summary>
+            <summary className="yfc-disclosure-summary">
+              Как читать тренировочные показатели
+              <DisclosureIcon />
+            </summary>
             <div>
               <p>
                 Внешняя нагрузка учитывается только там, где записаны и вес, и повторы. Для
@@ -1056,7 +1063,7 @@ function BodySection({
         }
       />
       <details className="progress-priority progress-priority--compact">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <small>Контекст планирования</small>
             <strong>
@@ -1147,7 +1154,10 @@ function BodySection({
           })}
           {hasGuidance && (
             <details className="progress-body-guidance">
-              <summary>Как сравнивать замеры</summary>
+              <summary className="yfc-disclosure-summary">
+                Как сравнивать замеры
+                <DisclosureIcon />
+              </summary>
               <div>
                 {body.guidance.consistency_tips.length > 0 && (
                   <ul>
@@ -1172,7 +1182,10 @@ function BodySection({
       </div>
       {measurementDiary && (
         <details id="measurement-diary" className="progress-measurement-editor progress-body-diary">
-          <summary>Добавить замер · история и редактирование</summary>
+          <summary className="yfc-disclosure-summary">
+            Добавить замер · история и редактирование
+            <DisclosureIcon />
+          </summary>
           {measurementDiary}
         </details>
       )}
@@ -1381,25 +1394,25 @@ function ProgressPeriodControls({
           aria-describedby={customError ? 'progress-custom-period-error' : undefined}
         >
           <Field label="Начало периода" labelFor="progress-period-from">
-            <input
+            <DateInput
               aria-label="Начало периода"
               className="ui-input"
               id="progress-period-from"
               max={customDateTo || today}
               onChange={(event) => setCustomDateFrom(event.target.value)}
-              type="date"
+
               value={customDateFrom}
             />
           </Field>
           <Field label="Конец периода" labelFor="progress-period-to">
-            <input
+            <DateInput
               aria-label="Конец периода"
               className="ui-input"
               id="progress-period-to"
               max={today}
               min={customDateFrom}
               onChange={(event) => setCustomDateTo(event.target.value)}
-              type="date"
+
               value={customDateTo}
             />
           </Field>

@@ -472,10 +472,18 @@ test('related materials use one editorial measure and compact inline CTAs', asyn
             const cta = card.querySelector<HTMLElement>('small');
             return {
               height: card.getBoundingClientRect().height,
-              ctaText: cta?.textContent,
+              ctaText: cta?.textContent?.trim(),
               ctaHeight: cta?.getBoundingClientRect().height ?? 0,
               ctaScrollHeight: cta?.scrollHeight ?? 0,
               ctaSvgCount: cta?.querySelectorAll('svg').length ?? 0,
+              ctaIcons: [...(cta?.querySelectorAll('svg') ?? [])].map((icon) => ({
+                name: icon.getAttribute('data-icon'),
+                shared: icon.classList.contains('yfc-icon'),
+                viewBox: icon.getAttribute('viewBox'),
+                stroke: icon.getAttribute('stroke'),
+                strokeWidth: icon.getAttribute('stroke-width'),
+                ariaHidden: icon.getAttribute('aria-hidden'),
+              })),
             };
           }),
         };
@@ -486,10 +494,20 @@ test('related materials use one editorial measure and compact inline CTAs', asyn
       expect(metrics.cards.length).toBeGreaterThan(0);
       for (const card of metrics.cards) {
         expect(card.height).toBeLessThanOrEqual(230);
-        expect(card.ctaText).toBe('Открыть →');
+        expect(card.ctaText).toBe('Открыть');
         expect(card.ctaHeight).toBeGreaterThan(0);
         expect(card.ctaScrollHeight).toBeLessThanOrEqual(Math.ceil(card.ctaHeight));
-        expect(card.ctaSvgCount).toBe(0);
+        expect(card.ctaSvgCount).toBe(1);
+        expect(card.ctaIcons).toEqual([
+          {
+            name: 'arrow-right',
+            shared: true,
+            viewBox: '0 0 24 24',
+            stroke: 'currentColor',
+            strokeWidth: '1.8',
+            ariaHidden: 'true',
+          },
+        ]);
       }
     }
   }

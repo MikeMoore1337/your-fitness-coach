@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
@@ -11,6 +12,7 @@ import type {
 import { queryKeys } from '../../shared/queryKeys';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   EmptyState,
@@ -605,7 +607,10 @@ export function CoachProgramBulkOperations({
     >
       {selectedTemplate && (
         <details className="coach-program-rollout">
-          <summary>Проверить применение выбранного шаблона</summary>
+          <summary className="yfc-disclosure-summary">
+            Проверить применение выбранного шаблона
+            <DisclosureIcon />
+          </summary>
           {!selectedClients.length ? (
             <EmptyState title="Сначала выберите клиентов" text="Выбор клиентов находится выше." />
           ) : (
@@ -717,7 +722,10 @@ export function CoachProgramBulkOperations({
           if (!open) setRevisionOutcomes([]);
         }}
       >
-        <summary>Запланировать общую правку программ</summary>
+        <summary className="yfc-disclosure-summary">
+          Запланировать общую правку программ
+          <DisclosureIcon />
+        </summary>
         {selectedClients.length === 0 ? (
           <EmptyState title="Сначала выберите клиентов" text="Выбор клиентов находится выше." />
         ) : missingProgramNames.length ? (
@@ -779,9 +787,10 @@ export function CoachProgramBulkOperations({
             )}
             {revisionScope === 'future_program' && (
               <Field label="Дата начала" labelFor="coach-common-date">
-                <Input
+                <DateInput
+                  className="ui-input"
                   id="coach-common-date"
-                  type="date"
+
                   required
                   value={effectiveDate}
                   onChange={(event) => setEffectiveDate(event.target.value)}
@@ -901,7 +910,10 @@ export function CoachProgramBulkOperations({
           if (!open) setProposalOutcomes([]);
         }}
       >
-        <summary>Проверить одинаковые предложения прогрессии</summary>
+        <summary className="yfc-disclosure-summary">
+          Проверить одинаковые предложения прогрессии
+          <DisclosureIcon />
+        </summary>
         {!selectedClients.length ? (
           <EmptyState title="Сначала выберите клиентов" text="Выбор клиентов находится выше." />
         ) : missingProgramNames.length ? (

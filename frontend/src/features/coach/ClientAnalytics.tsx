@@ -19,6 +19,7 @@ import {
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DateInput, TimeInput } from '../../shared/ui/PickerInput';
+import { Icon } from '../../shared/ui/Icon';
 import { WorkoutFeedbackDisclosure } from '../workouts/WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from '../workouts/WorkoutCompletionSummary';
 import { MuscleWorkloadList } from '../workouts/MuscleWorkload';
@@ -232,8 +233,13 @@ export function ClientAnalytics({
                 <p>Факты за 30 дней и сравнение с предыдущим равным периодом.</p>
               </div>
               {!showTrainingWorkload && (
-                <Button variant="secondary" onClick={() => setShowTrainingWorkload(true)}>
+                <Button
+                  aria-expanded={false}
+                  variant="secondary"
+                  onClick={() => setShowTrainingWorkload(true)}
+                >
                   Показать данные
+                  <Icon name="chevron-down" size={16} />
                 </Button>
               )}
             </div>
@@ -292,7 +298,7 @@ export function ClientAnalytics({
                 id={`coach-workout-${workout.id}`}
                 key={workout.id}
               >
-                <summary>
+                <summary className="yfc-disclosure-summary">
                   <span>
                     <strong>{workout.title}</strong>
                     <small>

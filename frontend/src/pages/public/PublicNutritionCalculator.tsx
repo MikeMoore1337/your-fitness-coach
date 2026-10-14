@@ -1,3 +1,4 @@
+import { DisclosureIcon } from '../../shared/ui/common';
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   calculateNutritionEstimate,
@@ -309,7 +310,10 @@ export default function PublicNutritionCalculator() {
         </div>
 
         <details className="public-calculator__details">
-          <summary>Уточнить расчёт тренировочной нагрузки</summary>
+          <summary className="yfc-disclosure-summary">
+            Уточнить расчёт тренировочной нагрузки
+            <DisclosureIcon />
+          </summary>
           <p>
             Эти поля необязательны. Они помогают учесть длительность и характер силовой работы, а
             также отдельные кардиотренировки.

@@ -1,3 +1,4 @@
+import { DisclosureIcon } from '../../shared/ui/common';
 import { useState, type ReactNode, type AnchorHTMLAttributes } from 'react';
 import type { DemoSelfTrainingState } from '../../features/demo/demoApi';
 import { demoCabinetUrlForHostname } from '../../shared/navigation/appUrl';
@@ -243,7 +244,10 @@ function WeeklyPreview() {
         <h3>Проверка недели</h3>
         <p>2 из 3 тренировок выполнено · пример данных</p>
         <details>
-          <summary>Посмотреть вопрос недели</summary>
+          <summary className="yfc-disclosure-summary">
+            Посмотреть вопрос недели
+            <DisclosureIcon />
+          </summary>
           <fieldset>
             <legend>Как вы восстанавливались на этой неделе?</legend>
             <div className="ref-scores">

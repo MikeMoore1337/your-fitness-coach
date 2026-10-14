@@ -170,6 +170,20 @@ const glyphs = {
       <path d="M12 5v14" />
     </>
   ),
+  // Original YFC response rating, on the shared 24px grid.
+  'thumbs-up': (
+    <>
+      <rect x="3" y="10" width="4" height="11" rx="1" />
+      <path d="M7 12l3-3 2-6h1a2 2 0 0 1 2 2l-1 4h5a2 2 0 0 1 1.9 2.6l-2 7A2 2 0 0 1 17 20H7" />
+    </>
+  ),
+  // Original YFC time picker glyph, on the shared 24px grid.
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
   // Lucide: star.
   'star-filled': (
     <>
@@ -563,8 +577,11 @@ const glyphs = {
   ),
 } satisfies Record<string, ReactNode>;
 
+const thumbsUpGlyph = glyphs['thumbs-up'];
+
 export const iconGlyphs = {
   ...glyphs,
+  'thumbs-down': <g transform="rotate(180 12 12)">{thumbsUpGlyph}</g>,
   'nav-plan': glyphs['exercise'],
   'week-strength': glyphs['exercise'],
   'nav-more': glyphs['more-horizontal'],

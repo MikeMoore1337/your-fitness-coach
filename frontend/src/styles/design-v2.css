@@ -2377,6 +2377,10 @@ body:has(.app-shell--design-v2) {
   border-top: 1px solid var(--v2-border);
 }
 
+.active-workout--design-v2 .active-workout-history + .active-workout-exercise__sets {
+  margin-top: var(--v2-space-3);
+}
+
 .active-workout--design-v2 .progression-guidance {
   display: grid;
   gap: var(--v2-space-2);
@@ -2555,11 +2559,29 @@ body:has(.app-shell--design-v2) {
 
 .active-workout--design-v2 .active-workout-input input,
 .active-workout--design-v2 .active-workout-advanced-field select {
+  box-sizing: border-box;
   border: 1px solid #d3d6d6;
   padding: 12px 6px;
   border-radius: var(--radius-control);
   background: #fff;
   color: #111;
+}
+
+.active-workout--design-v2 .active-workout-set__controls,
+.active-workout--design-v2 .active-workout-set__controls > *,
+.active-workout--design-v2 .active-workout-input,
+.active-workout--design-v2 .active-workout-advanced-field {
+  min-width: 0;
+}
+
+.active-workout--design-v2 .active-workout-set__more-actions > summary,
+.active-workout--design-v2 .active-workout-set__helpers > summary,
+.active-workout--design-v2 .active-workout-set__advanced > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding-block: 0;
+  line-height: 1.3;
 }
 
 .active-workout--design-v2 .active-workout-set.is-current .active-workout-input input {
@@ -4602,11 +4624,17 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
   --app-bottom-nav-height: 0px;
   --yfc-mobile-dock-clearance: max(
     96px,
-    calc(var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)))
+    calc(
+      var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)) +
+        var(--yfc-viewport-bottom, 0px)
+    )
   );
   --yfc-mobile-action-clearance: max(
     104px,
-    calc(var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)))
+    calc(
+      var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)) +
+        var(--yfc-viewport-bottom, 0px)
+    )
   );
 }
 
@@ -4672,7 +4700,8 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
   }
 
   .app-shell--design-v2 .app-bottom-nav {
-    inset: auto max(10px, var(--yfc-layout-safe-right)) max(8px, var(--yfc-layout-safe-bottom))
+    inset: auto max(10px, var(--yfc-layout-safe-right))
+      calc(max(8px, var(--yfc-layout-safe-bottom)) + var(--yfc-viewport-bottom, 0px))
       max(10px, var(--yfc-layout-safe-left));
     width: auto;
     padding: 6px;
@@ -7014,6 +7043,32 @@ button.notification-row__main:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
+.nutrition-report-targets__values {
+  min-width: 0;
+}
+
+.nutrition-report-targets__value {
+  min-width: 0;
+}
+
+.nutrition-report-targets__value + .nutrition-report-targets__value::before {
+  content: ' · ';
+}
+
+.nutrition-report-targets__mobile-label {
+  display: none;
+}
+
+.nutrition-report-targets__content {
+  min-width: 0;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.nutrition-report-targets__content--source {
+  color: inherit !important;
+}
+
 .nutrition-report-days {
   border-block: 1px solid var(--v2-border);
 }
@@ -7147,8 +7202,47 @@ button.notification-row__main:focus-visible {
   }
 
   .nutrition-report-targets li {
-    grid-template-columns: 1fr;
-    gap: var(--v2-space-1);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--v2-space-2);
+    min-width: 0;
+    padding: var(--v2-space-3);
+    border: 1px solid var(--v2-border);
+    border-radius: var(--v2-control-radius);
+  }
+
+  .nutrition-report-targets {
+    row-gap: var(--v2-space-3);
+  }
+
+  .nutrition-report-targets li > :where(time, strong, span),
+  .nutrition-report-targets__values,
+  .nutrition-report-targets__value {
+    min-width: 0;
+  }
+
+  .nutrition-report-targets li > :where(time, strong),
+  .nutrition-report-targets__value {
+    display: grid;
+    grid-template-columns: minmax(64px, max-content) minmax(0, 1fr);
+    gap: var(--v2-space-2);
+    align-items: baseline;
+  }
+
+  .nutrition-report-targets__values {
+    display: grid;
+    gap: var(--v2-space-2);
+  }
+
+  .nutrition-report-targets__value + .nutrition-report-targets__value::before {
+    content: none;
+  }
+
+  .nutrition-report-targets__mobile-label {
+    display: block;
+    color: var(--v2-text-secondary);
+    font-size: 0.68rem;
+    font-weight: 700;
+    line-height: 1.25;
   }
 
   .nutrition-report-days table,
@@ -7201,6 +7295,13 @@ button.notification-row__main:focus-visible {
 
   .nutrition-report-days td:last-child::before {
     display: none;
+  }
+}
+
+@media screen and (max-width: 899px) {
+  .nutrition-report-targets ol {
+    row-gap: var(--v2-space-3);
+    border-top: 0;
   }
 }
 
@@ -9619,6 +9720,12 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   display: none;
 }
 
+.coach-client-row__menu > summary > .disclosure-icon {
+  margin-inline-start: 0;
+  background: transparent;
+  color: inherit;
+}
+
 .coach-client-row__menu > button {
   position: absolute;
   z-index: 20;
@@ -11097,13 +11204,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   align-items: center;
   cursor: pointer;
   gap: 12px;
-}
-.progress-report-options > summary::after {
-  content: '+';
-  margin-left: auto;
-}
-.progress-report-options[open] > summary::after {
-  content: '−';
 }
 .progress-report-options[open] {
   display: grid;

@@ -18,6 +18,7 @@ import type { Exercise } from '../../shared/api/types';
 import { difficultyLabels } from './exerciseOrdering';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { Icon } from '../../shared/ui/Icon';
+import { IconButton } from '../../shared/ui/common';
 
 export type ExercisePickerExercise = ExerciseSearchItem & {
   metric_type?: Exercise['metric_type'] | null;
@@ -51,7 +52,12 @@ export function SearchableExercisePicker({
   const selectedTitle = selected?.title ?? '';
   const resultsId = `exercise-picker-results-${useId()}`;
   const [query, setQuery] = useState(selectedTitle);
+  const [previousSelectedTitle, setPreviousSelectedTitle] = useState(selectedTitle);
   const [open, setOpen] = useState(false);
+  if (previousSelectedTitle !== selectedTitle) {
+    setPreviousSelectedTitle(selectedTitle);
+    if (!open) setQuery(selectedTitle);
+  }
   const [compact, setCompact] = useState(
     () => mobileSheet && Boolean(window.matchMedia?.('(max-width: 680px)').matches),
   );
@@ -65,16 +71,14 @@ export function SearchableExercisePicker({
     media.addEventListener('change', update);
     return () => media.removeEventListener('change', update);
   }, [mobileSheet]);
-  const panelRef = useModalA11y<HTMLDivElement>(
-    compact && open,
-    () => {
-      setOpen(false);
-      setQuery(selectedTitle);
-    },
-    'input',
-  );
+  const closePicker = () => {
+    setOpen(false);
+    setQuery(selectedTitle);
+  };
+  const panelRef = useModalA11y<HTMLDivElement>(compact && open, closePicker, 'input');
   const [activeIndex, setActiveIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const sheetResultsRef = useRef<HTMLDivElement>(null);
   const [resultsStyle, setResultsStyle] = useState<CSSProperties>();
   const results = useMemo(() => {
     if (!normalizeExerciseSearchText(query)) return exercises;
@@ -215,6 +219,7 @@ export function SearchableExercisePicker({
       }}
       onChange={(event) => {
         setQuery(event.target.value);
+        if (sheetResultsRef.current) sheetResultsRef.current.scrollTop = 0;
         setActiveIndex(-1);
         setOpen(true);
         if (!compact && value !== clearValue) onChange(clearValue);
@@ -236,8 +241,7 @@ export function SearchableExercisePicker({
         } else if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
-          setOpen(false);
-          setQuery(selectedTitle);
+          closePicker();
         }
       }}
     />
@@ -274,7 +278,7 @@ export function SearchableExercisePicker({
               onMouseDown={(event) => {
                 if (event.target === event.currentTarget) {
                   event.preventDefault();
-                  setOpen(false);
+                  closePicker();
                 }
               }}
             >
@@ -291,13 +295,32 @@ export function SearchableExercisePicker({
                   <button
                     type="button"
                     aria-label="Закрыть выбор упражнения"
-                    onClick={() => setOpen(false)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={closePicker}
                   >
                     <Icon name="close" size={20} />
                   </button>
                 </header>
-                {searchInput}
-                <div className="exercise-picker__results" id={resultsId}>
+                <div className="exercise-picker-sheet__search">
+                  {searchInput}
+                  {query && (
+                    <IconButton
+                      type="button"
+                      className="exercise-picker-sheet__clear"
+                      aria-label="Очистить поиск"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        setQuery('');
+                        if (sheetResultsRef.current) sheetResultsRef.current.scrollTop = 0;
+                        setActiveIndex(-1);
+                        inputRef.current?.focus({ preventScroll: true });
+                      }}
+                    >
+                      <Icon name="close" size={20} />
+                    </IconButton>
+                  )}
+                </div>
+                <div className="exercise-picker__results" id={resultsId} ref={sheetResultsRef}>
                   {results.length ? (
                     results.map((exercise) => (
                       <div className="exercise-picker-sheet__row" key={exercise.id}>
@@ -306,6 +329,7 @@ export function SearchableExercisePicker({
                           type="button"
                           aria-pressed={exercise.id === value}
                           data-yfc-choice="compact"
+                          onMouseDown={(event) => event.preventDefault()}
                           onClick={() => chooseExercise(exercise)}
                         >
                           <ExerciseMediaAsset
@@ -332,6 +356,7 @@ export function SearchableExercisePicker({
                             className="text-button exercise-picker__guide"
                             type="button"
                             aria-label={`${exercise.has_guide ? 'Техника' : 'Подробнее'}: ${exercise.title}`}
+                            onMouseDown={(event) => event.preventDefault()}
                             onClick={() => {
                               setOpen(false);
                               onOpenGuide(exercise);

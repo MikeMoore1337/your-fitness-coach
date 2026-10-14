@@ -1742,6 +1742,13 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
   display: none;
 }
 
+.ai-coach-history__item-menu summary > .disclosure-icon,
+.ai-coach-history__menu summary > .disclosure-icon {
+  margin-inline-start: 0;
+  background: transparent;
+  color: inherit;
+}
+
 .ai-coach-history__item-menu summary:hover,
 .ai-coach-history__item-menu[open] summary,
 .ai-coach-history__item-menu summary:focus-visible {
@@ -2268,16 +2275,6 @@ body:has(.ai-coach-workspace--mobile) .app-quick-add-trigger {
 
 .ai-coach-memory__notice summary::-webkit-details-marker {
   display: none;
-}
-
-.ai-coach-memory__notice summary::after {
-  float: right;
-  content: '+';
-  font-size: 1rem;
-}
-
-.ai-coach-memory__notice[open] summary::after {
-  content: '−';
 }
 
 .ai-coach-memory__notice p {

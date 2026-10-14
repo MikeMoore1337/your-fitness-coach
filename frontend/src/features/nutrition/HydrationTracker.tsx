@@ -14,7 +14,11 @@ import {
   Select,
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
+import { Icon } from '../../shared/ui/Icon';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
+
+// Inter has no Unicode subscript ₂; its ordinary 2 is rendered below the baseline.
+const waterFormula = 'H₂O';
 
 const beverageLabels: Record<string, string> = {
   water: 'Вода',
@@ -381,7 +385,17 @@ export function HydrationTracker({
         </div>
         <div className="hydration-orb" aria-hidden="true">
           <span style={{ height: `${progress}%` }} />
-          <strong>{target ? `${Math.round(data.progress_percent ?? 0)}%` : 'H₂O'}</strong>
+          <strong>
+            {target ? (
+              `${Math.round(data.progress_percent ?? 0)}%`
+            ) : (
+              <>
+                {waterFormula[0]}
+                <sub>2</sub>
+                {waterFormula[2]}
+              </>
+            )}
+          </strong>
         </div>
       </header>
       <div
@@ -416,7 +430,9 @@ export function HydrationTracker({
             }
           >
             <span>{preset.label}</span>
-            <strong>+{preset.volume_ml} мл</strong>
+            <strong>
+              <Icon name="plus" size={16} /> {preset.volume_ml} мл
+            </strong>
           </Button>
         ))}
       </div>
@@ -444,6 +460,7 @@ export function HydrationTracker({
         onClick={() => setExpanded((value) => !value)}
       >
         {expanded ? 'Скрыть детали' : 'Другой напиток, история и цель'}
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} />
       </Button>
       {expanded && (
         <div className="hydration-details">

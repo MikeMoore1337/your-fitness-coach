@@ -1,6 +1,6 @@
 import type { ExerciseHistory } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
-import { ErrorState, LoadingState } from '../../shared/ui/common';
+import { DisclosureIcon, ErrorState, LoadingState } from '../../shared/ui/common';
 
 const eventLabels: Record<ExerciseHistory['progression_events'][number]['event_kind'], string> = {
   confirm: 'Подтверждено',
@@ -63,14 +63,12 @@ export function ExerciseProgressPanel({
   return (
     <section className="exercise-progress" aria-labelledby="exercise-progress-title">
       <details className="card-disclosure" open={Boolean(data?.last_performed)}>
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong id="exercise-progress-title">Мой прогресс</strong>
             <small>{summary}</small>
           </span>
-          <span className="disclosure-icon" aria-hidden="true">
-            ›
-          </span>
+          <DisclosureIcon />
         </summary>
         <div className="exercise-progress__body">
           {isLoading && <LoadingState />}

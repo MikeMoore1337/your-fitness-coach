@@ -163,6 +163,86 @@
   color: inherit;
 }
 
+.yfc-disclosure-summary {
+  display: flex;
+  min-height: var(--touch-target);
+  align-items: center;
+  gap: var(--v2-space-2);
+  list-style: none;
+  cursor: pointer;
+}
+
+select:not([multiple]) {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 42px;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 20px 20px;
+}
+
+input[type='search']::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  --search-clear-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M18 6 6 18' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3Cpath d='m6 6 12 12' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
+  background: var(--search-clear-icon) center / 20px 20px no-repeat;
+  cursor: pointer;
+}
+
+@media (forced-colors: active) {
+  select:not([multiple]) {
+    appearance: auto;
+    padding-right: 14px;
+    background-image: none;
+  }
+  input[type='search']::-webkit-search-cancel-button {
+    appearance: auto;
+    background: none;
+  }
+}
+
+.yfc-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+
+.yfc-disclosure-summary:focus-visible {
+  outline: var(--focus-width) solid var(--color-focus);
+  outline-offset: var(--focus-offset);
+}
+
+.disclosure-icon {
+  display: grid;
+  flex: 0 0 28px;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-inline-start: auto;
+  border-radius: 50%;
+  background: var(--bg-soft, var(--v2-surface-secondary));
+  color: var(--muted, var(--v2-text-secondary));
+}
+
+.disclosure-icon .yfc-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  transition: transform var(--motion-state) var(--motion-ease);
+}
+
+details[open] > summary > .disclosure-icon .yfc-icon {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .disclosure-icon .yfc-icon {
+    transition: none;
+  }
+}
+
 @media (forced-colors: active) {
   .yfc-icon {
     color: ButtonText;
