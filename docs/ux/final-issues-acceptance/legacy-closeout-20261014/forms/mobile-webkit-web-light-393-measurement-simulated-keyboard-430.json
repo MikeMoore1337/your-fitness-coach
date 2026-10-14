@@ -1,0 +1,26 @@
+{
+  "scenario": "measurement-simulated-keyboard",
+  "browser": "mobile-webkit",
+  "viewport": {
+    "width": 393,
+    "height": 430
+  },
+  "theme": "light",
+  "controls": [
+    {
+      "text": "Вернуться",
+      "bounds": {
+        "x": 12,
+        "y": 115.46875,
+        "width": 369,
+        "height": 44,
+        "top": 115.46875,
+        "right": 381,
+        "bottom": 159.46875,
+        "left": 12
+      },
+      "clientWidth": 367,
+      "scrollWidth": 367
+    }
+  ]
+}

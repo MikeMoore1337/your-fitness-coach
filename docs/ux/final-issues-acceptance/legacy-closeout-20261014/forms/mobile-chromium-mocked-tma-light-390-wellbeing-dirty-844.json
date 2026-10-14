@@ -1,0 +1,41 @@
+{
+  "scenario": "wellbeing-dirty",
+  "browser": "mobile-chromium",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "theme": "light",
+  "controls": [
+    {
+      "text": "Сохранить отметку",
+      "bounds": {
+        "x": 31,
+        "y": 804.203125,
+        "width": 194.046875,
+        "height": 44,
+        "top": 804.203125,
+        "right": 225.046875,
+        "bottom": 848.203125,
+        "left": 31
+      },
+      "clientWidth": 192,
+      "scrollWidth": 192
+    },
+    {
+      "text": "Вернуться",
+      "bounds": {
+        "x": 233.046875,
+        "y": 804.203125,
+        "width": 120.15625,
+        "height": 44,
+        "top": 804.203125,
+        "right": 353.203125,
+        "bottom": 848.203125,
+        "left": 233.046875
+      },
+      "clientWidth": 118,
+      "scrollWidth": 118
+    }
+  ]
+}

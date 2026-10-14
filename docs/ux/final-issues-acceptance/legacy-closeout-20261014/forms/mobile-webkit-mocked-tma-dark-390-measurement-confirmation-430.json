@@ -1,0 +1,41 @@
+{
+  "scenario": "measurement-confirmation",
+  "browser": "mobile-webkit",
+  "viewport": {
+    "width": 390,
+    "height": 430
+  },
+  "theme": "dark",
+  "controls": [
+    {
+      "text": "Вернуться",
+      "bounds": {
+        "x": 12,
+        "y": 115.46875,
+        "width": 366,
+        "height": 44,
+        "top": 115.46875,
+        "right": 378,
+        "bottom": 159.46875,
+        "left": 12
+      },
+      "clientWidth": 364,
+      "scrollWidth": 364
+    },
+    {
+      "text": "Вернуться без сохранения?Значения замера останутся в черновике на этом устройстве и не попадут в историю.ОтменаВернуться",
+      "bounds": {
+        "x": 16,
+        "y": 112.421875,
+        "width": 358,
+        "height": 205.15625,
+        "top": 112.421875,
+        "right": 374,
+        "bottom": 317.578125,
+        "left": 16
+      },
+      "clientWidth": 356,
+      "scrollWidth": 356
+    }
+  ]
+}

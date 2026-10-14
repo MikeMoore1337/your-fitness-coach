@@ -1,0 +1,24 @@
+{
+  "mobile": {
+    "startTime": "2026-10-14T19:58:47.736Z",
+    "duration": 171296.80800000002,
+    "expected": 76,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "desktop": {
+    "startTime": "2026-10-14T20:01:49.431Z",
+    "duration": 10647.265,
+    "expected": 4,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "unit": {
+    "numPassedTests": 869,
+    "numFailedTests": 0,
+    "success": true
+  },
+  "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594"
+}

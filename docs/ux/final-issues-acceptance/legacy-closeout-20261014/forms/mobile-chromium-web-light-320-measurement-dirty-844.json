@@ -1,0 +1,26 @@
+{
+  "scenario": "measurement-dirty",
+  "browser": "mobile-chromium",
+  "viewport": {
+    "width": 320,
+    "height": 844
+  },
+  "theme": "light",
+  "controls": [
+    {
+      "text": "Вернуться",
+      "bounds": {
+        "x": 12,
+        "y": 188.625,
+        "width": 296,
+        "height": 44,
+        "top": 188.625,
+        "right": 308,
+        "bottom": 232.625,
+        "left": 12
+      },
+      "clientWidth": 294,
+      "scrollWidth": 294
+    }
+  ]
+}

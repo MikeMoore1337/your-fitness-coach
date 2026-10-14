@@ -1,0 +1,41 @@
+{
+  "scenario": "wellbeing-simulated-keyboard",
+  "browser": "mobile-chromium",
+  "viewport": {
+    "width": 393,
+    "height": 430
+  },
+  "theme": "light",
+  "controls": [
+    {
+      "text": "Сохранить отметку",
+      "bounds": {
+        "x": 31,
+        "y": 293.203125,
+        "width": 194.046875,
+        "height": 44,
+        "top": 293.203125,
+        "right": 225.046875,
+        "bottom": 337.203125,
+        "left": 31
+      },
+      "clientWidth": 192,
+      "scrollWidth": 192
+    },
+    {
+      "text": "Вернуться",
+      "bounds": {
+        "x": 233.046875,
+        "y": 293.203125,
+        "width": 120.15625,
+        "height": 44,
+        "top": 293.203125,
+        "right": 353.203125,
+        "bottom": 337.203125,
+        "left": 233.046875
+      },
+      "clientWidth": 118,
+      "scrollWidth": 118
+    }
+  ]
+}

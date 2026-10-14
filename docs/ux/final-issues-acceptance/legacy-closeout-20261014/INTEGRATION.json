@@ -1,0 +1,67 @@
+{
+  "base_sha": "f99f1954c007567cefeec7dc882f14e68de6b0ba",
+  "production_sha": "f99f1954c007567cefeec7dc882f14e68de6b0ba",
+  "integration_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+  "source_prs": {
+    "990": {
+      "issue": 959,
+      "original_head": "5573da3ddd35e9f2a004329c11fdf013c50469b8",
+      "final_head": "e3149f05043c12fcfd1f15ca3adcaa2c2460e0da",
+      "integration_merge": "4a272af4a85c8fddb3817a56f3850613272e2375"
+    },
+    "979": {
+      "issue": 873,
+      "original_head": "7cb6e8fb7b3947927dbdfee4cca824d8e52dd2e2",
+      "final_head": "bace7c8564b8f479022d837784c111902b105a55",
+      "integration_merges": [
+        "65c77e557b14fd89aeb6d954959bcc629c3d0c91",
+        "a27c7b792eb6f3d24883f90828700b4468bb26b0"
+      ]
+    },
+    "972": {
+      "issue": 968,
+      "original_head": "5c036e8d8af5eab1f3b3643f010a74d898b131e9",
+      "final_head": "ec2d95021d9152d60331f7d41ef36beb79d87e20",
+      "integration_merge": "c9547d91dc38a6c7af65c619ef66c277a3824683"
+    },
+    "978": {
+      "issue": 969,
+      "original_head": "c460f0f16b389bcc881c3ed7b43bbbdc3a697c97",
+      "final_head": "c5fc1c2594df3ffda4f561706a366243d59a97aa",
+      "integration_merges": [
+        "1d71d1a5a9991d1d2e183835e366373ffc196582",
+        "8dd0d05d4dc747d99c41eb0a2ec2a2c35c87bc89",
+        "cc2d8d13546de74132d10b1259e04dad35f94594"
+      ]
+    }
+  },
+  "first_parent_order": [
+    "4a272af4a85c8fddb3817a56f3850613272e2375",
+    "65c77e557b14fd89aeb6d954959bcc629c3d0c91",
+    "c9547d91dc38a6c7af65c619ef66c277a3824683",
+    "a27c7b792eb6f3d24883f90828700b4468bb26b0",
+    "1d71d1a5a9991d1d2e183835e366373ffc196582",
+    "8dd0d05d4dc747d99c41eb0a2ec2a2c35c87bc89",
+    "cc2d8d13546de74132d10b1259e04dad35f94594"
+  ],
+  "conflicts": [
+    {
+      "path": "frontend/src/features/nutrition/FoodPickerDialog.tsx",
+      "resolution": "kept current production master blob; no Quick Add structural change"
+    }
+  ],
+  "tests": {
+    "vitest_passed": 869,
+    "mobile_passed": 76,
+    "desktop_passed": 4,
+    "retries": 0,
+    "skips": 0,
+    "snapshot_golden_changes": "NONE"
+  },
+  "native_ci": {
+    "run_id": "38628832702",
+    "status": "SUCCESS",
+    "url": "https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38628832702"
+  },
+  "git_status_at_capture": "tracked runtime clean; final evidence/docs committed after capture"
+}

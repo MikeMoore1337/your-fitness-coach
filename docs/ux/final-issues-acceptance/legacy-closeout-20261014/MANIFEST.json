@@ -1,0 +1,5487 @@
+{
+  "base_sha": "f99f1954c007567cefeec7dc882f14e68de6b0ba",
+  "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+  "frontend_tree": "5a8d254e62688c5f8119f00ad3c38baacadc7ce0",
+  "data": "synthetic platform-api/nutrition fixtures only",
+  "physical_devices": "NOT_VERIFIED",
+  "counts": {
+    "progress": 16,
+    "quick-add": 60,
+    "forms": 192,
+    "desktop": 20
+  },
+  "images": [
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-dark-430.png",
+      "sha256": "522c82b1ab46db1a2bbaa8ef59155f617e24c90d4fae4d2e98641346accc2506",
+      "bytes": 86079,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-dark-430.png",
+      "sha256": "394d2d9554d41684aad60e1522c1aaefbab1e161642927e0ce3ee6e719402275",
+      "bytes": 63377,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-light-393.png",
+      "sha256": "914fbb7c8a26a8150d0716833cc294d98d0e13e5f787dddfa48429b6465316c3",
+      "bytes": 81958,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-light-393.png",
+      "sha256": "fa310e039c0e4e372c4c989c7c8bc511ba9d2481a01e9268dda71997bb160f57",
+      "bytes": 60683,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-light-360.png",
+      "sha256": "cabc649ff2ec58287e829696e61c3b774d8aa1b26ff961e30d358b1a1e7a7bc3",
+      "bytes": 80219,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-light-360.png",
+      "sha256": "d1e87a48d6598b14b89bd7d6715ae273f921807c52b4e950f74de0db34178114",
+      "bytes": 57546,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-light-430.png",
+      "sha256": "60680cc502d84c789612d8b5560e330067aa73f673972416b7ba281493a7f4fb",
+      "bytes": 83980,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-light-430.png",
+      "sha256": "f37fe3b5d799284a65c65d742f15ddee2b93b13ab4f46c87ca536279c9a66e9c",
+      "bytes": 59656,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-dark-360.png",
+      "sha256": "be7bb4f8636d7811a6de763659643f313b278e4dbb35ba1351f5dddbb6535d16",
+      "bytes": 83378,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-dark-360.png",
+      "sha256": "c7eaad60e4f882b7f4e509fabb0f5385739c1b416a2919ea74feefc71670f77f",
+      "bytes": 61118,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-dark-320.png",
+      "sha256": "ff965300a1a70a093a7858eba1ac79bdf88c8dc69fbf2936b0fa396feea3bdc6",
+      "bytes": 78457,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-dark-320.png",
+      "sha256": "aa73c6625f2214317f44ee35cf7844f02c8ab77eea2500ec88a955922bc65ce8",
+      "bytes": 57960,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-light-320.png",
+      "sha256": "eba78b40204fcb777498c40c4eb7dc942ece830940bfcffa45baf7f5fd32d064",
+      "bytes": 75655,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-light-320.png",
+      "sha256": "e67258751378342256acc002f02393f08f6b5926345914b38893298ba11cb8e6",
+      "bytes": 54877,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-chromium-dark-393.png",
+      "sha256": "722fd9a4049827bde130880d6859d286f5f8693f7d6125743f90df9fe9fadcaf",
+      "bytes": 84909,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "progress",
+      "path": "progress/mobile-webkit-dark-393.png",
+      "sha256": "5ba4dbc564f6e657ff03e85e07803dc19d6b66eafc3d63f8651dc13db87e3936",
+      "bytes": 63950,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "progress-navigation",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-320-empty.png",
+      "sha256": "7570164ab7eb2cbd0797be5fe019a1a498f3510fb3d8efe552e3da67d4b7c006",
+      "bytes": 64913,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-320-filled.png",
+      "sha256": "b453ac96d60abb49903f508eb6b752a86c733d624c76cfafc933c629f8ddfc40",
+      "bytes": 65872,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-320-keyboard-safe-area-long-label.png",
+      "sha256": "d255091877a771a2e817178942eac2ef48f0c69a9b0f34719fa42c4d13050666",
+      "bytes": 43250,
+      "png_pixels": {
+        "width": 320,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 320,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-320-empty.png",
+      "sha256": "54fdd29cea758c9dbbd4fc5df44572cb055e2e16c03daad3e82115c02ababbcd",
+      "bytes": 48119,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-320-filled.png",
+      "sha256": "252f6521abc3f0b3237552645b2b9857ea8bd18b0b7a8d2d980b60fd2b03f2f8",
+      "bytes": 48804,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-320-keyboard-safe-area-long-label.png",
+      "sha256": "7560ada7984dd79d7b31e71e077f0a896ceb8b2de20eee292d3ddc455a5c15ed",
+      "bytes": 30557,
+      "png_pixels": {
+        "width": 320,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 320,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-360-empty.png",
+      "sha256": "56c49322287ca27a55781d690e6e9be20a9aba1843b45dc0c295a90791faff86",
+      "bytes": 66059,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-360-filled.png",
+      "sha256": "270b934dd5563f63a2b61c9456f31fd6225314ccb1f83dac61c0994690d898a1",
+      "bytes": 67646,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-360-keyboard-safe-area-long-label.png",
+      "sha256": "e308eba17ecc6c3621042ba02ca0c79f264209a182d957fb454d23577ff9dafd",
+      "bytes": 44784,
+      "png_pixels": {
+        "width": 360,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 360,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-360-empty.png",
+      "sha256": "d864942ab63604fe851c179c84f84ae8448020670473e3efb472753692790309",
+      "bytes": 48704,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-360-filled.png",
+      "sha256": "89127c7d556537d77e47712844cea44cdf4f5fa69d21e2fb1b1c1ba00307468d",
+      "bytes": 49386,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-360-keyboard-safe-area-long-label.png",
+      "sha256": "8781a55a7ff8407933f846ff1df9115e9dd4324dcea17cceb939bfff1b87617b",
+      "bytes": 25830,
+      "png_pixels": {
+        "width": 360,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 360,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-390-empty.png",
+      "sha256": "458dd68b1a72b56946fe0cf39f536f5409487e96fb85eca2e4371eca1be79c57",
+      "bytes": 77691,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-390-filled.png",
+      "sha256": "644a643df45c239650346d67ef24930b798bf81527336f61fefe994b486348f9",
+      "bytes": 78888,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-390-keyboard-safe-area-long-label.png",
+      "sha256": "aa94db7f5003efee82b3c73497427c0c7becd30fee1b6350a7d171b205c96fd4",
+      "bytes": 48367,
+      "png_pixels": {
+        "width": 390,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 390,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-390-empty.png",
+      "sha256": "12dc4e9be40168e7dc34c8a37566a84af3b1e95566cb202e0b161f58f58ce1b1",
+      "bytes": 55892,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-390-filled.png",
+      "sha256": "de7b78e53e11f7d9a68ffc2e05b52833b80ca7761c7283a5565257055c11d3e0",
+      "bytes": 56362,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-390-keyboard-safe-area-long-label.png",
+      "sha256": "65fcd5a2d45eaac06c9030e4a386815fcfec0a7e94905508d22db6c315a80a52",
+      "bytes": 33123,
+      "png_pixels": {
+        "width": 390,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 390,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-393-empty.png",
+      "sha256": "25419b87f4920cb3f211529494dd42f938435dd4f480af646a56680d71991280",
+      "bytes": 78031,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-393-filled.png",
+      "sha256": "31fb9c7182c5cf29c720f45ee241d31cb694cb6d833c628c8152345ab16a6426",
+      "bytes": 79189,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-393-keyboard-safe-area-long-label.png",
+      "sha256": "8f4bc2fa8ba652f687102d75c30c03922193bf0ecb679010b23794840a5357dd",
+      "bytes": 48535,
+      "png_pixels": {
+        "width": 393,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 393,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-393-empty.png",
+      "sha256": "96bb1bccc80a52458392ede607daf343f344f05fb4245ce6e51f383c9bd090a9",
+      "bytes": 55961,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-393-filled.png",
+      "sha256": "54c58e9122e5a8340fad15eeb69376c99367d5bc73f27984376e2021212eee0b",
+      "bytes": 56456,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-393-keyboard-safe-area-long-label.png",
+      "sha256": "5d0e9bc49498ea23982c369cf3cbf23dd268812b5cd54f9bc94f3fe11b250d56",
+      "bytes": 30667,
+      "png_pixels": {
+        "width": 393,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 393,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-430-empty.png",
+      "sha256": "c70ef1c40d2ce80b620e7ececbebe8b5aa6e81ea3ffcd672b95a952da7f21000",
+      "bytes": 81337,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-430-filled.png",
+      "sha256": "a814afe1051c9ac3f7a161a5515ef38f3d985208a66afac2d53dbe296ee1d960",
+      "bytes": 82500,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-dark-430-keyboard-safe-area-long-label.png",
+      "sha256": "e16222a0fb2e0daa34184c7a1c35756f5424121364132c9379e9d565ae1bac64",
+      "bytes": 49554,
+      "png_pixels": {
+        "width": 430,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 430,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-430-empty.png",
+      "sha256": "1bfe6aaa7335bce0679dfc544cb74784111f48846359a895d8b23f0bd5523561",
+      "bytes": 56996,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "empty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-430-filled.png",
+      "sha256": "dd33ee3504cfe04b5265dac058858ebe1d79c336a0b35debc0ffc3292c5e58d1",
+      "bytes": 57466,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "filled",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-dark-430-keyboard-safe-area-long-label.png",
+      "sha256": "5bbea4d71e8183f5c67ac0a36538473cf986315b2570da33daf92cdeb41fe3f8",
+      "bytes": 31509,
+      "png_pixels": {
+        "width": 430,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 430,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-320-empty.png",
+      "sha256": "288a4ead54bbff4e8fbd3b3b81d4f13d51b5c117ab867e9738ed6077b54e9670",
+      "bytes": 66001,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-320-filled.png",
+      "sha256": "7aef527b91de1796f7325a6716cebc50cf0b236135b1371738ec3a8840ee6a51",
+      "bytes": 66954,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-320-keyboard-safe-area-long-label.png",
+      "sha256": "080f443498feab6ee9c65533bd2454af53a03465058bac05e8296db155cd2184",
+      "bytes": 45721,
+      "png_pixels": {
+        "width": 320,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 320,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-320-empty.png",
+      "sha256": "1c7dda1956fabd411f0f64b0982f9538f913a5cd5e20a1352c0b15787327d25c",
+      "bytes": 44397,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-320-filled.png",
+      "sha256": "03113a63f0b62e01e24ec0ce7c49f3214589eafbb5d80b4c140f4c1216f6b61c",
+      "bytes": 45055,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-320-keyboard-safe-area-long-label.png",
+      "sha256": "8820672fe4973684f531a8b911025ddd3fcdee7a63125b2e12a6b80248ee20b4",
+      "bytes": 22818,
+      "png_pixels": {
+        "width": 320,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 320,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-360-empty.png",
+      "sha256": "2a4ea1cf8d84ab07b591e314d4a4b9d975fb34e786c356fae8e1451915c0627d",
+      "bytes": 68048,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-360-filled.png",
+      "sha256": "106a7f2acda3806f6c02904450b9e9fa185c864609e18c08c699eeeb8370ddb6",
+      "bytes": 69608,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-360-keyboard-safe-area-long-label.png",
+      "sha256": "102b555d6a847e313279b13062af00b1d0ac5c138d710ae457208587e9b07f30",
+      "bytes": 48080,
+      "png_pixels": {
+        "width": 360,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 360,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-360-empty.png",
+      "sha256": "1e59014f42c371a1dfaf6d0bebaf2d6c39b11e2388f6f3801df52e325cc83ed2",
+      "bytes": 45113,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-360-filled.png",
+      "sha256": "402d2203023d78c9122a4eab6543b01ed16abf3fae2b43081f8d58f45ac08b7a",
+      "bytes": 45767,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-360-keyboard-safe-area-long-label.png",
+      "sha256": "e8d18a8ea63aa5135a676e067858c58c0a851709fe95b4c645d4ca26633699cb",
+      "bytes": 30388,
+      "png_pixels": {
+        "width": 360,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 360,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-390-empty.png",
+      "sha256": "a5d93b4dbb17b9bcacef6ed1e445ef08b17a6343b1a4081def2d0ab4230461f0",
+      "bytes": 78500,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-390-filled.png",
+      "sha256": "07f23f73529e03b735d9b29a1218c2ff33eb106ee9f03ae626b2df72eff155db",
+      "bytes": 79328,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-390-keyboard-safe-area-long-label.png",
+      "sha256": "9dd034780de75312f3c58264f0289feec32264f15777aa586c807287c5e86f14",
+      "bytes": 50930,
+      "png_pixels": {
+        "width": 390,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 390,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-390-empty.png",
+      "sha256": "837f6f9d4fa792fd98a26d38e6fbc0b9a6a1b76c5571ec19109a3211862edfed",
+      "bytes": 51976,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-390-filled.png",
+      "sha256": "43cf25f357fcaf247f9f30fbf23f12e1db02794033afe6da0e83980827547e6d",
+      "bytes": 52509,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-390-keyboard-safe-area-long-label.png",
+      "sha256": "9990df08584779055921c4d27ee4b8d56678b43aa93396b76ce8448ea1b6c447",
+      "bytes": 27224,
+      "png_pixels": {
+        "width": 390,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 390,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-393-empty.png",
+      "sha256": "75564bf078672380863bf5674b591fa1d6f644d5b6f5e9397eb401ef9dfc9955",
+      "bytes": 78455,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-393-filled.png",
+      "sha256": "152cffce374fc79a157ca1a68801cbc508e1c6003d30305a5a0eb724ca0d3e1e",
+      "bytes": 79304,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-393-keyboard-safe-area-long-label.png",
+      "sha256": "7c4f75124753490a1f4ac0bd1d05517991a4618b3e4e44a2c1954721c089d4f4",
+      "bytes": 51029,
+      "png_pixels": {
+        "width": 393,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 393,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-393-empty.png",
+      "sha256": "7d31904104e1e665faacf81eb8a4c1f696b6efdfb40dac93868a7314d3914ada",
+      "bytes": 52043,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-393-filled.png",
+      "sha256": "06a2a285c186ce19f09a96e98d827d87e0a0e993c6f86eb9b66f5219c2c5c0fa",
+      "bytes": 52543,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-393-keyboard-safe-area-long-label.png",
+      "sha256": "22938d76e07ffc5da55308838a41ef9b529cb4bb6b93801f130cce9769c42238",
+      "bytes": 27199,
+      "png_pixels": {
+        "width": 393,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 393,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-430-empty.png",
+      "sha256": "1abcfc5b9e792499b537323cb59cfdbf6665c06e905c5d4560af86ef7bb3ea59",
+      "bytes": 81564,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-430-filled.png",
+      "sha256": "d4387ecded8a0555a51bb943d0d4982d078808f2abccc4f2f5add712743a67dc",
+      "bytes": 82683,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-chromium-light-430-keyboard-safe-area-long-label.png",
+      "sha256": "87bc5299a478d4f1748a470b9866ba72c0f5bb5517ba9506f8948a63b4f3ab1e",
+      "bytes": 52637,
+      "png_pixels": {
+        "width": 430,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 430,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-430-empty.png",
+      "sha256": "0c83aa15c2809ce7ed2ea9ddb485a7ad1be7c91552e7c85317cd6696fe7c1952",
+      "bytes": 53098,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "empty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-430-filled.png",
+      "sha256": "c6615239076f749d9801b980234d744f3714aa78f57d82bc44667ad4022260e2",
+      "bytes": 53570,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "filled",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "quick-add",
+      "path": "quick-add/mobile-webkit-light-430-keyboard-safe-area-long-label.png",
+      "sha256": "017c842ab3b797b473005dd8de3d9ff2d1c8bdc3850366af5a850a61898aa45b",
+      "bytes": 28035,
+      "png_pixels": {
+        "width": 430,
+        "height": 420
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "keyboard-safe-area-long-label",
+      "viewport": {
+        "width": 430,
+        "height": 420
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-measurement-confirmation-430.png",
+      "sha256": "8f76adfed762d78a5447e1574b39f2d91966d4962af62c8a459b52e07426268f",
+      "bytes": 58794,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-measurement-dirty-844.png",
+      "sha256": "521154f599dfa3de0630f54d749e27c3c16871079ee0c6384b8a2a48fa0b5171",
+      "bytes": 40422,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-measurement-simulated-keyboard-430.png",
+      "sha256": "5381a1a675b69b1d20573df6ebaea3f1319a44f77bbf55acde29c613764e1130",
+      "bytes": 21365,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-measurement-unchanged-844.png",
+      "sha256": "6bb2eca5b03aab52e93b5bd33ca60dbbd83ff2651b86f204691d8bd1596ffb98",
+      "bytes": 58056,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-wellbeing-confirmation-430.png",
+      "sha256": "2ffd812ea04a00256d2c911a33c5d610870ee965f456bbe1d30c4da1ccd8464b",
+      "bytes": 52713,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-wellbeing-dirty-844.png",
+      "sha256": "582b899aa10a43b21273c58af4a3a83b227bdaacea5d5fc661cc50994acd58f5",
+      "bytes": 67910,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "ae76070204bcc175ff51056176410bb68ed05699980e5eb6a3fbe938bc60a912",
+      "bytes": 34115,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-dark-390-wellbeing-unchanged-844.png",
+      "sha256": "0a2bf8e222dd45d523e9cabf8a7915b15b6be881559f798d9560bbddb349fba6",
+      "bytes": 54083,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-measurement-confirmation-430.png",
+      "sha256": "c2fdb97e4617479f12a8f506905d9a5ce26814c6c378c790a6bd092a4b959e9b",
+      "bytes": 61467,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-measurement-dirty-844.png",
+      "sha256": "755878120b30913fdf0c49e0fd218635d70b340d673224024bfbd54aa19969ad",
+      "bytes": 37078,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-measurement-simulated-keyboard-430.png",
+      "sha256": "8b99c2a1027568ff2b07de55a4edc84304701c3a70013c6f90f55e9ec0838421",
+      "bytes": 18960,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-measurement-unchanged-844.png",
+      "sha256": "7adc913fd85ba2326c5111b0cb1de9c76758e0c44bba8b6b6b9562e1b949af41",
+      "bytes": 53615,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-wellbeing-confirmation-430.png",
+      "sha256": "6bfc0815b7524ecbbb6afc522d495789b60f74cee7b591b17b1939455850bfe5",
+      "bytes": 58633,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-wellbeing-dirty-844.png",
+      "sha256": "e9b5548df7c0343a41f5dbc2491fdd1b1adc82b065d1da042df4c3f75cc634ad",
+      "bytes": 61145,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "549a8d416582874fd4ea909c2667680763e5da8abd30efb5a8705334e4b846fe",
+      "bytes": 30125,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-mocked-tma-light-390-wellbeing-unchanged-844.png",
+      "sha256": "4483b5b8e830912229a1c314fb7b196b89d5680c03a110ee4930d715af3c44ee",
+      "bytes": 49493,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-measurement-confirmation-430.png",
+      "sha256": "edc8c2d73be23fd77702d477049dcfe71b29bc768c0408930007f63d43dbc253",
+      "bytes": 52284,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-measurement-dirty-844.png",
+      "sha256": "5b0b36c44effee259b9fd0c34a920456e85b3789336ff422fcd2bbaf884bad8b",
+      "bytes": 40560,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-measurement-simulated-keyboard-430.png",
+      "sha256": "ddc49e0e88de5ae6d55212351f9f772fc1c9fb8e8f9ab69665e075063f953f48",
+      "bytes": 20959,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-measurement-unchanged-844.png",
+      "sha256": "237f7b020e8b17aaf370a5017bada730226b8ef5b75d81ce960fea3e9689cb17",
+      "bytes": 53518,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-wellbeing-confirmation-430.png",
+      "sha256": "bea1aa5454e27260bf70bd9bba02c68ca16e8e00c311b67fce7003b6a4a1e6df",
+      "bytes": 44936,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-wellbeing-dirty-844.png",
+      "sha256": "9198ad8d74f4c06deeaa1d2f65be6f727ba79f393d2fd19270e285d751468a03",
+      "bytes": 60609,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-wellbeing-simulated-keyboard-430.png",
+      "sha256": "578e1c2728874a6c3030ca0af3da3c9346bc9410beb154a29ca701769c818ca5",
+      "bytes": 28136,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-320-wellbeing-unchanged-844.png",
+      "sha256": "9fa6f01be537df52f963ea825d01b39d9cc5d8eee7b319f0a41e87676409773d",
+      "bytes": 48181,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-measurement-confirmation-430.png",
+      "sha256": "b8ba557acd07bc0e00df79a86cae6c92a6305be27ce205cf95b5be6728435236",
+      "bytes": 57489,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-measurement-dirty-844.png",
+      "sha256": "bbe2b93605692c11fff584deb9becbee8cf5b3ce007cc713c58b0bdef0c68268",
+      "bytes": 41429,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-measurement-simulated-keyboard-430.png",
+      "sha256": "c0a2f59d7f61b4bce04f56d4849da8eddf22c4c2793813084460d3a75db8a6f5",
+      "bytes": 21562,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-measurement-unchanged-844.png",
+      "sha256": "efa79fb684d96e2171c2639975c3810475ef8ef379753b55d28b96b1af35fb5d",
+      "bytes": 57446,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-wellbeing-confirmation-430.png",
+      "sha256": "5ca9ee65a71ba9186a4fa381881ac420163d8a063f2adacc4df18e0b34866671",
+      "bytes": 47316,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-wellbeing-dirty-844.png",
+      "sha256": "b2b4cef28dc15fa010685f2e80bd8e07e313fbabaa2302396a19a08b816d3860",
+      "bytes": 66652,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-wellbeing-simulated-keyboard-430.png",
+      "sha256": "637c9b55cdcd45e4a33345833825e084b6fc55bbe477888716cdf106bdd12ec0",
+      "bytes": 30551,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-360-wellbeing-unchanged-844.png",
+      "sha256": "1c2fef10989e07e0e4043ee5d3763d6fd5b2d20d78e9a948cb5ba0cf57092c46",
+      "bytes": 50459,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-measurement-confirmation-430.png",
+      "sha256": "48ef0c6e86487c332627116c8fe4c25c12db8f83905768df9f49ae12c71a8919",
+      "bytes": 55598,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-measurement-dirty-844.png",
+      "sha256": "33f600d413cdd67109502ccfe9d63fc54fe4c50159ca54997875b66915a7cf61",
+      "bytes": 41335,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-measurement-simulated-keyboard-430.png",
+      "sha256": "5381a1a675b69b1d20573df6ebaea3f1319a44f77bbf55acde29c613764e1130",
+      "bytes": 21365,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-measurement-unchanged-844.png",
+      "sha256": "e23774a816b686228f9fb1a517a3b39992f10463edba66d279a036747e70167f",
+      "bytes": 58055,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-wellbeing-confirmation-430.png",
+      "sha256": "2ffd812ea04a00256d2c911a33c5d610870ee965f456bbe1d30c4da1ccd8464b",
+      "bytes": 52713,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-wellbeing-dirty-844.png",
+      "sha256": "cfc42d7ca557f30f2c03e9bc98dd60443b9e1cd3d7e4990a95b73d58c48adba5",
+      "bytes": 68083,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "ae76070204bcc175ff51056176410bb68ed05699980e5eb6a3fbe938bc60a912",
+      "bytes": 34115,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-390-wellbeing-unchanged-844.png",
+      "sha256": "42423a5b7ad6d7cd3990b6c1052539527586b931b59d29b34134397e496b7fe9",
+      "bytes": 54082,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-measurement-confirmation-430.png",
+      "sha256": "51e986bb6160da7bb60fae2cb2ab8940961737644fc1fb55416af99d58a3c2f5",
+      "bytes": 55780,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-measurement-dirty-844.png",
+      "sha256": "03ea4b90c955f06215454149994f89857255793ca249c279ff771da20b3a0231",
+      "bytes": 41425,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-measurement-simulated-keyboard-430.png",
+      "sha256": "c4070f43a5772a29bd478a2f8e343759c53a4dbe03e2e8bc8b40ed567adf2af3",
+      "bytes": 21404,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-measurement-unchanged-844.png",
+      "sha256": "cf07015d4bf480cfbf74dab2545c036b68e37a3ac3b0f50915a3b5345bffc0ff",
+      "bytes": 58004,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-wellbeing-confirmation-430.png",
+      "sha256": "90e445b63f7b2b376e68bab4df43eaef92bf41afb192ce188b2a0cb430f4bb67",
+      "bytes": 52932,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-wellbeing-dirty-844.png",
+      "sha256": "597ab0300c19a0167a8b0176b428d8f60fb72636330213acb556e0ed038fde43",
+      "bytes": 68175,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-wellbeing-simulated-keyboard-430.png",
+      "sha256": "a66d61445bc9fd3229ec088e9691e0c5dbb8bfc5322af3d912e6a391e8cc19ae",
+      "bytes": 34013,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-393-wellbeing-unchanged-844.png",
+      "sha256": "c6bd81e16279674ed528d1aea4d2b1685bb010fd6dd2179c394ea1fb46389c22",
+      "bytes": 54669,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-measurement-confirmation-430.png",
+      "sha256": "5e7ee1b30a8056657b1dd2477d3309cc68c21c669dea6c065196038bd9824545",
+      "bytes": 57927,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-measurement-dirty-844.png",
+      "sha256": "0c952f6ce2bb62f7e8e09b1f425aa9c2ffcde1fa96075150bdaef73e2f956f0d",
+      "bytes": 41548,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-measurement-simulated-keyboard-430.png",
+      "sha256": "fe42b48ee00fb25efa365f838445c909050390edb88b487906299d9dbf85145b",
+      "bytes": 21457,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-measurement-unchanged-844.png",
+      "sha256": "f7aee3aba0f890b37600d83230eefbbd97874aed55ff8d3264fd2066227c15c8",
+      "bytes": 57573,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-wellbeing-confirmation-430.png",
+      "sha256": "8fe92143f44b8c46a06e544a5754e5b2c0463845440e57cbd0f856cbb644ef8f",
+      "bytes": 54637,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-wellbeing-dirty-844.png",
+      "sha256": "10d6bd42e35320e1893b5100f53c148fedc0df9a324a3311e85e1052e9d6db60",
+      "bytes": 68581,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-wellbeing-simulated-keyboard-430.png",
+      "sha256": "0948ae0a71c50eb0b1c962067eb559f5d254a4b379e11d25b17e83b3a53e66dd",
+      "bytes": 34499,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-dark-430-wellbeing-unchanged-844.png",
+      "sha256": "18a51ad5a878982b93e75ba96741c6b684482ed327dc85154f3b40dd08f57456",
+      "bytes": 57187,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-measurement-confirmation-430.png",
+      "sha256": "0a91c5250a37c6b34f8a991c8e1cb6b294bd71eb04d1b83b199e88501bb43231",
+      "bytes": 56748,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-measurement-dirty-844.png",
+      "sha256": "0fd44ffead936b9cb7efae44196f797aa201bc8fc8bba8f3eb8e4af6cd8fb8b7",
+      "bytes": 39529,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-measurement-simulated-keyboard-430.png",
+      "sha256": "da2e9c74e6f1b8d2d03b3a6afde97e8a8ed2d0a781b0152c8f522b3b46d7afc0",
+      "bytes": 18622,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-measurement-unchanged-844.png",
+      "sha256": "434fb55bb7490478984db8e16b14ff56f9908c13601850367b34b00b5c0cb102",
+      "bytes": 49629,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-wellbeing-confirmation-430.png",
+      "sha256": "4dbac14b2ee1e40b61505848c776790f8489065aad489e9896a3164f61b4f4bd",
+      "bytes": 48675,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-wellbeing-dirty-844.png",
+      "sha256": "b44cc463cb216a6ad0f05f3a13bc2fc6afc8a2c775428e28c7ca88c7733d5a9d",
+      "bytes": 54803,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-wellbeing-simulated-keyboard-430.png",
+      "sha256": "ba3f4bf6592ed2adc163afb19ff89d4f9180d386cb9bd8ecf453e8f2551d900c",
+      "bytes": 25398,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-320-wellbeing-unchanged-844.png",
+      "sha256": "70cdac7890291d9c60c1e6e339683fb08bea277f48c85b83feaa33f45e2150ec",
+      "bytes": 44348,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-measurement-confirmation-430.png",
+      "sha256": "fd27f4822958483682c87c828d957be7065bfe0ba84ceb9bab7431b494a76f6c",
+      "bytes": 59514,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-measurement-dirty-844.png",
+      "sha256": "d86213bafc0e927c05e7fe92639ac094b059d73012eaaafb581fe92d9a049194",
+      "bytes": 37051,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-measurement-simulated-keyboard-430.png",
+      "sha256": "2152ed105d93c7c9cbc28c395d135c57938dff5d08b4b5b5064a63b768a2cf38",
+      "bytes": 19074,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-measurement-unchanged-844.png",
+      "sha256": "468350c5329291e1fec00bad3a75d8e5af996a2c43318a9bb7ee3de610b2cc7d",
+      "bytes": 52891,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-wellbeing-confirmation-430.png",
+      "sha256": "d3fa7b6cf2dda6bf3a61960abf778040e51289d6761d0324875bf690125d8f5f",
+      "bytes": 51210,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-wellbeing-dirty-844.png",
+      "sha256": "6d1b76572f8adcf91235fed97d61a41cc588dfda44930d6982d65f809c631495",
+      "bytes": 59862,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-wellbeing-simulated-keyboard-430.png",
+      "sha256": "a2b0ec551473941d88456d3903f19f09f48438481810842c9b54c6d0a0265151",
+      "bytes": 26818,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-360-wellbeing-unchanged-844.png",
+      "sha256": "c4eef52e3d656da42069bfa69199fd25c387f79ac9991ef11877f49dffe5d80f",
+      "bytes": 46610,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-measurement-confirmation-430.png",
+      "sha256": "c2fdb97e4617479f12a8f506905d9a5ce26814c6c378c790a6bd092a4b959e9b",
+      "bytes": 61467,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-measurement-dirty-844.png",
+      "sha256": "755878120b30913fdf0c49e0fd218635d70b340d673224024bfbd54aa19969ad",
+      "bytes": 37078,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-measurement-simulated-keyboard-430.png",
+      "sha256": "8b99c2a1027568ff2b07de55a4edc84304701c3a70013c6f90f55e9ec0838421",
+      "bytes": 18960,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-measurement-unchanged-844.png",
+      "sha256": "7adc913fd85ba2326c5111b0cb1de9c76758e0c44bba8b6b6b9562e1b949af41",
+      "bytes": 53615,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-wellbeing-confirmation-430.png",
+      "sha256": "3ebe602e456d6891a9a93e2329f45cf016e24c44ce60561f08f3a372cfd20573",
+      "bytes": 58427,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-wellbeing-dirty-844.png",
+      "sha256": "e9b5548df7c0343a41f5dbc2491fdd1b1adc82b065d1da042df4c3f75cc634ad",
+      "bytes": 61145,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "549a8d416582874fd4ea909c2667680763e5da8abd30efb5a8705334e4b846fe",
+      "bytes": 30125,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-390-wellbeing-unchanged-844.png",
+      "sha256": "44b755034801a05e07bcb3d1f940e0973d3b00385a0cdb5212ab601118bd8493",
+      "bytes": 49501,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-measurement-confirmation-430.png",
+      "sha256": "510993980a2feb3ba7d34ae31f3d9f59149771a2da6d5d5abedcb792ec927b7c",
+      "bytes": 65592,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-measurement-dirty-844.png",
+      "sha256": "d6fbe30015a4346fda112e003f97319ad10bfd2a0b143803d8a5bd70bc8d6842",
+      "bytes": 37153,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-measurement-simulated-keyboard-430.png",
+      "sha256": "8ef9fa6a826d9ce729a5355a874027357119990e8c6fe1a8f7b81e1852b105b8",
+      "bytes": 19014,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-measurement-unchanged-844.png",
+      "sha256": "3c5180bb034fd77fc2c0735ab0d04af8995c2f6178f850ffe350b013b2d358f3",
+      "bytes": 53627,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-wellbeing-confirmation-430.png",
+      "sha256": "88689745fad464cc129be39e1a6fbaa7a3b44a9f4cee0add4ab60019622d49e3",
+      "bytes": 58876,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-wellbeing-dirty-844.png",
+      "sha256": "048285727b4a128c819c90cc2a64b19c216efec39942de0af835615afa7a484a",
+      "bytes": 60855,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-wellbeing-simulated-keyboard-430.png",
+      "sha256": "1defa8b141081599a56f7d3d5e130a4a70d48c3b87c186c54759084b6f175564",
+      "bytes": 29717,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-393-wellbeing-unchanged-844.png",
+      "sha256": "e8bb05a50cf2e432fc11ff7e751ceabb3380270d547f46c8933f29f58693b9ab",
+      "bytes": 49962,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-measurement-confirmation-430.png",
+      "sha256": "08ac1bb25824df0ba9e04a671b3d7b71b17d6395ea7911982b7de6db2f4be7fc",
+      "bytes": 63630,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-measurement-dirty-844.png",
+      "sha256": "3dde4b77851c16f3124833162ffef05f92da00b2e2b8c3ed4310d35ce471be38",
+      "bytes": 37259,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-measurement-simulated-keyboard-430.png",
+      "sha256": "436ac2723a23a60d25d7031159811ea5bc2dad734dacfa5a1d516f5b29b3995f",
+      "bytes": 19033,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-measurement-unchanged-844.png",
+      "sha256": "cc4053338d24e64e9698bc65c7e6a3167390e1706bfa90809fd10c6fd83b428d",
+      "bytes": 53378,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-wellbeing-confirmation-430.png",
+      "sha256": "14c9bff4b5a49e3599745e528a83777c16ee6c4d383a77546a56e37e8382c05a",
+      "bytes": 60515,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-wellbeing-dirty-844.png",
+      "sha256": "af6308148363ab1edbd4fc7b82f18ea290f2ea756ee4603595356d38781ee362",
+      "bytes": 61816,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-wellbeing-simulated-keyboard-430.png",
+      "sha256": "3ac767c617861594932628ba2184af1cb9477759624fab4e3442b5b1232faeb3",
+      "bytes": 30597,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-chromium-web-light-430-wellbeing-unchanged-844.png",
+      "sha256": "ae2cbfeda033cc9cd7cf328ca49fe893c173596f765d4abbc3f13c64f4ff669a",
+      "bytes": 52505,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-measurement-confirmation-430.png",
+      "sha256": "b14f7f254dbf24a0607022d0936592f0f113a28934b252a6854391d17029e856",
+      "bytes": 43948,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-measurement-dirty-844.png",
+      "sha256": "5ed087320e2dcdf629cee6f2d4f693737e8a049187bba81e0f4f05816e54e4db",
+      "bytes": 42452,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-measurement-simulated-keyboard-430.png",
+      "sha256": "f4ecbe036b55799bad75946b60dcd054560b480e09e4ec59d5938c479f7a4068",
+      "bytes": 19440,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-measurement-unchanged-844.png",
+      "sha256": "217bfe9dce4409a5704338093e1de463961db4384d7b9049cd7c9b095391faa4",
+      "bytes": 47470,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-wellbeing-confirmation-430.png",
+      "sha256": "297c374eba189175c67375203d7bf6d0f0e3f8f5ad006379f7c4d54454548dcc",
+      "bytes": 42427,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-wellbeing-dirty-844.png",
+      "sha256": "4fa235e2a55a03491a7b75675063effeb1be4e26131b658e8d78e6804530691c",
+      "bytes": 48488,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "66e8ac31a7dc6cc8575edd558888c4dd4d8613fe832ad94f63c1856ebda7a5c0",
+      "bytes": 24439,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-dark-390-wellbeing-unchanged-844.png",
+      "sha256": "fa517500696af2bf5463a511312e06368ae15c084a95b208918b7950401ee3c1",
+      "bytes": 41807,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-measurement-confirmation-430.png",
+      "sha256": "6decbe4d8617a22e4aef0094e9bfa7170f488820a9c0e7c30830af6b56f97020",
+      "bytes": 50044,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-measurement-dirty-844.png",
+      "sha256": "f978d55d004640d9f6b9a2baa1e3e8212cf8f33ef62a517e5e92d650072a4cd0",
+      "bytes": 40660,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-measurement-simulated-keyboard-430.png",
+      "sha256": "0a8e79693e5ea779da8e1be18dd1e9866f84e767da2610466efee3500535cf62",
+      "bytes": 17742,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-measurement-unchanged-844.png",
+      "sha256": "3eb64bb632126316bded7dab85d91733e620c00cb5edbe78015750ddc61e914e",
+      "bytes": 45567,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-wellbeing-confirmation-430.png",
+      "sha256": "90297d47a4dae82a2e3f4ab80c2f27a819b514f4d88ba4f7cc846f009c313718",
+      "bytes": 45973,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-wellbeing-dirty-844.png",
+      "sha256": "3e2ab63c29f6dc996beebee7d9fc3f13d638121bf71c6d63b3fa86e00189651b",
+      "bytes": 45321,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "7dcfa25f504feef08b84be979f8eb8c90f8f92d61dfc0cf92c32e75843e1a87b",
+      "bytes": 23665,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-mocked-tma-light-390-wellbeing-unchanged-844.png",
+      "sha256": "b03dbc5aaff067d3d6f6a1b87f644f9ce649782d919c1061f1dec7cad0900578",
+      "bytes": 38848,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "mocked-tma"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-measurement-confirmation-430.png",
+      "sha256": "9d5ef1dd60789c6c64607654b0ae890bed53be8be5d4eedfce506d553e77e7ea",
+      "bytes": 43186,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-measurement-dirty-844.png",
+      "sha256": "0fff6d977285b352057a3c5e5b99d6ef0a81b791b29e1ced44d953c77bfe09c5",
+      "bytes": 32171,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-measurement-simulated-keyboard-430.png",
+      "sha256": "e4e7204b2ac98536e1ecc496c9b15f551788356480c98bc4a119a1c115f35463",
+      "bytes": 19020,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-measurement-unchanged-844.png",
+      "sha256": "d4141c3c1d8324b27cb79280aa8e4f572cd0ad880872e6ae46e22b48b4686944",
+      "bytes": 44020,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-wellbeing-confirmation-430.png",
+      "sha256": "e052c1299e759eac2a43f68233ec67c9616198fc6e1965d97cfd379c504b03bb",
+      "bytes": 35499,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-wellbeing-dirty-844.png",
+      "sha256": "337ad060410d3cfc843257450cf3cc150ea49cb3e7dd99a88aac3c0d642e91ab",
+      "bytes": 45438,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-wellbeing-simulated-keyboard-430.png",
+      "sha256": "3ae43857ccb5d7a73db7a263bf6c2ee4b477630a11fd79eeb3eaf4314890eabf",
+      "bytes": 21427,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-320-wellbeing-unchanged-844.png",
+      "sha256": "4f174cfba95eafc935bf701ef79bbec8ecf3694f819cc139916664d0678665af",
+      "bytes": 37705,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-measurement-confirmation-430.png",
+      "sha256": "a051d9d9124a1276b0e8862efbe4753e5b76e90ad298a17e03b4b1d72acc8cad",
+      "bytes": 46503,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-measurement-dirty-844.png",
+      "sha256": "f19261ff6cd6a1e0e761c14c8e58b8ef6835bba1056c0920eb6ca25daeac8188",
+      "bytes": 41827,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-measurement-simulated-keyboard-430.png",
+      "sha256": "d6e38d19dbb4b6209569b946be974368d6a431acb774932712e9f255822b60bf",
+      "bytes": 19531,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-measurement-unchanged-844.png",
+      "sha256": "4bc59bd4ca5cc56b1990c62718208bce4767e1e21a46c60a5fbf35aba6666bf9",
+      "bytes": 46727,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-wellbeing-confirmation-430.png",
+      "sha256": "3d778f27c1f083cbf51e4cf9d872dd46238bc48004a8db160930eee206bf2eba",
+      "bytes": 37788,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-wellbeing-dirty-844.png",
+      "sha256": "f5880c2f146449a36cad0f15d5a17d7347a6ff33cc1aca4af3ba7269558a06d1",
+      "bytes": 48155,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-wellbeing-simulated-keyboard-430.png",
+      "sha256": "5c2c481f95cb091ed883d42c76efa08fb05624fa5d7e4c33fdf81117a6bf7796",
+      "bytes": 22271,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-360-wellbeing-unchanged-844.png",
+      "sha256": "823311f639017cc0f9010b3c5f4429a352a818e7b13a86f207cd46901befe74a",
+      "bytes": 39121,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-measurement-confirmation-430.png",
+      "sha256": "fca61453be8f78e4ae04a92c5af1cf191125309fb43a4288325c6b7e40c6ed3c",
+      "bytes": 46959,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-measurement-dirty-844.png",
+      "sha256": "97cfee7eb4dacb75455a49702b5eb952c80a2b1ae0190652f4d89e6ab69a2152",
+      "bytes": 42958,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-measurement-simulated-keyboard-430.png",
+      "sha256": "f4ecbe036b55799bad75946b60dcd054560b480e09e4ec59d5938c479f7a4068",
+      "bytes": 19440,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-measurement-unchanged-844.png",
+      "sha256": "217bfe9dce4409a5704338093e1de463961db4384d7b9049cd7c9b095391faa4",
+      "bytes": 47470,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-wellbeing-confirmation-430.png",
+      "sha256": "297c374eba189175c67375203d7bf6d0f0e3f8f5ad006379f7c4d54454548dcc",
+      "bytes": 42427,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-wellbeing-dirty-844.png",
+      "sha256": "485e4a48920a7d7e913f71d6e643570e2b9ad5108bae0482d915ba9d0bb9a518",
+      "bytes": 48548,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "66e8ac31a7dc6cc8575edd558888c4dd4d8613fe832ad94f63c1856ebda7a5c0",
+      "bytes": 24439,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-390-wellbeing-unchanged-844.png",
+      "sha256": "fa517500696af2bf5463a511312e06368ae15c084a95b208918b7950401ee3c1",
+      "bytes": 41807,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-measurement-confirmation-430.png",
+      "sha256": "b942c39a62502c257a6bab25e6fa02afc2d2bef4c63d895687bac1b7e2c8f2cf",
+      "bytes": 46806,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-measurement-dirty-844.png",
+      "sha256": "c173f3dc3aae784cfb179ecad255aafc02ee846280448e6982d22a2e5274ce5f",
+      "bytes": 33841,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-measurement-simulated-keyboard-430.png",
+      "sha256": "9dc98875dd3dd78dbee9b08e8296e009291cbf87abb97debfeaaa3cc871bc71f",
+      "bytes": 19596,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-measurement-unchanged-844.png",
+      "sha256": "1b083681039a16a788bcccb35c1bd4649dae7187d306b705236e12ba33ec1b78",
+      "bytes": 47450,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-wellbeing-confirmation-430.png",
+      "sha256": "a80b27730bc40abf3c7d9a76440fcf373b429762ebe7468b5024e1ad9dd075a9",
+      "bytes": 42521,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-wellbeing-dirty-844.png",
+      "sha256": "01b11ac9a6a5a9f97a66acdfb202849be11df30dec7990af0888b4c03e40d0a7",
+      "bytes": 50988,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-wellbeing-simulated-keyboard-430.png",
+      "sha256": "982fecf284c889054d451317e8f2dcf079f40bdbb48f51e16f0ff38a27e8c4e8",
+      "bytes": 24689,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-393-wellbeing-unchanged-844.png",
+      "sha256": "703585c7033afb1cf4019fbd4692c62c6c2a8bff5ff205e5ef8f145453ced899",
+      "bytes": 43159,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-measurement-confirmation-430.png",
+      "sha256": "dc650bd2f8794ed9634d11c2b97a926e759b416da7849e0a734a758cd9b3049c",
+      "bytes": 45628,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-measurement-dirty-844.png",
+      "sha256": "da2689d0f4e3c2331226bb3b33cbd60675b2dde82574da722e98c701e94d8a23",
+      "bytes": 44790,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-measurement-simulated-keyboard-430.png",
+      "sha256": "6b41a12334e77185415cb3e78420731d9a29b68592440084048d729aed05c6c9",
+      "bytes": 20949,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-measurement-unchanged-844.png",
+      "sha256": "ba31d3ca2e24e4e5c0be5dc85e321dfacf07a46fdc57e71c592a127413682020",
+      "bytes": 48722,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-wellbeing-confirmation-430.png",
+      "sha256": "9db348b5dbe27687e7babdb156612d0df73562b193d97108c37a13a77308ce77",
+      "bytes": 44491,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-wellbeing-dirty-844.png",
+      "sha256": "8fa808dbf39bae4665fd0a8cce45a99a9fb1151a4fd6a10a882c6cb4858f7013",
+      "bytes": 52181,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-wellbeing-simulated-keyboard-430.png",
+      "sha256": "598bef98826ec83d057fb7815ddcf8826daa55af73b47503a2a04cac878c951c",
+      "bytes": 27788,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-dark-430-wellbeing-unchanged-844.png",
+      "sha256": "d73dbe3b9c89f2946906ab886f16d07118b0c2d1134e27aeb35441a60f3e5774",
+      "bytes": 44387,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-measurement-confirmation-430.png",
+      "sha256": "f13a369ef50d9b318d50d62e8de1f2ec1082246d1a554eb458a69efa90efe5b0",
+      "bytes": 45287,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-measurement-dirty-844.png",
+      "sha256": "58a9c316e69939fdbd819ee268245d804c66f5a25ca20f3f872e72cbc6e23983",
+      "bytes": 29506,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-measurement-simulated-keyboard-430.png",
+      "sha256": "2c1113358d2790e4c999ae4028b3012a627410b556b46c111694dd55e1ddd80c",
+      "bytes": 17295,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-measurement-unchanged-844.png",
+      "sha256": "7503653a041cd4c0e975e1719b4be3f695620557c845e51dc64887bb6ffb1195",
+      "bytes": 42227,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-wellbeing-confirmation-430.png",
+      "sha256": "6f8a1d1cc7a21d45c74565e2a3dff3c20c8cadf560ad8eefe1e4ecc088dc0d9b",
+      "bytes": 37834,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-wellbeing-dirty-844.png",
+      "sha256": "90e37c30bb4f76625c36ad2d6b8e14782e0cc0287e046b84ea18c94e3f205db2",
+      "bytes": 42604,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-wellbeing-simulated-keyboard-430.png",
+      "sha256": "5be0c2f93abba0c8a574ecc1ecc4b53a55ed4194c06f6bafbb123c248f2b378f",
+      "bytes": 20623,
+      "png_pixels": {
+        "width": 320,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 320,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-320-wellbeing-unchanged-844.png",
+      "sha256": "a66528b9acaad904db53c3f5a34bb36b02ae1175a9f04e07e8f7f91ccc7485c9",
+      "bytes": 35076,
+      "png_pixels": {
+        "width": 320,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 320,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-measurement-confirmation-430.png",
+      "sha256": "b53701668e243752a3f560a080b96ff38f9d461d4b356ff5d7da338e0314d884",
+      "bytes": 46310,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-measurement-dirty-844.png",
+      "sha256": "e3b416412801c752a1d5dfbeb978fef4eb5175b89249cbba45eddc54606215af",
+      "bytes": 30602,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-measurement-simulated-keyboard-430.png",
+      "sha256": "1228b76e7bc1ff616cebeb8c7eeb4acddf432d754965f24f3952d142602a6ccd",
+      "bytes": 17779,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-measurement-unchanged-844.png",
+      "sha256": "499ccc5f7c25d7412542f0dc2d60dbdf5ddbec294c59dd5d83a324b9b08883a0",
+      "bytes": 44616,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-wellbeing-confirmation-430.png",
+      "sha256": "da033cc4b245df94e27118b6240772ccae8db5b4e2017715f629657257723139",
+      "bytes": 40705,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-wellbeing-dirty-844.png",
+      "sha256": "d95e3f529feaa8febaaa8a3e9b2b5ce368f6f350894d3669612c4a27eb59c010",
+      "bytes": 44921,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-wellbeing-simulated-keyboard-430.png",
+      "sha256": "bbe53cd13fbd95916a646829ef6097f89d53d28b3dcc0acabd1f502a933a3c1e",
+      "bytes": 21490,
+      "png_pixels": {
+        "width": 360,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 360,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-360-wellbeing-unchanged-844.png",
+      "sha256": "4f40ab4a2824b693ad20e3146e8f64b80446c02afd4b9b4dc2657d7159858b59",
+      "bytes": 36372,
+      "png_pixels": {
+        "width": 360,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 360,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-measurement-confirmation-430.png",
+      "sha256": "6decbe4d8617a22e4aef0094e9bfa7170f488820a9c0e7c30830af6b56f97020",
+      "bytes": 50044,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-measurement-dirty-844.png",
+      "sha256": "156efc85727a3a8fd47e21720d26a9604d9021043d9f4ee49b3208dd4dc7e24a",
+      "bytes": 30991,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-measurement-simulated-keyboard-430.png",
+      "sha256": "0a8e79693e5ea779da8e1be18dd1e9866f84e767da2610466efee3500535cf62",
+      "bytes": 17742,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-measurement-unchanged-844.png",
+      "sha256": "3eb64bb632126316bded7dab85d91733e620c00cb5edbe78015750ddc61e914e",
+      "bytes": 45567,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-wellbeing-confirmation-430.png",
+      "sha256": "90297d47a4dae82a2e3f4ab80c2f27a819b514f4d88ba4f7cc846f009c313718",
+      "bytes": 45973,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-wellbeing-dirty-844.png",
+      "sha256": "bdda629a193e4e11e81e54098ee6da723530203c498aea8671797e956c0aa51d",
+      "bytes": 44965,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-wellbeing-simulated-keyboard-430.png",
+      "sha256": "7dcfa25f504feef08b84be979f8eb8c90f8f92d61dfc0cf92c32e75843e1a87b",
+      "bytes": 23665,
+      "png_pixels": {
+        "width": 390,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 390,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-390-wellbeing-unchanged-844.png",
+      "sha256": "b03dbc5aaff067d3d6f6a1b87f644f9ce649782d919c1061f1dec7cad0900578",
+      "bytes": 38848,
+      "png_pixels": {
+        "width": 390,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-measurement-confirmation-430.png",
+      "sha256": "57cedfe680cc86761965b50d5de7e34889019d77cf6a7f70cdeeb8260f4652d5",
+      "bytes": 46704,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-measurement-dirty-844.png",
+      "sha256": "b95669fb8b66df1d3433821f3c193cb9b3d686c43c922690c1ec7d685ceb11b2",
+      "bytes": 38669,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-measurement-simulated-keyboard-430.png",
+      "sha256": "0c85452720c4b8395a2a3d780332f056f0aed5a1c730e2cc3543f9a3f85fa149",
+      "bytes": 17856,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-measurement-unchanged-844.png",
+      "sha256": "45506f674c89988546632c218bfb01e408b2236a87e07d35656b7270a5728ec1",
+      "bytes": 45416,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-wellbeing-confirmation-430.png",
+      "sha256": "a46c8e9fc57fcb0535c946bbe55f0b9c822f716ac073e3476537b9d92df84dd0",
+      "bytes": 46179,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-wellbeing-dirty-844.png",
+      "sha256": "7a3afa07bbd13799a8c53e7a7b6c4f52e19fcc8f8b54b389c9ca34388cd45822",
+      "bytes": 47270,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-wellbeing-simulated-keyboard-430.png",
+      "sha256": "daf2c3b20074d295dcf42655d5f5c2d73f7da485f7c494148871fecf8477e7f2",
+      "bytes": 23819,
+      "png_pixels": {
+        "width": 393,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 393,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-393-wellbeing-unchanged-844.png",
+      "sha256": "d9dd9b34e179222dfc1ed6479b2d53250543a84ad8e04e4b0b96ab9c2e20618a",
+      "bytes": 40146,
+      "png_pixels": {
+        "width": 393,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 393,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-measurement-confirmation-430.png",
+      "sha256": "3f80b9074972912f8f1e29d6aa690fc8d40f4ed1bd11140980eb8ec576f792d9",
+      "bytes": 51175,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-measurement-dirty-844.png",
+      "sha256": "991c79c764019c064f06873628611f3530136b3c6157e31395ef485a180e0b2a",
+      "bytes": 29697,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-measurement-simulated-keyboard-430.png",
+      "sha256": "216dca50ac74c8979d62f26d51842011e0f47b8039c1ef27db05a3d580eb248e",
+      "bytes": 19006,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-measurement-unchanged-844.png",
+      "sha256": "d713473ce664853b20621cd14c745100810605b309194987b40ffc07d2458a9d",
+      "bytes": 46648,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-wellbeing-confirmation-430.png",
+      "sha256": "ee9b0d5c0ca702e13b87226de9bf2cd46357f22e65e8c6d48c397b74cdc55447",
+      "bytes": 48583,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-wellbeing-dirty-844.png",
+      "sha256": "101d5f136f8a9e3b615f44043d998b4d591363b55b1734ef09a652f51067b6e1",
+      "bytes": 48599,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-dirty",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-wellbeing-simulated-keyboard-430.png",
+      "sha256": "6936bb822d6898fef651ea3d7142d1dd9e17ae445d9fdf0364ec399831fc900b",
+      "bytes": 26688,
+      "png_pixels": {
+        "width": 430,
+        "height": 430
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-simulated-keyboard",
+      "viewport": {
+        "width": 430,
+        "height": 430
+      },
+      "platform": "web"
+    },
+    {
+      "group": "forms",
+      "path": "forms/mobile-webkit-web-light-430-wellbeing-unchanged-844.png",
+      "sha256": "80a0bee0a3982780de275766b00c121d819b062cf63fc96a6d927964a57914a5",
+      "bytes": 41444,
+      "png_pixels": {
+        "width": 430,
+        "height": 844
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "mobile-webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 430,
+        "height": 844
+      },
+      "platform": "web"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-dark-measurement-confirmation.png",
+      "sha256": "082049c2200e648138726016dbf291dc5b36e544cd57dbc009b3bb5ec331078d",
+      "bytes": 182419,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-dark-measurement-unchanged.png",
+      "sha256": "cc6e2b1318a09e15c22278a943d00bf181f9d997e8007ab579e2676d34bcfcd7",
+      "bytes": 200354,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-dark-quick-add-filled.png",
+      "sha256": "6f1cd3584a9a07718d58a944ee1eb2d492895b5480a6f73875693a6d30eca462",
+      "bytes": 185747,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "dark",
+      "scenario": "quick-add-filled",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-dark-wellbeing-confirmation.png",
+      "sha256": "cdaffb8d8b6c3825a26474e6e5abaca43033e30d9d222fb9918c2bbe22130bd0",
+      "bytes": 173558,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-dark-wellbeing-unchanged.png",
+      "sha256": "ec7f647ab64075fdb0aff08ad4a19ef536fac4619a55de233a143544b840e1c4",
+      "bytes": 300407,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-dark-measurement-confirmation.png",
+      "sha256": "b1fba61c0a7467d2da565e5a31d58aeaffe8b1992231702bffe3d80d66d22b67",
+      "bytes": 125865,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "dark",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-dark-measurement-unchanged.png",
+      "sha256": "af62f50b927192015c67b1900071f3b9c280b3df4ea37517afe7865b167a57d9",
+      "bytes": 109664,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "dark",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-dark-quick-add-filled.png",
+      "sha256": "7b95c4f4af937fc816ccd4a0b6bf9d9c01af9effe501a7fc1adf41509237195d",
+      "bytes": 123327,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "dark",
+      "scenario": "quick-add-filled",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-dark-wellbeing-confirmation.png",
+      "sha256": "4003836e4f3f8bb90b80ace49acd58f6502152de4bb3ab1c2e5bfc6a3be09edd",
+      "bytes": 125352,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-dark-wellbeing-unchanged.png",
+      "sha256": "a6894f50a269bf733f1755044fa663229b552af3b6251e8e5de07b797ace48a6",
+      "bytes": 117713,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "dark",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-light-measurement-confirmation.png",
+      "sha256": "23cf38954580e1246e0733af9a549f983bc13a244ac757231b14dd61c5bed149",
+      "bytes": 182624,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-light-measurement-unchanged.png",
+      "sha256": "f5d0b135cd7378a298ba72aac51d85d14b8022a70afc989b5ea83fc2979278ce",
+      "bytes": 173460,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-light-quick-add-filled.png",
+      "sha256": "adb8ba204841e0340e80fc6139e54b25acc1d3b22ed27d6163eb8e6b087d0cd5",
+      "bytes": 193947,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "light",
+      "scenario": "quick-add-filled",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-light-wellbeing-confirmation.png",
+      "sha256": "ce00be29066961b75df606efd6f97aed74d7faf1007c9a9c6c256c9ec95c77df",
+      "bytes": 168473,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/chromium-light-wellbeing-unchanged.png",
+      "sha256": "66a87d6429f2c2c0f34f022a71f31090dc4b8783e5669b3470934599bfb65a3e",
+      "bytes": 270477,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "chromium",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-light-measurement-confirmation.png",
+      "sha256": "a566ba9ec55f254eb41df256822fe40751e526f07239202bf18f9b70d00f9344",
+      "bytes": 125420,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "light",
+      "scenario": "measurement-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-light-measurement-unchanged.png",
+      "sha256": "9b627abbfe41a0054b33b6a3bb42fa4559e4aa50685e24df656fe7be3bc8b43a",
+      "bytes": 98913,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "light",
+      "scenario": "measurement-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-light-quick-add-filled.png",
+      "sha256": "c1c3fe47e8d9470796fd71052d4547e0e12413c83cebd276d50da393f5d75325",
+      "bytes": 110901,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "light",
+      "scenario": "quick-add-filled",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-light-wellbeing-confirmation.png",
+      "sha256": "49b0cac619d2a7f145b9c83fe430a6ca88e1bdf73cdb212045d0455f601868c7",
+      "bytes": 122148,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "light",
+      "scenario": "wellbeing-confirmation",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    },
+    {
+      "group": "desktop",
+      "path": "desktop/webkit-light-wellbeing-unchanged.png",
+      "sha256": "bd557bf367f1620233f9dd67fb5b5b068d170d8bf2374329f5d272227b8b439a",
+      "bytes": 105514,
+      "png_pixels": {
+        "width": 1280,
+        "height": 900
+      },
+      "runtime_sha": "cc2d8d13546de74132d10b1259e04dad35f94594",
+      "browser": "webkit",
+      "theme": "light",
+      "scenario": "wellbeing-unchanged",
+      "viewport": {
+        "width": 1280,
+        "height": 900
+      },
+      "platform": "desktop"
+    }
+  ]
+}

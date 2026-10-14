@@ -1,0 +1,78 @@
+{
+  "browser": "mobile-webkit",
+  "theme": "dark",
+  "width": 390,
+  "state": "keyboard-safe-area-long-label",
+  "viewport": {
+    "width": 390,
+    "height": 420
+  },
+  "colorScheme": "dark",
+  "keyboard": "visible",
+  "safeLeft": "24px",
+  "safeRight": "24px",
+  "page": {
+    "scrollWidth": 390,
+    "clientWidth": 390
+  },
+  "calories": {
+    "left": 25,
+    "right": 190,
+    "top": 168.453125,
+    "bottom": 214.453125,
+    "width": 165,
+    "height": 46,
+    "scrollWidth": 163,
+    "clientWidth": 163,
+    "boxShadow": "none",
+    "outlineStyle": "none"
+  },
+  "time": {
+    "left": 200,
+    "right": 365,
+    "top": 168.453125,
+    "bottom": 214.453125,
+    "width": 165,
+    "height": 46,
+    "scrollWidth": 163,
+    "clientWidth": 163,
+    "boxShadow": "rgb(27, 31, 31) 0px 0px 0px 4px",
+    "outlineStyle": "none"
+  },
+  "nativeTime": {
+    "left": 201,
+    "right": 364,
+    "top": 169.453125,
+    "bottom": 213.453125,
+    "width": 163,
+    "height": 44,
+    "scrollWidth": 163,
+    "clientWidth": 163,
+    "boxShadow": "none",
+    "outlineStyle": "solid"
+  },
+  "timeLabel": {
+    "left": 200,
+    "right": 365,
+    "top": 91.453125,
+    "bottom": 160.453125,
+    "width": 165,
+    "height": 69,
+    "scrollWidth": 165,
+    "clientWidth": 165,
+    "boxShadow": "none",
+    "outlineStyle": "none"
+  },
+  "body": {
+    "left": 1,
+    "right": 389,
+    "top": 82.5625,
+    "bottom": 419,
+    "width": 388,
+    "height": 336.4375,
+    "scrollWidth": 388,
+    "clientWidth": 388,
+    "boxShadow": "none",
+    "outlineStyle": "none"
+  }
+}

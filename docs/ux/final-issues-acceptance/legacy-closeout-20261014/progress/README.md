@@ -1,0 +1,22 @@
+# AFTER: progress
+
+Все снимки реального браузера, синтетические данные. Размеры в CSS px; PNG pixels и SHA256 доступны в MANIFEST.json. Клавиатура/safe-area в stress case синтетические.
+
+| Браузер | Тема | Среда | Размер | Сценарий | AFTER | DOM |
+|---|---|---|---|---|---|---|
+| mobile-chromium | dark | web | 430×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-dark-430.png) | E2E assertions |
+| mobile-webkit | dark | web | 430×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-dark-430.png) | E2E assertions |
+| mobile-chromium | light | web | 393×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-light-393.png) | E2E assertions |
+| mobile-webkit | light | web | 393×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-light-393.png) | E2E assertions |
+| mobile-chromium | light | web | 360×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-light-360.png) | E2E assertions |
+| mobile-webkit | light | web | 360×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-light-360.png) | E2E assertions |
+| mobile-chromium | light | web | 430×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-light-430.png) | E2E assertions |
+| mobile-webkit | light | web | 430×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-light-430.png) | E2E assertions |
+| mobile-chromium | dark | web | 360×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-dark-360.png) | E2E assertions |
+| mobile-webkit | dark | web | 360×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-dark-360.png) | E2E assertions |
+| mobile-chromium | dark | web | 320×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-dark-320.png) | E2E assertions |
+| mobile-webkit | dark | web | 320×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-dark-320.png) | E2E assertions |
+| mobile-chromium | light | web | 320×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-light-320.png) | E2E assertions |
+| mobile-webkit | light | web | 320×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-light-320.png) | E2E assertions |
+| mobile-chromium | dark | web | 393×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-chromium-dark-393.png) | E2E assertions |
+| mobile-webkit | dark | web | 393×844 | progress-navigation | [PNG](https://github.com/MikeMoore1337/your-fitness-coach/blob/__EVIDENCE_SHA__/docs/ux/final-issues-acceptance/legacy-closeout-20261014/progress/mobile-webkit-dark-393.png) | E2E assertions |
