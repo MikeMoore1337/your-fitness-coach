@@ -1,13 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import {
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -353,137 +345,35 @@ function ProgressInsights({ summary }: { summary: ProgressSummary }) {
 }
 
 function ProgressCategoryNav({ search, view }: { search: string; view: ProgressView }) {
-  const railRef = useRef<HTMLDivElement>(null);
-  const [edges, setEdges] = useState({ start: true, end: false });
-  useLayoutEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const reveal = (link: HTMLElement) => {
-      rail.scrollLeft +=
-        link.getBoundingClientRect().left -
-        rail.getBoundingClientRect().left -
-        (rail.clientWidth - link.offsetWidth) / 2;
-    };
-    const update = () => {
-      setEdges({
-        start: rail.scrollLeft < 1,
-        end: rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - 1,
-      });
-      const bounds = rail.getBoundingClientRect();
-      rail.querySelectorAll<HTMLElement>('a').forEach((link) => {
-        const box = link.getBoundingClientRect();
-        link.dataset.clipped = String(box.left < bounds.left - 1 || box.right > bounds.right + 1);
-      });
-    };
-    const active = rail.querySelector<HTMLElement>('[aria-current="page"]');
-    if (active) reveal(active);
-    update();
-    rail.addEventListener('scroll', update);
-    const revealActive = () => {
-      const focused = rail.querySelector<HTMLElement>('a:focus');
-      const target = focused ?? active;
-      if (target) reveal(target);
-      update();
-    };
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealActive);
-    observer?.observe(rail);
-    rail.querySelectorAll('a').forEach((link) => observer?.observe(link));
-    let mounted = true;
-    void document.fonts?.ready.then(() => {
-      if (mounted) revealActive();
-    });
-    return () => {
-      mounted = false;
-      rail.removeEventListener('scroll', update);
-      observer?.disconnect();
-    };
+  const { navigate } = useNavigation();
+  const shouldRestoreFocus = useRef(false);
+  useEffect(() => {
+    if (!shouldRestoreFocus.current) return;
+    shouldRestoreFocus.current = false;
+    document
+      .querySelector<HTMLButtonElement>('.progress-category-nav [role="tab"][aria-selected="true"]')
+      ?.focus({ preventScroll: true });
   }, [view]);
-  const move = (direction: number) => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const links = [...rail.querySelectorAll<HTMLAnchorElement>('a')];
-    const bounds = rail.getBoundingClientRect();
-    const next =
-      direction > 0
-        ? links.find((link) => link.getBoundingClientRect().right > bounds.right + 1)
-        : [...links].reverse().find((link) => link.getBoundingClientRect().left <= bounds.left - 1);
-    next?.focus({ preventScroll: true });
-  };
-  const categories: Array<{ detail: string; label: string; value: ProgressView }> = [
-    { detail: 'Обзор периода', label: 'Обзор', value: 'overview' },
-    { detail: 'Вес и окружности', label: 'Тело', value: 'body' },
-    { detail: 'Нагрузка и PR', label: 'Тренировки', value: 'training' },
-    { detail: 'Калории и БЖУ', label: 'Питание', value: 'nutrition' },
-    { detail: 'Сессии и дистанция', label: 'Кардио', value: 'cardio' },
-    { detail: 'Check-in и история', label: 'Самочувствие', value: 'wellbeing' },
-    { detail: 'Исходные записи', label: 'История', value: 'history' },
+  const categories: Array<{ label: string; value: ProgressView }> = [
+    { label: 'Обзор', value: 'overview' },
+    { label: 'Тело', value: 'body' },
+    { label: 'Тренировки', value: 'training' },
+    { label: 'Питание', value: 'nutrition' },
+    { label: 'Кардио', value: 'cardio' },
+    { label: 'Самочувствие', value: 'wellbeing' },
+    { label: 'История', value: 'history' },
   ];
   return (
     <nav className="progress-category-nav section-navigation" aria-label="Разделы прогресса">
-      <button
-        className="progress-category-nav__edge"
-        type="button"
-        aria-label="Предыдущие разделы прогресса"
-        disabled={edges.start}
-        onClick={() => move(-1)}
-      >
-        <Icon name="arrow-left" size={16} />
-      </button>
-      <div
-        className="progress-category-nav__rail"
-        ref={railRef}
-        onFocus={(event) => {
-          if (event.target instanceof HTMLAnchorElement) {
-            const rail = event.currentTarget;
-            const bounds = rail.getBoundingClientRect();
-            const link = event.target.getBoundingClientRect();
-            if (link.left < bounds.left) rail.scrollLeft += link.left - bounds.left;
-            else if (link.right > bounds.right) rail.scrollLeft += link.right - bounds.right;
-          }
+      <SegmentedControl
+        ariaLabel="Разделы прогресса"
+        onChange={(value) => {
+          shouldRestoreFocus.current = true;
+          navigate(progressViewPath(search, value as ProgressView));
         }}
-        onKeyDown={(event) => {
-          const links = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('a')];
-          const index = links.indexOf(document.activeElement as HTMLAnchorElement);
-          const next =
-            event.key === 'Home'
-              ? 0
-              : event.key === 'End'
-                ? links.length - 1
-                : event.key === 'ArrowRight'
-                  ? Math.min(index + 1, links.length - 1)
-                  : event.key === 'ArrowLeft'
-                    ? Math.max(index - 1, 0)
-                    : null;
-          if (next !== null) {
-            event.preventDefault();
-            links[next]?.focus({ preventScroll: true });
-          }
-        }}
-      >
-        {categories.map((category) => (
-          <AppLink
-            aria-current={view === category.value ? 'page' : undefined}
-            data-yfc-choice="compact"
-            className={view === category.value ? 'is-active' : undefined}
-            key={category.value}
-            to={progressViewPath(search, category.value)}
-          >
-            <strong>{category.label}</strong>
-            <small>{category.detail}</small>
-            <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-          </AppLink>
-        ))}
-      </div>
-      <button
-        className="progress-category-nav__edge"
-        type="button"
-        aria-label="Следующие разделы прогресса"
-        disabled={edges.end}
-        onClick={() => move(1)}
-      >
-        <Icon name="chevron-right" size={16} />
-      </button>
+        options={categories}
+        value={view}
+      />
     </nav>
   );
 }

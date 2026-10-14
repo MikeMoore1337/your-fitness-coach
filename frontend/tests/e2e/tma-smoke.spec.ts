@@ -368,7 +368,7 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   await mobilePage.goto('/app?section=progress');
   await mobilePage
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Кардио/ })
+    .getByRole('tab', { name: /^Кардио/ })
     .click();
   const history = mobilePage.locator('#progress-cardio');
   await history.scrollIntoViewIfNeeded();
@@ -1051,7 +1051,7 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
   for (const currentPage of [tmaPage, mobilePage]) {
     await currentPage
       .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('link', { name: /^Питание/ })
+      .getByRole('tab', { name: /^Питание/ })
       .click();
     const report = currentPage.locator('#nutrition-period-report');
     await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
@@ -1207,7 +1207,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   for (const currentPage of [tmaPage, mobilePage]) {
     await currentPage
       .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('link', { name: /^Тело/ })
+      .getByRole('tab', { name: /^Тело/ })
       .click();
     const body = currentPage.locator('#progress-body');
     await body.locator('.progress-measurement-editor > summary').click();
@@ -1313,7 +1313,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   for (const page of [tmaPage, mobilePage]) {
     await page
       .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('link', { name: /^Тренировки/ })
+      .getByRole('tab', { name: /^Тренировки/ })
       .click();
     const insufficient = page
       .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
@@ -1340,7 +1340,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
   await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
   await tmaPage
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тело/ })
+    .getByRole('tab', { name: /^Тело/ })
     .click();
   const bodyConfidence = tmaPage
     .locator('#progress-body')
@@ -1396,7 +1396,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await tmaPage.goto('/app?section=progress');
   await tmaPage
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тренировки/ })
+      .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
@@ -2895,7 +2895,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
       if (scenario.label === 'progress') {
         await page
           .getByRole('navigation', { name: 'Разделы прогресса' })
-          .getByRole('link', { name: /^Тело/ })
+          .getByRole('tab', { name: /^Тело/ })
           .click();
       }
       if (scenario.label === 'today') {
@@ -2947,7 +2947,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
     if (viewport.width === 768) {
       await page
         .getByRole('navigation', { name: 'Разделы прогресса' })
-        .getByRole('link', { name: /^Тело/ })
+        .getByRole('tab', { name: /^Тело/ })
         .click();
     }
     const progressConfidences = page

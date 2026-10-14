@@ -26,13 +26,14 @@ for (const theme of ['dark', 'light'] as const) {
     const help = page.locator('.progress-hero__help summary');
     await expect(help).toHaveText('О показателях');
     await help.click();
-    const rail = page.locator('.progress-category-nav__rail');
-    await page.getByRole('button', { name: 'Следующие разделы прогресса' }).click();
-    await expect.poll(() => rail.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-    await expect(rail.locator('a:focus')).toHaveAttribute('data-clipped', 'false');
+    const progressTabs = page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tablist');
+    await expect(page.getByRole('button', { name: 'Следующие разделы прогресса' })).toHaveCount(0);
+    await progressTabs.getByRole('tab', { name: 'Тело' }).focus();
+    await expect(progressTabs.getByRole('tab', { name: 'Тело' })).toBeFocused();
     await expect(page).not.toHaveURL(/progress_view=/);
-    await page.getByRole('button', { name: 'Предыдущие разделы прогресса' }).click();
-    await expect(rail.locator('a:focus')).toHaveAttribute('data-clipped', 'false');
+    await progressTabs.getByRole('tab', { name: 'Обзор' }).click();
     await expect(page.locator('.progress-hero__help details')).toHaveAttribute('open');
     await help.click();
     const download = (await page.locator('.progress-hero__download').boundingBox())!;
@@ -47,7 +48,7 @@ for (const theme of ['dark', 'light'] as const) {
         text.selectNodeContents(element);
         return text.getBoundingClientRect().bottom;
       });
-    const categoryText = (await rail.locator('a strong').first().boundingBox())!;
+    const categoryText = (await progressTabs.getByRole('tab').first().boundingBox())!;
     expect(categoryText.y - downloadTextBottom).toBeLessThanOrEqual(34);
     await page.screenshot({ path: info.outputPath(`glass-content-${theme}.png`) });
 

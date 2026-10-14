@@ -41,6 +41,11 @@ for (const width of [320, 360, 393, 430])
       await expect(page.locator('.progress-overview')).toBeVisible();
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: testInfo.outputPath(`progress-${width}-${theme}.png`) });
+      if (width === 430) {
+        await page.screenshot({
+          path: `../.artifacts/screenshots/task-979/progress-430-${theme}.png`,
+        });
+      }
       const periods = page.getByRole('tablist', { name: 'Период прогресса' });
       await expectSelectedChoice(navigation.getByRole('link', { name: 'Прогресс', exact: true }));
       for (const label of ['7 дней', '30 дней', '90 дней']) {
@@ -179,33 +184,36 @@ for (const width of [320, 360, 393, 430])
       await page.locator('.app-quick-add-layer').click({ position: { x: 2, y: 2 } });
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
-      const rail = page.locator('.progress-category-nav__rail');
-      const initialRailWidth = (await rail.boundingBox())!.width;
-      await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toBeHidden();
-      await rail.getByRole('link', { name: /^Тело/ }).click();
+      const progressTabs = page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('tablist');
+      await expect(progressTabs).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toHaveCount(
+        0,
+      );
+      await expect(page.getByRole('button', { name: 'Следующие разделы прогресса' })).toHaveCount(
+        0,
+      );
+      await progressTabs.getByRole('tab', { name: 'Тело' }).click();
       await expect(page).toHaveURL(/progress_view=body/);
-      await expect.poll(async () => (await rail.boundingBox())?.width).toBe(initialRailWidth);
-      await rail.getByRole('link', { name: /^Тренировки/ }).click();
+      await progressTabs.getByRole('tab', { name: 'Тренировки' }).click();
       await expect(page).toHaveURL(/progress_view=training/);
-      await rail.getByRole('link', { name: /^Тело/ }).click();
+      await progressTabs.getByRole('tab', { name: 'Тело' }).click();
       await expect(page).toHaveURL(/progress_view=body/);
-      await rail.getByRole('link', { name: /^Обзор/ }).focus();
+      await progressTabs.getByRole('tab', { name: 'Обзор' }).focus();
       await page.keyboard.press('End');
-      const history = rail.getByRole('link', { name: /^История/ });
+      const history = progressTabs.getByRole('tab', { name: 'История' });
       await expect(history).toBeFocused();
-      await expect(history).toHaveAttribute('data-clipped', 'false');
       await history.click();
       await expect(page).toHaveURL(/progress_view=history/);
-      await expect(history).toHaveAttribute('aria-current', 'page');
+      await expect(history).toHaveAttribute('aria-selected', 'true');
       await page.getByRole('link', { name: 'Скачать отчёт' }).click();
       await expect(
         page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
       ).toBeVisible();
       await page.getByRole('link', { name: 'Назад', exact: true }).click();
       await expect(page).toHaveURL(/progress_view=history/);
-      await expect(
-        page.locator('.progress-category-nav__rail [aria-current="page"]'),
-      ).toHaveAttribute('data-clipped', 'false');
+      await expect(progressTabs.getByRole('tab', { selected: true })).toHaveText('История');
       await expectNoHorizontalOverflow(page);
       await page
         .getByRole('button', { name: 'Быстро добавить', exact: true })

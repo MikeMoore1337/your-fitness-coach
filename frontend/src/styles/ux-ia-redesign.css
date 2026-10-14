@@ -1551,72 +1551,22 @@
   }
 }
 
-/* Approved B keeps the current section in the URL and reveals complete labels. */
+/* Progress sections are a local selector; the shared segmented control owns state and focus. */
 .app-section--progress .progress-category-nav.section-navigation {
-  display: flex;
-  align-items: center;
-  gap: 0;
+  display: block;
   min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
 }
-.progress-category-nav__rail {
+.app-section--progress .progress-category-nav .ui-tabs {
   display: flex;
-  flex: 1;
-  min-width: 0;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
-  scrollbar-width: none;
-  gap: 20px;
-  padding: 4px 0;
+  width: 100%;
 }
-.progress-category-nav__rail::-webkit-scrollbar {
-  display: none;
-}
-:where(
-    .app-shell--design-v2
-      .app-section--progress
-      .progress-category-nav.section-navigation
-      .progress-category-nav__rail
-  )
-  > a {
-  display: flex;
-  flex: 0 0 auto;
-  min-width: 44px;
+.app-section--progress .progress-category-nav .ui-tab {
   min-height: 44px;
-  align-items: center;
-  padding: 8px 12px;
-  border: 0;
-  border-radius: var(--v2-selected-radius-compact);
-  background: transparent;
-  white-space: nowrap;
-}
-.app-section--progress .progress-category-nav__rail > a strong {
-  font-size: 0.9375rem;
-  font-weight: 500;
-}
-.app-section--progress .progress-category-nav__rail > a :is(small, .section-navigation__chevron) {
-  display: none;
-}
-.app-section--progress .progress-category-nav__rail > a[data-clipped='true'] {
-  opacity: 0;
-  pointer-events: none;
-}
-.progress-category-nav__edge {
-  display: grid;
-  flex: 0 0 44px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  color: var(--v2-text-secondary);
-}
-.progress-category-nav__edge:disabled {
-  /* Keep the rail still while a pointer gesture reveals the opposite edge. */
-  visibility: hidden;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
 }
 @media (max-width: 680px) {
   .app-section--progress .progress-hero {

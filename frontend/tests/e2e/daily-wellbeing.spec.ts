@@ -58,6 +58,7 @@ function recordFor(localDate: string, state: Exclude<DailyState, 'error'>): Dail
 async function installDailyWellbeingApi(page: Page, initialState: DailyState) {
   let state = initialState;
   let record = initialState === 'error' ? null : recordFor(todayInMoscow(), initialState);
+  let lastPayload: DailyPayload | null = null;
 
   await page.route(/\/api\/v1\/check-ins\/daily(?:\/[^?]+)?(?:\?.*)?$/, async (route) => {
     const request = route.request();
@@ -81,6 +82,7 @@ async function installDailyWellbeingApi(page: Page, initialState: DailyState) {
 
     if (request.method() === 'PUT') {
       const payload = request.postDataJSON() as DailyPayload;
+      lastPayload = payload;
       record = {
         id: record?.id ?? 82,
         user_id: 7,
@@ -108,6 +110,9 @@ async function installDailyWellbeingApi(page: Page, initialState: DailyState) {
     setState(next: DailyState) {
       state = next;
       record = next === 'error' ? null : recordFor(todayInMoscow(), next);
+    },
+    getLastPayload() {
+      return lastPayload;
     },
   };
 }
@@ -180,12 +185,35 @@ test('daily wellbeing covers empty, partial, filled, offline and error states on
   await tmaPage.setViewportSize({ width: 390, height: 844 });
 
   dailyApi.setState('partial');
+  await tma.setTheme('light');
+  await tmaPage.goto(wellbeingUrl(localDate));
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'light');
+  await expect(tmaPage.getByRole('radio', { name: 'Хорошо' }).first()).toBeChecked();
+  await expect(
+    tmaPage
+      .locator('.daily-wellbeing__option')
+      .filter({ has: tmaPage.locator('input:checked') })
+      .first(),
+  ).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
+  await expectNoHorizontalOverflow(tmaPage);
+  await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await tmaPage.screenshot({
+    path: '../.artifacts/screenshots/task-82/mobile-light-partial-390x844.png',
+    fullPage: true,
+  });
+
   await tmaPage.goto(wellbeingUrl(localDate));
   await tma.setTheme('dark');
   await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(tmaPage.getByRole('radio', { name: 'Хорошо' }).first()).toBeChecked();
   await expect(bottomNav).toBeHidden();
   await expect(tmaPage.getByText('Выберите хотя бы один показатель')).not.toBeVisible();
+  await expect(
+    tmaPage
+      .locator('.daily-wellbeing__option')
+      .filter({ has: tmaPage.locator('input:checked') })
+      .first(),
+  ).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
   await expectNoHorizontalOverflow(tmaPage);
   await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await tmaPage.screenshot({
@@ -207,11 +235,23 @@ test('daily wellbeing covers empty, partial, filled, offline and error states on
   await expect(bottomNav).toBeHidden();
 
   await tmaPage.getByRole('radio', { name: 'Отлично' }).last().click();
-  await tmaPage.getByRole('spinbutton').fill('420');
+  await tmaPage.getByLabel('Сколько спали, часов').fill('7,5');
   await tmaPage.locator('.daily-wellbeing__note summary').click();
   await tmaPage.getByLabel('Заметка для себя').fill('Личная заметка остаётся только в экспорте.');
+  const actionRows = await tmaPage
+    .locator('.daily-wellbeing__actions .ui-button')
+    .evaluateAll((buttons) =>
+      buttons.map((button) => Math.round(button.getBoundingClientRect().top)),
+    );
+  expect(new Set(actionRows).size).toBe(1);
+  await tmaPage.screenshot({
+    path: '../.artifacts/screenshots/task-82/mobile-dark-hours-form-390x844.png',
+    fullPage: true,
+  });
   await tmaPage.getByRole('button', { name: 'Сохранить отметку' }).click();
   await expect(tmaPage.getByRole('button', { name: 'Изменить' })).toBeVisible();
+  expect(dailyApi.getLastPayload()).toMatchObject({ sleep_duration_minutes: 450 });
+  await expect(tmaPage.getByText(/7,5 ч/)).toBeVisible();
   await expect(tmaPage.getByText('Заметка сохранена отдельно')).toBeVisible();
   await expect(bottomNav).toBeVisible();
   await expectNoHorizontalOverflow(tmaPage);

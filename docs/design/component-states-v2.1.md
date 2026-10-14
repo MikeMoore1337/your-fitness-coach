@@ -63,6 +63,9 @@
 `--v2-selected-motion`. Dark и Light определяют значения одних и тех же токенов.
 Выбранная поверхность вложена в существующий control; отдельного backdrop-filter у неё нет.
 Liquid Glass остаётся материалом общей панели, а информационные карточки сохраняют свои роли.
+Для нативных radio/checkbox options выбранная compact-поверхность дополнительно имеет явную
+нижнюю lime-границу; это сохраняет видимый selected state в Dark и Light и не заменяет native
+checked semantics или focus-visible outline.
 
 Основная нижняя вкладка охватывает иконку и подпись полностью скруглённой капсулой:
 `--v2-selected-radius-pill: 9999px` на всех ширинах, без изменения формы в media queries.

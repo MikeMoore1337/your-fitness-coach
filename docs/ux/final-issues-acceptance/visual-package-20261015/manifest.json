@@ -1,0 +1,57 @@
+{
+  "package": "visual-package-20261015",
+  "scope": [
+    "#979 Progress navigation",
+    "#978 Daily Wellbeing",
+    "typography and component consistency"
+  ],
+  "base_origin_master": "f99f1954c007567cefeec7dc882f14e68de6b0ba",
+  "branch": "codex/visual-979-978-final-20261014",
+  "evidence_kind": "local synthetic mocked TMA/API",
+  "production_credentials_used": false,
+  "owner_visual_acceptance": "pending",
+  "merge_deploy_issue_close": "not performed",
+  "browser_matrix": {
+    "chromium": {
+      "targeted_visual_e2e": "24 passed, 1 skipped of 25; workers=8"
+    },
+    "webkit": {
+      "targeted_visual_e2e": "24 passed, 1 skipped of 25; workers=1; isolated retry after transient parallel failures"
+    }
+  },
+  "automated_mobile_widths": [320, 360, 393, 430],
+  "visual_viewports": [
+    {
+      "name": "progress",
+      "width": 430,
+      "height": 844,
+      "themes": ["dark", "light"]
+    },
+    {
+      "name": "wellbeing",
+      "width": 390,
+      "height": 844,
+      "themes": ["dark", "light"]
+    },
+    {
+      "name": "progress-report",
+      "width": 1440,
+      "height": 900,
+      "themes": ["dark", "light"]
+    }
+  ],
+  "visuals": [
+    "visuals/progress-430-dark.png",
+    "visuals/progress-430-light.png",
+    "visuals/wellbeing-390-dark-selected.png",
+    "visuals/wellbeing-390-light-selected.png",
+    "visuals/wellbeing-390-dark-hours-form.png",
+    "visuals/wellbeing-390-dark-saved.png",
+    "visuals/report-1440-dark-top.png",
+    "visuals/report-1440-dark-middle.png",
+    "visuals/report-1440-dark-bottom.png",
+    "visuals/report-1440-light-top.png",
+    "visuals/report-1440-light-middle.png",
+    "visuals/report-1440-light-bottom.png"
+  ]
+}
