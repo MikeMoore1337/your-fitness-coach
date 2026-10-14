@@ -35,6 +35,11 @@
   }
 }
 
+body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--floating {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (max-width: 899px) {
   html[data-yfc-keyboard='visible'] .app-quick-add-trigger--floating,
   body:has(.active-workout--design-v2) .app-quick-add-trigger--floating {

@@ -63,6 +63,18 @@ async function expectVisibleReturn(page: Page, button: Locator) {
   expect(rect!.x + rect!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
   expect(rect!.y).toBeGreaterThanOrEqual(0);
   expect(rect!.y + rect!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
+  await expect
+    .poll(() =>
+      button.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return [0.15, 0.5, 0.85].every((fraction) =>
+          element.contains(
+            document.elementFromPoint(box.left + box.width * fraction, box.top + box.height / 2),
+          ),
+        );
+      }),
+    )
+    .toBe(true);
 }
 
 for (const platform of ['web', 'mocked-tma'] as const) {
@@ -260,3 +272,68 @@ test('quick measurement protects editing and unrelated history deletion without 
   await expect(rows.filter({ hasText: '80.5 кг' })).toHaveCount(1);
   await expect(diary.getByLabel('Вес, кг')).toHaveValue('');
 });
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`desktop wellbeing return stays unobscured ${theme}`, async ({ page }, info) => {
+    await installPlatformApi(page, { browserSession: true });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await page.goto('/app?section=today&wellbeing=1');
+    const wellbeing = page.locator('form.daily-wellbeing__form');
+    const exit = wellbeing.getByRole('button', { name: 'Вернуться' });
+    const floatingAdd = page.getByRole('button', { name: 'Быстро добавить' });
+    await expect(exit).toBeVisible();
+    await page.getByRole('heading', { name: 'Сон и настроение' }).scrollIntoViewIfNeeded();
+    await page.evaluate(() => document.fonts.ready);
+    await exit.scrollIntoViewIfNeeded();
+    const geometry = await exit.evaluate((button) => {
+      const box = button.getBoundingClientRect();
+      const fab = document.querySelector<HTMLElement>('.app-quick-add-trigger--floating');
+      const fabBox = fab?.getBoundingClientRect();
+      const fabVisible = fab && getComputedStyle(fab).visibility !== 'hidden';
+      return {
+        exit: box.toJSON(),
+        fab: fabBox?.toJSON(),
+        overlap: Boolean(
+          fabVisible &&
+          fabBox &&
+          box.left < fabBox.right &&
+          box.right > fabBox.left &&
+          box.top < fabBox.bottom &&
+          box.bottom > fabBox.top,
+        ),
+        hits: [0.15, 0.5, 0.85].map((fraction) =>
+          button.contains(
+            document.elementFromPoint(box.left + box.width * fraction, box.top + box.height / 2),
+          ),
+        ),
+      };
+    });
+    await info.attach('wellbeing-return-hit-test', {
+      body: JSON.stringify(geometry, null, 2),
+      contentType: 'application/json',
+    });
+    expect(geometry.overlap).toBe(false);
+    expect(geometry.hits).toEqual([true, true, true]);
+    await expect(floatingAdd).toBeHidden();
+    const sleep = wellbeing.getByRole('radio', { name: 'Очень плохо' });
+    await sleep.scrollIntoViewIfNeeded();
+    expect(
+      await sleep.evaluate((input) => {
+        const box = input.closest('label')!.getBoundingClientRect();
+        return input
+          .closest('label')!
+          .contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+      }),
+    ).toBe(true);
+    await page.locator('details.daily-wellbeing-card > summary').click();
+    await expect(floatingAdd).toBeVisible();
+    await page.locator('details.daily-wellbeing-card > summary').click();
+    await expect(floatingAdd).toBeHidden();
+    await exit.click();
+    await expect(page).toHaveURL(/\/app\?section=today$/);
+    await expect(floatingAdd).toBeVisible();
+    await expect(floatingAdd).toBeFocused();
+  });
+}
