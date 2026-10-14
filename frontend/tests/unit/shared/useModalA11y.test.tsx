@@ -49,14 +49,16 @@ describe('useDocumentScrollLock', () => {
     expect(document.documentElement.style.overflow).toBe('');
     expect(document.body.style.overflow).toBe('auto');
     expect(document.body.style.position).toBe('');
-    expect(scrollTo).toHaveBeenCalledWith(12, 240);
+    expect(scrollTo).toHaveBeenCalledWith({ left: 12, top: 240, behavior: 'instant' });
   });
 
   it('sends Escape only to the top dialog and keeps its parent locked', () => {
     const parentClose = vi.fn();
     const childClose = vi.fn();
     const view = render(<Modal name="Редактор" onClose={parentClose} />);
-    screen.getByRole('button', { name: 'Редактор' }).focus();
+    const parentTrigger = screen.getByRole('button', { name: 'Редактор' });
+    parentTrigger.focus();
+    const restoreFocus = vi.spyOn(parentTrigger, 'focus');
     view.rerender(
       <>
         <Modal name="Редактор" onClose={parentClose} />
@@ -67,6 +69,7 @@ describe('useDocumentScrollLock', () => {
     expect(childClose).toHaveBeenCalledOnce();
     expect(parentClose).not.toHaveBeenCalled();
     view.rerender(<Modal name="Редактор" onClose={parentClose} />);
+    expect(restoreFocus).toHaveBeenCalledWith({ preventScroll: true });
     expect(screen.getByRole('button', { name: 'Редактор' })).toHaveFocus();
     expect(document.body.style.position).toBe('fixed');
     fireEvent.keyDown(document, { key: 'Escape' });

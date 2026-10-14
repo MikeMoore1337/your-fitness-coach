@@ -442,7 +442,10 @@ function MessageSources({ message }: { message: AiCoachConversationMessage }) {
   if (!citations.length) return null;
   return (
     <details className="ai-coach-message__sources">
-      <summary>Материалы ответа</summary>
+      <summary className="yfc-disclosure-summary">
+        Материалы ответа
+        <DisclosureIcon />
+      </summary>
       <ul>
         {citations.map((citation) => {
           const url = safeCoachUrl(citation.url);
@@ -553,7 +556,7 @@ function ChatMessage({
             type="button"
             onClick={() => onFeedback(message.id, 'helpful')}
           >
-            👍
+            <Icon name="thumbs-up" size={20} />
           </button>
           <button
             aria-pressed={feedback === 'not_helpful'}
@@ -564,7 +567,7 @@ function ChatMessage({
             type="button"
             onClick={() => onFeedback(message.id, 'not_helpful')}
           >
-            👎
+            <Icon name="thumbs-down" size={20} />
           </button>
         </div>
       )}
@@ -624,8 +627,12 @@ function AiCoachHistoryView({
           </Button>
           {conversations.length > 0 && (
             <details className="ai-coach-history__menu" data-testid="ai-coach-history-menu">
-              <summary aria-label="Действия истории" title="Действия истории">
-                <Icon name="more-horizontal" size={20} />
+              <summary
+                className="yfc-disclosure-summary"
+                aria-label="Действия истории"
+                title="Действия истории"
+              >
+                <DisclosureIcon />
                 <span className="sr-only">Действия истории</span>
               </summary>
               <div>
@@ -676,8 +683,12 @@ function AiCoachHistoryView({
                         </span>
                       </button>
                       <details className="ai-coach-history__item-menu">
-                        <summary aria-label="Действия" title="Действия">
-                          <Icon name="more-horizontal" size={20} />
+                        <summary
+                          className="yfc-disclosure-summary"
+                          aria-label="Действия"
+                          title="Действия"
+                        >
+                          <DisclosureIcon />
                           <span className="sr-only">Действия</span>
                         </summary>
                         <div>
@@ -911,7 +922,10 @@ export function MemoryPanel() {
       </div>
 
       <details className="ai-coach-memory__notice">
-        <summary>Подробнее о памяти</summary>
+        <summary className="yfc-disclosure-summary">
+          Подробнее о памяти
+          <DisclosureIcon />
+        </summary>
         <p>
           Можно сохранять только подтверждённые немедицинские предпочтения и явный контекст. Данные
           приложения остаются источником истины.
@@ -1964,7 +1978,10 @@ export function AiCoachExperience({
       />
       {showMemorySettings && (
         <details className="ai-coach-memory-disclosure">
-          <summary>Настройки отдельной памяти</summary>
+          <summary className="yfc-disclosure-summary">
+            Настройки отдельной памяти
+            <DisclosureIcon />
+          </summary>
           <p className="ai-coach-memory-disclosure__hint">
             История этого чата хранится отдельно и не становится долговременной памятью
             автоматически.

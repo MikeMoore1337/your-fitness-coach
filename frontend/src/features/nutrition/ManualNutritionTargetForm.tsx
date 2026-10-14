@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
@@ -177,8 +178,7 @@ export function ManualNutritionTargetForm({
         </label>
         <label className="field nutrition-manual-grid__wide">
           <span>Действует с</span>
-          <input
-            type="date"
+          <DateInput
             min={initial?.effective_from}
             max={today}
             required

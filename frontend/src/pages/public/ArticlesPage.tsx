@@ -328,7 +328,9 @@ function ArticleDetail({ slug }: { slug: string }) {
                   >
                     <strong>{item.title}</strong>
                     <span>{item.description}</span>
-                    <small>Открыть →</small>
+                    <small className="public-card-action">
+                      Открыть <Icon name="arrow-right" size={16} />
+                    </small>
                   </AppLink>
                 ))}
               </div>

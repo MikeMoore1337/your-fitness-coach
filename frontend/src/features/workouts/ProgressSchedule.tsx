@@ -4,7 +4,14 @@ import { api } from '../../shared/api/client';
 import type { WorkoutScheduleItem } from '../../shared/api/types';
 import { dateInputValue, formatCalendarDate } from '../../shared/dateTime';
 import { workoutStatusLabel } from '../../shared/statusLabels';
-import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
+import {
+  DisclosureIcon,
+  Badge,
+  Card,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '../../shared/ui/common';
 import { ProgressExperience } from './ProgressExperience';
 import { WeeklyCheckInCard } from './WeeklyCheckInCard';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
@@ -139,7 +146,10 @@ export function SchedulePanel({
           {primary.map(row)}
           {remaining.length > 0 && (
             <details className="workout-schedule-all">
-              <summary>Все восемь недель · ещё {remaining.length}</summary>
+              <summary className="yfc-disclosure-summary">
+                Все восемь недель · ещё {remaining.length}
+                <DisclosureIcon />
+              </summary>
               <div className="list-grid">{remaining.map(row)}</div>
             </details>
           )}

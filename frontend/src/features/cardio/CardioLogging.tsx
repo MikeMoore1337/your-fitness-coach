@@ -19,6 +19,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { Icon } from '../../shared/ui/Icon';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   EmptyState,
@@ -331,7 +332,10 @@ function CardioSessionForm({
         open={optionalOpen}
         onToggle={(event) => setOptionalOpen(event.currentTarget.open)}
       >
-        <summary>Дистанция, пульс и заметка</summary>
+        <summary className="yfc-disclosure-summary">
+          Дистанция, пульс и заметка
+          <DisclosureIcon />
+        </summary>
         <div className="cardio-form__optional-fields">
           <Field
             error={errors.distance}
@@ -529,7 +533,10 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
                 </Button>
               )}
               <details className="cardio-session-row__menu">
-                <summary>Действия с записью</summary>
+                <summary className="yfc-disclosure-summary">
+                  Действия с записью
+                  <DisclosureIcon />
+                </summary>
                 <Button onClick={() => setEditing(session)} type="button" variant="secondary">
                   Изменить
                 </Button>

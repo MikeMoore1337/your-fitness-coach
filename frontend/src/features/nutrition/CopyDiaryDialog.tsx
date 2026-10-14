@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
@@ -8,7 +9,7 @@ import type {
 } from '../../shared/api/types';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { invalidateNutritionSummaries } from '../../shared/queryKeys';
-import { Button, CloseIcon, Field, Input, Select } from '../../shared/ui/common';
+import { Button, CloseIcon, Field, Select } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import type { MealType } from './FoodPickerDialog';
@@ -212,9 +213,10 @@ export function CopyDiaryDialog({
           </dl>
           <div className="nutrition-copy__target">
             <Field label="Дата назначения" labelFor="nutrition-copy-target-date">
-              <Input
+              <DateInput
+                className="ui-input"
                 id="nutrition-copy-target-date"
-                type="date"
+
                 max={today}
                 required
                 value={targetDate}

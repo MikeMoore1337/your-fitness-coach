@@ -90,6 +90,16 @@ export async function collectUiAudit(
         const candidate = element as HTMLElement;
         const style = getComputedStyle(candidate);
         const rect = candidate.getBoundingClientRect();
+        const clipEdges = /^rect\(([^)]+)\)$/
+          .exec(style.clip)?.[1]
+          ?.split(/[,\s]+/)
+          .filter(Boolean);
+        const zeroAreaClip =
+          (style.position === 'absolute' || style.position === 'fixed') &&
+          clipEdges?.length === 4 &&
+          clipEdges.every((edge) => /^[-+]?(?:\d*\.)?\d+(?:px)?$/.test(edge)) &&
+          (Number.parseFloat(clipEdges[1]!) <= Number.parseFloat(clipEdges[3]!) ||
+            Number.parseFloat(clipEdges[2]!) <= Number.parseFloat(clipEdges[0]!));
         return (
           candidate.getClientRects().length > 0 &&
           rect.width > 0 &&
@@ -98,7 +108,8 @@ export async function collectUiAudit(
           style.visibility !== 'hidden' &&
           style.visibility !== 'collapse' &&
           style.opacity !== '0' &&
-          style.pointerEvents !== 'none'
+          style.pointerEvents !== 'none' &&
+          !zeroAreaClip
         );
       };
 

@@ -1,0 +1,38 @@
+{
+  "scope": "#980 completed strength set confirmation cancel and reopen, local synthetic WebKit",
+  "classification": "Animated document scroll restoration can move a pointer target during a click; confirmState race was not supported by the observed trace.",
+  "originalFailedTrace": {
+    "path": "../reopen-synchronization/active-workout-experience--3263b-licit-edit-or-reopen-action-webkit/trace.zip",
+    "cancelClickEnd": 8455.172,
+    "secondReopenInputSnapshot": {
+      "timestamp": 8819.127,
+      "scrollTop": 1514,
+      "point": {
+        "x": 553.05,
+        "y": 89.4
+      }
+    },
+    "secondReopenAfterSnapshot": {
+      "timestamp": 8850.987,
+      "scrollTop": 1486,
+      "dialogAppeared": false
+    }
+  },
+  "fix": "Instant scroll restoration and focus preventScroll; physical click assertions retained.",
+  "acknowledgement": {
+    "classification": "#980 first reopen confirmation, local synthetic WebKit",
+    "source": "frontend/src/features/workouts/TodayWorkout.tsx acknowledgement reconciliation effect",
+    "fix": "Both acknowledgement reconciliation scroll calls use instant; normal current-set smooth handoff is unchanged."
+  },
+  "verification": {
+    "originalTest": "completed strength sets require an explicit edit or reopen action",
+    "browser": "webkit",
+    "retries": 0,
+    "startTime": "2026-10-14T04:06:53.525Z",
+    "duration": 44722.037000000004,
+    "expected": 5,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

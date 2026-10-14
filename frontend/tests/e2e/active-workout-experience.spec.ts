@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
 import {
@@ -13,6 +15,18 @@ const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EI
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
 test.use({ serviceWorkers: 'block', video: 'on' });
+
+const CAPTURE_980_AFTER = process.env.CAPTURE_980_AFTER === '1';
+const ISSUE_980_AFTER_DIR = resolve(
+  process.cwd(),
+  '..',
+  'docs',
+  'ux',
+  'final-issues-acceptance',
+  'evidence',
+  '980-completed-set-20261013',
+  'after',
+);
 
 const captureLandingProductProofs =
   (
@@ -708,6 +722,26 @@ async function mockActiveWorkout(
     },
     cardioCompleted,
   };
+}
+
+function completedActions(row: Locator) {
+  return row.locator('details.active-workout-set__more-actions');
+}
+
+async function openCompletedActions(row: Locator) {
+  const actions = completedActions(row);
+  await expect(actions.locator('summary')).toHaveText('Действия');
+  if ((await actions.getAttribute('open')) === null) {
+    await actions.locator('summary').click();
+  }
+  return actions;
+}
+
+async function activeWorkoutQueueLength(page: Page) {
+  return page.evaluate(() => {
+    const stored = localStorage.getItem('fit_active_workout_v1_user_7_workout_42');
+    return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
+  });
 }
 
 test('P1 completion waits for acceptance behind an in-flight autosave', async ({ page }, info) => {
@@ -2713,6 +2747,752 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   });
 });
 
+test('#980 completed strength sets require an explicit edit or reopen action', async ({ page }) => {
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+  await first.getByRole('button', { name: /^2 —/ }).click();
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+  await expect(
+    first.getByRole('button', { name: 'Выполнен: Жим штанги лёжа, подход 1' }),
+  ).toBeDisabled();
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeDisabled();
+  await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+  await expect(
+    completedActions(first).getByRole('button', { name: 'Вернуть в работу' }),
+  ).toBeHidden();
+
+  await first.getByRole('button', { name: 'Редактировать' }).click();
+  await expect(first.getByRole('button', { name: 'Отмена' })).toBeVisible();
+  await expect(first.getByRole('button', { name: 'Сохранить' })).toBeVisible();
+  await expect(completedActions(first)).toHaveCount(0);
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeEnabled();
+  const writesBeforeDraft = server.patches.length;
+  await first.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('44');
+  await first.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('10');
+  await expect.poll(() => server.patches.length).toBe(writesBeforeDraft);
+  await first.getByRole('button', { name: 'Отмена' }).click();
+  await expect(completedActions(first)).toHaveCount(1);
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('42.5');
+  await expect(first.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('9');
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeDisabled();
+  expect(server.readSet(201)).toMatchObject({
+    actual_weight: 42.5,
+    actual_reps: 9,
+    is_completed: true,
+  });
+
+  await first.getByRole('button', { name: 'Редактировать' }).click();
+  await first.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('45');
+  await first.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('10');
+  await expect.poll(() => server.patches.length).toBe(writesBeforeDraft);
+  await first.getByRole('button', { name: 'Сохранить' }).click();
+  await expect.poll(() => server.readSet(201).actual_weight).toBe(45);
+  await expect.poll(() => server.readSet(201).actual_reps).toBe(10);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  expect(server.readSet(201).is_completed).toBe(true);
+  await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+  await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeDisabled();
+
+  const writesBeforeCancel = server.patches.length;
+  const actions = await openCompletedActions(first);
+  await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
+  await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect.poll(() => server.patches.length).toBe(writesBeforeCancel);
+  expect(server.readSet(201)).toMatchObject({
+    actual_weight: 45,
+    actual_reps: 10,
+    is_completed: true,
+  });
+
+  await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Статус изменится на');
+  await page.getByRole('dialog').getByRole('button', { name: 'Вернуть в работу' }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(false);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  expect(server.readSet(201)).toMatchObject({ actual_weight: 45, actual_reps: 10 });
+  await expect(first).toHaveAttribute('aria-current', 'step');
+});
+
+test('#980 completed cardio results keep their values through edit and reopen', async ({
+  page,
+}) => {
+  const server = await mockActiveWorkout(page, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+  await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
+  await cardio.getByRole('spinbutton', { name: 'Дистанция, Велотренажёр' }).fill('6.4');
+  await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  await expect.poll(() => server.readSet(204).is_completed).toBe(true);
+
+  await expect(
+    cardio.getByRole('button', { name: 'Кардио выполнено: Велотренажёр' }),
+  ).toBeDisabled();
+  await cardio.getByRole('button', { name: 'Редактировать' }).click();
+  await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
+  await expect(completedActions(cardio)).toHaveCount(0);
+  const writesBeforeDraft = server.patches.length;
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('30');
+  await expect.poll(() => server.patches.length).toBe(writesBeforeDraft);
+  await cardio.getByRole('button', { name: 'Отмена' }).click();
+  await expect(completedActions(cardio)).toHaveCount(1);
+  await expect(cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' })).toHaveValue(
+    '27',
+  );
+  expect(server.readSet(204)).toMatchObject({ duration_minutes: 27, is_completed: true });
+
+  await cardio.getByRole('button', { name: 'Редактировать' }).click();
+  await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('30');
+  await cardio.getByRole('button', { name: 'Сохранить' }).click();
+  await expect.poll(() => server.readSet(204).duration_minutes).toBe(30);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  expect(server.readSet(204).is_completed).toBe(true);
+  await expect(cardio.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+  await expect(
+    cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }),
+  ).toBeDisabled();
+
+  const actions = await openCompletedActions(cardio);
+  await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
+  await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
+  await page.getByRole('dialog').getByRole('button', { name: 'Вернуть в работу' }).click();
+  await expect.poll(() => server.readSet(204).is_completed).toBe(false);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  expect(server.readSet(204)).toMatchObject({ duration_minutes: 30, distance_km: 6.4 });
+});
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#980 guide text has readable contrast in every interactive state ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockActiveWorkout(page, true);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const guide = page
+      .locator('.active-workout-exercise')
+      .filter({ hasText: 'Велотренажёр' })
+      .getByRole('button', { name: 'Подробнее', exact: true });
+    await expect(guide).toBeVisible();
+    await guide.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    const samples = [];
+    for (const state of ['default', 'hover', 'pressed', 'focus'] as const) {
+      if (state === 'hover') await guide.hover();
+      if (state === 'pressed') await page.mouse.down();
+      if (state === 'focus') {
+        await page.mouse.move(0, 0);
+        await page.mouse.up();
+        await page.keyboard.press('Tab');
+        await guide.focus();
+        await expect(guide).toBeFocused();
+      }
+      if (state === 'hover' || state === 'pressed')
+        await expect(guide).toHaveCSS('color', 'rgb(9, 11, 11)');
+      if (state === 'default')
+        expect(await guide.evaluate((element) => element.matches(':hover'))).toBe(false);
+      if (state !== 'default') {
+        const pseudo =
+          state === 'pressed' ? ':active' : state === 'focus' ? ':focus-visible' : ':hover';
+        await expect
+          .poll(() => guide.evaluate((element, selector) => element.matches(selector), pseudo))
+          .toBe(true);
+      }
+      const sample = await guide.evaluate((element) => {
+        const label = element.querySelector('span');
+        if (!label) throw new Error('Missing guide label');
+        const foreground = getComputedStyle(label).color;
+        const background = getComputedStyle(element).backgroundColor;
+        const luminance = (color: string) => {
+          const channels = color
+            .match(/[\d.]+/g)!
+            .slice(0, 3)
+            .map(Number)
+            .map((value) => {
+              const normalized = value / 255;
+              return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+            });
+          return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+        };
+        const a = luminance(foreground),
+          b = luminance(background);
+        return {
+          foreground,
+          background,
+          buttonColor: getComputedStyle(element).color,
+          labelTransition: getComputedStyle(label).transition,
+          contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+        };
+      });
+      samples.push({ state, ...sample });
+      expect
+        .soft(sample.contrast, `${state} guide label contrast ${JSON.stringify(sample)}`)
+        .toBeGreaterThanOrEqual(4.5);
+      if (CAPTURE_980_AFTER && state === 'hover') {
+        await mkdir(ISSUE_980_AFTER_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-guide-hover.png`),
+        });
+      }
+    }
+    await info.attach('guide-computed-colors.json', {
+      body: JSON.stringify(samples, null, 2),
+      contentType: 'application/json',
+    });
+    if (CAPTURE_980_AFTER)
+      await writeFile(
+        resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-guide-colors.json`),
+        JSON.stringify(samples, null, 2),
+      );
+  });
+}
+
+test.describe('#980 completed set visual candidate', () => {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`${theme} completed set keeps explicit actions visible`, async ({ page }, info) => {
+      const captureWidth = Number(process.env.CAPTURE_980_WIDTH ?? 390);
+      await page.setViewportSize({ width: captureWidth, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page, true);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+      await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+      const rest = page.locator('.active-workout-rest');
+      await expect(rest).toBeVisible();
+      await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+      await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('42.5');
+      await expect(first.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('9');
+      await first.evaluate((element) => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
+      const geometry = await page.evaluate(() => {
+        const panel = document.querySelector<HTMLElement>('.active-workout-rest');
+        const row = document.querySelector<HTMLElement>('[data-workout-set-id="201"]');
+        const edit = row?.querySelector<HTMLElement>('[data-workout-action="edit-completed"]');
+        if (!panel || !row || !edit) return null;
+        const panelBox = panel.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        const editBox = edit.getBoundingClientRect();
+        const overlaps = (a: DOMRect, b: DOMRect) =>
+          a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        return {
+          panel: panelBox.toJSON(),
+          row: rowBox.toJSON(),
+          edit: editBox.toJSON(),
+          rowOverlapsPanel: overlaps(rowBox, panelBox),
+          editOverlapsPanel: overlaps(editBox, panelBox),
+        };
+      });
+      expect(geometry).not.toBeNull();
+      expect(geometry?.rowOverlapsPanel).toBe(false);
+      expect(geometry?.editOverlapsPanel).toBe(false);
+      await info.attach('rest-panel-geometry.json', {
+        body: JSON.stringify(geometry, null, 2),
+        contentType: 'application/json',
+      });
+
+      if (CAPTURE_980_AFTER) {
+        await mkdir(ISSUE_980_AFTER_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-completed.png`,
+          ),
+          fullPage: false,
+        });
+      }
+
+      await first.getByRole('button', { name: 'Редактировать' }).click();
+      await expect(first.getByRole('button', { name: 'Сохранить' })).toBeVisible();
+      await first.getByLabel('Вес, Жим штанги лёжа, подход 1').focus();
+      await first.evaluate((element) => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
+      if (CAPTURE_980_AFTER) {
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-strength-editing.png`,
+          ),
+          fullPage: false,
+        });
+      }
+      await first.getByRole('button', { name: 'Отмена' }).click();
+
+      const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+      await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+      await cardio.getByLabel('Длительность, Велотренажёр').fill('27');
+      await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
+      await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+      await expect.poll(() => server.readSet(204).is_completed).toBe(true);
+      await cardio.getByRole('button', { name: 'Редактировать' }).click();
+      await cardio.getByLabel('Длительность, Велотренажёр').focus();
+      await cardio.evaluate((element) => {
+        element.scrollIntoView({ block: 'center', behavior: 'instant' });
+      });
+      if (CAPTURE_980_AFTER) {
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-cardio-editing.png`,
+          ),
+          fullPage: false,
+        });
+      }
+      await cardio.getByRole('button', { name: 'Отмена' }).click();
+
+      if (CAPTURE_980_AFTER) {
+        const rir = page
+          .locator('[data-workout-set-id="202"] .active-workout-rir__options button')
+          .first();
+        await rir.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-rir-actions.png`,
+          ),
+          fullPage: false,
+        });
+
+        const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+        await finish.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        await page.screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-footer-actions.png`,
+          ),
+          fullPage: false,
+        });
+      }
+
+      const actions = await openCompletedActions(first);
+      await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
+      await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
+      if (CAPTURE_980_AFTER) {
+        await page.getByRole('dialog').screenshot({
+          path: resolve(
+            ISSUE_980_AFTER_DIR,
+            `${info.project.name}-${captureWidth}-${theme}-confirm.png`,
+          ),
+        });
+      }
+      await page.getByRole('button', { name: 'Отмена' }).click();
+    });
+  }
+});
+
+test.describe('#980 completed-set geometry regression', () => {
+  for (const width of [320, 360, 390, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`keeps completed strength/cardio editing and lower actions inside ${width}px ${theme}`, async ({
+        page,
+      }, info) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+        const server = await mockActiveWorkout(page, true);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент' }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const strength = page.locator('[data-workout-set-id="201"]');
+        const strengthExercise = page
+          .locator('.active-workout-exercise')
+          .filter({ hasText: 'Жим штанги лёжа' })
+          .first();
+        await expect(strengthExercise.locator('.active-workout-history')).toBeVisible();
+        const historyGap = await strengthExercise.evaluate((exercise) => {
+          const history = exercise.querySelector<HTMLElement>('.active-workout-history');
+          const sets = exercise.querySelector<HTMLElement>('.active-workout-exercise__sets');
+          if (!history || !sets) return null;
+          return sets.getBoundingClientRect().top - history.getBoundingClientRect().bottom;
+        });
+        expect(historyGap).not.toBeNull();
+        expect(historyGap ?? 0).toBeGreaterThanOrEqual(8);
+
+        await strength.getByLabel(/^Вес,/).fill('42.5');
+        await strength.getByLabel(/^Повторы,/).fill('9');
+        await strength.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await strength.getByRole('button', { name: 'Редактировать' }).click();
+        const weight = strength.getByLabel('Вес, Жим штанги лёжа, подход 1');
+        const reps = strength.getByLabel('Повторы, Жим штанги лёжа, подход 1');
+        await weight.focus();
+        await expect(weight).toBeFocused();
+        await page.keyboard.press('Tab');
+        await expect(reps).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(weight).toBeFocused();
+
+        const strengthGeometry = await page.evaluate(() => {
+          const root = document.documentElement;
+          const app = document.querySelector<HTMLElement>('#appContent');
+          const exercise = document
+            .querySelector<HTMLElement>('[data-workout-set-id="201"]')
+            ?.closest('.active-workout-exercise');
+          const row = document.querySelector<HTMLElement>('[data-workout-set-id="201"]');
+          const input = row?.querySelector<HTMLInputElement>('[data-workout-field="weight"]');
+          const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+          const box = (element: Element | null | undefined) =>
+            element?.getBoundingClientRect().toJSON() ?? null;
+          return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            scroll: { x: window.scrollX, y: window.scrollY },
+            documentWidth: { client: root.clientWidth, scroll: root.scrollWidth },
+            safe: {
+              left: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-left').trim(),
+              right: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-right').trim(),
+            },
+            visualViewport: window.visualViewport
+              ? {
+                  width: window.visualViewport.width,
+                  height: window.visualViewport.height,
+                  offsetLeft: window.visualViewport.offsetLeft,
+                  offsetTop: window.visualViewport.offsetTop,
+                }
+              : null,
+            app: box(app),
+            exercise: box(exercise),
+            row: box(row),
+            controls: box(controls),
+            weight: box(input),
+            weightStyle: input
+              ? {
+                  boxSizing: getComputedStyle(input).boxSizing,
+                  minWidth: getComputedStyle(input).minWidth,
+                  width: getComputedStyle(input).width,
+                  paddingInline: getComputedStyle(input).paddingInline,
+                }
+              : null,
+            active: document.activeElement === input,
+          };
+        });
+        await info.attach('strength-edit-geometry.json', {
+          body: JSON.stringify(strengthGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(strengthGeometry.weight).not.toBeNull();
+        expect(strengthGeometry.exercise).not.toBeNull();
+        expect(strengthGeometry.weight?.left).toBeGreaterThanOrEqual(
+          (strengthGeometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(strengthGeometry.weight?.right).toBeLessThanOrEqual(
+          (strengthGeometry.exercise?.right ?? width) + 0.5,
+        );
+        expect(strengthGeometry.documentWidth.scroll).toBeLessThanOrEqual(width + 1);
+        expect(strengthGeometry.weightStyle?.boxSizing).toBe('border-box');
+
+        const summaryGeometry = await page.evaluate(() =>
+          Array.from(
+            document.querySelectorAll<HTMLElement>(
+              '.active-workout-set__more-actions > summary, .active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
+            ),
+          )
+            .map((summary) => {
+              const style = getComputedStyle(summary);
+              const rect = summary.getBoundingClientRect();
+              return {
+                text: summary.textContent?.trim() ?? '',
+                rect: rect.toJSON(),
+                display: style.display,
+                alignItems: style.alignItems,
+                minHeight: parseFloat(style.minHeight),
+                paddingTop: style.paddingTop,
+                paddingBottom: style.paddingBottom,
+              };
+            })
+            .filter((summary) => summary.rect.width > 0 && summary.rect.height > 0),
+        );
+        expect(summaryGeometry.length).toBeGreaterThan(0);
+        for (const summary of summaryGeometry) {
+          expect(summary.rect.height, summary.text).toBeGreaterThanOrEqual(44);
+          expect(summary.minHeight, summary.text).toBeGreaterThanOrEqual(44);
+          expect(summary.display, summary.text).toBe('flex');
+          expect(summary.alignItems, summary.text).toBe('center');
+          expect(summary.paddingTop, summary.text).toBe('0px');
+          expect(summary.paddingBottom, summary.text).toBe('0px');
+        }
+
+        for (const summary of [
+          strength.locator('.active-workout-set__advanced > summary').first(),
+          page
+            .locator('[data-workout-set-id="202"] .active-workout-set__helpers > summary')
+            .first(),
+        ]) {
+          await expect(summary).toBeVisible();
+          await summary.scrollIntoViewIfNeeded();
+          const summaryGeometry = await summary.evaluate((element) => {
+            const dock = document.querySelector<HTMLElement>('#appBottomNav');
+            const target = element.getBoundingClientRect();
+            const dockRect = dock?.getBoundingClientRect();
+            const hit = document.elementFromPoint(
+              target.left + target.width / 2,
+              target.top + target.height / 2,
+            );
+            return {
+              target: target.toJSON(),
+              dock: dockRect?.toJSON() ?? null,
+              hit: hit === element || Boolean(hit?.closest('summary') === element),
+              overlap:
+                Boolean(dockRect) && target.bottom > dockRect!.top && target.top < dockRect!.bottom,
+            };
+          });
+          expect(summaryGeometry.overlap).toBe(false);
+          expect(summaryGeometry.hit).toBe(true);
+        }
+
+        const current = page.locator('[data-workout-set-id="202"]');
+        const rir = current.getByRole('button', { name: /^2 —/ });
+        await rir.evaluate((element) =>
+          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+        );
+        const rirGeometry = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>(
+            '[data-workout-set-id="202"] .active-workout-rir__options button',
+          );
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const targetBox = target?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const point = targetBox
+            ? document.elementFromPoint(
+                targetBox.left + targetBox.width / 2,
+                targetBox.top + targetBox.height / 2,
+              )
+            : null;
+          return {
+            target: targetBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            hit: point?.closest('.active-workout-rir__options') !== null,
+            overlap:
+              Boolean(targetBox && dockBox) &&
+              targetBox!.bottom > dockBox!.top &&
+              targetBox!.top < dockBox!.bottom,
+          };
+        });
+        await info.attach('rir-dock-geometry.json', {
+          body: JSON.stringify(rirGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(rirGeometry.overlap).toBe(false);
+        expect(rirGeometry.hit).toBe(true);
+
+        const finish = page.getByRole('button', { name: 'Завершить тренировку', exact: true });
+        await finish.scrollIntoViewIfNeeded();
+        const finishGeometry = await page.evaluate(() => {
+          const target = document.querySelector<HTMLElement>(
+            'button[aria-label="Завершить тренировку"], button:not([aria-label])[type="button"]',
+          );
+          const finishButton = [...document.querySelectorAll<HTMLElement>('button')].find(
+            (button) => button.textContent?.trim() === 'Завершить тренировку',
+          );
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const targetBox = (finishButton ?? target)?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const point = targetBox
+            ? document.elementFromPoint(
+                targetBox.left + targetBox.width / 2,
+                targetBox.top + targetBox.height / 2,
+              )
+            : null;
+          return {
+            target: targetBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            hit:
+              point === finishButton ||
+              Boolean(finishButton && point?.closest('button') === finishButton),
+            overlap:
+              Boolean(targetBox && dockBox) &&
+              targetBox!.bottom > dockBox!.top &&
+              targetBox!.top < dockBox!.bottom,
+          };
+        });
+        await info.attach('finish-dock-geometry.json', {
+          body: JSON.stringify(finishGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(finishGeometry.overlap).toBe(false);
+        expect(finishGeometry.hit).toBe(true);
+
+        const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
+        await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
+        await cardio.getByLabel('Длительность, Велотренажёр').fill('27');
+        await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
+        await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+        await expect.poll(() => server.readSet(204).is_completed).toBe(true);
+        await cardio.getByRole('button', { name: 'Редактировать' }).click();
+        const duration = cardio.getByLabel('Длительность, Велотренажёр');
+        await duration.focus();
+        await expect(duration).toBeFocused();
+        const cardioGeometry = await duration.evaluate((input) => {
+          const row = input.closest<HTMLElement>('[data-workout-set-id]');
+          const exercise = row?.closest<HTMLElement>('.active-workout-exercise');
+          return {
+            input: input.getBoundingClientRect().toJSON(),
+            row: row?.getBoundingClientRect().toJSON() ?? null,
+            exercise: exercise?.getBoundingClientRect().toJSON() ?? null,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+          };
+        });
+        await info.attach('cardio-edit-geometry.json', {
+          body: JSON.stringify(cardioGeometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(cardioGeometry.input.left).toBeGreaterThanOrEqual(
+          (cardioGeometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(cardioGeometry.input.right).toBeLessThanOrEqual(
+          (cardioGeometry.exercise?.right ?? width) + 0.5,
+        );
+
+        const pulseSummary = cardio.locator('.active-workout-set__advanced > summary');
+        await expect(pulseSummary).toHaveText('Пульс (необязательно)');
+        await pulseSummary.scrollIntoViewIfNeeded();
+        const pulseGeometry = await pulseSummary.evaluate((element) => {
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const target = element.getBoundingClientRect();
+          const dockRect = dock?.getBoundingClientRect();
+          const hit = document.elementFromPoint(
+            target.left + target.width / 2,
+            target.top + target.height / 2,
+          );
+          return {
+            target: target.toJSON(),
+            dock: dockRect?.toJSON() ?? null,
+            hit: hit === element || Boolean(hit?.closest('summary') === element),
+            overlap:
+              Boolean(dockRect) && target.bottom > dockRect!.top && target.top < dockRect!.bottom,
+          };
+        });
+        expect(pulseGeometry.overlap).toBe(false);
+        expect(pulseGeometry.hit).toBe(true);
+      });
+    }
+  }
+});
+
+test.describe('#980 completed editing keyboard and safe-area regression', () => {
+  for (const width of [320, 360, 390, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`keeps focused completed weight usable with modeled keyboard at ${width}px ${theme}`, async ({
+        page,
+      }, info) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+        await installMockedTelegram(page);
+        await page.addInitScript((selectedTheme) => {
+          localStorage.setItem('app-theme', selectedTheme);
+          if (window.Telegram?.WebApp) window.Telegram.WebApp.colorScheme = selectedTheme;
+        }, theme);
+        const server = await mockActiveWorkout(page, true);
+        await page.goto('/app?tgWebAppPlatform=ios');
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+        const strength = page.locator('[data-workout-set-id="201"]');
+        await strength.getByLabel(/^Вес,/).fill('42.5');
+        await strength.getByLabel(/^Повторы,/).fill('9');
+        await strength.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+        await strength.getByRole('button', { name: 'Редактировать' }).click();
+
+        const weight = strength.getByLabel('Вес, Жим штанги лёжа, подход 1');
+        const reps = strength.getByLabel('Повторы, Жим штанги лёжа, подход 1');
+        await weight.focus();
+        await expect(weight).toBeFocused();
+        await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
+        await page.keyboard.press('Tab');
+        await expect(reps).toBeFocused();
+        await page.keyboard.press('Shift+Tab');
+        await expect(weight).toBeFocused();
+
+        const geometry = await page.evaluate(() => {
+          const root = document.documentElement;
+          const input = document.querySelector<HTMLInputElement>(
+            '[data-workout-set-id="201"] [data-workout-field="weight"]',
+          );
+          const exercise = input?.closest<HTMLElement>('.active-workout-exercise');
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const inputBox = input?.getBoundingClientRect();
+          const exerciseBox = exercise?.getBoundingClientRect();
+          const dockBox = dock?.getBoundingClientRect();
+          const style = input ? getComputedStyle(input) : null;
+          const dockStyle = dock ? getComputedStyle(dock) : null;
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            visualViewport: window.visualViewport
+              ? {
+                  width: window.visualViewport.width,
+                  height: window.visualViewport.height,
+                  offsetTop: window.visualViewport.offsetTop,
+                }
+              : null,
+            keyboard: root.getAttribute('data-yfc-keyboard'),
+            viewportHeight: getComputedStyle(root).getPropertyValue('--yfc-viewport-height').trim(),
+            safeBottom: getComputedStyle(root).getPropertyValue('--yfc-layout-safe-bottom').trim(),
+            documentWidth: { client: root.clientWidth, scroll: root.scrollWidth },
+            input: inputBox?.toJSON() ?? null,
+            exercise: exerciseBox?.toJSON() ?? null,
+            dock: dockBox?.toJSON() ?? null,
+            boxSizing: style?.boxSizing ?? null,
+            dockVisible: Boolean(
+              dockBox &&
+              dockBox.width > 0 &&
+              dockBox.height > 0 &&
+              dockStyle?.display !== 'none' &&
+              dockStyle?.visibility !== 'hidden',
+            ),
+          };
+        });
+        await info.attach('completed-weight-keyboard-geometry.json', {
+          body: JSON.stringify(geometry, null, 2),
+          contentType: 'application/json',
+        });
+        expect(geometry.keyboard).toBe('visible');
+        expect(geometry.boxSizing).toBe('border-box');
+        expect(geometry.input).not.toBeNull();
+        expect(geometry.exercise).not.toBeNull();
+        expect(geometry.input?.left ?? 0).toBeGreaterThanOrEqual(
+          (geometry.exercise?.left ?? 0) - 0.5,
+        );
+        expect(geometry.input?.right ?? width).toBeLessThanOrEqual(
+          (geometry.exercise?.right ?? width) + 0.5,
+        );
+        expect(geometry.documentWidth.scroll).toBeLessThanOrEqual(width + 1);
+        expect(geometry.dockVisible).toBe(false);
+      });
+    }
+  }
+});
+
 test('TMA active workout keeps in-page back while native back stays hidden and keyboard nav restores', async ({
   page,
 }) => {
@@ -3005,9 +3785,18 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await expect(context.current).toHaveAttribute('aria-current', 'step');
     await expect(
       context.previous.getByRole('button', {
-        name: 'Отметить невыполненным: Жим штанги лёжа, подход 1',
+        name: 'Выполнен: Жим штанги лёжа, подход 1',
       }),
-    ).toHaveAttribute('aria-pressed', 'true');
+    ).toBeDisabled();
+    await expect(context.previous.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+    const actions = completedActions(context.previous);
+    await actions.evaluate((element) => {
+      (element as HTMLDetailsElement).open = true;
+    });
+    await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
+    await actions.evaluate((element) => {
+      (element as HTMLDetailsElement).open = false;
+    });
     await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
     await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
     await expect(

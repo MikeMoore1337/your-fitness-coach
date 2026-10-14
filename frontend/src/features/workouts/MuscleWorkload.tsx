@@ -51,7 +51,7 @@ export function MuscleWorkloadList({ analytics }: { analytics: TrainingAnalytics
     <div className="progress-muscle-workload" aria-label="Нагрузка по мышечным группам">
       {workload.map((item) => (
         <details className="progress-exercise" key={item.muscle_id}>
-          <summary>
+          <summary className="yfc-disclosure-summary">
             <span>
               <strong>{item.muscle_name}</strong>
               <small>{periodSummary(item.current)}</small>
@@ -83,7 +83,7 @@ export function MuscleWorkloadList({ analytics }: { analytics: TrainingAnalytics
                   {item.contributing_exercises.map((exercise) => (
                     <li key={exercise.exercise_id}>
                       <details className="progress-workload__exercise">
-                        <summary>
+                        <summary className="yfc-disclosure-summary">
                           <span>
                             {exercise.exercise_title} ·{' '}
                             {exercise.contribution_roles.map(roleLabel).join(', ')}

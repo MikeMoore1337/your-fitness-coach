@@ -170,7 +170,7 @@ function ClientDataSection({
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary>
+      <summary className="yfc-disclosure-summary">
         <span>
           <strong>{title}</strong>
           <small>{description}</small>
@@ -783,7 +783,7 @@ function ProgramAssignmentDisclosure({ client }: { client: Client }) {
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary>
+      <summary className="yfc-disclosure-summary">
         <span>
           <strong>Назначить новую программу</strong>
           <small>Открыть общий конструктор программ для этого клиента</small>
@@ -1626,8 +1626,11 @@ export default function CoachPage({
                             )}
                           </button>
                           <details className="coach-client-row__menu">
-                            <summary aria-label={`Действия: ${clientDisplayName(client)}`}>
-                              <Icon name="more-horizontal" size={20} />
+                            <summary
+                              className="yfc-disclosure-summary"
+                              aria-label={`Действия: ${clientDisplayName(client)}`}
+                            >
+                              <DisclosureIcon />
                             </summary>
                             <button
                               className="btn-danger"

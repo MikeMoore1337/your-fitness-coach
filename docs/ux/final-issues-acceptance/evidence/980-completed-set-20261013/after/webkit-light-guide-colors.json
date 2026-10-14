@@ -1,0 +1,34 @@
+[
+  {
+    "state": "default",
+    "foreground": "rgb(72, 100, 20)",
+    "background": "rgb(240, 240, 240)",
+    "buttonColor": "rgb(72, 100, 20)",
+    "labelTransition": "none 0.00001s",
+    "contrast": 5.928024028349793
+  },
+  {
+    "state": "hover",
+    "foreground": "rgb(9, 11, 11)",
+    "background": "rgb(178, 245, 32)",
+    "buttonColor": "rgb(9, 11, 11)",
+    "labelTransition": "none 0.00001s",
+    "contrast": 15.009457963066886
+  },
+  {
+    "state": "pressed",
+    "foreground": "rgb(9, 11, 11)",
+    "background": "rgb(178, 245, 32)",
+    "buttonColor": "rgb(9, 11, 11)",
+    "labelTransition": "none 0.00001s",
+    "contrast": 15.009457963066886
+  },
+  {
+    "state": "focus",
+    "foreground": "rgb(72, 100, 20)",
+    "background": "rgb(240, 240, 240)",
+    "buttonColor": "rgb(72, 100, 20)",
+    "labelTransition": "none 0.00001s",
+    "contrast": 5.928024028349793
+  }
+]

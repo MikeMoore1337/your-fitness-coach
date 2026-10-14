@@ -92,22 +92,127 @@ test('client exercise rows stay compact-first across supported mobile widths', a
 
     const search = page.getByRole('searchbox', { name: 'Поиск' });
     await search.fill('goblet squat');
+    await expect(search).toBeFocused();
     await expect(page.locator('.exercise-catalog-item')).toHaveCount(1);
     await expect(page.locator('.exercise-catalog-item')).toContainText('Гоблет-присед с гирей');
+    const [resultBox, filtersBox] = await Promise.all([
+      page.locator('.exercise-catalog-item').first().boundingBox(),
+      page.locator('.exercise-catalog__filters').boundingBox(),
+    ]);
+    expect(resultBox).not.toBeNull();
+    expect(filtersBox).not.toBeNull();
+    expect(resultBox!.y).toBeLessThan(filtersBox!.y);
+    expect(resultBox!.y).toBeLessThan(viewport.height);
     await expectNoHorizontalOverflow(page);
-    await page.locator('.exercise-catalog-list').screenshot({
-      path: `../.artifacts/screenshots/task-120D/exercise-catalog-${name}-${viewport.width}.png`,
+    await page.screenshot({
+      path: `../.artifacts/screenshots/task-120D/${test.info().project.name}-exercise-catalog-${name}-${viewport.width}.png`,
+      fullPage: true,
     });
+
+    const structure = await page.evaluate(() => {
+      const search = document.querySelector('.exercise-catalog__search input');
+      const filters = document.querySelector('.exercise-catalog__filters');
+      const count = document.querySelector('.exercise-catalog__count');
+      const list = document.querySelector('.exercise-catalog-list');
+      const create = document.querySelector('.exercise-create > summary');
+      if (!search || !filters || !count || !list || !create) {
+        throw new Error('Exercise catalog search structure is incomplete');
+      }
+      const follows = (before: Element, after: Element) =>
+        Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return {
+        searchBeforeCount: follows(search, count),
+        countBeforeResults: follows(count, list),
+        resultsBeforeFilters: follows(list, filters),
+        resultsBeforeCreate: follows(list, create),
+        createBeforeFilters: follows(create, filters),
+        filtersOrder: getComputedStyle(filters).order,
+        resultsOrder: getComputedStyle(list).order,
+      };
+    });
+    expect(structure).toEqual({
+      searchBeforeCount: true,
+      countBeforeResults: true,
+      resultsBeforeFilters: true,
+      resultsBeforeCreate: true,
+      createBeforeFilters: true,
+      filtersOrder: '0',
+      resultsOrder: '0',
+    });
+
+    const filterControls = page.locator('.exercise-catalog__filters select');
+    await expect(filterControls).toHaveCount(3);
+    const resultButton = page
+      .locator('.exercise-catalog-item')
+      .first()
+      .getByRole('button', { name: /Техника и детали|Подробнее/ });
+    const createToggle = page.locator('.exercise-create > summary');
+    await expect(createToggle).toBeVisible();
+    await search.press('Tab');
+    await expect(resultButton).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(createToggle).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(filterControls.nth(0)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(filterControls.nth(1)).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(filterControls.nth(2)).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(filterControls.nth(1)).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(filterControls.nth(0)).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(createToggle).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(resultButton).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(search).toBeFocused();
   }
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/app?section=catalog');
-  await page.getByRole('searchbox', { name: 'Поиск' }).fill('гоблет');
+  const desktopSearch = page.getByRole('searchbox', { name: 'Поиск' });
+  await desktopSearch.fill('гоблет');
   await expect(page.locator('.exercise-catalog-item')).toHaveCount(1);
   await expect(page.locator('.exercise-catalog-item')).toContainText('Гоблет-присед с гирей');
+  const [desktopResultBox, desktopFiltersBox] = await Promise.all([
+    page.locator('.exercise-catalog-item').first().boundingBox(),
+    page.locator('.exercise-catalog__filters').boundingBox(),
+  ]);
+  expect(desktopResultBox).not.toBeNull();
+  expect(desktopFiltersBox).not.toBeNull();
+  expect(desktopFiltersBox!.y).toBeLessThan(desktopResultBox!.y);
+  const desktopStructure = await page.evaluate(() => {
+    const filters = document.querySelector('.exercise-catalog__filters');
+    const count = document.querySelector('.exercise-catalog__count');
+    const list = document.querySelector('.exercise-catalog-list');
+    if (!filters || !count || !list) {
+      throw new Error('Desktop exercise catalog search structure is incomplete');
+    }
+    const follows = (before: Element, after: Element) =>
+      Boolean(before.compareDocumentPosition(after) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return {
+      filtersBeforeCount: follows(filters, count),
+      countBeforeResults: follows(count, list),
+      filtersOrder: getComputedStyle(filters).order,
+      resultsOrder: getComputedStyle(list).order,
+    };
+  });
+  expect(desktopStructure).toEqual({
+    filtersBeforeCount: true,
+    countBeforeResults: true,
+    filtersOrder: '0',
+    resultsOrder: '0',
+  });
+  const desktopFilter = page.locator('.exercise-catalog__filters select').first();
+  await desktopSearch.press('Tab');
+  await expect(desktopFilter).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(desktopSearch).toBeFocused();
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
-    path: '../.artifacts/screenshots/task-120D/exercise-catalog-desktop-1280.png',
+    path: `../.artifacts/screenshots/task-120D/${test.info().project.name}-exercise-catalog-desktop-1280.png`,
     fullPage: true,
   });
 });

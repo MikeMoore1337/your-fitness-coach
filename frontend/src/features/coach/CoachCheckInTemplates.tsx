@@ -11,6 +11,7 @@ import type {
 import { queryKeys } from '../../shared/queryKeys';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Badge, Button, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { clientDisplayName } from './coachWorkspace';
 
 type FieldKey = 'recovery' | 'hunger' | 'training_load' | 'adherence_difficulty';
@@ -356,6 +357,8 @@ export function CoachCheckInTemplates({
                     Новая версия
                   </Button>
                   <Button
+                    aria-expanded={historyTemplate === template.id}
+                    aria-controls={`coach-check-in-history-${template.id}`}
                     onClick={() =>
                       setHistoryTemplate(historyTemplate === template.id ? null : template.id)
                     }
@@ -363,6 +366,10 @@ export function CoachCheckInTemplates({
                     variant="ghost"
                   >
                     {historyTemplate === template.id ? 'Скрыть ответы' : 'Ответы клиентов'}
+                    <Icon
+                      name={historyTemplate === template.id ? 'chevron-up' : 'chevron-down'}
+                      size={16}
+                    />
                   </Button>
                 </div>
                 {isVersioning && (
@@ -436,7 +443,10 @@ export function CoachCheckInTemplates({
                   </div>
                 ) : null}
                 {historyTemplate === template.id && (
-                  <div className="coach-check-in-template__history">
+                  <div
+                    className="coach-check-in-template__history"
+                    id={`coach-check-in-history-${template.id}`}
+                  >
                     {history.isPending ? (
                       <LoadingState label="Загружаем ответы…" />
                     ) : history.error ? (

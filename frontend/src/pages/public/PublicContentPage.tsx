@@ -575,7 +575,9 @@ function RelatedContent({ page }: { page: PublicContentPageData }) {
             <>
               <strong>{item.label}</strong>
               {item.description && <span>{item.description}</span>}
-              <small>Открыть →</small>
+              <small className="public-card-action">
+                Открыть <Icon name="arrow-right" size={16} />
+              </small>
             </>
           );
           if (href.startsWith('http')) {

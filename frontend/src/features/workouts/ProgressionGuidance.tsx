@@ -214,7 +214,7 @@ export function ProgressionGuidance({
       </div>
 
       <details className="progression-guidance__details">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>Почему?</span>
           <DisclosureIcon />
         </summary>

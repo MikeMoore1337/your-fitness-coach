@@ -1,3 +1,4 @@
+import { TimeInput } from '../../shared/ui/PickerInput';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
@@ -30,6 +31,7 @@ import {
   type OnboardingLatencyBucket,
 } from '../../shared/analytics/productEvents';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   CloseIcon,
@@ -1032,9 +1034,10 @@ export function FoodPickerDialog({
                 />
               </Field>
               <Field label="Время (необязательно)" labelFor="nutrition-quick-time">
-                <Input
+                <TimeInput
+                  className="ui-input"
                   id="nutrition-quick-time"
-                  type="time"
+
                   value={quick.loggedAt}
                   onChange={(event) => updateQuick({ loggedAt: event.target.value })}
                 />
@@ -1381,7 +1384,10 @@ export function FoodPickerDialog({
                 </p>
               )}
               <details className="nutrition-picker__secondary-tools">
-                <summary>Другие способы добавления</summary>
+                <summary className="yfc-disclosure-summary">
+                  Другие способы добавления
+                  <DisclosureIcon />
+                </summary>
                 <div className="nutrition-picker__tools" aria-label="Другие способы добавления">
                   <Button
                     type="button"
@@ -1437,7 +1443,10 @@ export function FoodPickerDialog({
               </details>
               {searchQuery.length < 2 && (
                 <details className="nutrition-picker__catalog-filters">
-                  <summary>Каталог и фильтры</summary>
+                  <summary className="yfc-disclosure-summary">
+                    Каталог и фильтры
+                    <DisclosureIcon />
+                  </summary>
                   <div className="nutrition-picker__tabs" aria-label="Быстрое добавление">
                     <button
                       type="button"
