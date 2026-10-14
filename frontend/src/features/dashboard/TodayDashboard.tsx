@@ -981,10 +981,12 @@ export function TodayDashboard({
   initialWellbeingDate,
   initialWellbeingOpen = false,
   initialCardioOpen = false,
+  onWellbeingExit,
 }: {
   initialWellbeingDate?: string;
   initialWellbeingOpen?: boolean;
   initialCardioOpen?: boolean;
+  onWellbeingExit?: () => void;
 } = {}) {
   const { user } = useAuth();
   const capabilities = useRuntimeCapabilities();
@@ -1015,16 +1017,6 @@ export function TodayDashboard({
     params.delete('cardio');
     const nextSearch = params.toString();
     navigate(`/app${nextSearch ? `?${nextSearch}` : ''}`, true);
-  };
-  const exitQuickWellbeing = () => {
-    navigate('/app?section=today', true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]')?.focus({
-          preventScroll: true,
-        });
-      });
-    });
   };
   const calendarContextRef = useRef(`${timeZone}:${today}`);
   const heading =
@@ -1476,7 +1468,7 @@ export function TodayDashboard({
                   key={`${user.id}:${initialWellbeingDate || selectedDate}:${
                     initialWellbeingOpen ? 'open' : 'closed'
                   }`}
-                  onExit={initialWellbeingOpen ? exitQuickWellbeing : undefined}
+                  onExit={initialWellbeingOpen ? onWellbeingExit : undefined}
                   timeZone={timeZone}
                   userId={user.id}
                 />
