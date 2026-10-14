@@ -392,6 +392,25 @@ afterEach(() => {
 });
 
 describe('ProgressExperience', () => {
+  it('uses matching decorative chevrons for both navigation directions', async () => {
+    installApi();
+    renderExperience();
+    await screen.findByRole('heading', { name: 'Что изменилось' });
+    const navigation = screen.getByRole('navigation', { name: 'Разделы прогресса' });
+    for (const [label, glyph] of [
+      ['Предыдущие разделы прогресса', 'chevron-left'],
+      ['Следующие разделы прогресса', 'chevron-right'],
+    ]) {
+      const icon = within(navigation).getByRole('button', { name: label }).querySelector('svg');
+      expect(icon).toHaveAttribute('data-icon', glyph);
+      expect(icon).toHaveAttribute('width', '16');
+      expect(icon).toHaveAttribute('height', '16');
+      expect(icon).toHaveAttribute('stroke-width', '1.8');
+      expect(icon).toHaveAttribute('aria-hidden', 'true');
+      expect(icon).toHaveAttribute('focusable', 'false');
+    }
+  });
+
   it('shows backend summaries, factual body points and workout detail', async () => {
     installApi();
     renderExperience();

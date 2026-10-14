@@ -428,7 +428,7 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
         disabled={edges.start}
         onClick={() => move(-1)}
       >
-        <Icon name="arrow-left" size={16} />
+        <Icon name="chevron-left" size={16} />
       </button>
       <div
         className="progress-category-nav__rail"

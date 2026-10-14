@@ -180,8 +180,81 @@ for (const width of [320, 360, 393, 430])
       await expect(sheet).toHaveCount(0);
       await expect(trigger).toBeFocused();
       const rail = page.locator('.progress-category-nav__rail');
+      const edgeIcons = await page
+        .locator('.progress-category-nav__edge [data-icon]')
+        .evaluateAll((icons) => icons.map((icon) => icon.getAttribute('data-icon')));
+      expect(edgeIcons).toEqual(['chevron-left', 'chevron-right']);
       const initialRailWidth = (await rail.boundingBox())!.width;
-      await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toBeHidden();
+      const previousSections = page.getByRole('button', {
+        name: 'Предыдущие разделы прогресса',
+        includeHidden: true,
+      });
+      const nextSections = page.getByRole('button', {
+        name: 'Следующие разделы прогресса',
+        includeHidden: true,
+      });
+      await expect(previousSections).toBeDisabled();
+      await expect(previousSections).toBeHidden();
+      await expect(nextSections).toBeEnabled();
+      const edgeGeometry = await page
+        .locator('.progress-category-nav__edge')
+        .evaluateAll((buttons) =>
+          buttons.map((button) => {
+            const bounds = button.getBoundingClientRect();
+            const icon = button.querySelector('svg')!;
+            const glyph = icon.getBoundingClientRect();
+            return {
+              width: bounds.width,
+              height: bounds.height,
+              iconWidth: glyph.width,
+              iconHeight: glyph.height,
+              centeredX: Math.abs(glyph.x + glyph.width / 2 - bounds.x - bounds.width / 2),
+              centeredY: Math.abs(glyph.y + glyph.height / 2 - bounds.y - bounds.height / 2),
+              stroke: icon.getAttribute('stroke-width'),
+              linecap: icon.getAttribute('stroke-linecap'),
+              linejoin: icon.getAttribute('stroke-linejoin'),
+            };
+          }),
+        );
+      expect(edgeGeometry).toEqual([
+        {
+          width: 44,
+          height: 44,
+          iconWidth: 16,
+          iconHeight: 16,
+          centeredX: 0,
+          centeredY: 0,
+          stroke: '1.8',
+          linecap: 'round',
+          linejoin: 'round',
+        },
+        edgeGeometry[0],
+      ]);
+      const initialScroll = await rail.evaluate((element) => element.scrollLeft);
+      await nextSections.focus();
+      await page.keyboard.press('ArrowRight');
+      await expect(nextSections).toHaveCSS('outline-style', 'solid');
+      await page.keyboard.press('Enter');
+      await expect
+        .poll(() => rail.evaluate((element) => element.scrollLeft))
+        .toBeGreaterThan(initialScroll);
+      await expect(rail.locator('a:focus')).toHaveAttribute('data-clipped', 'false');
+      await expect(rail.getByRole('link', { name: /^Обзор/ })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      await expect(previousSections).toBeEnabled();
+      await page.screenshot({
+        path: testInfo.outputPath(`progress-navigation-${width}-${theme}.png`),
+      });
+      await previousSections.focus();
+      await expect(previousSections).toHaveCSS('outline-style', 'solid');
+      await page.keyboard.press('Enter');
+      await expect(rail.getByRole('link', { name: /^Обзор/ })).toBeFocused();
+      await expect(rail.getByRole('link', { name: /^Обзор/ })).toHaveAttribute(
+        'data-clipped',
+        'false',
+      );
       await rail.getByRole('link', { name: /^Тело/ }).click();
       await expect(page).toHaveURL(/progress_view=body/);
       await expect.poll(async () => (await rail.boundingBox())?.width).toBe(initialRailWidth);
