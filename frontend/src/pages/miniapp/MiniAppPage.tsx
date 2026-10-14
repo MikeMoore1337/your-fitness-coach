@@ -4,6 +4,7 @@ import '../../styles/react.css';
 import '../../styles/design-v2.css';
 import '../../styles/ux-ia-redesign.css';
 import { useAuth } from '../../app/AuthProvider';
+import { useQuickAddReturn } from '../../app/useQuickAddReturn';
 import {
   authRecoveryMessage,
   providerLabel,
@@ -268,16 +269,8 @@ export default function MiniAppPage({
   const focusDailyWellbeing = new URLSearchParams(search).get('wellbeing') === '1';
   const focusCardio = new URLSearchParams(search).get('cardio') === '1';
   const focusMeasurements = requestedMeasurementsFocus(search);
-  const exitQuickMeasurement = () => {
-    navigate('/app?section=progress', true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]')?.focus({
-          preventScroll: true,
-        });
-      });
-    });
-  };
+  const exitQuickMeasurement = useQuickAddReturn('/app?section=progress');
+  const exitQuickWellbeing = useQuickAddReturn('/app?section=today');
   const progressView = parseProgressView(search, window.location.hash);
   const dailyWellbeingDate = requestedWellbeingDate(search);
   const [focusedWorkout, setFocusedWorkout] = useState<{
@@ -463,6 +456,7 @@ export default function MiniAppPage({
               initialCardioOpen={focusCardio}
               initialWellbeingDate={dailyWellbeingDate}
               initialWellbeingOpen={focusDailyWellbeing}
+              onWellbeingExit={exitQuickWellbeing}
             />
           )}
           {section === 'progress' && (
