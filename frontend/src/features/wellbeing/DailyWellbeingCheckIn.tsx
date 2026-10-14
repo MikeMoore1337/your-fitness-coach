@@ -27,6 +27,7 @@ import {
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { DateInput } from '../../shared/ui/PickerInput';
+import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 
 const sleepOptions = [
   { value: 1, label: 'Очень плохо' },
@@ -61,9 +62,12 @@ const emptyForm: WellbeingForm = {
 function formsEqual(left: WellbeingForm, right: WellbeingForm): boolean {
   return (
     left.sleepQuality === right.sleepQuality &&
-    left.sleepDurationMinutes === right.sleepDurationMinutes &&
+    (left.sleepDurationMinutes === right.sleepDurationMinutes ||
+      (left.sleepDurationMinutes !== '' &&
+        right.sleepDurationMinutes !== '' &&
+        Number(left.sleepDurationMinutes) === Number(right.sleepDurationMinutes))) &&
     left.mood === right.mood &&
-    left.note === right.note
+    left.note.trim() === right.note.trim()
   );
 }
 
@@ -117,6 +121,7 @@ function OptionField({
   legend,
   name,
   options,
+  disabled,
   value,
   onChange,
 }: {
@@ -124,11 +129,12 @@ function OptionField({
   legend: string;
   name: string;
   options: readonly { value: number; label: string }[];
+  disabled?: boolean;
   value: string;
   onChange(value: string): void;
 }) {
   return (
-    <fieldset className="daily-wellbeing__options">
+    <fieldset className="daily-wellbeing__options" disabled={disabled}>
       <legend>
         {legend} <small>необязательно</small>
       </legend>
@@ -287,6 +293,7 @@ export function DailyWellbeingCheckIn({
   const removeError = remove.error ? errorMessage(remove.error) : null;
 
   const leaveForm = async () => {
+    if (save.isPending || remove.isPending) return;
     if (
       isDirty &&
       !(await confirm({
@@ -308,6 +315,7 @@ export function DailyWellbeingCheckIn({
     }
     setEditing(false);
   };
+  useTelegramOverlayBackButton(Boolean(onExit) && editing, () => void leaveForm());
 
   if (!current.isLoading && !current.error && !record && !editing && !autoFocus) {
     return <EmptyWellbeingCard onStart={() => setEditing(true)} />;
@@ -405,7 +413,7 @@ export function DailyWellbeingCheckIn({
         }}
         onSubmit={(event) => {
           event.preventDefault();
-          if (isEmpty || !online || !isDateAllowed) return;
+          if (save.isPending || remove.isPending || isEmpty || !online || !isDateAllowed) return;
           setLastPayload(savePayload);
           save.mutate({ date: localDate, payload: savePayload });
         }}
@@ -416,11 +424,13 @@ export function DailyWellbeingCheckIn({
           labelFor={`${instanceId}-date`}
         >
           <DateInput
+            disabled={save.isPending || remove.isPending}
             id={`${instanceId}-date`}
             max={today}
             min={addCalendarDays(today, -90)}
             onChange={(event) => {
               const nextDate = event.target.value;
+              if (nextDate === localDate) return;
               void (async () => {
                 if (
                   isDirty &&
@@ -444,6 +454,7 @@ export function DailyWellbeingCheckIn({
         </Field>
 
         <OptionField
+          disabled={save.isPending || remove.isPending}
           id={`${instanceId}-sleep`}
           legend="Как спалось?"
           name={`${instanceId}-sleep-quality`}
@@ -457,6 +468,7 @@ export function DailyWellbeingCheckIn({
           value={form.sleepQuality}
         />
         <OptionField
+          disabled={save.isPending || remove.isPending}
           id={`${instanceId}-mood`}
           legend="Как себя ощущали?"
           name={`${instanceId}-mood`}
@@ -476,6 +488,7 @@ export function DailyWellbeingCheckIn({
           labelFor={`${instanceId}-duration`}
         >
           <Input
+            disabled={save.isPending || remove.isPending}
             id={`${instanceId}-duration`}
             inputMode="numeric"
             max={1440}
@@ -507,6 +520,7 @@ export function DailyWellbeingCheckIn({
             labelFor={`${instanceId}-note`}
           >
             <textarea
+              disabled={save.isPending || remove.isPending}
               id={`${instanceId}-note`}
               maxLength={500}
               onChange={(event) =>
@@ -533,12 +547,15 @@ export function DailyWellbeingCheckIn({
           </p>
         )}
         <div className="daily-wellbeing__actions">
-          <Button disabled={save.isPending || isEmpty || !online || !isDateAllowed} type="submit">
+          <Button
+            disabled={save.isPending || remove.isPending || isEmpty || !online || !isDateAllowed}
+            type="submit"
+          >
             {save.isPending ? 'Сохраняем…' : 'Сохранить отметку'}
           </Button>
           {record && (
             <Button
-              disabled={remove.isPending}
+              disabled={save.isPending || remove.isPending}
               onClick={async () => {
                 if (
                   await confirm({
@@ -556,7 +573,12 @@ export function DailyWellbeingCheckIn({
               {remove.isPending ? 'Удаляем…' : 'Удалить'}
             </Button>
           )}
-          <Button onClick={() => void leaveForm()} type="button" variant="ghost">
+          <Button
+            disabled={save.isPending || remove.isPending}
+            onClick={() => void leaveForm()}
+            type="button"
+            variant="ghost"
+          >
             {onExit ? 'Вернуться' : record ? 'Отменить изменение' : 'Отмена'}
           </Button>
         </div>
