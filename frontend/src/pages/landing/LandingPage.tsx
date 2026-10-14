@@ -1,3 +1,4 @@
+import { DisclosureIcon } from '../../shared/ui/common';
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { WebArticleCard } from '../../shared/api/types';
@@ -531,9 +532,9 @@ export default function LandingPage() {
             <div className="landing-faq-list">
               {faqs.map((item) => (
                 <details key={item.question}>
-                  <summary>
+                  <summary className="yfc-disclosure-summary">
                     {item.question}
-                    <Icon name="plus" size={20} />
+                    <DisclosureIcon />
                   </summary>
                   <p>{item.answer}</p>
                 </details>
@@ -541,12 +542,12 @@ export default function LandingPage() {
             </div>
             <div className="landing-assurance__details">
               <details>
-                <summary>
+                <summary className="yfc-disclosure-summary">
                   <span>
                     <small>Разобраться до действия</small>
                     <strong>Короткий путь к проверяемому объяснению.</strong>
                   </span>
-                  <Icon name="plus" size={20} />
+                  <DisclosureIcon />
                 </summary>
                 <div>
                   <p>
@@ -565,12 +566,12 @@ export default function LandingPage() {
                 </div>
               </details>
               <details id="privacy">
-                <summary>
+                <summary className="yfc-disclosure-summary">
                   <span>
                     <small>Приватность без входа</small>
                     <strong>Ваши данные остаются под вашим управлением.</strong>
                   </span>
-                  <Icon name="plus" size={20} />
+                  <DisclosureIcon />
                 </summary>
                 <div>
                   <p>

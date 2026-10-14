@@ -36,7 +36,14 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         expect(geometry.scrollHeight).toBeLessThanOrEqual(geometry.height + 1);
         expect(geometry.ellipsis).not.toBe('ellipsis');
       }
-      await expect(largeGlass.locator('strong')).toHaveText('+350 мл');
+      const quantity = largeGlass.locator('strong');
+      await expect(quantity).toHaveText('350 мл');
+      const plus = quantity.locator('svg.yfc-icon[data-icon="plus"]');
+      await expect(plus).toHaveCount(1);
+      await expect(plus).toHaveAttribute('viewBox', '0 0 24 24');
+      await expect(plus).toHaveAttribute('stroke', 'currentColor');
+      await expect(plus).toHaveAttribute('stroke-width', '1.8');
+      await expect(plus).toHaveAttribute('aria-hidden', 'true');
       expect((await largeGlass.boundingBox())!.height).toBeGreaterThanOrEqual(44);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
         width + 1,

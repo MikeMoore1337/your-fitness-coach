@@ -340,7 +340,10 @@ export function TemplatesList({
       </div>
       {item.owner_user_id === user?.id && <PublicProgramSharePanel template={item} />}
       <details className="program-danger-menu">
-        <summary>Другие действия</summary>
+        <summary className="yfc-disclosure-summary">
+          Другие действия
+          <DisclosureIcon />
+        </summary>
         <button
           type="button"
           className="btn-danger"
@@ -466,7 +469,10 @@ export function TemplatesList({
                 )}
                 {activeTemplate.assigned_program_id != null && (
                   <details className="program-danger-menu">
-                    <summary>Другие действия</summary>
+                    <summary className="yfc-disclosure-summary">
+                      Другие действия
+                      <DisclosureIcon />
+                    </summary>
                     <button
                       type="button"
                       className="btn-danger"
@@ -591,7 +597,7 @@ export function TemplatesList({
             )}
             {!!hidden.data?.length && (
               <details className="compact-disclosure top-gap">
-                <summary>
+                <summary className="yfc-disclosure-summary">
                   <span>Скрытые примеры программ ({hidden.data.length})</span>
                   <DisclosureIcon />
                 </summary>

@@ -560,21 +560,26 @@ def edit_template(
     db: Session = Depends(get_db),
 ):
     try:
-        template = update_template_for_user(
+        template, apply_result = update_template_for_user(
             db=db,
             current_user=current_user,
             template_id=template_id,
             payload=payload,
         )
     except ProgramError as exc:
+        db.rollback()
         detail = str(exc)
         if detail == "Template not found":
             raise HTTPException(status_code=404, detail=detail)
         if detail in {"No permission to edit template", "No permission to manage this user"}:
             raise HTTPException(status_code=403, detail=detail)
+        if detail == "Program revision conflict":
+            raise HTTPException(status_code=409, detail=detail)
         raise HTTPException(status_code=400, detail=detail)
 
-    return build_template_response(template, db, current_user)
+    response = build_template_response(template, db, current_user)
+    response.update(apply_result)
+    return response
 
 
 @router.post(

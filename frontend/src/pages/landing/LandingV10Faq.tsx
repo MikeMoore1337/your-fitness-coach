@@ -1,4 +1,4 @@
-import { Icon } from '../../shared/ui/Icon';
+import { DisclosureIcon } from '../../shared/ui/common';
 import { LandingChapter } from './LandingChapter';
 import type { LandingAudience } from './landingAudience';
 
@@ -48,9 +48,9 @@ export function LandingV10Faq({ audience }: { audience: LandingAudience }) {
             key={item.question}
             id={item.question === 'Что происходит с данными?' ? 'privacy' : undefined}
           >
-            <summary>
+            <summary className="yfc-disclosure-summary">
               {item.question}
-              <Icon name="plus" size={20} />
+              <DisclosureIcon />
             </summary>
             <p>{item.answer}</p>
           </details>

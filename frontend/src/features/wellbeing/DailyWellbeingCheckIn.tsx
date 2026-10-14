@@ -14,6 +14,7 @@ import {
 } from '../../shared/dateTime';
 import { queryKeys } from '../../shared/queryKeys';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   Card,
@@ -450,8 +451,9 @@ export function DailyWellbeingCheckIn({
           onToggle={(event) => setNoteOpen(event.currentTarget.open)}
           open={noteOpen}
         >
-          <summary>
+          <summary className="yfc-disclosure-summary">
             Добавить заметку <small>не попадёт в отчёт</small>
+            <DisclosureIcon />
           </summary>
           <Field
             hint={`${form.note.length}/500 символов`}

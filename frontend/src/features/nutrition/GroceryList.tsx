@@ -16,6 +16,7 @@ import type {
 import { queryKeys } from '../../shared/queryKeys';
 import { WeekStrip } from '../../shared/ui/WeekStrip';
 import {
+  DisclosureIcon,
   Button,
   EmptyState,
   ErrorState,
@@ -301,12 +302,13 @@ export function GroceryList({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       open={open}
     >
-      <summary className="grocery-list__summary">
+      <summary className="grocery-list__summary yfc-disclosure-summary">
         <span>
           <span className="eyebrow">Планирование питания</span>
           <strong>Список покупок</strong>
         </span>
         <span className="grocery-list__summary-note">По рецептам недели</span>
+        <DisclosureIcon />
       </summary>
       <div className="grocery-list__body">
         <WeekStrip

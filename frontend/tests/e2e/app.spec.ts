@@ -3024,9 +3024,9 @@ test('сенсорное поле даты сохраняет нативный �
       };
     });
     expect(fallbackIcon).toMatchObject({
-      height: '18px',
+      height: '20px',
       pointerEvents: 'none',
-      width: '18px',
+      width: '20px',
     });
 
     await dateControl.scrollIntoViewIfNeeded();

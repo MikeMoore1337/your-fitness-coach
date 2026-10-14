@@ -1,0 +1,72 @@
+{
+  "synthetic": true,
+  "theme": "dark",
+  "browser": "mobile-webkit",
+  "width": 390,
+  "rir": {
+    "target": {
+      "x": 31,
+      "y": 302.859375,
+      "width": 60.796875,
+      "height": 44,
+      "top": 302.859375,
+      "right": 91.796875,
+      "bottom": 346.859375,
+      "left": 31
+    },
+    "dock": {
+      "x": 10,
+      "y": 662,
+      "width": 370,
+      "height": 66,
+      "top": 662,
+      "right": 380,
+      "bottom": 728,
+      "left": 10
+    },
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "effectiveBottom": 760
+    },
+    "documentWidth": {
+      "client": 390,
+      "scroll": 390
+    },
+    "hit": true,
+    "overlap": false
+  },
+  "finish": {
+    "target": {
+      "x": 12,
+      "y": 605.765625,
+      "width": 366,
+      "height": 44,
+      "top": 605.765625,
+      "right": 378,
+      "bottom": 649.765625,
+      "left": 12
+    },
+    "dock": {
+      "x": 10,
+      "y": 662,
+      "width": 370,
+      "height": 66,
+      "top": 662,
+      "right": 380,
+      "bottom": 728,
+      "left": 10
+    },
+    "viewport": {
+      "width": 390,
+      "height": 844,
+      "effectiveBottom": 760
+    },
+    "documentWidth": {
+      "client": 390,
+      "scroll": 390
+    },
+    "hit": true,
+    "overlap": false
+  }
+}

@@ -105,7 +105,7 @@ export function NutritionTargetHistory({ targetTelegramId }: { targetTelegramId?
               return (
                 <li key={item.id}>
                   <details>
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <span>
                         <strong>{dateLabel(item.effective_from)}</strong>
                         <small>

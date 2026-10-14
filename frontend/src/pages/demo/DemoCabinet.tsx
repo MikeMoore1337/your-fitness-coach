@@ -211,6 +211,7 @@ function DemoRoute({
       <section className="demo-route demo-route--hidden" aria-label="Маршрут демо">
         <Button aria-expanded={false} onClick={onShow} variant="secondary">
           Показать маршрут
+          <Icon name="chevron-down" size={16} />
         </Button>
       </section>
     );
@@ -222,8 +223,14 @@ function DemoRoute({
         <strong id="demoRouteTitle">
           Маршрут демо · {route.currentStep} из {route.steps.length}
         </strong>
-        <Button aria-controls="demoRouteSteps" onClick={onHide} variant="secondary">
+        <Button
+          aria-controls="demoRouteSteps"
+          aria-expanded={true}
+          onClick={onHide}
+          variant="secondary"
+        >
           Скрыть маршрут
+          <Icon name="chevron-up" size={16} />
         </Button>
       </div>
       <ol id="demoRouteSteps" className="demo-route__steps">

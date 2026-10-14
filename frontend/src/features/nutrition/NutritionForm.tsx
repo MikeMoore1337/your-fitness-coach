@@ -572,7 +572,7 @@ export function NutritionForm({
                   )}
 
                   <details className="nutrition-details">
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <span>Подробнее о расчёте</span>
                       <DisclosureIcon />
                     </summary>

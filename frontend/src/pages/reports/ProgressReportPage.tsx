@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useOptionalAuth } from '../../app/AuthProvider';
@@ -16,11 +17,11 @@ import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { TimeSeriesChart } from '../../shared/ui/DataViz';
 import { Icon } from '../../shared/ui/Icon';
 import {
+  DisclosureIcon,
   Button,
   EmptyState,
   ErrorState,
   Field,
-  Input,
   LoadingState,
   SegmentedControl,
 } from '../../shared/ui/common';
@@ -285,7 +286,10 @@ function DailyWellbeingReportSection({ report }: { report: ProgressReport }) {
         </div>
       </div>
       <details className="progress-report-wellbeing-days">
-        <summary>Дни с фактическими отметками</summary>
+        <summary className="yfc-disclosure-summary">
+          Дни с фактическими отметками
+          <DisclosureIcon />
+        </summary>
         <div className="progress-report-wellbeing-days__table-wrap">
           <table>
             <caption>Записанные дни сна и настроения</caption>
@@ -979,9 +983,10 @@ export default function ProgressReportPage() {
           {draft.period === 'custom' && (
             <form className="progress-report-custom" onSubmit={applySelection}>
               <Field label="Начало" labelFor="report-date-from">
-                <Input
+                <DateInput
+                  className="ui-input"
                   id="report-date-from"
-                  type="date"
+
                   value={draft.dateFrom}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, dateFrom: event.target.value }))
@@ -989,9 +994,10 @@ export default function ProgressReportPage() {
                 />
               </Field>
               <Field error={customError || undefined} label="Окончание" labelFor="report-date-to">
-                <Input
+                <DateInput
+                  className="ui-input"
                   id="report-date-to"
-                  type="date"
+
                   value={draft.dateTo}
                   onChange={(event) =>
                     setDraft((current) => ({ ...current, dateTo: event.target.value }))
@@ -1062,7 +1068,10 @@ export default function ProgressReportPage() {
         className="progress-report-options report-screen-only"
         open={window.innerWidth > 680}
       >
-        <summary>Состав и отправка отчёта</summary>
+        <summary className="yfc-disclosure-summary">
+          Состав и отправка отчёта
+          <DisclosureIcon />
+        </summary>
         {handoffId === null && auth?.user?.trainer && !clientId && (
           <ReportHandoffPanel
             dateFrom={applied.dateFrom}

@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
+import { DisclosureIcon, Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
 import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
@@ -88,6 +88,7 @@ export function ProgramBuilder({
   onSaved?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const sectionId = useId();
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
@@ -139,15 +140,22 @@ export function ProgramBuilder({
   );
   const [startDate, setStartDate, clearStartDateDraft] = usePersistentState(
     programDraftStorageKey('start', draftScope),
-    defaultStartDate,
+    editingTemplate?.assigned_program_start_date ?? defaultStartDate,
   );
   const [durationWeeks, setDurationWeeks, clearDurationDraft] = usePersistentState<number>(
     programDraftStorageKey('duration', draftScope),
-    SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+    editingTemplate?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
   );
   const [scheduleWeekdays, setScheduleWeekdays, clearScheduleDraft] = usePersistentState<number[]>(
     programDraftStorageKey('weekdays', draftScope),
-    [],
+    editingTemplate?.assigned_program_schedule_weekdays ?? [],
+  );
+  const activeProgramEdit = Boolean(
+    editingTemplate &&
+    !saveAsCopy &&
+    editingTemplate.is_active_for_current_user &&
+    editingTemplate.assigned_program_id != null &&
+    editingTemplate.current_revision_number != null,
   );
   const [split, setSplit] = useState<StrengthSplit>('upper_lower');
   const snapshot = JSON.stringify([
@@ -195,7 +203,7 @@ export function ProgramBuilder({
 
   const mutation = useMutation({
     mutationFn: ({ replaceActive }: { replaceActive: boolean }) =>
-      api(updateTemplatePath ?? '/api/v1/programs/templates', {
+      api<ProgramTemplate>(updateTemplatePath ?? '/api/v1/programs/templates', {
         method: updateTemplatePath ? 'PATCH' : 'POST',
         body: {
           title,
@@ -208,6 +216,9 @@ export function ProgramBuilder({
           start_date: startDate,
           duration_weeks: durationWeeks,
           schedule_weekdays: scheduleWeekdaysForSave(days.length, effectiveScheduleWeekdays),
+          expected_revision_number: activeProgramEdit
+            ? editingTemplate?.current_revision_number
+            : undefined,
           replace_active: replaceActive,
           days: days.map((day) => ({
             ...day,
@@ -215,7 +226,7 @@ export function ProgramBuilder({
           })),
         } satisfies ProgramTemplateAssignmentCreate,
       }),
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       if (!editingTemplate) {
         trackGrowthEvent('program_added');
         if (targetTelegramId) {
@@ -231,13 +242,15 @@ export function ProgramBuilder({
         }
       }
       toast(
-        saveAsCopy
-          ? 'Личная копия программы создана'
-          : editingTemplate
-            ? 'Изменения программы сохранены'
-            : targetTelegramId
-              ? 'Программа создана и назначена'
-              : 'Программа создана',
+        result?.assigned_program_updated
+          ? 'Программа сохранена. Будущие тренировки обновлены'
+          : saveAsCopy
+            ? 'Личная копия программы создана'
+            : editingTemplate
+              ? 'Изменения программы сохранены'
+              : targetTelegramId
+                ? 'Программа создана и назначена'
+                : 'Программа создана',
       );
       if (!editingTemplate && !targetTelegramId) {
         setCreationSuccess({
@@ -261,12 +274,15 @@ export function ProgramBuilder({
       );
       clearDaysDraft([blankDay(1)]);
       clearDefaultRestDraft(SIMPLE_PROGRAM_DEFAULTS.restSeconds);
-      clearStartDateDraft(defaultStartDate);
-      clearDurationDraft(SIMPLE_PROGRAM_DEFAULTS.durationWeeks);
-      clearScheduleDraft([]);
+      clearStartDateDraft(result?.assigned_program_start_date ?? defaultStartDate);
+      clearDurationDraft(
+        result?.assigned_program_duration_weeks ?? SIMPLE_PROGRAM_DEFAULTS.durationWeeks,
+      );
+      clearScheduleDraft(result?.assigned_program_schedule_weekdays ?? []);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['templates'] }),
         queryClient.invalidateQueries({ queryKey: ['workout'] }),
+        queryClient.invalidateQueries({ queryKey: ['assigned-program'] }),
         queryClient.invalidateQueries({ queryKey: ['coach', 'programs'] }),
         reloadUser(),
       ]);
@@ -292,9 +308,11 @@ export function ProgramBuilder({
         return;
       }
       toast(
-        reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
-          ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
-          : (reason as Error).message,
+        reason instanceof ApiError && reason.status === 409
+          ? 'Программа уже изменилась на другом устройстве. Обновите список и повторите сохранение.'
+          : reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
+            ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
+            : (reason as Error).message,
         'error',
       );
     },
@@ -426,10 +444,13 @@ export function ProgramBuilder({
               копия, в которой можно использовать свои упражнения.
             </p>
           )}
-          <section className="program-builder-basics stack" aria-labelledby="program-basics-title">
+          <section
+            className="program-builder-basics stack"
+            aria-labelledby={`${sectionId}-program-basics-title`}
+          >
             <div>
               <span className="eyebrow">Шаг 1</span>
-              <h3 id="program-basics-title">Основа программы</h3>
+              <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
             </div>
             <div className="form-grid">
               <label className="field">
@@ -566,7 +587,6 @@ export function ProgramBuilder({
                     </span>
                     <SearchableExercisePicker
                       mobileSheet
-                      key={`${exerciseIndex}-${item.exercise_id}`}
                       exercises={orderedExercises}
                       value={item.exercise_id}
                       clearValue={0}
@@ -701,7 +721,7 @@ export function ProgramBuilder({
                     )}
                   </div>
                   <details className="program-exercise-advanced compact-disclosure">
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <span>
                         <strong>
                           {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
@@ -711,7 +731,7 @@ export function ProgramBuilder({
                         </strong>
                         <small>Необязательные настройки упражнения</small>
                       </span>
-                      <Icon name="plus" size={16} />
+                      <DisclosureIcon />
                     </summary>
                     <div className="program-exercise-advanced__body">
                       <label className="field exercise-notes">
@@ -817,19 +837,19 @@ export function ProgramBuilder({
             </div>
           ))}
           <details className="program-builder-settings compact-disclosure">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>
                 <strong>Настройки программы</strong>
                 <small>Цель, уровень, расписание, шаблон и общий отдых</small>
               </span>
-              <Icon name="plus" size={16} />
+              <DisclosureIcon />
             </summary>
             <div className="program-builder-settings__body stack">
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-profile-title"
+                aria-labelledby={`${sectionId}-program-profile-title`}
               >
-                <h3 id="program-profile-title">Цель и уровень</h3>
+                <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
                 <p className="muted">
                   По умолчанию программа подходит для поддержания формы и начального уровня.
                 </p>
@@ -865,16 +885,19 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-schedule-title"
+                aria-labelledby={`${sectionId}-program-schedule-title`}
               >
-                <h3 id="program-schedule-title">Расписание</h3>
+                <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
                 <p className="muted">
-                  По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.
+                  {activeProgramEdit
+                    ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
+                    : 'По умолчанию первая тренировка назначается на сегодня, цикл длится одну неделю.'}
                 </p>
                 <div className="form-grid">
                   <label className="field">
                     <span>Начать не раньше</span>
                     <DateInput
+                      disabled={activeProgramEdit}
                       min={defaultStartDate}
                       value={startDate}
                       onChange={(event) => {
@@ -889,6 +912,7 @@ export function ProgramBuilder({
                     <input
                       type="number"
                       inputMode="numeric"
+                      disabled={activeProgramEdit}
                       min="1"
                       max="24"
                       value={durationWeeks}
@@ -936,9 +960,9 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="strength-template-title"
+                aria-labelledby={`${sectionId}-strength-template-title`}
               >
-                <h3 id="strength-template-title">Быстрое заполнение</h3>
+                <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
                 <div className="form-grid">
                   <label className="field">
                     <span>Схема</span>
@@ -977,13 +1001,13 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-rest-title"
+                aria-labelledby={`${sectionId}-program-rest-title`}
               >
-                <h3 id="program-rest-title">Отдых между подходами</h3>
+                <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
                 <p className="muted">
                   Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
                 </p>
-                <div className="toolbar wrap">
+                <div className="toolbar wrap program-builder-rest-actions">
                   <label className="field">
                     <span>Общий отдых, сек</span>
                     <input
