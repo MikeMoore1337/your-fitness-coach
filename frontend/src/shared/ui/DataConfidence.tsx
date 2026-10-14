@@ -184,7 +184,7 @@ export function DataConfidence({
         <strong className="data-confidence__status">{labeledStatus}</strong>
         <p className="data-confidence__basis">{dataConfidenceBasis(kind, signal)}</p>
         <details className="data-confidence__details">
-          <summary>
+          <summary className="yfc-disclosure-summary">
             <span>Почему такой вывод</span>
             <DisclosureIcon />
           </summary>

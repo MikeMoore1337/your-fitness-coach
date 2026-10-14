@@ -9713,6 +9713,12 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   display: none;
 }
 
+.coach-client-row__menu > summary > .disclosure-icon {
+  margin-inline-start: 0;
+  background: transparent;
+  color: inherit;
+}
+
 .coach-client-row__menu > button {
   position: absolute;
   z-index: 20;
@@ -11191,13 +11197,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   align-items: center;
   cursor: pointer;
   gap: 12px;
-}
-.progress-report-options > summary::after {
-  content: '+';
-  margin-left: auto;
-}
-.progress-report-options[open] > summary::after {
-  content: '−';
 }
 .progress-report-options[open] {
   display: grid;

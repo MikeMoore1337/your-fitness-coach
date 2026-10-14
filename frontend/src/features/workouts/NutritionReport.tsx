@@ -10,6 +10,7 @@ import { QuantitativeProgress, TimeSeriesChart } from '../../shared/ui/DataViz';
 import { Icon } from '../../shared/ui/Icon';
 import { NUTRITION_WEEK_LEGEND, WeekStrip, type WeekStripDayMeta } from '../../shared/ui/WeekStrip';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   EmptyState,
@@ -411,7 +412,10 @@ function DailyTable({
       className="nutrition-report-days"
       open={report.daily.length <= 30 && report.summary.logged_days > 0}
     >
-      <summary>Дни периода: {report.daily.length}</summary>
+      <summary className="yfc-disclosure-summary">
+        Дни периода: {report.daily.length}
+        <DisclosureIcon />
+      </summary>
       <div className="nutrition-report-days__table-wrap">
         <table>
           <caption className="sr-only">
@@ -787,7 +791,10 @@ export function NutritionPeriodReport({
             </>
           )}
           <details className="nutrition-report-target-history">
-            <summary>История целей питания</summary>
+            <summary className="yfc-disclosure-summary">
+              История целей питания
+              <DisclosureIcon />
+            </summary>
             <TargetChanges report={report.data} />
           </details>
           <DailyTable dayLink={dayLink} report={report.data} />

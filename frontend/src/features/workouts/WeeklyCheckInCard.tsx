@@ -878,7 +878,7 @@ export function WeeklyCheckInCard({
 
         {history.data?.items.length ? (
           <details className="weekly-review__history">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>Предыдущие недели</span>
               <DisclosureIcon />
             </summary>

@@ -428,7 +428,7 @@ export function WorkoutFeedbackDisclosure({
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>
+      <summary className="yfc-disclosure-summary">
         <span>
           <strong>
             {feedbackProps.viewer === 'trainer' ? 'Комментарий тренера' : 'Обратная связь тренера'}

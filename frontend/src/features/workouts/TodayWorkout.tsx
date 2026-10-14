@@ -6,9 +6,11 @@ import type { ExerciseHistory, Workout, WorkoutScheduleItem } from '../../shared
 import { haptic } from '../../shared/telegram/useTelegram';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { ContextualHelp } from '../../shared/ui/ContextualHelp';
+import { Icon } from '../../shared/ui/Icon';
 import { glassProps } from '../../shared/ui/Glass';
 import { TaskProgress } from '../../shared/ui/DataViz';
 import {
+  DisclosureIcon,
   Badge,
   Button,
   Card,
@@ -242,7 +244,10 @@ function WorkoutSetHelpers({
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary>Разминка и блины</summary>
+      <summary className="yfc-disclosure-summary">
+        Разминка и блины
+        <DisclosureIcon />
+      </summary>
       <div className="active-workout-set__helpers-body">
         <div className="active-workout-helper-block">
           <div>
@@ -682,7 +687,10 @@ function WorkoutSetRow({
           )}
           {!editingCompleted && (
             <details className="active-workout-set__more-actions">
-              <summary>Действия</summary>
+              <summary className="yfc-disclosure-summary">
+                Действия
+                <DisclosureIcon />
+              </summary>
               <div className="active-workout-set__more-actions-body">
                 <Button
                   type="button"
@@ -859,7 +867,10 @@ function WorkoutSetRow({
       )}
 
       <details className="active-workout-set__advanced">
-        <summary>Дополнительно</summary>
+        <summary className="yfc-disclosure-summary">
+          Дополнительно
+          <DisclosureIcon />
+        </summary>
         <div className="active-workout-set__advanced-body">
           <label className="active-workout-advanced-field">
             <span>Вид подхода</span>
@@ -1217,7 +1228,10 @@ function CardioWorkoutRow({
           )}
           {!editingCompleted && (
             <details className="active-workout-set__more-actions">
-              <summary>Действия</summary>
+              <summary className="yfc-disclosure-summary">
+                Действия
+                <DisclosureIcon />
+              </summary>
               <div className="active-workout-set__more-actions-body">
                 <Button
                   type="button"
@@ -1383,7 +1397,10 @@ function CardioWorkoutRow({
       )}
 
       <details className="active-workout-set__advanced">
-        <summary>Пульс (необязательно)</summary>
+        <summary className="yfc-disclosure-summary">
+          Пульс (необязательно)
+          <DisclosureIcon />
+        </summary>
         <div className="active-workout-set__advanced-body active-workout-cardio-advanced">
           <label className="active-workout-advanced-field">
             <span>Средний пульс, уд/мин</span>
@@ -1610,6 +1627,7 @@ export function RestTimer({
         {[30, 60].map((extraSeconds) => (
           <Button
             key={extraSeconds}
+            aria-label={`+${extraSeconds} сек`}
             type="button"
             glass="clear"
             variant="secondary"
@@ -1625,7 +1643,7 @@ export function RestTimer({
               setAnnouncement(`К отдыху добавлено ${extraSeconds} секунд`);
             }}
           >
-            +{extraSeconds} сек
+            <Icon name="plus" size={16} /> {extraSeconds} сек
           </Button>
         ))}
         <Button
@@ -1843,7 +1861,7 @@ export function TodayWorkout({
       const done = currentElement?.querySelector<HTMLElement>('[data-workout-field="done"]');
       if (!currentElement || !navigation || !done) return;
       done.scrollIntoView?.({
-        behavior: 'auto',
+        behavior: 'instant',
         block: 'center',
       });
       const navigationTop = navigation.getBoundingClientRect().top;
@@ -1861,7 +1879,7 @@ export function TodayWorkout({
       const overlap = Math.max(
         ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - safeBottom),
       );
-      if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'auto' });
+      if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frameId);
   }, [completed, currentSetId, pendingActiveCount]);
@@ -2177,6 +2195,7 @@ export function TodayWorkout({
                               ? 'Кардио сохранено'
                               : `${exerciseCompleted} из ${exercise.sets.length} сохранено`
                             : 'Открыть упражнение'}
+                        <Icon name={exerciseOpen ? 'chevron-up' : 'chevron-down'} size={16} />
                       </button>
                     )}
                     <button

@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
@@ -2806,6 +2806,7 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
   await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
   await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect.poll(() => server.patches.length).toBe(writesBeforeCancel);
   expect(server.readSet(201)).toMatchObject({
     actual_weight: 45,
@@ -2872,6 +2873,97 @@ test('#980 completed cardio results keep their values through edit and reopen', 
   await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
   expect(server.readSet(204)).toMatchObject({ duration_minutes: 30, distance_km: 6.4 });
 });
+
+for (const theme of ['dark', 'light'] as const) {
+  test(`#980 guide text has readable contrast in every interactive state ${theme}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await mockActiveWorkout(page, true);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    const guide = page
+      .locator('.active-workout-exercise')
+      .filter({ hasText: 'Велотренажёр' })
+      .getByRole('button', { name: 'Подробнее', exact: true });
+    await expect(guide).toBeVisible();
+    await guide.scrollIntoViewIfNeeded();
+    await page.mouse.move(0, 0);
+    const samples = [];
+    for (const state of ['default', 'hover', 'pressed', 'focus'] as const) {
+      if (state === 'hover') await guide.hover();
+      if (state === 'pressed') await page.mouse.down();
+      if (state === 'focus') {
+        await page.mouse.move(0, 0);
+        await page.mouse.up();
+        await page.keyboard.press('Tab');
+        await guide.focus();
+        await expect(guide).toBeFocused();
+      }
+      if (state === 'hover' || state === 'pressed')
+        await expect(guide).toHaveCSS('color', 'rgb(9, 11, 11)');
+      if (state === 'default')
+        expect(await guide.evaluate((element) => element.matches(':hover'))).toBe(false);
+      if (state !== 'default') {
+        const pseudo =
+          state === 'pressed' ? ':active' : state === 'focus' ? ':focus-visible' : ':hover';
+        await expect
+          .poll(() => guide.evaluate((element, selector) => element.matches(selector), pseudo))
+          .toBe(true);
+      }
+      const sample = await guide.evaluate((element) => {
+        const label = element.querySelector('span');
+        if (!label) throw new Error('Missing guide label');
+        const foreground = getComputedStyle(label).color;
+        const background = getComputedStyle(element).backgroundColor;
+        const luminance = (color: string) => {
+          const channels = color
+            .match(/[\d.]+/g)!
+            .slice(0, 3)
+            .map(Number)
+            .map((value) => {
+              const normalized = value / 255;
+              return normalized <= 0.04045
+                ? normalized / 12.92
+                : ((normalized + 0.055) / 1.055) ** 2.4;
+            });
+          return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+        };
+        const a = luminance(foreground),
+          b = luminance(background);
+        return {
+          foreground,
+          background,
+          buttonColor: getComputedStyle(element).color,
+          labelTransition: getComputedStyle(label).transition,
+          contrast: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
+        };
+      });
+      samples.push({ state, ...sample });
+      expect
+        .soft(sample.contrast, `${state} guide label contrast ${JSON.stringify(sample)}`)
+        .toBeGreaterThanOrEqual(4.5);
+      if (CAPTURE_980_AFTER && state === 'hover') {
+        await mkdir(ISSUE_980_AFTER_DIR, { recursive: true });
+        await page.screenshot({
+          path: resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-guide-hover.png`),
+        });
+      }
+    }
+    await info.attach('guide-computed-colors.json', {
+      body: JSON.stringify(samples, null, 2),
+      contentType: 'application/json',
+    });
+    if (CAPTURE_980_AFTER)
+      await writeFile(
+        resolve(ISSUE_980_AFTER_DIR, `${info.project.name}-${theme}-guide-colors.json`),
+        JSON.stringify(samples, null, 2),
+      );
+  });
+}
 
 test.describe('#980 completed set visual candidate', () => {
   for (const theme of ['dark', 'light'] as const) {

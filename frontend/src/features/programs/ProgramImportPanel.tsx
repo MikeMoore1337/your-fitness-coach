@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { useMemo, useState, type ChangeEvent } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, apiFile, ApiError } from '../../shared/api/client';
@@ -8,7 +9,7 @@ import type {
   ProgramImportTarget,
 } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { Badge, Button, Card, Field, Input, Select } from '../../shared/ui/common';
+import { DisclosureIcon, Badge, Button, Card, Field, Input, Select } from '../../shared/ui/common';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { SearchableExercisePicker, type ExercisePickerExercise } from './SearchableExercisePicker';
 import './program-import.css';
@@ -577,7 +578,10 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
           </div>
 
           <details className="program-import-provenance">
-            <summary>Источник и заметки об адаптации</summary>
+            <summary className="yfc-disclosure-summary">
+              Источник и заметки об адаптации
+              <DisclosureIcon />
+            </summary>
             <div className="program-import-fields">
               <Field label="Тип программы" labelFor="program-import-provenance-type">
                 <Select
@@ -657,9 +661,10 @@ export function ProgramImportPanel({ onImported }: { onImported?: () => void } =
                 />
               </Field>
               <Field label="Дата источника" labelFor="program-import-source-date">
-                <Input
+                <DateInput
+                  className="ui-input"
                   id="program-import-source-date"
-                  type="date"
+
                   value={provenance.source_date ?? ''}
                   onChange={(event) =>
                     setProvenance((current) => ({

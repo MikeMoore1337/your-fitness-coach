@@ -51,9 +51,17 @@ describe('Icon', () => {
     const { container } = render(<Icon name="chevron-down" />);
     const geometry = container.querySelector('path')?.getAttribute('d');
     expect(geometry).toBeTruthy();
-    const css = readFileSync('src/styles/react.css', 'utf8');
+    const css = readFileSync('src/styles/design-system.css', 'utf8');
     expect(css).toContain(`d='${geometry}'`);
     expect(css).toContain("stroke-width='1.8'");
+  });
+  it('keeps the native search clear resource synchronized with the shared close glyph', () => {
+    const { container } = render(<Icon name="close" />);
+    const css = readFileSync('src/styles/design-system.css', 'utf8');
+    for (const path of container.querySelectorAll('path')) {
+      expect(css).toContain(`d='${path.getAttribute('d')}'`);
+    }
+    expect(css).toContain("input[type='search']::-webkit-search-cancel-button");
   });
   it('fills only the explicit selected star state', () => {
     const { container, rerender } = render(<Icon name="star" />);

@@ -78,10 +78,11 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
   );
   const daily = Array.from({ length: dayCount }, (_, index) => {
     const diaryDate = shiftDate(periodStart, index);
-    const targetCalories = diaryDate < targetChangeDate ? 2100 : 1950;
-    const targetProtein = diaryDate < targetChangeDate ? 140 : 135;
-    const targetFat = diaryDate < targetChangeDate ? 70 : 65;
-    const targetCarbs = diaryDate < targetChangeDate ? 230 : 210;
+    const trainerTarget = state === 'long' && diaryDate > targetChangeDate;
+    const targetCalories = diaryDate < targetChangeDate ? 2100 : trainerTarget ? 2000 : 1950;
+    const targetProtein = diaryDate < targetChangeDate ? 140 : trainerTarget ? 140 : 135;
+    const targetFat = diaryDate < targetChangeDate ? 70 : trainerTarget ? 70 : 65;
+    const targetCarbs = diaryDate < targetChangeDate ? 230 : trainerTarget ? 220 : 210;
     const status =
       state === 'no-data'
         ? 'missing'
@@ -226,6 +227,18 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
               fat_g: 65,
               carbs_g: 210,
             },
+            ...(state === 'long'
+              ? [
+                  {
+                    effective_from: shiftDate(targetChangeDate, 1),
+                    source: 'trainer',
+                    calories: 2000,
+                    protein_g: 140,
+                    fat_g: 70,
+                    carbs_g: 220,
+                  },
+                ]
+              : []),
           ],
   };
 }
@@ -1328,7 +1341,7 @@ test('nutrition report preserves truthful period context, daily drill-down and r
   }
 });
 
-for (const width of [320, 360, 393, 430]) {
+for (const width of [320, 360, 390, 393, 430]) {
   for (const theme of ['dark', 'light'] as const) {
     test(`#970 target changes stay readable at ${width}px ${theme}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 932 });
@@ -1353,11 +1366,21 @@ for (const width of [320, 360, 393, 430]) {
         .filter({ hasText: 'Изменения цели в периоде' });
       await expect(targetChanges).toBeVisible();
       const cards = targetChanges.locator('ol > li');
-      await expect(cards).toHaveCount(1);
-      await expect(cards.getByText('Дата', { exact: true })).toBeVisible();
-      await expect(cards.getByText('Источник', { exact: true })).toBeVisible();
-      await expect(cards.getByText('Калории', { exact: true })).toBeVisible();
-      await expect(cards.getByText('Б / Ж / У', { exact: true })).toBeVisible();
+      await expect(cards).toHaveCount(2);
+      await expect(cards.first().getByText('Принятая адаптация', { exact: true })).toBeVisible();
+      await expect(cards.last().getByText('Цель тренера', { exact: true })).toBeVisible();
+      for (const card of await cards.all()) {
+        for (const label of ['Дата', 'Источник', 'Калории', 'Б / Ж / У']) {
+          await expect(card.getByText(label, { exact: true })).toBeVisible();
+        }
+      }
+
+      // Layout stress only: keep valid API enums and model a longer localized label in the DOM.
+      const source = cards.first().locator('.nutrition-report-targets__content--source');
+      await source.evaluate((element) => {
+        element.textContent = 'Принятая адаптация по согласованному индивидуальному плану питания';
+      });
+      await expect(source).toContainText('индивидуальному плану питания');
 
       const geometry = await targetChanges.evaluate((element) => {
         const viewport = document.documentElement.clientWidth;

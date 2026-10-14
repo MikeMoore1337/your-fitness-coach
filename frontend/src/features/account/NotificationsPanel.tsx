@@ -671,7 +671,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
       <WebPushSettings />
 
       <details className="notification-templates profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Готовые шаблоны</strong>
             <small>
@@ -717,7 +717,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
       </details>
 
       <details className="notification-center profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Центр уведомлений</strong>
             <small>
@@ -827,7 +827,7 @@ export function NotificationsPanel({ onNavigate }: { onNavigate?: (path: string)
       </details>
 
       <details className="notification-personal profile-disclosure">
-        <summary>
+        <summary className="yfc-disclosure-summary">
           <span>
             <strong>Личное напоминание</strong>
             <small>Свободный текст остаётся внутри приложения</small>

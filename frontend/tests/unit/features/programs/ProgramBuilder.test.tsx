@@ -227,6 +227,74 @@ describe('ProgramBuilder type-aware prescription', () => {
       await screen.findByText('Программа сохранена. Будущие тренировки обновлены'),
     ).toBeInTheDocument();
   });
+
+  it('синхронизирует picker после перестановки и удаления строк, сохраняя назначения', async () => {
+    const user = userEvent.setup();
+    renderBuilder({ editingTemplate: activeTemplate });
+    await screen.findByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(screen.getByRole('button', { name: 'Добавить упражнение' }));
+    const pickers = screen.getAllByRole('combobox', { name: 'Поиск упражнения' });
+    await user.click(pickers[1]!);
+    await user.click(screen.getByRole('option', { name: /Велотренажёр/ }));
+    await user.clear(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' }), '25');
+    await user.click(screen.getByRole('button', { name: 'Переместить упражнение 2 выше' }));
+    expect(pickers[0]).toHaveValue('Велотренажёр');
+    expect(pickers[1]).toHaveValue('Жим штанги лёжа');
+    await user.click(screen.getByRole('button', { name: 'Удалить упражнение 2 из дня 1' }));
+    expect(screen.getAllByRole('combobox', { name: 'Поиск упражнения' })).toHaveLength(1);
+    expect(pickers[0]).toHaveValue('Велотренажёр');
+    expect(screen.getByRole('spinbutton', { name: 'Плановая длительность, мин' })).toHaveValue(25);
+    await user.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/programs/templates/9',
+        expect.objectContaining({
+          body: expect.objectContaining({
+            days: [
+              expect.objectContaining({
+                exercises: [
+                  expect.objectContaining({ exercise_id: 12, prescribed_duration_minutes: 25 }),
+                ],
+              }),
+            ],
+          }),
+        }),
+      ),
+    );
+  });
+
+  it('связывает разделы с собственными заголовками при двух открытых редакторах', async () => {
+    const user = userEvent.setup();
+    renderBuilder();
+    renderBuilder({ editingTemplate: activeTemplate });
+    await waitFor(() =>
+      expect(screen.getAllByRole('combobox', { name: 'Поиск упражнения' })).toHaveLength(2),
+    );
+    const settings = screen.getAllByText('Настройки программы', { exact: true });
+    expect(settings).toHaveLength(2);
+    for (const summary of settings) await user.click(summary);
+    const ids: string[] = [];
+    for (const name of [
+      'Основа программы',
+      'Цель и уровень',
+      'Расписание',
+      'Быстрое заполнение',
+      'Отдых между подходами',
+    ]) {
+      const sections = screen.getAllByRole('region', { name });
+      expect(sections).toHaveLength(2);
+      for (const section of sections) {
+        const id = section.getAttribute('aria-labelledby');
+        expect(id).toBeTruthy();
+        ids.push(id!);
+        const heading = document.getElementById(id!);
+        expect(heading).toHaveTextContent(name);
+        expect(section).toContainElement(heading);
+      }
+    }
+    expect(new Set(ids).size).toBe(10);
+  });
 });
 
 const activeTemplate = {

@@ -1,3 +1,4 @@
+import { DateInput } from '../../shared/ui/PickerInput';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
@@ -377,7 +378,7 @@ export function ExerciseCatalog({
 
   const createExercisePanel = canCreate ? (
     <details className="exercise-create compact-disclosure">
-      <summary>
+      <summary className="yfc-disclosure-summary">
         <span>
           <strong>Создать своё упражнение</strong>
           <small>
@@ -523,7 +524,10 @@ export function ExerciseCatalog({
             )}
             {exercise.is_custom && (
               <details className="exercise-catalog-item__danger">
-                <summary>Другие действия</summary>
+                <summary className="yfc-disclosure-summary">
+                  Другие действия
+                  <DisclosureIcon />
+                </summary>
                 <button
                   className="btn-danger"
                   type="button"
@@ -748,8 +752,7 @@ export function ExerciseCatalog({
                 {assignmentScope === 'future_program' && (
                   <label className="field">
                     <span>Начать с даты клиента</span>
-                    <input
-                      type="date"
+                    <DateInput
                       required
                       value={assignmentEffectiveDate}
                       onChange={(event) => setAssignmentEffectiveDate(event.target.value)}
@@ -848,7 +851,7 @@ export function ExerciseCatalog({
                   />
                 </label>
                 <details className="compact-disclosure assignment-advanced">
-                  <summary>
+                  <summary className="yfc-disclosure-summary">
                     <span>
                       <strong>Дополнительные настройки</strong>
                       <small>

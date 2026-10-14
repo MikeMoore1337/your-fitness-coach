@@ -14,7 +14,7 @@ export function ContextualHelp({
 }) {
   return (
     <details className="contextual-help">
-      <summary>
+      <summary className="yfc-disclosure-summary">
         {summary}
         <DisclosureIcon />
       </summary>

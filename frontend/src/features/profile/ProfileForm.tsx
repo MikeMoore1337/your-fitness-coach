@@ -530,7 +530,7 @@ export function ProfileForm() {
           </section>
 
           <details className="profile-form-advanced">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>
                 <strong>Пульс и кардио-ориентиры</strong>
                 <small>Необязательные параметры для расчёта пульсовых зон</small>

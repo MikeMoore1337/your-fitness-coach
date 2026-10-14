@@ -14,6 +14,7 @@ import {
   Select,
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
+import { Icon } from '../../shared/ui/Icon';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 
 const beverageLabels: Record<string, string> = {
@@ -416,7 +417,9 @@ export function HydrationTracker({
             }
           >
             <span>{preset.label}</span>
-            <strong>+{preset.volume_ml} мл</strong>
+            <strong>
+              <Icon name="plus" size={16} /> {preset.volume_ml} мл
+            </strong>
           </Button>
         ))}
       </div>
@@ -444,6 +447,7 @@ export function HydrationTracker({
         onClick={() => setExpanded((value) => !value)}
       >
         {expanded ? 'Скрыть детали' : 'Другой напиток, история и цель'}
+        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} />
       </Button>
       {expanded && (
         <div className="hydration-details">

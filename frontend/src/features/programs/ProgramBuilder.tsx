@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
-import { Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
+import { DisclosureIcon, Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
 import { orderExercisesForLevel } from './exerciseOrdering';
 import { buildStrengthPreset, resolveStrengthRule, type StrengthSplit } from './strengthPresets';
 import { usePersistentState } from '../../shared/storage';
@@ -88,6 +88,7 @@ export function ProgramBuilder({
   onSaved?: () => void;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
+  const sectionId = useId();
   const { toast, confirm } = useFeedback();
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
@@ -443,10 +444,13 @@ export function ProgramBuilder({
               копия, в которой можно использовать свои упражнения.
             </p>
           )}
-          <section className="program-builder-basics stack" aria-labelledby="program-basics-title">
+          <section
+            className="program-builder-basics stack"
+            aria-labelledby={`${sectionId}-program-basics-title`}
+          >
             <div>
               <span className="eyebrow">Шаг 1</span>
-              <h3 id="program-basics-title">Основа программы</h3>
+              <h3 id={`${sectionId}-program-basics-title`}>Основа программы</h3>
             </div>
             <div className="form-grid">
               <label className="field">
@@ -583,7 +587,6 @@ export function ProgramBuilder({
                     </span>
                     <SearchableExercisePicker
                       mobileSheet
-                      key={`${exerciseIndex}-${item.exercise_id}`}
                       exercises={orderedExercises}
                       value={item.exercise_id}
                       clearValue={0}
@@ -718,7 +721,7 @@ export function ProgramBuilder({
                     )}
                   </div>
                   <details className="program-exercise-advanced compact-disclosure">
-                    <summary>
+                    <summary className="yfc-disclosure-summary">
                       <span>
                         <strong>
                           {exercises.data?.find((exercise) => exercise.id === item.exercise_id)
@@ -728,7 +731,7 @@ export function ProgramBuilder({
                         </strong>
                         <small>Необязательные настройки упражнения</small>
                       </span>
-                      <Icon name="plus" size={16} />
+                      <DisclosureIcon />
                     </summary>
                     <div className="program-exercise-advanced__body">
                       <label className="field exercise-notes">
@@ -834,19 +837,19 @@ export function ProgramBuilder({
             </div>
           ))}
           <details className="program-builder-settings compact-disclosure">
-            <summary>
+            <summary className="yfc-disclosure-summary">
               <span>
                 <strong>Настройки программы</strong>
                 <small>Цель, уровень, расписание, шаблон и общий отдых</small>
               </span>
-              <Icon name="plus" size={16} />
+              <DisclosureIcon />
             </summary>
             <div className="program-builder-settings__body stack">
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-profile-title"
+                aria-labelledby={`${sectionId}-program-profile-title`}
               >
-                <h3 id="program-profile-title">Цель и уровень</h3>
+                <h3 id={`${sectionId}-program-profile-title`}>Цель и уровень</h3>
                 <p className="muted">
                   По умолчанию программа подходит для поддержания формы и начального уровня.
                 </p>
@@ -882,9 +885,9 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-schedule-title"
+                aria-labelledby={`${sectionId}-program-schedule-title`}
               >
-                <h3 id="program-schedule-title">Расписание</h3>
+                <h3 id={`${sectionId}-program-schedule-title`}>Расписание</h3>
                 <p className="muted">
                   {activeProgramEdit
                     ? 'Дата начала и длительность текущего цикла сохраняются. Здесь можно обновить дни будущих тренировок.'
@@ -957,9 +960,9 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="strength-template-title"
+                aria-labelledby={`${sectionId}-strength-template-title`}
               >
-                <h3 id="strength-template-title">Быстрое заполнение</h3>
+                <h3 id={`${sectionId}-strength-template-title`}>Быстрое заполнение</h3>
                 <div className="form-grid">
                   <label className="field">
                     <span>Схема</span>
@@ -998,13 +1001,13 @@ export function ProgramBuilder({
               </section>
               <section
                 className="program-builder-section stack"
-                aria-labelledby="program-rest-title"
+                aria-labelledby={`${sectionId}-program-rest-title`}
               >
-                <h3 id="program-rest-title">Отдых между подходами</h3>
+                <h3 id={`${sectionId}-program-rest-title`}>Отдых между подходами</h3>
                 <p className="muted">
                   Общий отдых можно применить ко всем упражнениям, а затем изменить точечно.
                 </p>
-                <div className="toolbar wrap">
+                <div className="toolbar wrap program-builder-rest-actions">
                   <label className="field">
                     <span>Общий отдых, сек</span>
                     <input
