@@ -719,8 +719,10 @@
       document.querySelectorAll("details").forEach((details, index) => {
         const summary = details.querySelector(":scope>summary"),
           body = summary.nextElementSibling;
-        summary.innerHTML =
-          "<span>" + summary.textContent + "</span>" + chevron();
+        const label = document.createElement("span");
+        label.textContent = summary.textContent;
+        summary.replaceChildren(label);
+        summary.insertAdjacentHTML("beforeend", chevron());
         if (body) {
           body.id = "disclosure-body-" + index;
           summary.setAttribute("aria-controls", body.id);

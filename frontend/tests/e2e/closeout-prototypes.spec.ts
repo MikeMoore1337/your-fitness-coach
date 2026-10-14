@@ -56,6 +56,24 @@ async function checkGeometry(page: Page) {
   }
 }
 
+test('design-only prototype labels remain literal DOM text', async ({ page }) => {
+  await servePrototypes(page);
+  const original = await readFile(resolve(packageDir, 'prototypes/compact-hydration.html'), 'utf8');
+  const body = original.replace(
+    /(<summary[^>]*>)\s*Личный ориентир\s*(<\/summary>)/,
+    '$1&lt;span data-prototype-text&gt;Личный ориентир&lt;/span&gt;$2',
+  );
+  expect(body).not.toBe(original);
+  await page.route('**/compact-hydration.html*', (route) =>
+    route.fulfill({ contentType: 'text/html', body }),
+  );
+  await page.goto(`${routePath}/compact-hydration.html`);
+  await expect(page.locator('summary').filter({ hasText: 'data-prototype-text' })).toHaveText(
+    '<span data-prototype-text>Личный ориентир</span>',
+  );
+  await expect(page.locator('[data-prototype-text]')).toHaveCount(0);
+});
+
 for (const theme of ['dark', 'light'] as const) {
   for (const width of [320, 360, 390, 393, 430, 1280]) {
     test(`design-only prototypes keep icons, history and results truthful ${width}px ${theme}`, async ({

@@ -1,6 +1,6 @@
 {
   "verdict": "COMPLETE_LOCAL_SYNTHETIC_SCREEN_MATRIX_WITH_RECORDED_LIMITS",
-  "runtime": "Frozen local Vite dist at http://127.0.0.1:4187, parent build session6213; final source SHA is bound by parent release report.",
+  "runtime": "Local Vite build6213; only Nutrition refreshed on build78497 after confirmed glyph fallback fix; immutable source bound by package README.",
   "fixture": "installPlatformApi and canonical progress report fixture",
   "fixedDate": "2026-09-06",
   "sampleCount": 420,
@@ -59,7 +59,13 @@
       "coach-programs",
       "coach-tools",
       "progress-report"
-    ]
+    ],
+    "hydrationFontRefresh": {
+      "reason": "Actual glyph fallback confirmed by CDP; only Nutrition28samples replaced.",
+      "tests": "4/4PASS",
+      "samples": 28,
+      "build": 78497
+    }
   },
   "severityOccurrences": {
     "BLOCKER": 0,
@@ -1859,7 +1865,7 @@
     },
     {
       "file": "nutrition-chromium-dark-1440-bottom.png",
-      "bytes": 190453,
+      "bytes": 190526,
       "width": 1440,
       "height": 1000
     },
@@ -1871,7 +1877,7 @@
     },
     {
       "file": "nutrition-chromium-dark-390-bottom.png",
-      "bytes": 55899,
+      "bytes": 55934,
       "width": 390,
       "height": 844
     },
@@ -1889,7 +1895,7 @@
     },
     {
       "file": "nutrition-chromium-light-1440-bottom.png",
-      "bytes": 166981,
+      "bytes": 167092,
       "width": 1440,
       "height": 1000
     },
@@ -1901,7 +1907,7 @@
     },
     {
       "file": "nutrition-chromium-light-390-bottom.png",
-      "bytes": 53432,
+      "bytes": 53456,
       "width": 390,
       "height": 844
     },
@@ -1919,7 +1925,7 @@
     },
     {
       "file": "nutrition-webkit-dark-1440-bottom.png",
-      "bytes": 101896,
+      "bytes": 101948,
       "width": 1440,
       "height": 1000
     },
@@ -1931,7 +1937,7 @@
     },
     {
       "file": "nutrition-webkit-dark-390-bottom.png",
-      "bytes": 45391,
+      "bytes": 45369,
       "width": 390,
       "height": 844
     },
@@ -1949,7 +1955,7 @@
     },
     {
       "file": "nutrition-webkit-light-1440-bottom.png",
-      "bytes": 92965,
+      "bytes": 92977,
       "width": 1440,
       "height": 1000
     },
@@ -1961,7 +1967,7 @@
     },
     {
       "file": "nutrition-webkit-light-390-bottom.png",
-      "bytes": 42898,
+      "bytes": 42879,
       "width": 390,
       "height": 844
     },

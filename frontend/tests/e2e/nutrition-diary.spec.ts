@@ -15,14 +15,17 @@ test.use({ serviceWorkers: 'block' });
 
 const CAPTURE_974_AFTER = process.env.CAPTURE_974_AFTER === '1';
 const ISSUE_974_AFTER_DIR = resolve(
-  process.cwd(),
-  '..',
-  'docs',
-  'ux',
-  'final-issues-acceptance',
-  'evidence',
-  '869-contrast-rework-20261013',
-  'after',
+  process.env.CAPTURE_974_AFTER_DIR ??
+    resolve(
+      process.cwd(),
+      '..',
+      'docs',
+      'ux',
+      'final-issues-acceptance',
+      'evidence',
+      '869-contrast-rework-20261013',
+      'after',
+    ),
 );
 
 const zeroNutrition = {
@@ -1502,7 +1505,9 @@ test.describe('#974 hydration orb H₂O without an enabled goal', () => {
       const orb = hydration.locator('.hydration-orb');
       const text = orb.locator('strong');
       const fill = orb.locator(':scope > span');
-      await expect(text).toHaveText('H₂O');
+      await expect(text).toHaveText('H2O');
+      await expect(text.locator('sub')).toHaveText('2');
+      await expect(text.locator('sub')).toHaveCSS('vertical-align', 'sub');
       await expect(text).toHaveCSS('color', 'rgb(245, 245, 245)');
       await expect(text).toHaveCSS('-webkit-text-stroke-width', '0.75px');
       await expect(hydration.getByText('850 мл записано', { exact: true })).toBeVisible();

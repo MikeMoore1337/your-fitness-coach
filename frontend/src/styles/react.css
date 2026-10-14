@@ -6495,6 +6495,12 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     0.5px 0.5px 0 var(--v2-on-lime);
 }
 
+.hydration-orb strong sub {
+  font-size: 0.75em;
+  line-height: 0;
+  vertical-align: sub;
+}
+
 .hydration-progress {
   height: 7px;
   margin: 0 20px 16px;
