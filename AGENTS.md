@@ -72,6 +72,23 @@ Approval of the mockup authorizes implementation of the approved scope only; it 
 merge, deploy or release. Technical fixes that preserve the existing composition follow the normal
 workflow and do not require this visual gate.
 
+### Batch owner visual reviews (owner rule, 2026-10-13)
+
+- When owner visual input is needed, deliver **all final, ready-for-review visual candidates of
+  that stage in one complete reply**: Dark/Light captures, mobile/desktop where applicable, all
+  impacted views and states, browser names and viewport sizes, direct SHA-pinned GitHub links
+  to evidence with Issue/PR references, animation/video or prototype where relevant, and an
+  explicit list of decisions requested. Do not split visual approval by screen, PR or reply.
+- If further visual fixes are known or still underway, do not request approval of the
+  intermediate candidate. Complete those fixes first and show only the final coherent package.
+  Do not mislabel an unfinished candidate as final.
+- Design prototype approval before production UI and real AFTER acceptance after implementation
+  remain separate sequential gates. Batch items within each gate, not across gates that cannot
+  exist simultaneously. If new work changes an approved design, prepare a new final review package.
+  Visual acceptance does not authorize merge or deploy; those require separate owner permission.
+- Use safe synthetic/test fixture data in published evidence; never publish owner screenshots
+  or personal data from private chats without explicit authorization.
+
 ## RUSSIAN_USER_FACING_UI (mandatory)
 
 - All new authenticated Web, Telegram Mini App, athlete-cabinet and trainer-cabinet UI copy is
