@@ -1452,6 +1452,19 @@ test('weekly review focus exposes a predictable TMA BackButton return path', asy
   await tmaPage.getByRole('link', { name: 'Пройти короткую проверку' }).click();
   await expect(tmaPage).toHaveURL('/app?section=progress&weekly_review=1');
   await expect.poll(async () => (await tma.state()).backButton.visible).toBe(true);
+  await expect(tmaPage.locator('#weekly-review')).toBeFocused();
+  // Wait for the review's arrival scroll before clicking the header above it.
+  await expect
+    .poll(() =>
+      tmaPage
+        .locator('.weekly-review-card')
+        .evaluate((card) =>
+          Math.abs(
+            card.getBoundingClientRect().top - parseFloat(getComputedStyle(card).scrollMarginTop),
+          ),
+        ),
+    )
+    .toBeLessThan(1);
 
   await tmaPage.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }).click();
   await expect(tmaPage.getByRole('dialog')).toBeVisible();
