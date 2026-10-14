@@ -4,7 +4,7 @@
 
 **Проверенная база и production:** `f99f1954c007567cefeec7dc882f14e68de6b0ba`, release #991, [CI38555115853](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38555115853), [production38555590138](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38555590138). Оба SUCCESS; deploy log содержит тот же production SHA.
 
-**Итоговый integration runtime SHA:** `cc2d8d13546de74132d10b1259e04dad35f94594`. Все новые PNG сняты заново на этой сборке; старые снимки PR не используются как AFTER. Evidence files закреплены в `__EVIDENCE_SHA__`. Последующие commits этого пакета меняют только документацию и изображения: frontend tree и runtime не меняются.
+**Итоговый integration runtime SHA:** `cc2d8d13546de74132d10b1259e04dad35f94594`. Все новые PNG сняты заново на этой сборке; старые снимки PR не используются как AFTER. Evidence files закреплены в `5dd5abb806800a4efe1b0a0f5aa56a5763d0df47`. Последующие commits этого пакета меняют только документацию и изображения: frontend tree и runtime не меняются.
 
 ## Итог по исходным PR
 
