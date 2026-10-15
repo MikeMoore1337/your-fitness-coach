@@ -1829,9 +1829,8 @@ export function TodayWorkout({
         const editingRir = document.activeElement?.matches('.active-workout-rir button');
         if (!editingWorkoutField() && !editingRir) return;
         const input = document.activeElement as HTMLElement;
-        const controls =
-          input.closest('.active-workout-set')?.querySelector('.active-workout-set__controls') ??
-          input;
+        const row = input.closest('.active-workout-set');
+        const controls = row?.querySelector('.active-workout-set__controls') ?? input;
         const controlsBox = controls.getBoundingClientRect();
         const inputBox = input.getBoundingClientRect();
         const box = {
@@ -1853,10 +1852,9 @@ export function TodayWorkout({
         const target = box.bottom - box.top <= bottom - safeTop ? box : inputBox;
         let delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
-        const nextRow = input.closest('.active-workout-set')?.nextElementSibling;
+        const nextRow = row?.matches('[aria-current="step"]') ? row.nextElementSibling : null;
         const nextDone = nextRow?.querySelector('[data-workout-field="done"]');
         if (
-          editingRir &&
           nextRow &&
           nextDone &&
           nextRow.getBoundingClientRect().top < top + (viewport?.height ?? window.innerHeight)
