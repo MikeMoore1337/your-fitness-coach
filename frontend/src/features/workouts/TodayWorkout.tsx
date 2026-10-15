@@ -1791,7 +1791,6 @@ export function TodayWorkout({
   const currentSetId = currentSet?.set.id;
   const clearActiveState = activeSync.clear;
   const pendingActiveCount = activeSync.pendingCount;
-  const reconciledCompletion = useRef<string | null>(null);
 
   useEffect(() => {
     let frame: number | undefined;
@@ -1891,7 +1890,7 @@ export function TodayWorkout({
         const rect = control.getBoundingClientRect();
         return rect.width > 0 && rect.height > 0 && rect.bottom > 0;
       });
-      const nextRect = nextControl?.getBoundingClientRect();
+      const nextRect = nextControl?.closest('.active-workout-set')?.getBoundingClientRect();
       const controlsToClear = [
         ...currentControls,
         ...(nextControl && nextRect && nextRect.top < window.innerHeight ? [nextControl] : []),
@@ -1920,9 +1919,6 @@ export function TodayWorkout({
   // Reconcile the active completion control after that final render while rest is visible.
   useEffect(() => {
     if (!currentSetId || completed === 0 || pendingActiveCount !== 0) return;
-    const completion = `${workout.data?.id}:${completed}:${currentSetId}`;
-    if (reconciledCompletion.current === completion) return;
-    reconciledCompletion.current = completion;
     if (editingWorkoutField()) return;
     if (!document.querySelector('.active-workout-rest')) return;
     const frameId = window.requestAnimationFrame(() => {
@@ -1933,10 +1929,7 @@ export function TodayWorkout({
       const navigation = document.getElementById('appBottomNav');
       const done = currentElement?.querySelector<HTMLElement>('[data-workout-field="done"]');
       if (!currentElement || !navigation || !done) return;
-      done.scrollIntoView?.({
-        behavior: 'instant',
-        block: 'center',
-      });
+      if (navigation.getBoundingClientRect().height === 0) return;
       const navigationTop = navigation.getBoundingClientRect().top;
       const safeBottom = navigationTop - 8;
       const doneControls = Array.from(
@@ -1944,7 +1937,7 @@ export function TodayWorkout({
       );
       const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
       const nextDone = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
-      const nextRect = nextDone?.getBoundingClientRect();
+      const nextRect = nextDone?.closest('.active-workout-set')?.getBoundingClientRect();
       const controlsToClear = [
         done,
         ...(nextDone && nextRect && nextRect.top < window.innerHeight ? [nextDone] : []),
@@ -1955,7 +1948,7 @@ export function TodayWorkout({
       if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [completed, currentSetId, pendingActiveCount, workout.data?.id]);
+  }, [completed, currentSetId, pendingActiveCount]);
 
   if (workout.isLoading)
     return (
