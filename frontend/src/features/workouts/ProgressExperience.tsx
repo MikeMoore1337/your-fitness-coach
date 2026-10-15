@@ -1468,9 +1468,22 @@ export function ProgressExperience({
   return (
     <div className="progress-experience progress-experience--bento">
       <header className="progress-hero">
-        <div className="progress-hero__copy">
-          <span className="eyebrow">Факты за период</span>
-          <h1>Прогресс</h1>
+        <div className="progress-hero__heading">
+          <div className="progress-hero__copy">
+            <span className="eyebrow">Факты за период</span>
+            <h1>Прогресс</h1>
+          </div>
+          <div className="progress-hero__help">
+            <ContextualHelp
+              articlePath="/knowledge/progress/how-to-read-progress"
+              summary="О показателях"
+            >
+              <p>
+                Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
+                пропущенная запись не равна нулевому результату.
+              </p>
+            </ContextualHelp>
+          </div>
         </div>
         <div className="progress-hero__period">
           <ProgressPeriodControls
@@ -1480,17 +1493,6 @@ export function ProgressExperience({
             timeZone={resolvedTimeZone}
             today={today}
           />
-        </div>
-        <div className="progress-hero__help">
-          <ContextualHelp
-            articlePath="/knowledge/progress/how-to-read-progress"
-            summary="О показателях"
-          >
-            <p>
-              Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
-              пропущенная запись не равна нулевому результату.
-            </p>
-          </ContextualHelp>
         </div>
         <div className="progress-hero__download">
           {canExport ? (

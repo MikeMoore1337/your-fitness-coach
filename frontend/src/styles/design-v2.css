@@ -3646,18 +3646,32 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-experience--bento .progress-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 620px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(620px, 50%));
   grid-template-areas:
-    'copy period'
-    'help download';
+    'heading period'
+    'heading download';
   align-items: start;
   column-gap: var(--v2-space-5);
   row-gap: var(--v2-space-2);
   padding-block: var(--v2-space-2) 0;
 }
 
+.app-section--progress .progress-hero__heading {
+  display: grid;
+  grid-area: heading;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 172px);
+  align-content: start;
+  column-gap: var(--v2-space-3);
+  min-width: 0;
+}
+
 .app-section--progress .progress-hero__copy {
-  grid-area: copy;
+  grid-column: 1;
+  grid-row: 1;
+  display: grid;
+  align-content: start;
+  gap: var(--v2-space-2);
+  min-width: 0;
 }
 
 .app-section--progress .progress-hero__period,
@@ -3671,8 +3685,23 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 .app-section--progress .progress-hero__help {
-  grid-area: help;
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  justify-self: end;
   min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.app-section--progress .progress-hero__help:has(.contextual-help[open]) {
+  display: block;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-self: start;
+  justify-self: stretch;
+  width: 100%;
+  max-width: none;
 }
 
 .app-section--progress .progress-hero__download {
@@ -3688,13 +3717,37 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 }
 
 .app-section--progress .progress-hero__help .contextual-help > summary {
-  width: fit-content;
-  max-width: min(100%, 140px);
-  justify-content: flex-start;
+  width: 100%;
+  max-width: 172px;
+  min-height: 44px;
+  justify-content: space-between;
+  white-space: nowrap;
 }
 
 .app-section--progress .progress-hero__help .contextual-help > summary > span {
   flex: 0 0 28px;
+}
+
+.app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help {
+  display: block;
+  width: 100%;
+  max-width: none;
+}
+
+.app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help > summary {
+  margin-inline-start: auto;
+}
+
+.app-section--progress .progress-hero__help:has(.contextual-help[open]) .contextual-help__body {
+  width: 100%;
+  max-width: 65ch;
+  min-width: 0;
+}
+
+@media (min-width: 681px) {
+  .app-section--progress .progress-hero__help:has(.contextual-help[open]) {
+    padding-block-start: max(0px, calc(clamp(2.65rem, 5vw, 4.4rem) * 0.96 - 0.9375rem));
+  }
 }
 
 .app-section--progress .progress-period-controls {
@@ -3761,10 +3814,40 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   min-width: 0;
 }
 
+.app-section--progress .progress-period-controls__custom .date-control {
+  overflow: visible;
+}
+
+.app-section--progress .progress-period-controls__custom .date-control input[type='date'] {
+  overflow: visible;
+  font-variant-numeric: tabular-nums;
+  text-align: start;
+  text-align-last: start;
+}
+
+.app-section--progress
+  .progress-period-controls__custom
+  .date-control
+  input[type='date']::-webkit-date-and-time-value {
+  width: 100%;
+  margin: 0;
+  text-align: start;
+}
+
 .app-section--progress .progress-period-controls__custom-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
+}
+
+@media (min-width: 768px) and (max-width: 1360px) {
+  .app-section--progress .progress-period-controls__custom {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-section--progress .progress-period-controls__custom-actions {
+    grid-column: 1 / -1;
+  }
 }
 
 .app-section--progress .progress-period-controls__custom .ui-field__error,
@@ -4037,9 +4120,8 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   .app-section--progress .progress-experience--bento .progress-hero {
     grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'copy'
+      'heading'
       'period'
-      'help'
       'download';
     row-gap: var(--v2-space-3);
   }
@@ -11187,33 +11269,13 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     letter-spacing: -0.035em;
   }
   .app-section--progress .progress-experience .progress-hero {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      'copy help'
-      'period period'
-      'download download';
+      'heading'
+      'period'
+      'download';
     gap: 12px;
-    align-items: center;
-  }
-  .app-section--progress
-    .progress-experience
-    .progress-hero:has(.progress-hero__help .contextual-help[open]) {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 172px);
-  }
-  .app-section--progress .progress-hero__copy {
-    grid-column: 1;
-    grid-row: 1;
-  }
-  .app-section--progress .progress-hero__help {
-    grid-column: 2;
-    grid-row: 1;
-  }
-  .app-section--progress .progress-hero__help .contextual-help > summary {
-    max-width: 172px;
-    min-height: 44px;
-  }
-  .app-section--progress .progress-hero__help .contextual-help[open] {
-    width: min(100%, 172px);
+    align-items: start;
   }
   .app-section--progress .progress-experience--bento {
     /* The category rail adds its own 4px focus gutter around the 44px targets. */

@@ -1885,7 +1885,7 @@ test('progress period controls drive one exact URL and API range through history
   await expect(progressOverview(page)).toBeVisible();
 });
 
-test('progress header aligns help and report without clipping the period selector', async ({
+test('progress header keeps the title row separate from period and report controls', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
@@ -1903,9 +1903,9 @@ test('progress header aligns help and report without clipping the period selecto
     }
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 
-    for (const width of [320, 360, 393, 430, 768, 1280, 1440]) {
+    for (const width of [320, 360, 393, 430, 1280, 1440, 1920, 2560]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
-      const help = page.locator('.progress-hero__help').getByText('О показателях', { exact: true });
+      const help = page.locator('.progress-hero__help summary');
       const report = page.getByRole('link', { name: 'Скачать отчёт' });
       const period = page.locator('.progress-hero__period');
       const tabs = period.getByRole('tablist', { name: 'Период прогресса' });
@@ -1914,22 +1914,6 @@ test('progress header aligns help and report without clipping the period selecto
       await expect(report).toBeVisible();
       await expect(tabs.getByRole('tab')).toHaveCount(4);
       await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
-      if (CAPTURE_PROGRESS_865) {
-        const evidenceDirectory = resolve(
-          process.cwd(),
-          '..',
-          'docs',
-          'ux',
-          'final-issues-acceptance',
-          'evidence',
-          '865',
-          CAPTURE_PROGRESS_865,
-        );
-        await mkdir(evidenceDirectory, { recursive: true });
-        await page.locator('.progress-hero').screenshot({
-          path: resolve(evidenceDirectory, `${test.info().project.name}-${width}-${theme}.png`),
-        });
-      }
       const selectorGeometry = await tabs.evaluate((element) => {
         const tabStyle = getComputedStyle(element);
         const wrapperStyle = getComputedStyle(element.parentElement!);
@@ -1946,28 +1930,62 @@ test('progress header aligns help and report without clipping the period selecto
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
 
-      const helpGeometry = await help.evaluate((element) => {
-        const summary = element.closest('summary');
-        const textNode = summary
-          ? Array.from(summary.childNodes).find((node) => node.nodeType === Node.TEXT_NODE)
-          : null;
+      const helpGeometry = await help.evaluate((summary) => {
+        const textNode = Array.from(summary.childNodes).find(
+          (node) => node.nodeType === Node.TEXT_NODE,
+        );
         const range = document.createRange();
         if (textNode) range.selectNodeContents(textNode);
         const textRects = textNode ? Array.from(range.getClientRects()) : [];
-        const summaryBox = summary?.getBoundingClientRect();
-        const summaryStyle = summary ? getComputedStyle(summary) : null;
+        const summaryBox = summary.getBoundingClientRect();
+        const summaryStyle = getComputedStyle(summary);
         return {
           textRectCount: textRects.length,
           textWidths: textRects.map((rect) => Math.round(rect.width * 100) / 100),
-          height: summaryBox?.height ?? 0,
-          width: summaryBox?.width ?? 0,
-          x: summaryBox?.x ?? 0,
-          right: summaryBox?.right ?? Infinity,
+          height: summaryBox.height,
+          width: summaryBox.width,
+          x: summaryBox.x,
+          right: summaryBox.right,
+          top: summaryBox.top,
+          bottom: summaryBox.bottom,
           viewportWidth: window.innerWidth,
-          minHeight: summaryStyle ? parseFloat(summaryStyle.minHeight) : 0,
+          minHeight: parseFloat(summaryStyle.minHeight),
         };
       });
-      if (width <= 430 && CAPTURE_PROGRESS_865 !== 'before') {
+      const boxes = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) return null;
+          const value = element.getBoundingClientRect();
+          return {
+            bottom: value.bottom,
+            left: value.left,
+            right: value.right,
+            top: value.top,
+          };
+        };
+        return {
+          heading: rect('.progress-hero__heading'),
+          title: rect('.progress-hero__copy h1'),
+          help: rect('.progress-hero__help summary'),
+          report: rect('.progress-hero__download'),
+          period: rect('.progress-hero__period'),
+        };
+      });
+      expect(boxes.heading).not.toBeNull();
+      expect(boxes.title).not.toBeNull();
+      expect(boxes.help).not.toBeNull();
+      expect(boxes.report).not.toBeNull();
+      expect(boxes.period).not.toBeNull();
+      expect(helpGeometry.top).toBeLessThan(boxes.title!.bottom);
+      expect(helpGeometry.bottom).toBeGreaterThan(boxes.title!.top);
+      expect(boxes.help!.right).toBeLessThanOrEqual(boxes.heading!.right + 0.5);
+      if (width <= 430) {
+        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.left - 0.5);
+        expect(boxes.period!.right).toBeLessThanOrEqual(boxes.heading!.right + 0.5);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.heading!.bottom - 1);
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
+        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
         expect(
           helpGeometry.textRectCount,
           `wrapped at ${width}px: ${JSON.stringify(helpGeometry)}`,
@@ -1977,32 +1995,11 @@ test('progress header aligns help and report without clipping the period selecto
           helpGeometry.viewportWidth,
         );
       }
-
       if (width >= 1280) {
-        const [helpBox, reportBox, periodBox] = await Promise.all([
-          help.boundingBox(),
-          report.boundingBox(),
-          period.boundingBox(),
-        ]);
-        expect(helpBox?.width ?? Infinity).toBeLessThanOrEqual(140);
-        expect(helpBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-        expect(periodBox).not.toBeNull();
-        expect(helpBox!.x + helpBox!.width).toBeLessThan(periodBox!.x);
-        const collapsed = [helpBox, reportBox];
-        expect(collapsed[0]).not.toBeNull();
-        expect(collapsed[1]).not.toBeNull();
-        expect(Math.abs(collapsed[0]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
-        expect(reportBox!.x).toBeGreaterThanOrEqual(periodBox!.x);
-        const periodBeforeExpand = await period.boundingBox();
-
-        await help.click();
-        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeVisible();
-        const expanded = await Promise.all([help.boundingBox(), report.boundingBox()]);
-        expect(Math.abs(expanded[0]!.y - collapsed[0]!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(expanded[1]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
-        expect(await period.boundingBox()).toEqual(periodBeforeExpand);
-        await help.click();
-        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeHidden();
+        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.right + 1);
+        expect(boxes.help!.right).toBeLessThan(boxes.period!.left);
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
+        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
       }
     }
   }
@@ -2066,7 +2063,8 @@ test('progress header keeps expanded help and custom period in normal flow', asy
           };
           const boxes = {
             heading: box('.progress-hero__copy h1'),
-            help: box('.progress-hero__help'),
+            headingRegion: box('.progress-hero__heading'),
+            summary: box('.progress-hero__help summary'),
             helpBody: box('.progress-hero__help .contextual-help__body'),
             period: box('.progress-hero__period'),
             custom: box('.progress-period-controls__custom'),
@@ -2084,7 +2082,7 @@ test('progress header keeps expanded help and custom period in normal flow', asy
               left.top < right.bottom &&
               left.bottom > right.top,
             );
-          const topLevel = ['heading', 'help', 'period', 'download'] as const;
+          const topLevel = ['heading', 'summary', 'period', 'download'] as const;
           const internal = ['from', 'to', 'actions'] as const;
           const overlapPairs = [
             ...topLevel.flatMap((left, index) =>
@@ -2093,6 +2091,7 @@ test('progress header keeps expanded help and custom period in normal flow', asy
             ...internal.flatMap((left, index) =>
               internal.slice(index + 1).map((right) => `${left}:${right}`),
             ),
+            'helpBody:period',
             'helpBody:custom',
             'helpBody:download',
           ] as const;
@@ -2114,16 +2113,65 @@ test('progress header keeps expanded help and custom period in normal flow', asy
 
       const assertGeometry = async (state: string) => {
         const geometry = await measureGeometry();
-        expect(geometry.overlapPairs, `${theme} ${width}px ${state}`).toEqual([]);
+        expect(
+          geometry.overlapPairs,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toEqual([]);
         expect(geometry.outOfViewport, `${theme} ${width}px ${state}`).toEqual([]);
         expect(geometry.scrollWidth, `${theme} ${width}px ${state}`).toBeLessThanOrEqual(
           geometry.viewportWidth,
         );
+        const headingRegionBox = geometry.boxes.headingRegion;
+        const headingBox = geometry.boxes.heading;
+        const summaryBox = geometry.boxes.summary;
+        expect(headingRegionBox).not.toBeNull();
+        expect(headingBox).not.toBeNull();
+        expect(summaryBox).not.toBeNull();
+        expect(
+          summaryBox!.top,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toBeLessThan(headingBox!.bottom);
+        expect(
+          summaryBox!.bottom,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toBeGreaterThan(headingBox!.top);
+        if (state.includes('help')) {
+          const helpBodyBox = geometry.boxes.helpBody;
+          expect(helpBodyBox, `${theme} ${width}px ${state} help body`).not.toBeNull();
+          expect(helpBodyBox!.left).toBeGreaterThanOrEqual(headingRegionBox!.left - 0.5);
+          expect(helpBodyBox!.right).toBeLessThanOrEqual(headingRegionBox!.right + 0.5);
+          expect(
+            helpBodyBox!.top,
+            `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+          ).toBeGreaterThanOrEqual(Math.max(headingBox!.bottom, summaryBox!.bottom) - 0.5);
+        }
         if (state.includes('custom')) {
           expect(geometry.boxes.custom).not.toBeNull();
           expect(geometry.boxes.from).not.toBeNull();
           expect(geometry.boxes.to).not.toBeNull();
           expect(geometry.boxes.actions).not.toBeNull();
+          const dateContract = await page.locator('#progress-period-from').evaluate((input) => {
+            const style = getComputedStyle(input);
+            const webkitValue = getComputedStyle(input, '::-webkit-date-and-time-value');
+            const control = input.closest('.date-control');
+            return {
+              value: (input as HTMLInputElement).value,
+              width: input.getBoundingClientRect().width,
+              textAlign: style.textAlign,
+              textAlignLast: style.textAlignLast,
+              overflow: style.overflow,
+              controlOverflow: control ? getComputedStyle(control).overflow : null,
+              webkitTextAlign: webkitValue.textAlign,
+            };
+          });
+          expect(dateContract.value).toBe('2025-01-01');
+          expect(dateContract.width).toBeGreaterThanOrEqual(140);
+          expect(dateContract.textAlign).toBe('start');
+          expect(dateContract.textAlignLast).toBe('start');
+          expect(['clip', 'visible']).toContain(dateContract.overflow);
+          expect(dateContract.controlOverflow).toBe('visible');
+          // WebKit does not expose this pseudo-element through computed styles.
+          expect(['', 'start']).toContain(dateContract.webkitTextAlign);
         }
         if (captureDirectory) {
           await mkdir(captureDirectory, { recursive: true });
@@ -2141,6 +2189,7 @@ test('progress header keeps expanded help and custom period in normal flow', asy
       await summary.focus();
       await page.keyboard.press('Enter');
       await expect(summary).toHaveAttribute('aria-expanded', 'true');
+      await expect(summary).toBeFocused();
       await expect(helpBody).toBeVisible();
       await assertGeometry('help-open');
 

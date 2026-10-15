@@ -74,3 +74,11 @@ BEFORE снят в отдельном чистом worktree от `origin/master`
 `aria-expanded` mirror, чтобы прогнать тот же keyboard harness. API, данные и credentials
 синтетические. AFTER относится к текущему Draft PR; merge, deploy и owner visual acceptance
 не выполнены.
+
+## Финальный пакет реализации PR #1013
+
+После утверждения композиции снят отдельный финальный пакет реального AFTER:
+[implementation-after-20261015](implementation-after-20261015/README.md). Он содержит 144
+кадра Chromium/WebKit для обеих тем, всех требуемых ширин и четырёх сочетаний состояний,
+включая заполненную форму «Свой период» и проверку полной видимости дат. Merge, deploy и
+закрытие Issue по-прежнему не выполнялись; visual acceptance остаётся отдельным owner gate.
