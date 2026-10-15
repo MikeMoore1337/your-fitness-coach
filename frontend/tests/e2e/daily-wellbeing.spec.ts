@@ -390,17 +390,18 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
       const selectedOption = tmaPage.locator(
         '.daily-wellbeing__option[data-yfc-choice="compact"]:has(> input:checked)',
       );
-      await expect(selectedOption).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
-      await expect(selectedOption).toHaveCSS(
-        'border-bottom-width',
-        theme === 'light' ? '3px' : '1px',
-      );
-      if (theme === 'light') {
-        const selectedShadow = await selectedOption.evaluate(
-          (element) => getComputedStyle(element).boxShadow,
-        );
-        expect(selectedShadow).toMatch(/rgb\(178,\s*245,\s*32\)\s+0px\s+-2px\s+0px\s+0px\s+inset/);
-      }
+      await expect(selectedOption).toHaveCSS('border-bottom-width', '1px');
+      const selectedOutline = await selectedOption.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          topColor: style.borderTopColor,
+          bottomColor: style.borderBottomColor,
+          boxShadow: style.boxShadow,
+        };
+      });
+      expect(selectedOutline.bottomColor).toBe(selectedOutline.topColor);
+      expect(selectedOutline.bottomColor).not.toBe('rgb(178, 245, 32)');
+      expect(selectedOutline.boxShadow).not.toContain('rgb(178, 245, 32)');
 
       const unchecked = tmaPage.locator('.daily-wellbeing__option input:not(:checked)').first();
       await unchecked.focus();
