@@ -508,3 +508,172 @@ test('@extended mobile layout stress keeps long content inside viewport', async 
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
   }
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 390, 393, 430] as const) {
+    test(`@critical #867 keeps the browser dock clear at ${width}px ${theme}`, async ({
+      page,
+    }, info) => {
+      await preparePage(page, theme, 'browser');
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/app?section=today');
+      await waitForSurface(page, 'today');
+
+      await page.evaluate(() => {
+        const root = document.documentElement;
+        root.style.setProperty('--yfc-layout-safe-bottom', '34px');
+        const viewport = window.visualViewport;
+        if (!viewport) throw new Error('visualViewport is required for #867 geometry coverage');
+        Object.defineProperty(viewport, 'height', {
+          configurable: true,
+          value: window.innerHeight - 34,
+        });
+        Object.defineProperty(viewport, 'offsetTop', { configurable: true, value: 0 });
+        viewport.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('resize'));
+      });
+
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const rootStyle = getComputedStyle(document.documentElement);
+            const dock = document.querySelector<HTMLElement>('#appBottomNav');
+            if (!dock) return null;
+            return {
+              viewportBottom: rootStyle.getPropertyValue('--yfc-viewport-bottom').trim(),
+              safeBottom: rootStyle.getPropertyValue('--yfc-layout-safe-bottom').trim(),
+              dockBottomGap: window.innerHeight - dock.getBoundingClientRect().bottom,
+            };
+          }),
+        )
+        .not.toBeNull();
+
+      const measureGeometry = () =>
+        page.evaluate(() => {
+          const rootStyle = getComputedStyle(document.documentElement);
+          const dock = document.querySelector<HTMLElement>('#appBottomNav');
+          const quickAdd = document.querySelector<HTMLElement>('.app-bottom-nav__quick-add');
+          const startWorkout = Array.from(document.querySelectorAll<HTMLElement>('button')).find(
+            (button) => button.textContent?.includes('Начать тренировку'),
+          );
+          if (!dock || !quickAdd || !startWorkout) throw new Error('Missing #867 geometry target');
+          const dockRect = dock.getBoundingClientRect();
+          const quickAddRect = quickAdd.getBoundingClientRect();
+          const startWorkoutRect = startWorkout.getBoundingClientRect();
+          const quickAddHit = document.elementFromPoint(
+            quickAddRect.left + quickAddRect.width / 2,
+            quickAddRect.top + quickAddRect.height / 2,
+          )?.closest('.app-bottom-nav__quick-add') === quickAdd;
+          return {
+            surface: document.documentElement.dataset.yfcLayoutSurface,
+            viewportBottom: Number.parseFloat(rootStyle.getPropertyValue('--yfc-viewport-bottom')),
+            safeBottom: Number.parseFloat(rootStyle.getPropertyValue('--yfc-layout-safe-bottom')),
+            effectiveViewportBottom: rootStyle
+              .getPropertyValue('--yfc-viewport-bottom-effective')
+              .trim(),
+            dockBottomGap: window.innerHeight - dockRect.bottom,
+            quickAddVisible: quickAdd.getClientRects().length > 0,
+            quickAddHit,
+            startWorkoutInViewport:
+              startWorkoutRect.top >= -0.5 && startWorkoutRect.bottom <= window.innerHeight + 0.5,
+            startWorkoutOverlapsDock:
+              startWorkoutRect.bottom > dockRect.top && startWorkoutRect.top < dockRect.bottom,
+            documentWidth: {
+              client: document.documentElement.clientWidth,
+              scroll: document.documentElement.scrollWidth,
+            },
+          };
+        });
+
+      const geometry = await measureGeometry();
+      await assertMobileShellGeometry(page);
+      expect(geometry.surface).toBe('browser');
+      expect(geometry.viewportBottom).toBe(34);
+      expect(geometry.safeBottom).toBe(34);
+      expect(geometry.dockBottomGap).toBeLessThanOrEqual(geometry.safeBottom + 16);
+      expect(geometry.quickAddVisible).toBe(true);
+      expect(geometry.quickAddHit).toBe(true);
+      expect(geometry.startWorkoutInViewport).toBe(true);
+      expect(geometry.startWorkoutOverlapsDock).toBe(false);
+      expect(geometry.documentWidth.scroll).toBeLessThanOrEqual(geometry.documentWidth.client + 1);
+
+      if (process.env.CAPTURE_867_AFTER === '1' && width === 393) {
+        const evidenceRoot = resolve(
+          process.cwd(),
+          `../docs/ux/final-issues-acceptance/evidence/867-mobile-geometry-20261016`,
+        );
+        await mkdir(resolve(evidenceRoot, 'before'), { recursive: true });
+        await mkdir(resolve(evidenceRoot, 'after'), { recursive: true });
+        const evidenceName = `${info.project.name}-${theme}-393x844`;
+
+        await page.evaluate(() => {
+          document.documentElement.style.setProperty(
+            '--yfc-viewport-bottom-effective',
+            '34px',
+          );
+        });
+        const beforeGeometry = await measureGeometry();
+        await page.screenshot({
+          path: resolve(evidenceRoot, 'before', `${evidenceName}.png`),
+          ...screenshotOptions,
+          fullPage: true,
+        });
+
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty('--yfc-viewport-bottom-effective');
+        });
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        const afterGeometry = await measureGeometry();
+        await page.screenshot({
+          path: resolve(evidenceRoot, 'after', `${evidenceName}.png`),
+          ...screenshotOptions,
+          fullPage: true,
+        });
+        await writeFile(
+          resolve(evidenceRoot, `${evidenceName}-geometry.json`),
+          JSON.stringify(
+            {
+              synthetic: true,
+              issue: 867,
+              theme,
+              browser: info.project.name,
+              viewport: { width, height: 844 },
+              before: beforeGeometry,
+              after: afterGeometry,
+            },
+            null,
+            2,
+          ),
+        );
+      }
+
+      const lastInteractive = page.locator(
+        '#appContent :where(button, a, input, select, textarea, summary):visible',
+      ).last();
+      await expect(lastInteractive).toBeVisible();
+      await lastInteractive.scrollIntoViewIfNeeded();
+      await expect(lastInteractive).toBeInViewport();
+      const lastInteractiveGeometry = await lastInteractive.evaluate((element) => {
+        const targetRect = element.getBoundingClientRect();
+        const dock = document.querySelector<HTMLElement>('#appBottomNav');
+        if (!dock) throw new Error('Mobile dock is missing after last-item scroll');
+        const dockRect = dock.getBoundingClientRect();
+        const targetPoint = document.elementFromPoint(
+          targetRect.left + targetRect.width / 2,
+          targetRect.top + targetRect.height / 2,
+        );
+        return {
+          overlap: targetRect.bottom > dockRect.top && targetRect.top < dockRect.bottom,
+          hit: targetPoint === element || Boolean(targetPoint && element.contains(targetPoint)),
+        };
+      });
+      expect(lastInteractiveGeometry.overlap).toBe(false);
+      expect(lastInteractiveGeometry.hit).toBe(true);
+    });
+  }
+}
