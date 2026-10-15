@@ -322,7 +322,7 @@ test('Task 294 keeps Progress desktop hierarchy and Profile nav title-first on m
     await openApp(page, 'profile');
     const profileNavigation = page.locator('.profile-settings-nav.section-navigation');
     await expect(profileNavigation).toBeVisible();
-    await expect(profileNavigation.locator(':scope > a > small')).toHaveCount(6);
+    await expect(profileNavigation.locator(':scope > a > small')).toHaveCount(5);
     await expect(profileNavigation.locator(':scope > a > small').first()).toBeHidden();
     const titleBoxes = await Promise.all(
       (await profileNavigation.locator(':scope > a > span').all()).map((title) =>

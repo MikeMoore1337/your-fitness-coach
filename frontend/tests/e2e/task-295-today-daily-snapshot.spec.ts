@@ -434,14 +434,13 @@ test('Task 295 keeps Profile shortcuts title-first and untruncated at narrow wid
     await openApp(page, 'profile');
     const navigation = page.getByRole('navigation', { name: 'Разделы профиля' });
     const shortcuts = navigation.locator('.profile-settings-nav__item');
-    await expect(shortcuts).toHaveCount(6);
+    await expect(shortcuts).toHaveCount(5);
     const expectedLabels = [
       'Личные данные',
       'Цели',
       'Тренер',
       'Уведомления',
       'Безопасность',
-      'AI Coach',
     ];
     for (const [index, shortcut] of (await shortcuts.all()).entries()) {
       await expect(shortcut.locator(':scope > span')).toHaveText(expectedLabels[index]!);
