@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>#865 — Progress header proposal</title>
+    <link rel="stylesheet" href="./prototype.css" />
+  </head>
+  <body>
+    <main class="prototype" aria-label="Макет верхней области Прогресса">
+      <header class="progress-hero">
+        <section class="hero-heading" aria-labelledby="progress-title">
+          <span class="eyebrow">ФАКТЫ ЗА ПЕРИОД</span>
+          <div class="hero-title-row">
+            <h1 id="progress-title">Прогресс</h1>
+            <button class="help-toggle" type="button" aria-expanded="false">
+              <span>О показателях</span>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+              </svg>
+            </button>
+          </div>
+          <div class="help-body" hidden>
+            <p>
+              Сначала смотрите на период и полноту данных. Одна точка не образует тренд, а
+              пропущенная запись не равна нулевому результату.
+            </p>
+            <a href="#knowledge">
+              Подробнее на сайте
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M14 5h5v5M19 5l-8 8M19 14v4a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+              </svg>
+            </a>
+          </div>
+        </section>
+
+        <section class="period-panel" aria-label="Период прогресса">
+          <div class="period-tabs" role="tablist" aria-label="Период прогресса">
+            <button type="button" role="tab" aria-selected="false">7 дней</button>
+            <button type="button" role="tab" aria-selected="true">30 дней</button>
+            <button type="button" role="tab" aria-selected="false">90 дней</button>
+            <button class="period-tab-custom" type="button" role="tab" aria-selected="false">
+              Свой период
+            </button>
+          </div>
+          <div class="period-meta">
+            <strong>Период: 16 сент. 2026 г. — 15 окт. 2026 г.</strong>
+            <span>Часовой пояс: Москва, стандартное время</span>
+          </div>
+          <form class="custom-period" hidden>
+            <label>
+              <span>Начало периода</span>
+              <span class="date-control">
+                <input aria-label="Начало периода" value="01.01.2025" readonly />
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  <path d="M8 3v4M16 3v4M4 9h16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                </svg>
+              </span>
+            </label>
+            <label>
+              <span>Конец периода</span>
+              <span class="date-control">
+                <input aria-label="Конец периода" value="30.01.2025" readonly />
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <rect x="4" y="5" width="16" height="15" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+                  <path d="M8 3v4M16 3v4M4 9h16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+                </svg>
+              </span>
+            </label>
+            <div class="custom-actions">
+              <button type="button">Показать период</button>
+              <button class="ghost" type="button">Отмена</button>
+            </div>
+          </form>
+        </section>
+
+        <a class="download-link" href="#report">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 9V5h12v4M6 18H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-2M6 14h12v6H6z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" />
+          </svg>
+          Скачать отчёт
+        </a>
+      </header>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+      const expanded = params.get('state') === 'expanded';
+      const root = document.documentElement;
+      const helpToggle = document.querySelector('.help-toggle');
+      const helpBody = document.querySelector('.help-body');
+      const customPeriod = document.querySelector('.custom-period');
+      const customTab = document.querySelector('.period-tab-custom');
+      const presetTab = document.querySelector('.period-tabs button[aria-selected="true"]');
+
+      root.dataset.theme = theme;
+      helpToggle.setAttribute('aria-expanded', String(expanded));
+      helpBody.hidden = !expanded;
+      customPeriod.hidden = !expanded;
+      customTab.setAttribute('aria-selected', String(expanded));
+      presetTab.setAttribute('aria-selected', String(!expanded));
+      document.body.dataset.state = expanded ? 'expanded' : 'closed';
+
+      helpToggle.addEventListener('click', () => {
+        const next = helpToggle.getAttribute('aria-expanded') !== 'true';
+        helpToggle.setAttribute('aria-expanded', String(next));
+        helpBody.hidden = !next;
+      });
+    </script>
+  </body>
+</html>
