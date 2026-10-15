@@ -66,7 +66,7 @@ repos:
 
       - id: link-check-tests
         name: link checker tests
-        entry: python -m pytest tests/test_check_links.py -q
+        entry: python -m pytest --override-ini filterwarnings=default tests/test_check_links.py -q
         language: system
         pass_filenames: false
         files: ^(scripts/check_links\.py|tests/test_check_links\.py|docs/development/link-checking\.md)
