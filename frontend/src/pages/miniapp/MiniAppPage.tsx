@@ -14,7 +14,7 @@ import { TelegramLinkPrompt } from '../../features/account/TelegramLinkPrompt';
 import { TodayDashboard } from '../../features/dashboard/TodayDashboard';
 import type { WorkoutNavigationTarget } from '../../features/workouts/WorkoutHistory';
 import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navigation/router';
-import { Badge, Button, Card } from '../../shared/ui/common';
+import { Badge, Card } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
 import { AiCoachContextualEntry } from '../../features/ai/AiCoachContextualEntry';
@@ -388,6 +388,18 @@ export default function MiniAppPage({
   }, [section]);
 
   useEffect(() => {
+    if (
+      section !== 'profile' ||
+      window.location.hash !== '#profile-ai-coach' ||
+      !aiCoachStatus.isFetched ||
+      aiCoachStatus.data?.ui_enabled
+    ) {
+      return;
+    }
+    navigate('/app?section=profile', true);
+  }, [aiCoachStatus.data?.ui_enabled, aiCoachStatus.isFetched, navigate, section]);
+
+  useEffect(() => {
     if (section !== 'profile') return;
     const targetId = window.location.hash.slice(1);
     if (!targetId.startsWith('profile-')) return;
@@ -614,9 +626,7 @@ export default function MiniAppPage({
                 )}
 
                 <nav
-                  className={`profile-settings-nav section-navigation${
-                    aiCoachStatus.data?.ui_enabled ? ' profile-settings-nav--ai-enabled' : ''
-                  }`}
+                  className="profile-settings-nav section-navigation"
                   aria-label="Разделы профиля"
                 >
                   <a
@@ -719,30 +729,6 @@ export default function MiniAppPage({
                     <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
                     <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
                   </a>
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-ai-coach' ? ' is-active' : ''
-                    }`}
-                    href="#profile-ai-coach"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-ai-coach' ? 'location' : undefined
-                    }
-                    aria-label="AI Coach"
-                    aria-describedby="profile-nav-ai-description"
-                    onClick={() => openProfileSection('profile-ai-coach')}
-                  >
-                    <Icon className="section-navigation__leading-icon" name="ai-coach" size={16} />
-                    <span>AI Coach</span>
-                    <small id="profile-nav-ai-description">
-                      {aiCoachStatus.isLoading
-                        ? 'Проверяем доступность'
-                        : aiCoachStatus.data?.ui_enabled
-                          ? 'Доступность и личный контекст'
-                          : 'Сейчас недоступен'}
-                    </small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
                 </nav>
 
                 <ProfileForm key={profileFormKey} />
@@ -764,35 +750,11 @@ export default function MiniAppPage({
                   />
                   <TrainerCapabilityCard />
                 </Card>
-                {aiCoachStatus.data?.ui_enabled ? (
+                {aiCoachStatus.data?.ui_enabled && (
                   <AiCoachSettingsCard
                     defaultOpen={window.location.hash === '#profile-ai-coach'}
                     status={aiCoachStatus.data}
                   />
-                ) : (
-                  <section
-                    aria-labelledby="profile-ai-coach-title"
-                    className="profile-settings-ai-unavailable"
-                    id="profile-ai-coach"
-                  >
-                    <div>
-                      <span className="eyebrow">AI Coach</span>
-                      <h2 id="profile-ai-coach-title">AI Coach сейчас недоступен</h2>
-                      <p>
-                        Основные функции приложения продолжают работать. Доступность можно проверить
-                        позже.
-                      </p>
-                    </div>
-                    {aiCoachStatus.error && (
-                      <Button
-                        onClick={() => void aiCoachStatus.refetch()}
-                        type="button"
-                        variant="secondary"
-                      >
-                        Повторить
-                      </Button>
-                    )}
-                  </section>
                 )}
                 <Card
                   className="profile-settings-group"

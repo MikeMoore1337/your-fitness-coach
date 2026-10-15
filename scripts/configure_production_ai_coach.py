@@ -8,8 +8,8 @@ from pathlib import Path
 PRODUCTION_AI_COACH_FLAGS = {
     "AI_COACH_ENABLED": "true",
     "AI_COACH_KILL_SWITCH": "false",
-    # Kept compatible with older bundles; the current bundle does not use this as an access gate.
-    "AI_COACH_UI_ENABLED": "true",
+    # Keep the existing server implementation configured, but hide its user-facing UI.
+    "AI_COACH_UI_ENABLED": "false",
     "AI_COACH_INTERNAL_USER_IDS": "",
     "AI_COACH_PROVIDER": "groq",
     "AI_COACH_ENDPOINT": "https://api.groq.com/openai/v1/chat/completions",

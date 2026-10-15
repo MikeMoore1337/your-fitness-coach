@@ -860,6 +860,20 @@ describe('AiCoachExperience', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders nothing and does not query quota while the UI gate is off', () => {
+    renderSettingsCard({ ...status, ui_enabled: false });
+
+    expect(screen.queryByTestId('ai-coach-entry-profile')).not.toBeInTheDocument();
+    expect(apiMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose an unavailable workspace fallback in the accessibility tree', () => {
+    renderExperience({ ...status, ui_enabled: false });
+
+    expect(screen.queryByTestId('ai-coach-experience')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('ai-coach-ui-disabled')).not.toBeInTheDocument();
+  });
+
   it('opens one workspace, keeps the draft through settings and restores a minimized chat', async () => {
     mockBaseApi();
     window.localStorage.removeItem(AI_COACH_WORKSPACE_LAYOUT_KEY);
