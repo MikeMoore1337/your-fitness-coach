@@ -9,8 +9,8 @@
     },
     {
       "filename": "chromium-wellbeing-action-bounds.json",
-      "bytes": 15506,
-      "sha256": "bc8fff9f11b871f9f08c4a25535ed41644d8f5b0ac274f23aad6183f4249aef2"
+      "bytes": 17367,
+      "sha256": "6d188a59f413c2f6fc6d1a13c8ee0c351052dc39dab12073bb13ef39c9b01892"
     },
     {
       "filename": "chromium-wellbeing-actions-320-dark.png",
@@ -119,8 +119,8 @@
     },
     {
       "filename": "webkit-wellbeing-action-bounds.json",
-      "bytes": 15508,
-      "sha256": "f541508176bbb186b8a6278d4bbd08c56340b055315d6eb2e7f0f25b8fbfa3b9"
+      "bytes": 17371,
+      "sha256": "24ef677ed1c433fa115b52c8817a7330bff31519d46bbc2760f850ff32e54842"
     },
     {
       "filename": "webkit-wellbeing-actions-320-dark.png",

@@ -368,6 +368,7 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
             return {
               accentColor: style.accentColor,
               appearance: style.appearance,
+              colorScheme: style.colorScheme,
               checked: (element as HTMLInputElement).checked,
             };
           }),
@@ -376,6 +377,7 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
       const uncheckedRadios = radioStyles.filter((radio) => !radio.checked);
       expect(checkedRadio).toBeTruthy();
       expect(uncheckedRadios.length).toBeGreaterThan(0);
+      expect(radioStyles.every((radio) => radio.colorScheme === theme)).toBe(true);
       expect(['auto', 'radio']).toContain(checkedRadio!.appearance);
       expect(uncheckedRadios.every((radio) => ['auto', 'radio'].includes(radio.appearance))).toBe(
         true,

@@ -4328,6 +4328,14 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   accent-color: var(--v2-lime);
 }
 
+html[data-color-scheme='dark'] .daily-wellbeing__option input {
+  color-scheme: dark;
+}
+
+html[data-color-scheme='light'] .daily-wellbeing__option input {
+  color-scheme: light;
+}
+
 :root .daily-wellbeing__option[data-yfc-choice='compact']:has(> input:checked) {
   border-color: var(--v2-selected-outline);
   border-bottom-color: var(--v2-lime);

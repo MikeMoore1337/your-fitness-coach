@@ -32,51 +32,61 @@
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": true
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       }
     ]
@@ -90,11 +100,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1341.95,
+          "bottom": 1049.95,
           "height": 44,
           "left": 31,
           "right": 218.13,
-          "top": 1297.95
+          "top": 1005.95
         }
       },
       {
@@ -102,11 +112,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1341.95,
+          "bottom": 1049.95,
           "height": 44,
           "left": 222.13,
           "right": 329,
-          "top": 1297.95
+          "top": 1005.95
         }
       }
     ],
@@ -114,51 +124,61 @@
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": true
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       }
     ]
@@ -172,11 +192,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1227.58,
+          "bottom": 1345.58,
           "height": 46,
           "left": 31,
           "right": 236.86,
-          "top": 1181.58
+          "top": 1299.58
         }
       },
       {
@@ -184,11 +204,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1227.58,
+          "bottom": 1345.58,
           "height": 46,
           "left": 244.86,
           "right": 359,
-          "top": 1181.58
+          "top": 1299.58
         }
       }
     ],
@@ -196,51 +216,61 @@
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": true
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       }
     ]
@@ -254,11 +284,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1007.2,
+          "bottom": 1327.2,
           "height": 46,
           "left": 31,
           "right": 256.86,
-          "top": 961.2
+          "top": 1281.2
         }
       },
       {
@@ -266,11 +296,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1007.2,
+          "bottom": 1327.2,
           "height": 46,
           "left": 264.86,
           "right": 399,
-          "top": 961.2
+          "top": 1281.2
         }
       }
     ],
@@ -278,51 +308,61 @@
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": true
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       },
       {
         "accentColor": "rgb(184, 184, 184)",
         "appearance": "auto",
+        "colorScheme": "dark",
         "checked": false
       }
     ]
@@ -336,11 +376,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1113.95,
+          "bottom": 1485.95,
           "height": 44,
           "left": 31,
           "right": 198.13,
-          "top": 1069.95
+          "top": 1441.95
         }
       },
       {
@@ -348,11 +388,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1113.95,
+          "bottom": 1485.95,
           "height": 44,
           "left": 202.13,
           "right": 289,
-          "top": 1069.95
+          "top": 1441.95
         }
       }
     ],
@@ -360,51 +400,61 @@
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": true
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       }
     ]
@@ -418,11 +468,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1049.95,
+          "bottom": 1033.95,
           "height": 44,
           "left": 31,
           "right": 218.13,
-          "top": 1005.95
+          "top": 989.95
         }
       },
       {
@@ -430,11 +480,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1049.95,
+          "bottom": 1033.95,
           "height": 44,
           "left": 222.13,
           "right": 329,
-          "top": 1005.95
+          "top": 989.95
         }
       }
     ],
@@ -442,51 +492,61 @@
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": true
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       }
     ]
@@ -500,11 +560,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1089.58,
+          "bottom": 1007.58,
           "height": 46,
           "left": 31,
           "right": 236.86,
-          "top": 1043.58
+          "top": 961.58
         }
       },
       {
@@ -512,11 +572,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1089.58,
+          "bottom": 1007.58,
           "height": 46,
           "left": 244.86,
           "right": 359,
-          "top": 1043.58
+          "top": 961.58
         }
       }
     ],
@@ -524,51 +584,61 @@
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": true
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       }
     ]
@@ -582,11 +652,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(9, 11, 11)",
         "bounds": {
-          "bottom": 1299.2,
+          "bottom": 1327.2,
           "height": 46,
           "left": 31,
           "right": 256.86,
-          "top": 1253.2
+          "top": 1281.2
         }
       },
       {
@@ -594,11 +664,11 @@
         "borderColor": "rgba(0, 0, 0, 0)",
         "color": "rgb(255, 255, 255)",
         "bounds": {
-          "bottom": 1299.2,
+          "bottom": 1327.2,
           "height": 46,
           "left": 264.86,
           "right": 399,
-          "top": 1253.2
+          "top": 1281.2
         }
       }
     ],
@@ -606,51 +676,61 @@
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(178, 245, 32)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": true
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       },
       {
         "accentColor": "rgb(96, 96, 96)",
         "appearance": "auto",
+        "colorScheme": "light",
         "checked": false
       }
     ]
