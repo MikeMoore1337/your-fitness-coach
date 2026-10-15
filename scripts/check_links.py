@@ -389,6 +389,10 @@ def _safe_target(target: str) -> str:
         return "[invalid-url]"
     if parsed.scheme in SUPPORTED_EXTERNAL_SCHEMES:
         host = parsed.hostname or "[invalid-host]"
+        if host.casefold().rstrip(".") == "fatsecret.com" or host.casefold().endswith(
+            ".fatsecret.com"
+        ):
+            return f"{parsed.scheme}://{host}/[redacted]"
         try:
             port = f":{parsed.port}" if parsed.port else ""
         except ValueError:
@@ -472,7 +476,7 @@ def _external_skip_reason(target: str) -> tuple[str, str] | None:
         return "forbidden-url", "URL credentials are never sent"
     if _is_private_host(host):
         return "forbidden-url", "private or local host is never contacted"
-    if host.casefold().endswith("fatsecret.com"):
+    if host.casefold().rstrip(".") == "fatsecret.com" or host.casefold().endswith(".fatsecret.com"):
         return "forbidden-url", "personal FatSecret resources are excluded"
     query_keys = {
         unquote(pair.split("=", 1)[0]).casefold() for pair in parsed.query.split("&") if pair

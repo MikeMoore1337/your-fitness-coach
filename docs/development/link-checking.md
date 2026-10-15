@@ -41,7 +41,8 @@ python scripts/check_links.py --external --timeout 5 --max-external-urls 50 --ma
 python scripts/check_links.py
 ```
 
-Проверяются только public `http(s)` URLs. Redirect считается успешным; `404/410` — подтверждённой
+Проверяются только public `http(s)` URLs, последовательно (concurrency=1). Redirect считается
+успешным; `404/410` — подтверждённой
 ошибкой; `403/429`, timeout, сетевой сбой и `5xx` получают `deferred` и не превращаются в
 случайный обязательный CI-fail. `file:`, `javascript:`, `data:`, `ftp:`, `mailto:`, loopback/
 private hosts, FatSecret personal exports, URL credentials, sensitive query parameters и API/auth

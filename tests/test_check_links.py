@@ -174,7 +174,7 @@ def test_unsupported_and_private_urls_never_reach_fetch_and_are_redacted(tmp_pat
         tmp_path,
         "[file](file:///secret.txt)\n"
         "[private](http://127.0.0.1/export?token=secret-token)\n"
-        "[provider](https://www.fatsecret.com/export?token=personal-token)\n",
+        "[provider](https://www.fatsecret.com/users/private-export/secret-id?token=personal-token)\n",
     )
 
     def fetch(url: str, timeout: float) -> HttpResponse:
@@ -187,6 +187,8 @@ def test_unsupported_and_private_urls_never_reach_fetch_and_are_redacted(tmp_pat
     assert {finding.category for finding in report.findings} >= {"unsupported-url", "forbidden-url"}
     assert "secret-token" not in output
     assert "personal-token" not in output
+    assert "private-export" not in output
+    assert "secret-id" not in output
 
 
 def test_live_public_route_404_is_checked_without_auth(tmp_path: Path) -> None:
