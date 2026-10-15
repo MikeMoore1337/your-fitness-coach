@@ -1440,7 +1440,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     padding-bottom: var(--yfc-mobile-dock-clearance);
   }
   .app-quick-add-layer {
-    padding-bottom: calc(88px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px));
+    padding-bottom: calc(
+      88px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
   }
   .app-quick-add-panel {
     max-height: calc(
@@ -1449,7 +1451,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     );
   }
   html[data-yfc-keyboard='visible'] .app-quick-add-layer {
-    padding-bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px));
+    padding-bottom: calc(
+      12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
   }
   html[data-yfc-keyboard='visible'] .app-quick-add-panel {
     max-height: calc(

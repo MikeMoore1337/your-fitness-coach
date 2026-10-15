@@ -560,10 +560,13 @@ for (const theme of ['light', 'dark'] as const) {
           const dockRect = dock.getBoundingClientRect();
           const quickAddRect = quickAdd.getBoundingClientRect();
           const startWorkoutRect = startWorkout.getBoundingClientRect();
-          const quickAddHit = document.elementFromPoint(
-            quickAddRect.left + quickAddRect.width / 2,
-            quickAddRect.top + quickAddRect.height / 2,
-          )?.closest('.app-bottom-nav__quick-add') === quickAdd;
+          const quickAddHit =
+            document
+              .elementFromPoint(
+                quickAddRect.left + quickAddRect.width / 2,
+                quickAddRect.top + quickAddRect.height / 2,
+              )
+              ?.closest('.app-bottom-nav__quick-add') === quickAdd;
           return {
             surface: document.documentElement.dataset.yfcLayoutSurface,
             viewportBottom: Number.parseFloat(rootStyle.getPropertyValue('--yfc-viewport-bottom')),
@@ -607,10 +610,7 @@ for (const theme of ['light', 'dark'] as const) {
         const evidenceName = `${info.project.name}-${theme}-393x844`;
 
         await page.evaluate(() => {
-          document.documentElement.style.setProperty(
-            '--yfc-viewport-bottom-effective',
-            '34px',
-          );
+          document.documentElement.style.setProperty('--yfc-viewport-bottom-effective', '34px');
         });
         const beforeGeometry = await measureGeometry();
         await page.screenshot({
@@ -652,9 +652,9 @@ for (const theme of ['light', 'dark'] as const) {
         );
       }
 
-      const lastInteractive = page.locator(
-        '#appContent :where(button, a, input, select, textarea, summary):visible',
-      ).last();
+      const lastInteractive = page
+        .locator('#appContent :where(button, a, input, select, textarea, summary):visible')
+        .last();
       await expect(lastInteractive).toBeVisible();
       await lastInteractive.scrollIntoViewIfNeeded();
       await expect(lastInteractive).toBeInViewport();
