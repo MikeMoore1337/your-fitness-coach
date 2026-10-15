@@ -1786,6 +1786,7 @@ export function TodayWorkout({
     accepted: boolean;
   } | null>(null);
   const navigatedCompletion = useRef<typeof completionNavigation>(null);
+  const autosaveSetId = useRef<number | null>(null);
   const enqueueSet = async (
     setId: number,
     version: number,
@@ -1793,6 +1794,7 @@ export function TodayWorkout({
     immediate?: boolean,
     completing = false,
   ) => {
+    autosaveSetId.current = !immediate && !values.is_completed ? setId : null;
     const navigation = completing ? { setId, accepted: false } : null;
     if (navigation) setCompletionNavigation(navigation);
     const accepted = await activeSync.enqueue(setId, version, values, immediate);
@@ -1823,53 +1825,42 @@ export function TodayWorkout({
 
   useEffect(() => {
     let frame: number | undefined;
+    let pointerActive = false;
+    let correctionPending = false;
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
+        // A pressed control must stay under the pointer until its click is delivered.
+        if (pointerActive) {
+          correctionPending = true;
+          return;
+        }
+        correctionPending = false;
         const editingRir = document.activeElement?.matches('.active-workout-rir button');
         if (!editingWorkoutField() && !editingRir) return;
         const input = document.activeElement as HTMLElement;
-        const row = input.closest('.active-workout-set');
-        const controls = row?.querySelector('.active-workout-set__controls') ?? input;
-        const controlsBox = controls.getBoundingClientRect();
-        const inputBox = input.getBoundingClientRect();
-        const box = {
-          top: Math.min(controlsBox.top, inputBox.top),
-          bottom: Math.max(controlsBox.bottom, inputBox.bottom),
-        };
+        const controls = input.closest('.active-workout-set__controls') ?? input;
+        const box = controls.getBoundingClientRect();
         const viewport = window.visualViewport;
         const top = viewport?.offsetTop ?? 0;
-        const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
-        const bottom = Math.min(
-          top + (viewport?.height ?? window.innerHeight),
-          dock && dock.height > 0 ? dock.top - 8 : Infinity,
-        );
+        const bottom = top + (viewport?.height ?? window.innerHeight);
         const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
         const safeTop = Math.max(
           top,
           timer && timer.bottom > top && timer.top < bottom ? timer.bottom : top,
         );
-        const target = box.bottom - box.top <= bottom - safeTop ? box : inputBox;
-        let delta =
+        const target = box.height <= bottom - safeTop ? box : input.getBoundingClientRect();
+        const delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
-        const nextRow = row?.matches('[aria-current="step"]') ? row.nextElementSibling : null;
-        const nextDone = nextRow?.querySelector('[data-workout-field="done"]');
-        if (
-          nextRow &&
-          nextDone &&
-          nextRow.getBoundingClientRect().top < top + (viewport?.height ?? window.innerHeight)
-        ) {
-          delta = Math.max(
-            delta,
-            Math.min(nextDone.getBoundingClientRect().bottom - bottom, target.top - safeTop),
-          );
-        }
-        if (delta)
-          window.scrollBy({
-            top: delta < 0 ? Math.floor(delta) : Math.ceil(delta),
-            behavior: 'instant',
-          });
+        if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
       });
+    };
+    const pointerDown = () => {
+      pointerActive = true;
+    };
+    const pointerEnd = () => {
+      pointerActive = false;
+      if (correctionPending) keepFieldsVisible();
     };
     const viewport = window.visualViewport;
     let viewportTop = viewport?.offsetTop;
@@ -1893,6 +1884,9 @@ export function TodayWorkout({
       keepFieldsVisible();
     };
     document.addEventListener('focusin', focus);
+    document.addEventListener('pointerdown', pointerDown, true);
+    document.addEventListener('pointerup', pointerEnd, true);
+    document.addEventListener('pointercancel', pointerEnd, true);
     viewport?.addEventListener('resize', keepFieldsVisible);
     viewport?.addEventListener('scroll', panViewport);
     window.addEventListener('resize', keepFieldsVisible);
@@ -1900,6 +1894,9 @@ export function TodayWorkout({
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       observer.disconnect();
       document.removeEventListener('focusin', focus);
+      document.removeEventListener('pointerdown', pointerDown, true);
+      document.removeEventListener('pointerup', pointerEnd, true);
+      document.removeEventListener('pointercancel', pointerEnd, true);
       viewport?.removeEventListener('resize', keepFieldsVisible);
       viewport?.removeEventListener('scroll', panViewport);
       window.removeEventListener('resize', keepFieldsVisible);
@@ -1962,6 +1959,40 @@ export function TodayWorkout({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [completionNavigation, currentSetId]);
+
+  useEffect(() => {
+    if (pendingActiveCount !== 0 || autosaveSetId.current !== currentSetId || editingWorkoutField())
+      return;
+    const frame = window.requestAnimationFrame(() => {
+      if (editingWorkoutField() || autosaveSetId.current !== currentSetId) return;
+      const row = document.querySelector<HTMLElement>(
+        '[data-workout-set-id="' + currentSetId + '"]',
+      );
+      const controls = row?.querySelector('.active-workout-set__controls')?.getBoundingClientRect();
+      const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+      const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+      if (!row || !controls || !dock?.height || !timer) return;
+      const viewport = window.visualViewport;
+      const top = Math.max(viewport?.offsetTop ?? 0, timer.bottom);
+      const bottom =
+        Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), dock.top) - 8;
+      const nextRow = row.nextElementSibling;
+      const next = nextRow?.querySelector('[data-workout-field="done"]')?.getBoundingClientRect();
+      const visibleNext =
+        nextRow &&
+        nextRow.getBoundingClientRect().top <
+          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const rir = row.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
+      const overlap = Math.max(
+        0,
+        controls.bottom - bottom,
+        visibleNext && next ? next.bottom - bottom : 0,
+      );
+      const delta = Math.min(overlap, Math.min(controls.top, rir?.top ?? controls.top) - top);
+      if (delta > 0) window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentSetId, pendingActiveCount]);
 
   if (workout.isLoading)
     return (

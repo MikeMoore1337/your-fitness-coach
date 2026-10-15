@@ -944,6 +944,26 @@ test.describe('#1001 completion navigation', () => {
             await row.getByLabel(/^Повторы,/).fill('15');
           }
           if (!releaseAutosave) await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          if (id === 201) {
+            const rir = row.getByRole('button', { name: /^2 —/ });
+            await rir.scrollIntoViewIfNeeded();
+            const box = (await rir.boundingBox())!;
+            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await page.mouse.down();
+            const before = await page.evaluate(() => scrollY);
+            await page.evaluate(() => {
+              Object.assign(window.visualViewport!, { height: 420 });
+              window.visualViewport!.dispatchEvent(new Event('resize'));
+              return new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+              );
+            });
+            expect(await page.evaluate(() => scrollY)).toBe(before);
+            await page.mouse.up();
+            await expect(rir).toHaveAttribute('aria-pressed', 'true');
+            await expect.poll(() => server.readSet(id).rir).toBe('2');
+            await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          }
           if (id === 202) await setNetworkOffline(page, true);
           const patchCount = server.patches.length;
           const releaseCompletion = id === 201 ? server.holdNextPatch() : null;
@@ -1034,7 +1054,12 @@ test.describe('#1001 completion navigation', () => {
           expect(server.readSet(id)).toMatchObject(
             id === 204
               ? { is_completed: true, duration_minutes: 25 }
-              : { is_completed: true, actual_weight: 50, actual_reps: 15 },
+              : {
+                  is_completed: true,
+                  actual_weight: 50,
+                  actual_reps: 15,
+                  ...(id === 201 ? { rir: '2' } : {}),
+                },
           );
           if (id !== 204) await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
         }
