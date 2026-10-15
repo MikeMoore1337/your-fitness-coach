@@ -98,6 +98,12 @@
 
 [Computed typography Chromium](chromium-typography-computed.json) · [Computed typography WebKit](webkit-typography-computed.json)
 
+## Обновление двух Linux-эталонов после утверждённой смены навигации
+
+- В [CI #38683966883](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/38683966883) только два снимка `progress-390x844-{dark,light}.png` ожидали прежний вариант со стрелками. Само новое переключение уже проверено Chromium/WebKit.
+- Новые эталоны взяты **не из локальной Windows**, а из сохранённых `actual.png` Linux CI. На каждой теме первый запуск и retry дали **побайтово одинаковые** изображения; прежние `expected.png` побайтово совпадали со старыми файлами репозитория.
+- Изменены исключительно два Linux golden-файла в `frontend/tests/e2e/mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/`. Остальные эталоны не перезаписывались. Отдельный повторный exact-head CI обязателен.
+
 ## Проверки
 
 - Unit 15/15 PASS, весь диапазон хранения 1..1440 минут.
