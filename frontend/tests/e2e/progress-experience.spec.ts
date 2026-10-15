@@ -1,6 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
 
@@ -44,6 +45,203 @@ const ISSUE_970_AFTER_DIR = resolve(
   '970-report-mobile-20261013',
   'after',
 );
+
+type DateVisualMetrics = {
+  contentWidth: number;
+  expectedTextWidth: number;
+  inputWidth: number;
+  inkLeft: number | null;
+  inkRight: number | null;
+  inkWidth: number;
+  textRegionRight: number;
+};
+
+type DecodedPng = { data: Uint8Array; height: number; width: number };
+
+function decodePng(buffer: Buffer): DecodedPng {
+  if (buffer.readUInt32BE(0) !== 0x89504e47 || buffer.readUInt32BE(4) !== 0x0d0a1a0a) {
+    throw new Error('Date visual regression expected a PNG screenshot');
+  }
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlaceMethod = 0;
+  const imageData: Buffer[] = [];
+  for (let offset = 8; offset < buffer.length;) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (type === 'IHDR') {
+      width = buffer.readUInt32BE(dataStart);
+      height = buffer.readUInt32BE(dataStart + 4);
+      bitDepth = buffer[dataStart + 8]!;
+      colorType = buffer[dataStart + 9]!;
+      interlaceMethod = buffer[dataStart + 12]!;
+    } else if (type === 'IDAT') {
+      imageData.push(buffer.subarray(dataStart, dataEnd));
+    }
+    offset = dataEnd + 4;
+  }
+  if (bitDepth !== 8 || interlaceMethod !== 0 || ![2, 6].includes(colorType)) {
+    throw new Error(
+      `Unsupported date screenshot PNG format: ${bitDepth}/${colorType}/${interlaceMethod}`,
+    );
+  }
+  const channels = colorType === 6 ? 4 : 3;
+  const bytesPerRow = width * channels;
+  const raw = inflateSync(Buffer.concat(imageData));
+  const pixels = new Uint8Array(width * height * 4);
+  const previous = new Uint8Array(bytesPerRow);
+  const current = new Uint8Array(bytesPerRow);
+  let rawOffset = 0;
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[rawOffset++]!;
+    for (let index = 0; index < bytesPerRow; index += 1) {
+      const left = index >= channels ? current[index - channels]! : 0;
+      const above = previous[index]!;
+      const upperLeft = index >= channels ? previous[index - channels]! : 0;
+      const source = raw[rawOffset++]!;
+      const predictor =
+        filter === 1
+          ? left
+          : filter === 2
+            ? above
+            : filter === 3
+              ? Math.floor((left + above) / 2)
+              : filter === 4
+                ? paethPredictor(left, above, upperLeft)
+                : 0;
+      if (![0, 1, 2, 3, 4].includes(filter)) {
+        throw new Error(`Unsupported PNG row filter: ${filter}`);
+      }
+      current[index] = (source + predictor) & 0xff;
+    }
+    for (let x = 0; x < width; x += 1) {
+      const source = x * channels;
+      const destination = (y * width + x) * 4;
+      pixels[destination] = current[source]!;
+      pixels[destination + 1] = current[source + 1]!;
+      pixels[destination + 2] = current[source + 2]!;
+      pixels[destination + 3] = channels === 4 ? current[source + 3]! : 255;
+    }
+    previous.set(current);
+    current.fill(0);
+  }
+  return { data: pixels, height, width };
+}
+
+function paethPredictor(left: number, above: number, upperLeft: number): number {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+  if (aboveDistance <= upperLeftDistance) return above;
+  return upperLeft;
+}
+
+type DateLayoutMetrics = {
+  contentWidth: number;
+  expectedTextWidth: number;
+  inputWidth: number;
+  paddingLeft: number;
+  paddingRight: number;
+};
+
+function analyzeDateScreenshots(
+  filledBuffer: Buffer,
+  blankBuffer: Buffer,
+  layout: DateLayoutMetrics,
+): DateVisualMetrics {
+  const filled = decodePng(filledBuffer);
+  const blank = decodePng(blankBuffer);
+  const scale = filled.width / Math.max(layout.inputWidth, 1);
+  const textRegionRight = Math.floor(filled.width - Math.max(42, layout.paddingRight) * scale);
+  const textRegionLeft = Math.max(4, Math.floor(layout.paddingLeft * scale - 2));
+  const changedColumns = new Uint8Array(filled.width);
+  const width = Math.min(filled.width, blank.width);
+  const height = Math.min(filled.height, blank.height);
+  for (let y = 6; y < height - 6; y += 1) {
+    for (let x = textRegionLeft; x < Math.min(textRegionRight, width); x += 1) {
+      const index = (y * width + x) * 4;
+      const difference =
+        Math.abs(filled.data[index]! - blank.data[index]!) +
+        Math.abs(filled.data[index + 1]! - blank.data[index + 1]!) +
+        Math.abs(filled.data[index + 2]! - blank.data[index + 2]!);
+      if (difference >= 32) changedColumns[x] = 1;
+    }
+  }
+  const changed = Array.from(changedColumns.entries())
+    .filter(([, value]) => value === 1)
+    .map(([column]) => column);
+  return {
+    contentWidth: layout.contentWidth,
+    expectedTextWidth: layout.expectedTextWidth,
+    inputWidth: layout.inputWidth,
+    inkLeft: changed.length ? changed[0]! / scale : null,
+    inkRight: changed.length ? changed[changed.length - 1]! / scale : null,
+    inkWidth: changed.length ? (changed[changed.length - 1]! - changed[0]! + 1) / scale : 0,
+    textRegionRight: textRegionRight / scale,
+  };
+}
+
+async function inspectDateVisual(
+  page: Page,
+  input: Locator,
+  value: string,
+  focused: boolean,
+): Promise<DateVisualMetrics> {
+  const setFocusState = async () => {
+    if (focused) {
+      await input.focus();
+      return;
+    }
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+    });
+  };
+
+  const capture = async (nextValue: string) => {
+    await input.fill(nextValue);
+    await expect(input).toHaveValue(nextValue);
+    await setFocusState();
+    return input.screenshot({ animations: 'disabled' });
+  };
+
+  const filled = await capture(value);
+  const blank = await capture('');
+  await input.fill(value);
+  await expect(input).toHaveValue(value);
+  await setFocusState();
+  const id = await input.getAttribute('id');
+  if (!id) throw new Error('Date input must have an id for visual regression');
+  const layout = await page.locator(`#${id}`).evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const style = getComputedStyle(input);
+    const rect = input.getBoundingClientRect();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas is unavailable for font measurement');
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    return {
+      contentWidth:
+        input.clientWidth -
+        (Number.parseFloat(style.paddingLeft) || 0) -
+        (Number.parseFloat(style.paddingRight) || 0),
+      expectedTextWidth: Math.max(
+        context.measureText('01.01.2025').width,
+        context.measureText('2025-01-01').width,
+      ),
+      inputWidth: rect.width,
+      paddingLeft: Number.parseFloat(style.paddingLeft) || 0,
+      paddingRight: Number.parseFloat(style.paddingRight) || 0,
+    };
+  });
+  return analyzeDateScreenshots(filled, blank, layout);
+}
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -1885,7 +2083,7 @@ test('progress period controls drive one exact URL and API range through history
   await expect(progressOverview(page)).toBeVisible();
 });
 
-test('progress header aligns help and report without clipping the period selector', async ({
+test('progress header keeps the title row separate from period and report controls', async ({
   page,
 }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
@@ -1903,9 +2101,9 @@ test('progress header aligns help and report without clipping the period selecto
     }
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
 
-    for (const width of [320, 360, 393, 430, 768, 1280, 1440]) {
+    for (const width of [320, 360, 393, 430, 1280, 1440, 1920, 2560]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
-      const help = page.locator('.progress-hero__help').getByText('О показателях', { exact: true });
+      const help = page.locator('.progress-hero__help summary');
       const report = page.getByRole('link', { name: 'Скачать отчёт' });
       const period = page.locator('.progress-hero__period');
       const tabs = period.getByRole('tablist', { name: 'Период прогресса' });
@@ -1914,22 +2112,6 @@ test('progress header aligns help and report without clipping the period selecto
       await expect(report).toBeVisible();
       await expect(tabs.getByRole('tab')).toHaveCount(4);
       await expect(page.locator('.progress-hero')).toHaveCSS('border-bottom-width', '0px');
-      if (CAPTURE_PROGRESS_865) {
-        const evidenceDirectory = resolve(
-          process.cwd(),
-          '..',
-          'docs',
-          'ux',
-          'final-issues-acceptance',
-          'evidence',
-          '865',
-          CAPTURE_PROGRESS_865,
-        );
-        await mkdir(evidenceDirectory, { recursive: true });
-        await page.locator('.progress-hero').screenshot({
-          path: resolve(evidenceDirectory, `${test.info().project.name}-${width}-${theme}.png`),
-        });
-      }
       const selectorGeometry = await tabs.evaluate((element) => {
         const tabStyle = getComputedStyle(element);
         const wrapperStyle = getComputedStyle(element.parentElement!);
@@ -1946,28 +2128,62 @@ test('progress header aligns help and report without clipping the period selecto
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true);
 
-      const helpGeometry = await help.evaluate((element) => {
-        const summary = element.closest('summary');
-        const textNode = summary
-          ? Array.from(summary.childNodes).find((node) => node.nodeType === Node.TEXT_NODE)
-          : null;
+      const helpGeometry = await help.evaluate((summary) => {
+        const textNode = Array.from(summary.childNodes).find(
+          (node) => node.nodeType === Node.TEXT_NODE,
+        );
         const range = document.createRange();
         if (textNode) range.selectNodeContents(textNode);
         const textRects = textNode ? Array.from(range.getClientRects()) : [];
-        const summaryBox = summary?.getBoundingClientRect();
-        const summaryStyle = summary ? getComputedStyle(summary) : null;
+        const summaryBox = summary.getBoundingClientRect();
+        const summaryStyle = getComputedStyle(summary);
         return {
           textRectCount: textRects.length,
           textWidths: textRects.map((rect) => Math.round(rect.width * 100) / 100),
-          height: summaryBox?.height ?? 0,
-          width: summaryBox?.width ?? 0,
-          x: summaryBox?.x ?? 0,
-          right: summaryBox?.right ?? Infinity,
+          height: summaryBox.height,
+          width: summaryBox.width,
+          x: summaryBox.x,
+          right: summaryBox.right,
+          top: summaryBox.top,
+          bottom: summaryBox.bottom,
           viewportWidth: window.innerWidth,
-          minHeight: summaryStyle ? parseFloat(summaryStyle.minHeight) : 0,
+          minHeight: parseFloat(summaryStyle.minHeight),
         };
       });
-      if (width <= 430 && CAPTURE_PROGRESS_865 !== 'before') {
+      const boxes = await page.evaluate(() => {
+        const rect = (selector: string) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) return null;
+          const value = element.getBoundingClientRect();
+          return {
+            bottom: value.bottom,
+            left: value.left,
+            right: value.right,
+            top: value.top,
+          };
+        };
+        return {
+          heading: rect('.progress-hero__heading'),
+          title: rect('.progress-hero__copy h1'),
+          help: rect('.progress-hero__help summary'),
+          report: rect('.progress-hero__download'),
+          period: rect('.progress-hero__period'),
+        };
+      });
+      expect(boxes.heading).not.toBeNull();
+      expect(boxes.title).not.toBeNull();
+      expect(boxes.help).not.toBeNull();
+      expect(boxes.report).not.toBeNull();
+      expect(boxes.period).not.toBeNull();
+      expect(helpGeometry.top).toBeLessThan(boxes.title!.bottom);
+      expect(helpGeometry.bottom).toBeGreaterThan(boxes.title!.top);
+      expect(boxes.help!.right).toBeLessThanOrEqual(boxes.heading!.right + 0.5);
+      if (width <= 430) {
+        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.left - 0.5);
+        expect(boxes.period!.right).toBeLessThanOrEqual(boxes.heading!.right + 0.5);
+        expect(boxes.period!.top).toBeGreaterThanOrEqual(boxes.heading!.bottom - 1);
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
+        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
         expect(
           helpGeometry.textRectCount,
           `wrapped at ${width}px: ${JSON.stringify(helpGeometry)}`,
@@ -1977,33 +2193,271 @@ test('progress header aligns help and report without clipping the period selecto
           helpGeometry.viewportWidth,
         );
       }
-
       if (width >= 1280) {
-        const [helpBox, reportBox, periodBox] = await Promise.all([
-          help.boundingBox(),
-          report.boundingBox(),
-          period.boundingBox(),
-        ]);
-        expect(helpBox?.width ?? Infinity).toBeLessThanOrEqual(140);
-        expect(helpBox?.height ?? 0).toBeGreaterThanOrEqual(44);
-        expect(periodBox).not.toBeNull();
-        expect(helpBox!.x + helpBox!.width).toBeLessThan(periodBox!.x);
-        const collapsed = [helpBox, reportBox];
-        expect(collapsed[0]).not.toBeNull();
-        expect(collapsed[1]).not.toBeNull();
-        expect(Math.abs(collapsed[0]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
-        expect(reportBox!.x).toBeGreaterThanOrEqual(periodBox!.x);
-        const periodBeforeExpand = await period.boundingBox();
-
-        await help.click();
-        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeVisible();
-        const expanded = await Promise.all([help.boundingBox(), report.boundingBox()]);
-        expect(Math.abs(expanded[0]!.y - collapsed[0]!.y)).toBeLessThanOrEqual(1);
-        expect(Math.abs(expanded[1]!.y - collapsed[1]!.y)).toBeLessThanOrEqual(1);
-        expect(await period.boundingBox()).toEqual(periodBeforeExpand);
-        await help.click();
-        await expect(page.getByText(/Сначала смотрите на период и полноту данных/)).toBeHidden();
+        expect(boxes.period!.left).toBeGreaterThanOrEqual(boxes.heading!.right + 1);
+        expect(boxes.help!.right).toBeLessThan(boxes.period!.left);
+        expect(boxes.report!.left).toBeGreaterThanOrEqual(boxes.period!.left);
+        expect(boxes.report!.top).toBeGreaterThanOrEqual(boxes.period!.bottom - 1);
       }
+    }
+  }
+});
+
+test('progress header keeps expanded help and custom period in normal flow', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_period=days_30');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  const captureDirectory = CAPTURE_PROGRESS_865
+    ? resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux',
+        'final-issues-acceptance',
+        'evidence',
+        '865',
+        CAPTURE_PROGRESS_865,
+      )
+    : null;
+
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await page.evaluate(() => {
+        localStorage.setItem('app-theme', 'dark');
+        window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+      });
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+
+    for (const width of [320, 360, 390, 393, 430, 1280, 1440, 1920, 2560]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      const summary = page.locator('.progress-hero__help summary');
+      const helpBody = page.locator('.progress-hero__help .contextual-help__body');
+      const period = page.locator('.progress-hero__period');
+      const customTab = period.getByRole('tab', { name: 'Свой период' });
+      const customForm = period.locator('.progress-period-controls__custom');
+
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await expect(customForm).toBeHidden();
+
+      const measureGeometry = async () =>
+        page.evaluate(() => {
+          type Box = { bottom: number; left: number; right: number; top: number; width: number };
+          const box = (selector: string): Box | null => {
+            const element = document.querySelector<HTMLElement>(selector);
+            if (!element) return null;
+            const rect = element.getBoundingClientRect();
+            return {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+            };
+          };
+          const boxes = {
+            heading: box('.progress-hero__copy h1'),
+            headingRegion: box('.progress-hero__heading'),
+            summary: box('.progress-hero__help summary'),
+            helpBody: box('.progress-hero__help .contextual-help__body'),
+            period: box('.progress-hero__period'),
+            custom: box('.progress-period-controls__custom'),
+            from: box('#progress-period-from'),
+            to: box('#progress-period-to'),
+            actions: box('.progress-period-controls__custom-actions'),
+            download: box('.progress-hero__download'),
+          };
+          const overlaps = (left: Box | null, right: Box | null) =>
+            Boolean(
+              left &&
+              right &&
+              left.left < right.right &&
+              left.right > right.left &&
+              left.top < right.bottom &&
+              left.bottom > right.top,
+            );
+          const topLevel = ['heading', 'summary', 'period', 'download'] as const;
+          const internal = ['from', 'to', 'actions'] as const;
+          const overlapPairs = [
+            ...topLevel.flatMap((left, index) =>
+              topLevel.slice(index + 1).map((right) => `${left}:${right}`),
+            ),
+            ...internal.flatMap((left, index) =>
+              internal.slice(index + 1).map((right) => `${left}:${right}`),
+            ),
+            'helpBody:period',
+            'helpBody:custom',
+            'helpBody:download',
+          ] as const;
+          const outOfViewport = Object.entries(boxes)
+            .filter(([, value]) => value)
+            .filter(([, value]) => value!.left < -0.5 || value!.right > window.innerWidth + 0.5)
+            .map(([name]) => name);
+          return {
+            boxes,
+            overlapPairs: overlapPairs.filter((pair) => {
+              const [left, right] = pair.split(':') as [keyof typeof boxes, keyof typeof boxes];
+              return overlaps(boxes[left], boxes[right]);
+            }),
+            outOfViewport,
+            scrollWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+          };
+        });
+
+      const assertGeometry = async (state: string) => {
+        const geometry = await measureGeometry();
+        expect(
+          geometry.overlapPairs,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toEqual([]);
+        expect(geometry.outOfViewport, `${theme} ${width}px ${state}`).toEqual([]);
+        expect(geometry.scrollWidth, `${theme} ${width}px ${state}`).toBeLessThanOrEqual(
+          geometry.viewportWidth,
+        );
+        const headingRegionBox = geometry.boxes.headingRegion;
+        const headingBox = geometry.boxes.heading;
+        const summaryBox = geometry.boxes.summary;
+        expect(headingRegionBox).not.toBeNull();
+        expect(headingBox).not.toBeNull();
+        expect(summaryBox).not.toBeNull();
+        expect(
+          summaryBox!.top,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toBeLessThan(headingBox!.bottom);
+        expect(
+          summaryBox!.bottom,
+          `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+        ).toBeGreaterThan(headingBox!.top);
+        if (width >= 1280) {
+          const customTabText = await customTab.evaluate((tab) => {
+            const range = document.createRange();
+            range.selectNodeContents(tab);
+            const box = tab.getBoundingClientRect();
+            return {
+              clientWidth: tab.clientWidth,
+              height: box.height,
+              scrollWidth: tab.scrollWidth,
+              textRectCount: range.getClientRects().length,
+            };
+          });
+          expect(
+            customTabText.textRectCount,
+            `${theme} ${width}px ${state}: custom period label wrapped unexpectedly`,
+          ).toBe(1);
+          expect(customTabText.scrollWidth).toBeLessThanOrEqual(customTabText.clientWidth);
+        }
+        if (state.includes('help')) {
+          const helpBodyBox = geometry.boxes.helpBody;
+          expect(helpBodyBox, `${theme} ${width}px ${state} help body`).not.toBeNull();
+          expect(helpBodyBox!.left).toBeGreaterThanOrEqual(headingRegionBox!.left - 0.5);
+          expect(helpBodyBox!.right).toBeLessThanOrEqual(headingRegionBox!.right + 0.5);
+          expect(
+            helpBodyBox!.top,
+            `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
+          ).toBeGreaterThanOrEqual(Math.max(headingBox!.bottom, summaryBox!.bottom) - 0.5);
+        }
+        if (state.includes('custom')) {
+          expect(geometry.boxes.custom).not.toBeNull();
+          expect(geometry.boxes.from).not.toBeNull();
+          expect(geometry.boxes.to).not.toBeNull();
+          expect(geometry.boxes.actions).not.toBeNull();
+          for (const [id, value] of [
+            ['#progress-period-from', '2025-01-01'],
+            ['#progress-period-to', '2025-01-30'],
+          ] as const) {
+            const input = page.locator(id);
+            const dateContract = await input.evaluate((element) => {
+              const input = element as HTMLInputElement;
+              const style = getComputedStyle(input);
+              const webkitValue = getComputedStyle(input, '::-webkit-date-and-time-value');
+              const control = input.closest('.date-control');
+              return {
+                value: input.value,
+                width: input.getBoundingClientRect().width,
+                textAlign: style.textAlign,
+                textAlignLast: style.textAlignLast,
+                overflow: style.overflow,
+                controlOverflow: control ? getComputedStyle(control).overflow : null,
+                webkitTextAlign: webkitValue.textAlign,
+              };
+            });
+            expect(dateContract.value).toBe(value);
+            expect(dateContract.width).toBeGreaterThanOrEqual(140);
+            expect(dateContract.textAlign).toBe('start');
+            expect(dateContract.textAlignLast).toBe('start');
+            expect(['clip', 'visible']).toContain(dateContract.overflow);
+            expect(dateContract.controlOverflow).toBe('visible');
+            // WebKit does not expose this pseudo-element through computed styles.
+            expect(['', 'start']).toContain(dateContract.webkitTextAlign);
+
+            if (state === 'custom-open') {
+              for (const focused of [true, false]) {
+                const visual = await inspectDateVisual(page, input, value, focused);
+                const stateLabel = focused ? 'focused' : 'blurred';
+                const context = `${theme} ${width}px ${id} ${stateLabel}`;
+                expect(visual.inkLeft, `${context}: no value pixels`).not.toBeNull();
+                expect(visual.inkRight, `${context}: no value pixels`).not.toBeNull();
+                expect(visual.contentWidth, `${context}: content box`).toBeGreaterThanOrEqual(
+                  visual.expectedTextWidth,
+                );
+                expect(visual.inkWidth, `${context}: rendered date pixels`).toBeGreaterThanOrEqual(
+                  visual.expectedTextWidth - 8,
+                );
+                expect(
+                  visual.inkRight,
+                  `${context}: value reaches calendar reserve`,
+                ).toBeLessThanOrEqual(visual.textRegionRight + 1);
+              }
+            }
+          }
+        }
+        if (captureDirectory) {
+          await mkdir(captureDirectory, { recursive: true });
+          await page.locator('.progress-hero').screenshot({
+            path: resolve(
+              captureDirectory,
+              `${test.info().project.name}-${width}-${theme}-${state}.png`,
+            ),
+          });
+        }
+      };
+
+      await assertGeometry('closed-closed');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'true');
+      await expect(summary).toBeFocused();
+      await expect(helpBody).toBeVisible();
+      await assertGeometry('help-open');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await expect(summary).toBeFocused();
+      await expect(helpBody).toBeHidden();
+
+      await customTab.click();
+      await expect(customForm).toBeVisible();
+      await page.getByLabel('Начало периода').fill('2025-01-01');
+      await page.getByLabel('Конец периода').fill('2025-01-30');
+      await assertGeometry('custom-open');
+
+      await summary.click();
+      await expect(summary).toHaveAttribute('aria-expanded', 'true');
+      await expect(helpBody).toBeVisible();
+      await assertGeometry('help-and-custom-open');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await period.getByRole('button', { name: 'Отмена' }).click();
+      await expect(customForm).toBeHidden();
     }
   }
 });
