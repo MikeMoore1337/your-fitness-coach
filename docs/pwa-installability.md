@@ -83,7 +83,7 @@ release rollback, описанным в [production-deployment.md](production-de
 
 Для самого Task 86 изменение API/schema не требуется: active workout queue остаётся совместимой с
 существующим backend-контрактом. Web Push subscriptions, permission UX, delivery и backend
-notification integration реализованы отдельным [Task 86A](../codex-backlog/tasks/86a-web-push-notifications-foundation.md)
+notification integration реализованы отдельным [Task 86A](web-push-notifications.md)
 и используют уже существующий PWA service worker.
 
 ## Проверка перед release

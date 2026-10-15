@@ -1,7 +1,7 @@
 # #874 — отчёт, PDF и числовая согласованность
 
 Проверки используют один фиксированный synthetic набор данных из
-[`tests/fixtures/progress-report-canonical.json`](../../../../tests/fixtures/progress-report-canonical.json).
+[`tests/fixtures/progress-report-canonical.json`](../../../../../tests/fixtures/progress-report-canonical.json).
 Это не production или real-user proof.
 
 ## Интегрированный срез и owner-gate
