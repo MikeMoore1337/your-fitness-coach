@@ -183,6 +183,20 @@ CLI snapshots are diagnostics, not proof of real Telegram devices. Do not run sc
 browser sessions with production credentials. Strix is not an authorized production scanner or
 required CI gate. Setup, use, fallbacks and Strix pilot gates: `docs/development/optional-agent-tools.md`.
 
+## Optional 21st.dev UI component reference (Codex)
+
+21st.dev is an optional **host-level Codex plugin/MCP catalog**, not an application dependency,
+source of truth, design system, required CI tool or license grant. Read
+[`docs/development/optional-agent-tools.md`](docs/development/optional-agent-tools.md)
+before using it. For approved UI tasks, search only with generic, non-sensitive requests and
+inspect proposed components locally. Do not submit project source, screenshots containing
+private data, tokens, internal docs, personal data or production URLs to 21st.dev.
+
+Do not auto-import components, dependencies or themes, run hosted AI generation, publish
+project materials, or enable billing. Check component-specific license and transitive packages
+before any separately approved adoption. Existing YFC design contracts, owner visual approval,
+Russian UI, accessibility, Mobile/TMA and performance gates always take precedence.
+
 ## Permanent anti-recurrence rule
 
 STANDARD GIT/GITHUB FIRST. ONE OPERATIONAL SOURCE OF TRUTH. STATELESS HELPERS. FAIL CLOSED ONLY
