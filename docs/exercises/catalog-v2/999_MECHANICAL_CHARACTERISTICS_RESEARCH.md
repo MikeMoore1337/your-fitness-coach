@@ -126,7 +126,7 @@
 ### ExerciseDB / AscendAPI
 
 Публичная [документация ExerciseDB](https://v2.exercisedb.io/docs) описывает поля `bodyPart`, `equipment`,
-`secondaryMuscles`, инструкции и медиа. Официальный сайт сообщает, что ExerciseDB продолжает
+`secondaryMuscles`, инструкции и медиа. Официальный сайт
 [AscendAPI](https://www.ascendapi.com/) сообщает, что продукт ранее назывался ExerciseDB.
 В [документации AscendAPI V2](https://docs.ascendapi.com/products/edb-v2/overview) перечислены `equipments[]`,
 `bodyParts[]`, `exerciseType`, целевые и вторичные мышцы, инструкции, варианты и связанные
