@@ -56,3 +56,17 @@ repos:
         language: system
         pass_filenames: false
         files: ^(\.agents/skills/|scripts/skill_safety\.py)
+
+      - id: deterministic-link-check
+        name: deterministic local link check
+        entry: python scripts/check_links.py
+        language: system
+        pass_filenames: false
+        files: ^(README\.md|codex-backlog/|docs/|frontend/index\.html|frontend/public/manifest\.webmanifest|frontend/src/(content/publicContent\.json|pages/(landing|public)/|shared/navigation/)|scripts/check_links\.py|tests/test_check_links\.py)
+
+      - id: link-check-tests
+        name: link checker tests
+        entry: python -m pytest --override-ini addopts= --override-ini filterwarnings=default tests/test_check_links.py -q
+        language: system
+        pass_filenames: false
+        files: ^(scripts/check_links\.py|tests/test_check_links\.py|docs/development/link-checking\.md)
