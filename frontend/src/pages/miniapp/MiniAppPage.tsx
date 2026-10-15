@@ -391,13 +391,12 @@ export default function MiniAppPage({
     if (
       section !== 'profile' ||
       window.location.hash !== '#profile-ai-coach' ||
-      !aiCoachStatus.isFetched ||
       aiCoachStatus.data?.ui_enabled
     ) {
       return;
     }
     navigate('/app?section=profile', true);
-  }, [aiCoachStatus.data?.ui_enabled, aiCoachStatus.isFetched, navigate, section]);
+  }, [aiCoachStatus.data?.ui_enabled, navigate, section]);
 
   useEffect(() => {
     if (section !== 'profile') return;

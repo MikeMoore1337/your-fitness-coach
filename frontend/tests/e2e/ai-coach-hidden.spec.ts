@@ -56,6 +56,17 @@ test('AI Coach is hidden across user surfaces, roles, themes and Web/TMA/PWA run
     fullPage: true,
   });
 
+  await page.reload();
+  await expect(page).toHaveURL(/\/app\?section=profile$/);
+  await page.goto('/app?section=today');
+  await page.goto('/app?section=profile#profile-ai-coach');
+  await expect(page).toHaveURL(/\/app\?section=profile$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/app\?section=today$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/app\?section=profile$/);
+  await expectAiCoachHidden(page, desktopRequests);
+
   const trainerPage = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const trainerRequests = trackAiCoachRequests(trainerPage);
   await installPlatformApi(trainerPage, { browserSession: true, trainerActive: true });
