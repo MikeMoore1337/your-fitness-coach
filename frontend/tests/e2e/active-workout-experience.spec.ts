@@ -3990,6 +3990,30 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
     .toBe(1);
 });
 
+test('rest timer reaches its final state from the deadline without user events', async ({
+  page,
+}) => {
+  const start = new Date('2026-09-09T12:00:00Z');
+  await page.clock.install({ time: start });
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
+  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+
+  const timer = page.getByRole('timer', { name: 'Отдых' });
+  await expect(timer).toHaveText('1:30');
+  await page.clock.runFor(90_000);
+
+  await expect(timer).toHaveCount(0);
+  await expect(page.locator('.active-workout-rest--complete')).toContainText('Отдых завершён');
+  await expect(page.locator('.active-workout-rest--complete')).not.toContainText('Отдых пропущен');
+});
+
 test.describe('#914 rest timer pointer lifecycle', () => {
   test.use({
     hasTouch: true,

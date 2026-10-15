@@ -1514,7 +1514,6 @@ export function RestTimer({
         wasBackgrounded.current = true;
         pressedPointers.current.clear();
       }
-      setNow(Date.now());
     };
     const markPageHidden = () => {
       wasBackgrounded.current = true;
@@ -1539,10 +1538,18 @@ export function RestTimer({
   }, []);
   useEffect(() => {
     if (!deadline) return;
+    let timer: number | undefined;
+    let expired = false;
     const update = () => {
+      if (timer !== undefined) {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
       const currentTime = Date.now();
       setNow(currentTime);
       if (deadline <= currentTime) {
+        if (expired) return;
+        expired = true;
         const wasHidden = wasBackgrounded.current || document.visibilityState === 'hidden';
         removeStorage(storageKey);
         setDeadline(0);
@@ -1561,13 +1568,16 @@ export function RestTimer({
         }
         wasBackgrounded.current = false;
         haptic('success');
+        return;
       }
+      // Wake at the absolute deadline so timer drift cannot leave a stale 0:00 state.
+      timer = window.setTimeout(update, Math.max(1, Math.min(1000, deadline - currentTime)));
     };
-    const timer = window.setInterval(update, 1000);
+    update();
     document.addEventListener('visibilitychange', update);
     window.addEventListener('pageshow', update);
     return () => {
-      window.clearInterval(timer);
+      if (timer !== undefined) window.clearTimeout(timer);
       document.removeEventListener('visibilitychange', update);
       window.removeEventListener('pageshow', update);
     };
