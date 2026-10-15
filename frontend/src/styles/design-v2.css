@@ -4282,8 +4282,10 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   margin-bottom: var(--v2-space-2);
   padding: 0;
   color: var(--v2-text-primary);
+  font-size: var(--font-size-body);
   font-weight: 700;
   font-family: var(--font-body);
+  line-height: var(--line-height-body);
 }
 
 .daily-wellbeing__options legend small,
@@ -4318,6 +4320,11 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   width: 18px;
   height: 18px;
   margin: 0 6px 0 0;
+  appearance: auto;
+  accent-color: var(--v2-text-secondary);
+}
+
+.daily-wellbeing__option input:checked {
   accent-color: var(--v2-lime);
 }
 
@@ -4390,8 +4397,19 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   min-width: 0;
   min-height: 44px;
   flex: 1 1 auto;
+  font-size: var(--font-size-body-lg);
+  line-height: var(--line-height-body);
   padding-inline: var(--v2-space-2);
   white-space: nowrap;
+}
+
+.daily-wellbeing__actions .ui-button--danger {
+  background: var(--danger-button);
+  color: #fff;
+}
+
+.daily-wellbeing__actions .ui-button--danger:hover:not(:disabled) {
+  background: var(--danger-hover);
 }
 
 @media (max-width: 360px) {

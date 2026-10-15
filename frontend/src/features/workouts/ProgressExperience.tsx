@@ -348,11 +348,37 @@ function ProgressCategoryNav({ search, view }: { search: string; view: ProgressV
   const { navigate } = useNavigation();
   const shouldRestoreFocus = useRef(false);
   useEffect(() => {
-    if (!shouldRestoreFocus.current) return;
-    shouldRestoreFocus.current = false;
-    document
-      .querySelector<HTMLButtonElement>('.progress-category-nav [role="tab"][aria-selected="true"]')
-      ?.focus({ preventScroll: true });
+    const selected = document.querySelector<HTMLButtonElement>(
+      '.progress-category-nav [role="tab"][aria-selected="true"]',
+    );
+    const tabs = selected?.closest<HTMLElement>('.ui-tabs');
+    if (!selected || !tabs) return;
+
+    const revealSelected = () => {
+      const viewport = tabs.getBoundingClientRect();
+      const item = selected.getBoundingClientRect();
+      if (item.left < viewport.left) tabs.scrollLeft -= viewport.left - item.left;
+      else if (item.right > viewport.right) tabs.scrollLeft += item.right - viewport.right;
+    };
+    revealSelected();
+
+    if (shouldRestoreFocus.current) {
+      shouldRestoreFocus.current = false;
+      selected.focus({ preventScroll: true });
+    }
+
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(revealSelected);
+    observer?.observe(tabs);
+    observer?.observe(selected);
+    let active = true;
+    void document.fonts?.ready.then(() => {
+      if (active) revealSelected();
+    });
+    return () => {
+      active = false;
+      observer?.disconnect();
+    };
   }, [view]);
   const categories: Array<{ label: string; value: ProgressView }> = [
     { label: 'Обзор', value: 'overview' },

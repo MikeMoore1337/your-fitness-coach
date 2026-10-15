@@ -99,6 +99,7 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  line-height: var(--line-height-tight);
 }
 .app-quick-add-panel__close {
   display: grid;
@@ -157,8 +158,9 @@
   min-width: 0;
 }
 .app-quick-add-action__copy strong {
-  font-size: 1rem;
-  font-weight: 500;
+  font-size: var(--font-size-body-lg);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
 }
 .app-quick-add-action__arrow {
   color: var(--v2-text-secondary);

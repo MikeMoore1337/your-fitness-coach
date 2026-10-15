@@ -1,0 +1,658 @@
+[
+  {
+    "theme": "dark",
+    "width": 320,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1111.77,
+          "height": 44,
+          "left": 31,
+          "right": 197.91,
+          "top": 1067.77
+        }
+      },
+      {
+        "backgroundColor": "rgb(239, 116, 116)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1111.77,
+          "height": 44,
+          "left": 201.91,
+          "right": 289,
+          "top": 1067.77
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "width": 360,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1047.77,
+          "height": 44,
+          "left": 31,
+          "right": 217.91,
+          "top": 1003.77
+        }
+      },
+      {
+        "backgroundColor": "rgb(239, 116, 116)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1047.77,
+          "height": 44,
+          "left": 221.91,
+          "right": 329,
+          "top": 1003.77
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "width": 390,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1005.42,
+          "height": 46,
+          "left": 31,
+          "right": 236.61,
+          "top": 959.42
+        }
+      },
+      {
+        "backgroundColor": "rgb(239, 116, 116)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1005.42,
+          "height": 46,
+          "left": 244.61,
+          "right": 359,
+          "top": 959.42
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "dark",
+    "width": 430,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1006.08,
+          "height": 46,
+          "left": 31,
+          "right": 256.61,
+          "top": 960.08
+        }
+      },
+      {
+        "backgroundColor": "rgb(239, 116, 116)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1006.08,
+          "height": 46,
+          "left": 264.61,
+          "right": 399,
+          "top": 960.08
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(184, 184, 184)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "width": 320,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1111.77,
+          "height": 44,
+          "left": 31,
+          "right": 197.91,
+          "top": 1067.77
+        }
+      },
+      {
+        "backgroundColor": "rgb(185, 56, 56)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1111.77,
+          "height": 44,
+          "left": 201.91,
+          "right": 289,
+          "top": 1067.77
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "width": 360,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1047.77,
+          "height": 44,
+          "left": 31,
+          "right": 217.91,
+          "top": 1003.77
+        }
+      },
+      {
+        "backgroundColor": "rgb(185, 56, 56)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1047.77,
+          "height": 44,
+          "left": 221.91,
+          "right": 329,
+          "top": 1003.77
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "width": 390,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1005.42,
+          "height": 46,
+          "left": 31,
+          "right": 236.61,
+          "top": 959.42
+        }
+      },
+      {
+        "backgroundColor": "rgb(185, 56, 56)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1005.42,
+          "height": 46,
+          "left": 244.61,
+          "right": 359,
+          "top": 959.42
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  },
+  {
+    "theme": "light",
+    "width": 430,
+    "actions": [
+      {
+        "backgroundColor": "rgb(178, 245, 32)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(9, 11, 11)",
+        "bounds": {
+          "bottom": 1006.08,
+          "height": 46,
+          "left": 31,
+          "right": 256.61,
+          "top": 960.08
+        }
+      },
+      {
+        "backgroundColor": "rgb(185, 56, 56)",
+        "borderColor": "rgba(0, 0, 0, 0)",
+        "color": "rgb(255, 255, 255)",
+        "bounds": {
+          "bottom": 1006.08,
+          "height": 46,
+          "left": 264.61,
+          "right": 399,
+          "top": 960.08
+        }
+      }
+    ],
+    "radioStyles": [
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(178, 245, 32)",
+        "appearance": "auto",
+        "checked": true
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      },
+      {
+        "accentColor": "rgb(96, 96, 96)",
+        "appearance": "auto",
+        "checked": false
+      }
+    ]
+  }
+]

@@ -76,12 +76,12 @@ function sleepDurationError(value: string): string | null {
     : 'Укажите длительность от 1 минуты до 24 часов.';
 }
 
-function minutesFromSleepHours(value: string): number | null {
+export function minutesFromSleepHours(value: string): number | null {
   if (!value.trim() || sleepDurationError(value)) return null;
   return Math.round(Number(normalizeSleepHours(value)) * 60);
 }
 
-function hoursFromMinutes(minutes: number | null | undefined): string {
+export function hoursFromMinutes(minutes: number | null | undefined): string {
   if (minutes == null) return '';
   return String(Number((minutes / 60).toFixed(2))).replace('.', ',');
 }

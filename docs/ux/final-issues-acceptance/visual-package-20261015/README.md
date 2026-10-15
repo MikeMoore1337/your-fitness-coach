@@ -1,3 +1,9 @@
+# Итоговые AFTER после замечаний владельца
+
+**Актуальные материалы:** [матрица Dark/Light, 28 новых PNG и DOM](visuals/final/README.md) · [HTML-галерея](visuals/final/gallery.html). Снимки исходного пакета оставлены как история, но не заменяют обновлённую визуальную приёмку.
+
+---
+
 # YFC — единый визуальный пакет #979/#978, 15.10.2026
 
 Единый пакет для визуальной проверки после owner feedback по [#979](https://github.com/MikeMoore1337/your-fitness-coach/issues/979) и [#978](https://github.com/MikeMoore1337/your-fitness-coach/issues/978). Основа работы — точный [origin/master `f99f1954c007567cefeec7dc882f14e68de6b0ba`](https://github.com/MikeMoore1337/your-fitness-coach/commit/f99f1954c007567cefeec7dc882f14e68de6b0ba); итоговый exact head опубликован в описании нового Draft PR.

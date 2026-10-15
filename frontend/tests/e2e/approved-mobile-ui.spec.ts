@@ -188,6 +188,12 @@ for (const width of [320, 360, 393, 430])
         .getByRole('navigation', { name: 'Разделы прогресса' })
         .getByRole('tablist');
       await expect(progressTabs).toBeVisible();
+      if (width === 393) {
+        await page.screenshot({
+          path: testInfo.outputPath(`progress-393-initial-${theme}.png`),
+          fullPage: true,
+        });
+      }
       await expect(page.getByRole('button', { name: 'Предыдущие разделы прогресса' })).toHaveCount(
         0,
       );
@@ -207,6 +213,56 @@ for (const width of [320, 360, 393, 430])
       await history.click();
       await expect(page).toHaveURL(/progress_view=history/);
       await expect(history).toHaveAttribute('aria-selected', 'true');
+      if (width === 393) {
+        const historyViewport = await progressTabs.evaluate((element) => {
+          const selected = element.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]');
+          const container = element.getBoundingClientRect();
+          const tab = selected?.getBoundingClientRect();
+          return {
+            clientWidth: element.clientWidth,
+            scrollLeft: element.scrollLeft,
+            scrollWidth: element.scrollWidth,
+            container: { left: container.left, right: container.right },
+            selected: tab ? { left: tab.left, right: tab.right } : null,
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+          };
+        });
+        expect(historyViewport.scrollWidth).toBeGreaterThan(historyViewport.clientWidth);
+        expect(historyViewport.scrollLeft).toBeGreaterThan(0);
+        expect(historyViewport.selected).not.toBeNull();
+        expect(historyViewport.selected!.left).toBeGreaterThanOrEqual(
+          historyViewport.container.left - 1,
+        );
+        expect(historyViewport.selected!.right).toBeLessThanOrEqual(
+          historyViewport.container.right + 1,
+        );
+        expect(historyViewport.documentWidth).toBeLessThanOrEqual(historyViewport.viewportWidth);
+        await expectNoHorizontalOverflow(page);
+        await page.screenshot({
+          path: testInfo.outputPath(`progress-393-history-${theme}.png`),
+          fullPage: true,
+        });
+        await page.reload();
+        await expect(history).toHaveAttribute('aria-selected', 'true');
+        await expect
+          .poll(async () =>
+            progressTabs.evaluate((element) => {
+              const selected = element.querySelector<HTMLElement>(
+                '[role="tab"][aria-selected="true"]',
+              );
+              if (!selected) return false;
+              const viewport = element.getBoundingClientRect();
+              const item = selected.getBoundingClientRect();
+              return item.left >= viewport.left - 1 && item.right <= viewport.right + 1;
+            }),
+          )
+          .toBe(true);
+        await page.screenshot({
+          path: testInfo.outputPath(`progress-393-history-direct-${theme}.png`),
+          fullPage: true,
+        });
+      }
       await page.getByRole('link', { name: 'Скачать отчёт' }).click();
       await expect(
         page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),

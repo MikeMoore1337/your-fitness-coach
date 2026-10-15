@@ -2,7 +2,11 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DailyWellbeingCheckIn } from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
+import {
+  DailyWellbeingCheckIn,
+  hoursFromMinutes,
+  minutesFromSleepHours,
+} from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
 import type {
   DailyWellbeingCheckIn as DailyWellbeingRecord,
   DailyWellbeingSave,
@@ -91,6 +95,13 @@ describe('DailyWellbeingCheckIn', () => {
   });
 
   afterEach(cleanup);
+
+  it('round-trips every whole sleep duration minute through the Russian hour field', () => {
+    for (let minutes = 1; minutes <= 1440; minutes += 1) {
+      const hours = hoursFromMinutes(minutes);
+      expect(minutesFromSleepHours(hours)).toBe(minutes);
+    }
+  });
 
   it('exposes a compact entry point on Today before the first check-in', async () => {
     const user = userEvent.setup();
