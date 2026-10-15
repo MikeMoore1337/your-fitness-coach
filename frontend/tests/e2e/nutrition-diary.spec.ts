@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { PNG } from './fixtures/landing-pixels';
 import type {
@@ -2422,6 +2422,142 @@ test('nutrition diary is responsive, keyboard-safe and supports local quick add'
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeAttached();
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 390, 393, 430]) {
+    test(`Quick Add geometry ${theme} ${width}px`, async ({ page }, testInfo) => {
+      await mockNutritionApi(page);
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((selectedTheme) => {
+        localStorage.setItem('app-theme', selectedTheme);
+      }, theme);
+      await page.setViewportSize({ width, height: 844 });
+      await page.goto('/app?section=nutrition');
+      await page.getByRole('button', { name: /Быстрый ввод/ }).click();
+      const calories = page.getByRole('spinbutton', { name: 'Калории' });
+      const time = page.getByLabel('Время (необязательно)');
+      await expect(calories).toBeVisible();
+      await expect(time).toBeVisible();
+
+      for (const state of ['empty', 'filled', 'keyboard-safe-area-long-label'] as const) {
+        if (state === 'empty') {
+          await expect(calories).toHaveValue('');
+          await expect(time).toHaveValue('');
+          await calories.focus();
+        } else {
+          await calories.fill('512.5');
+          await time.fill('23:59');
+          await expect(time).toHaveAttribute('type', 'time');
+          if (state === 'keyboard-safe-area-long-label') {
+            await page.evaluate(() => {
+              const root = document.documentElement;
+              root.style.setProperty('--yfc-layout-safe-left', '24px');
+              root.style.setProperty('--yfc-layout-safe-right', '24px');
+              root.style.setProperty('--yfc-layout-safe-bottom', '20px');
+              document.querySelector('label[for="nutrition-quick-time"]')!.textContent =
+                'Время (необязательно) — можно заполнить позднее';
+            });
+            await page.setViewportSize({ width, height: 420 });
+          }
+          await time.focus();
+          await time.scrollIntoViewIfNeeded();
+          await expect(time).toBeFocused();
+          await expect(calories).toHaveValue('512.5');
+          await expect(time).toHaveValue('23:59');
+        }
+        const geometry = await page.evaluate(() => {
+          const measure = (selector: string) => {
+            const node = document.querySelector<HTMLElement>(selector);
+            if (!node) throw new Error(`Quick Add geometry node missing: ${selector}`);
+            const rect = node.getBoundingClientRect();
+            const style = getComputedStyle(node);
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+              width: rect.width,
+              height: rect.height,
+              scrollWidth: node.scrollWidth,
+              clientWidth: node.clientWidth,
+              boxShadow: style.boxShadow,
+              outlineStyle: style.outlineStyle,
+            };
+          };
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            colorScheme: document.documentElement.dataset.colorScheme,
+            keyboard: document.documentElement.dataset.yfcKeyboard,
+            safeLeft: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-left')
+              .trim(),
+            safeRight: getComputedStyle(document.documentElement)
+              .getPropertyValue('--yfc-layout-safe-right')
+              .trim(),
+            page: {
+              scrollWidth: document.documentElement.scrollWidth,
+              clientWidth: document.documentElement.clientWidth,
+            },
+            calories: measure('#nutrition-quick-calories'),
+            time: measure('.nutrition-quick-add__primary-fields .time-control'),
+            nativeTime: measure('#nutrition-quick-time'),
+            timeLabel: measure('label[for="nutrition-quick-time"]'),
+            body: measure('.nutrition-quick-add'),
+          };
+        });
+        await page.screenshot({
+          path: testInfo.outputPath(`quick-add-${state}.png`),
+          animations: 'disabled',
+        });
+        const geometryPath = testInfo.outputPath(`geometry-${state}.json`);
+        await writeFile(
+          geometryPath,
+          JSON.stringify(
+            { browser: testInfo.project.name, theme, width, state, ...geometry },
+            null,
+            2,
+          ),
+        );
+        await testInfo.attach(`geometry-${state}.json`, {
+          path: geometryPath,
+          contentType: 'application/json',
+        });
+
+        expect.soft(geometry.page.scrollWidth).toBeLessThanOrEqual(geometry.page.clientWidth + 1);
+        expect.soft(geometry.colorScheme).toBe(theme);
+        expect.soft(geometry.body.scrollWidth).toBeLessThanOrEqual(geometry.body.clientWidth + 1);
+        for (const control of [geometry.calories, geometry.time, geometry.nativeTime]) {
+          expect.soft(control.left).toBeGreaterThanOrEqual(geometry.body.left + 4);
+          expect.soft(control.right).toBeLessThanOrEqual(geometry.body.right - 4);
+          expect.soft(control.scrollWidth).toBeLessThanOrEqual(control.clientWidth + 1);
+          expect.soft(control.height).toBeGreaterThanOrEqual(44);
+        }
+        expect
+          .soft(Math.abs(geometry.calories.height - geometry.time.height))
+          .toBeLessThanOrEqual(1);
+        expect.soft(Math.abs(geometry.calories.width - geometry.time.width)).toBeLessThanOrEqual(1);
+        if (width > 380) {
+          expect
+            .soft(Math.abs(geometry.calories.bottom - geometry.time.bottom))
+            .toBeLessThanOrEqual(1);
+        }
+        expect.soft(geometry.timeLabel.right).toBeLessThanOrEqual(geometry.body.right - 4);
+        if (state !== 'empty') {
+          expect.soft(geometry.time.boxShadow).not.toBe('none');
+          expect.soft(geometry.time.top).toBeGreaterThanOrEqual(geometry.body.top + 4);
+          expect.soft(geometry.time.bottom).toBeLessThanOrEqual(geometry.body.bottom - 4);
+          if (state === 'keyboard-safe-area-long-label') {
+            expect.soft(geometry.keyboard).toBe('visible');
+            expect.soft(geometry.safeLeft).toBe('24px');
+            expect.soft(geometry.safeRight).toBe('24px');
+          }
+        } else {
+          expect.soft(geometry.calories.outlineStyle).not.toBe('none');
+        }
+      }
+    });
+  }
+}
 
 test('dark nutrition uses the shared lime status and progress accents', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('app-theme', 'dark'));
