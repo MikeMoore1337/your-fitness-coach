@@ -61,6 +61,10 @@ visual redesigns.
   Mobile primary navigation uses the shared full-pill radius at every breakpoint and the existing
   frosted matte Liquid Glass material/fallback contract based on the rest timer, not the Landing
   header's transparency; never introduce a page-local selected-state system.
+- Local horizontal section navigation uses the shared `SegmentedControl` when the choices are
+  peer destinations, with no directional arrow/chevron controls. Functional glyphs come from
+  `Icon`/its shared adapters; CSS-drawn or Unicode glyphs are not substitutes. New text and data
+  roles reuse the shared typography tokens, with tabular numerals for measurable values.
 
 ## Owner-gated visual delivery
 

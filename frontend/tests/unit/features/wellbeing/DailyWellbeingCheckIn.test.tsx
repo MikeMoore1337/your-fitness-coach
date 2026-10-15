@@ -2,7 +2,11 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DailyWellbeingCheckIn } from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
+import {
+  DailyWellbeingCheckIn,
+  hoursFromMinutes,
+  minutesFromSleepHours,
+} from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
 import type {
   DailyWellbeingCheckIn as DailyWellbeingRecord,
   DailyWellbeingSave,
@@ -92,6 +96,13 @@ describe('DailyWellbeingCheckIn', () => {
 
   afterEach(cleanup);
 
+  it('round-trips every whole sleep duration minute through the Russian hour field', () => {
+    for (let minutes = 1; minutes <= 1440; minutes += 1) {
+      const hours = hoursFromMinutes(minutes);
+      expect(minutesFromSleepHours(hours)).toBe(minutes);
+    }
+  });
+
   it('exposes a compact entry point on Today before the first check-in', async () => {
     const user = userEvent.setup();
     renderCheckIn();
@@ -163,11 +174,26 @@ describe('DailyWellbeingCheckIn', () => {
     expect(screen.queryByText('Личная заметка')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Изменить' }));
+    const duration = screen.getByRole('textbox', { name: 'Сколько спали, часов' });
+    expect(duration).toHaveValue('7');
+    await user.clear(duration);
+    await user.type(duration, '7,5');
     await user.click(screen.getAllByRole('radio', { name: 'Отлично' })[1]!);
     await user.click(screen.getByRole('button', { name: 'Сохранить отметку' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/check-ins/daily/2026-09-01',
+        expect.objectContaining({
+          method: 'PUT',
+          body: expect.objectContaining({ sleep_duration_minutes: 450 }),
+        }),
+      ),
+    );
     await waitFor(() => expect(feedbackMock.toast).toHaveBeenCalledWith('Отметка сохранена'));
 
+    expect(await screen.findByText(/7,5 ч/)).toBeVisible();
     await user.click(await screen.findByRole('button', { name: 'Изменить' }));
+    expect(screen.getByRole('textbox', { name: 'Сколько спали, часов' })).toHaveValue('7,5');
     await user.click(screen.getByRole('button', { name: 'Удалить' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/check-ins/daily/2026-09-01', {
@@ -176,5 +202,23 @@ describe('DailyWellbeingCheckIn', () => {
     );
     expect(await screen.findByRole('button', { name: 'Сохранить отметку' })).toBeVisible();
     expect(feedbackMock.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('validates sleep hours without sending an invalid minute payload', async () => {
+    const user = userEvent.setup();
+    renderCheckIn(true);
+
+    await screen.findByRole('heading', { name: 'Сон и настроение' });
+    await user.click(screen.getAllByRole('radio', { name: 'Хорошо' })[0]!);
+    const duration = screen.getByRole('textbox', { name: 'Сколько спали, часов' });
+    await user.type(duration, '25');
+
+    expect(duration).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('от 1 минуты до 24 часов');
+    expect(screen.getByRole('button', { name: 'Сохранить отметку' })).toBeDisabled();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      '/api/v1/check-ins/daily/2026-09-01',
+      expect.objectContaining({ method: 'PUT' }),
+    );
   });
 });
