@@ -398,7 +398,12 @@ describe('ProgressExperience', () => {
 
     expect(await screen.findByRole('heading', { name: 'Что изменилось' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeVisible();
-    expect(screen.getAllByRole('link', { name: /Тренировки/ })).toHaveLength(2);
+    expect(screen.getByRole('navigation', { name: 'Разделы прогресса' })).toBeVisible();
+    expect(
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: 'Тренировки',
+      }),
+    ).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Замеры и приоритеты' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Питание' })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Соблюдение плана' })).not.toBeInTheDocument();
@@ -419,7 +424,7 @@ describe('ProgressExperience', () => {
     expect(screen.getByRole('img', { name: /Вес: 2 янв. — 69,4 кг/ })).toBeVisible();
 
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
         name: /^Тренировки/,
       }),
     );
@@ -593,7 +598,7 @@ describe('ProgressExperience', () => {
     expect(screen.queryByText('Нет подтверждённых дней питания')).not.toBeInTheDocument();
 
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
         name: /^Тело/,
       }),
     );
@@ -605,7 +610,7 @@ describe('ProgressExperience', () => {
     expect(screen.getByText(/1 замер/)).toBeVisible();
 
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
         name: /^Питание/,
       }),
     );

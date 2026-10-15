@@ -981,10 +981,12 @@ export function TodayDashboard({
   initialWellbeingDate,
   initialWellbeingOpen = false,
   initialCardioOpen = false,
+  onWellbeingExit,
 }: {
   initialWellbeingDate?: string;
   initialWellbeingOpen?: boolean;
   initialCardioOpen?: boolean;
+  onWellbeingExit?: () => void;
 } = {}) {
   const { user } = useAuth();
   const capabilities = useRuntimeCapabilities();
@@ -1466,6 +1468,7 @@ export function TodayDashboard({
                   key={`${user.id}:${initialWellbeingDate || selectedDate}:${
                     initialWellbeingOpen ? 'open' : 'closed'
                   }`}
+                  onExit={initialWellbeingOpen ? onWellbeingExit : undefined}
                   timeZone={timeZone}
                   userId={user.id}
                 />

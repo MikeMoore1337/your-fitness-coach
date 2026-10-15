@@ -11,21 +11,56 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Button, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
 import { useAuth } from '../../app/AuthProvider';
 import { dateInputValue, detectedTimeZone, formatCalendarDate } from '../../shared/dateTime';
-import { usePersistentState } from '../../shared/storage';
+import { usePersistentState, writeStorage } from '../../shared/storage';
 import { measurementDraftStorageKey } from '../../shared/userScopedStorage';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { invalidateMeasurementMutation, queryKeys } from '../../shared/queryKeys';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
+import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+
+const measurementFields = [
+  'weight_kg',
+  'chest_cm',
+  'waist_cm',
+  'hips_cm',
+  'biceps_cm',
+  'thigh_cm',
+] as const;
+
+function hasMeasurementValues(form: BodyMeasurementSave): boolean {
+  return (
+    measurementFields.some((key) => form[key] != null) ||
+    Boolean(form.note?.trim()) ||
+    Boolean(form.custom_values?.some((value) => value.value != null))
+  );
+}
+
+function matchesMeasurement(form: BodyMeasurementSave, record: BodyMeasurement): boolean {
+  const customValues = (form.custom_values ?? []).filter((value) => value.value != null);
+  return (
+    form.measured_on === record.measured_on &&
+    measurementFields.every((key) => (form[key] ?? null) === (record[key] ?? null)) &&
+    (form.note?.trim() || '') === (record.note?.trim() || '') &&
+    customValues.length === (record.custom_values ?? []).length &&
+    customValues.every((value) =>
+      record.custom_values?.some(
+        (saved) => saved.definition_id === value.definition_id && saved.value === value.value,
+      ),
+    )
+  );
+}
 
 export function Diary({
   clientId,
   timeZone: clientTimeZone,
+  onExit,
   onSaved,
   embedded = false,
   readOnly = false,
 }: {
   clientId?: number;
   timeZone?: string | null;
+  onExit?: () => void;
   onSaved?: () => void | Promise<void>;
   embedded?: boolean;
   readOnly?: boolean;
@@ -35,15 +70,17 @@ export function Diary({
   const { toast, confirm } = useFeedback();
   const formRef = useRef<HTMLFormElement>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [editingDate, setEditingDate] = useState<string | null>(null);
   const timeZone = clientId
     ? clientTimeZone || detectedTimeZone()
     : user?.profile?.timezone || detectedTimeZone();
   const today = dateInputValue(new Date(), timeZone);
-  const [form, setForm, clearDraft] = usePersistentState<BodyMeasurementSave>(
-    measurementDraftStorageKey(clientId ? `client_${clientId}` : `user_${user?.id ?? 'me'}`),
-    { measured_on: dateInputValue(new Date(), timeZone) },
+  const draftKey = measurementDraftStorageKey(
+    clientId ? `client_${clientId}` : `user_${user?.id ?? 'me'}`,
   );
+  const [form, setForm, clearDraft] = usePersistentState<
+    BodyMeasurementSave & { editingDate?: string }
+  >(draftKey, { measured_on: dateInputValue(new Date(), timeZone) });
+  const { editingDate, ...measurement } = form;
   const base = clientId
     ? `/api/v1/coach/clients/${clientId}/measurements`
     : '/api/v1/workouts/diary';
@@ -78,8 +115,9 @@ export function Diary({
       if (activeElement instanceof HTMLElement && formRef.current?.contains(activeElement)) {
         activeElement.blur();
       }
-      setEditingDate(null);
-      clearDraft({ measured_on: today });
+      if (variables.method === 'POST' || variables.path === `${base}/${editingMeasurement?.id}`) {
+        clearDraft({ measured_on: today });
+      }
       await invalidateMeasurementMutation(queryClient, clientId);
       await onSaved?.();
       toast('Дневник обновлён');
@@ -103,14 +141,7 @@ export function Diary({
     },
     onError: (reason) => toast((reason as Error).message, 'error'),
   });
-  const numeric = [
-    'weight_kg',
-    'chest_cm',
-    'waist_cm',
-    'hips_cm',
-    'biceps_cm',
-    'thigh_cm',
-  ] as const;
+  const numeric = measurementFields;
   const numericLimits: Record<(typeof numeric)[number], { min: number; max: number }> = {
     weight_kg: { min: 20, max: 350 },
     chest_cm: { min: 0.1, max: 300 },
@@ -120,15 +151,66 @@ export function Diary({
     thigh_cm: { min: 0.1, max: 200 },
   };
   const editingMeasurement = rows.data?.find((item) => item.measured_on === editingDate);
-  const resetForm = () => {
+  const isDirty = editingMeasurement
+    ? !matchesMeasurement(form, editingMeasurement)
+    : hasMeasurementValues(form);
+  const resetForm = async () => {
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Отменить изменения?',
+        message: 'Введённые значения не будут записаны в историю.',
+        confirmText: 'Отменить изменения',
+      }))
+    ) {
+      return;
+    }
     setSubmitError(null);
-    setEditingDate(null);
     clearDraft({ measured_on: today });
   };
-  const editMeasurement = (item: BodyMeasurement) => {
+  const leaveQuickForm = async () => {
+    if (mutation.isPending || definitionMutation.isPending) return;
+    const draftSaved = writeStorage(draftKey, form);
+    const unsavedDefinition =
+      editingDefinitionId == null
+        ? Boolean(definitionLabel.trim())
+        : definitionLabel.trim() !==
+          definitions.data?.find((item) => item.id === editingDefinitionId)?.label;
+    if (
+      (isDirty || unsavedDefinition) &&
+      !(await confirm({
+        title: 'Вернуться без сохранения?',
+        message: [
+          draftSaved
+            ? 'Значения замера останутся в черновике на этом устройстве и не попадут в историю.'
+            : 'Не удалось сохранить черновик на устройстве. Введённые значения будут потеряны.',
+          unsavedDefinition ? 'Несохранённое название показателя будет потеряно.' : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        confirmText: 'Вернуться',
+        danger: false,
+      }))
+    ) {
+      return;
+    }
+    onExit?.();
+  };
+  useTelegramOverlayBackButton(Boolean(onExit), () => void leaveQuickForm());
+  const editMeasurement = async (item: BodyMeasurement) => {
+    if (
+      isDirty &&
+      !(await confirm({
+        title: 'Открыть другой замер?',
+        message: 'Несохранённые значения текущего замера будут потеряны.',
+        confirmText: 'Открыть замер',
+      }))
+    ) {
+      return;
+    }
     setSubmitError(null);
-    setEditingDate(item.measured_on);
     setForm({
+      editingDate: item.measured_on,
       measured_on: item.measured_on,
       weight_kg: item.weight_kg,
       chest_cm: item.chest_cm,
@@ -185,8 +267,23 @@ export function Diary({
           </p>
         </div>
         {editingMeasurement && (
-          <Button type="button" variant="secondary" disabled={readOnly} onClick={resetForm}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={readOnly || mutation.isPending}
+            onClick={() => void resetForm()}
+          >
             Отменить изменение
+          </Button>
+        )}
+        {onExit && (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={mutation.isPending || definitionMutation.isPending}
+            onClick={() => void leaveQuickForm()}
+          >
+            Вернуться
           </Button>
         )}
       </header>
@@ -195,14 +292,15 @@ export function Diary({
           Изменение замеров доступно после входа. Здесь показаны только подготовленные данные.
         </p>
       )}
-      <fieldset className="demo-capability-fieldset" disabled={readOnly}>
+      <fieldset className="demo-capability-fieldset" disabled={readOnly || mutation.isPending}>
         <form
           ref={formRef}
           className="stack measurement-diary__form"
           aria-busy={mutation.isPending}
           onSubmit={(e) => {
             e.preventDefault();
-            mutation.mutate({ path: base, method: 'POST', body: form });
+            if (mutation.isPending) return;
+            mutation.mutate({ path: base, method: 'POST', body: measurement });
           }}
         >
           <div className="form-grid diary-form-grid">
@@ -480,7 +578,11 @@ export function Diary({
                   {item.note && <p className="measurement-history__note">{item.note}</p>}
                 </div>
                 <div className="measurement-history__actions">
-                  <Button type="button" variant="secondary" onClick={() => editMeasurement(item)}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => void editMeasurement(item)}
+                  >
                     Изменить
                   </Button>
                   <Button
@@ -490,11 +592,11 @@ export function Diary({
                       if (
                         await confirm({
                           title: 'Удалить замер?',
-                          message: formatCalendarDate(item.measured_on, {
+                          message: `${formatCalendarDate(item.measured_on, {
                             day: 'numeric',
                             month: 'long',
                             year: 'numeric',
-                          }),
+                          })}.${editingDate === item.measured_on && isDirty ? ' Несохранённые изменения этого замера также будут удалены.' : ''}`,
                           confirmText: 'Удалить',
                         })
                       )
