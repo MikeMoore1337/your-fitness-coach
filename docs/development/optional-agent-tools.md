@@ -87,10 +87,44 @@ codex mcp list
 
 На Windows Codex Desktop установлен плагин версии 0.5.0 (15.10.2026); это локальная проверка,
 не обещание доступности на других машинах и не гарантия работы инструментов в существующем чате.
-Перезапустите чат Codex Desktop или создайте новый после установки. Для проверки откройте YFC
-в Codex, попросите **найти публичный компонент таблицы/фильтра** и выдать ссылки и
-обезличенный обзор исходного кода **без установки**. Результат `PASS` только после
-фактического вызова инструмента из нового чата и проверки ответа.
+
+### Фактическая проверка 15.10.2026
+
+Статус MCP и авторизации: `PASS`. Из нового чата Codex Desktop фактически выполнены только
+публичные metadata-проверки:
+
+- `mcp__21st__get_usage`: `tier=free`, `aiGenerationEnabled=false`,
+  `freeRetrievalsRemaining=2/2`, `credits.balance=0`;
+- `mcp__21st__search`: получены результаты для обезличенных запросов про data table,
+  filter table и coach dashboard;
+- `get_component`, установка, генерация, публикация и платные действия не выполнялись,
+  поэтому бесплатные загрузки исходного кода не расходовалиcь.
+
+Исходный код YFC, приватные материалы, пользовательские данные, реальные скриншоты/логи,
+секреты и production URL в MCP не передавались. `PASS` означает доступность MCP и
+успешную авторизацию, а не разрешение на внедрение компонентов.
+
+### Результат сравнения
+
+- [Data Table (27049)](https://21st.dev/@arihantcodes_1f7b8c4d/components/data-table):
+  публичный registry/source family [Spectrum UI](https://github.com/arihantcodes/spectrum-ui),
+  лицензия Apache-2.0 подтверждена файлом [LICENSE](https://github.com/arihantcodes/spectrum-ui/blob/main/LICENSE);
+  registry-пакет заявляет `motion`. YFC уже имеет поиск, фильтр, шесть семантических колонок,
+  ограниченный запрос и desktop/mobile E2E; прямое подключение добавило бы зависимость и
+  дублирование поведения.
+- [Flexi Filter Table (7466)](https://21st.dev/@ruixen.ui/components/flexi-filter-table):
+  публичный registry/source [Ruixen UI](https://github.com/ruixenui/ruixen.com), лицензия MIT
+  подтверждена [LICENSE.md](https://github.com/ruixenui/ruixen.com/blob/main/LICENSE.md);
+  registry-пакет заявляет `motion` и glass/sound-oriented interaction. Для YFC это
+  избыточно относительно существующих фильтров Coach OS и расходится с токенами,
+  русской локализацией, accessibility и performance-контрактами.
+
+Решение: сейчас не внедрять ни один компонент и не добавлять зависимости. Если появится
+подтверждённая потребность в сортировке колонок, bulk selection или server-side pagination,
+сначала показать owner два локальных прототипа на синтетических данных: (A) эволюция
+текущей семантической таблицы с существующими `Input`/`Select`/`SegmentedControl`;
+(B) узкая toolbar-идея, вдохновлённая каталогом, без копирования кода и стилей. Реализация
+возможна только после отдельного visual approval и acceptance-тестов.
 
 Правила для задач YFC:
 
@@ -118,6 +152,6 @@ codex mcp list
 - Playwright CLI: documented opt-in установка на компьютер; в CI и на VPS не устанавливался.
 - Strix: только протокол пилота, не запущен.
 - Supabase: без изменений.
-- 21st.dev: host-level Codex plugin/MCP активирован на одном ПК; проверка реального поиска в новом чате пока не выполнена.
+- 21st.dev: host-level Codex plugin/MCP активирован на одном ПК; публичный metadata-поиск из нового чата выполнен 15.10.2026 (`PASS`); `get_component` и установка не выполнялись.
 
 Откат: удалить `[mcp_servers.context7]` из `.codex/config.toml` (или отключить MCP в локальном Codex); при необходимости удалить глобально установленный Playwright CLI и внешний skill из пользовательского профиля. Эти действия не должны менять runtime/базу данных YFC.
