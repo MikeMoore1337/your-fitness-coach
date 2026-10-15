@@ -77,8 +77,9 @@ BEFORE снят в отдельном чистом worktree от `origin/master`
 
 ## Финальный пакет реализации PR #1013
 
-После утверждения композиции снят отдельный финальный пакет реального AFTER:
-[implementation-after-20261015](implementation-after-20261015/README.md). Он содержит 144
+После исправления desktop native date inputs снят единый обновлённый пакет реального AFTER:
+[implementation-after-20261016](implementation-after-20261016/README.md). Он содержит 144
 кадра Chromium/WebKit для обеих тем, всех требуемых ширин и четырёх сочетаний состояний,
-включая заполненную форму «Свой период» и проверку полной видимости дат. Merge, deploy и
-закрытие Issue по-прежнему не выполнялись; visual acceptance остаётся отдельным owner gate.
+включая заполненную форму «Свой период» и полную визуальную доступность обеих дат. Merge,
+deploy и закрытие Issue по-прежнему не выполнялись; visual acceptance остаётся отдельным owner
+gate.

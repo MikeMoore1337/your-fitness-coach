@@ -3656,6 +3656,12 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   padding-block: var(--v2-space-2) 0;
 }
 
+@media (min-width: 1361px) {
+  .app-section--progress .progress-experience--bento .progress-hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, min(704px, 61%));
+  }
+}
+
 .app-section--progress .progress-hero__heading {
   display: grid;
   grid-area: heading;
@@ -3682,6 +3688,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-hero__period {
   grid-area: period;
+  container-type: inline-size;
 }
 
 .app-section--progress .progress-hero__help {
@@ -3782,6 +3789,14 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   line-height: 1.2;
 }
 
+@media (min-width: 681px) {
+  .app-section--progress .progress-period-controls .ui-tab {
+    min-width: max-content;
+    padding-inline: var(--v2-space-2);
+    white-space: nowrap;
+  }
+}
+
 .app-section--progress .progress-period-controls__meta {
   display: flex;
   flex-wrap: wrap;
@@ -3801,7 +3816,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
 .app-section--progress .progress-period-controls__custom {
   display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr)) auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: end;
   gap: var(--v2-space-2);
   padding: var(--v2-space-3);
@@ -3838,15 +3853,16 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
+  grid-column: 1 / -1;
 }
 
-@media (min-width: 768px) and (max-width: 1360px) {
+@container (min-width: 704px) {
   .app-section--progress .progress-period-controls__custom {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(180px, 1fr)) max-content;
   }
 
   .app-section--progress .progress-period-controls__custom-actions {
-    grid-column: 1 / -1;
+    grid-column: auto;
   }
 }
 

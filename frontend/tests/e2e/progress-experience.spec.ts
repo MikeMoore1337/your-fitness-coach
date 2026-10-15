@@ -1,6 +1,7 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
 
@@ -44,6 +45,203 @@ const ISSUE_970_AFTER_DIR = resolve(
   '970-report-mobile-20261013',
   'after',
 );
+
+type DateVisualMetrics = {
+  contentWidth: number;
+  expectedTextWidth: number;
+  inputWidth: number;
+  inkLeft: number | null;
+  inkRight: number | null;
+  inkWidth: number;
+  textRegionRight: number;
+};
+
+type DecodedPng = { data: Uint8Array; height: number; width: number };
+
+function decodePng(buffer: Buffer): DecodedPng {
+  if (buffer.readUInt32BE(0) !== 0x89504e47 || buffer.readUInt32BE(4) !== 0x0d0a1a0a) {
+    throw new Error('Date visual regression expected a PNG screenshot');
+  }
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  let interlaceMethod = 0;
+  const imageData: Buffer[] = [];
+  for (let offset = 8; offset < buffer.length;) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (type === 'IHDR') {
+      width = buffer.readUInt32BE(dataStart);
+      height = buffer.readUInt32BE(dataStart + 4);
+      bitDepth = buffer[dataStart + 8]!;
+      colorType = buffer[dataStart + 9]!;
+      interlaceMethod = buffer[dataStart + 12]!;
+    } else if (type === 'IDAT') {
+      imageData.push(buffer.subarray(dataStart, dataEnd));
+    }
+    offset = dataEnd + 4;
+  }
+  if (bitDepth !== 8 || interlaceMethod !== 0 || ![2, 6].includes(colorType)) {
+    throw new Error(
+      `Unsupported date screenshot PNG format: ${bitDepth}/${colorType}/${interlaceMethod}`,
+    );
+  }
+  const channels = colorType === 6 ? 4 : 3;
+  const bytesPerRow = width * channels;
+  const raw = inflateSync(Buffer.concat(imageData));
+  const pixels = new Uint8Array(width * height * 4);
+  const previous = new Uint8Array(bytesPerRow);
+  const current = new Uint8Array(bytesPerRow);
+  let rawOffset = 0;
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[rawOffset++]!;
+    for (let index = 0; index < bytesPerRow; index += 1) {
+      const left = index >= channels ? current[index - channels]! : 0;
+      const above = previous[index]!;
+      const upperLeft = index >= channels ? previous[index - channels]! : 0;
+      const source = raw[rawOffset++]!;
+      const predictor =
+        filter === 1
+          ? left
+          : filter === 2
+            ? above
+            : filter === 3
+              ? Math.floor((left + above) / 2)
+              : filter === 4
+                ? paethPredictor(left, above, upperLeft)
+                : 0;
+      if (![0, 1, 2, 3, 4].includes(filter)) {
+        throw new Error(`Unsupported PNG row filter: ${filter}`);
+      }
+      current[index] = (source + predictor) & 0xff;
+    }
+    for (let x = 0; x < width; x += 1) {
+      const source = x * channels;
+      const destination = (y * width + x) * 4;
+      pixels[destination] = current[source]!;
+      pixels[destination + 1] = current[source + 1]!;
+      pixels[destination + 2] = current[source + 2]!;
+      pixels[destination + 3] = channels === 4 ? current[source + 3]! : 255;
+    }
+    previous.set(current);
+    current.fill(0);
+  }
+  return { data: pixels, height, width };
+}
+
+function paethPredictor(left: number, above: number, upperLeft: number): number {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+  if (aboveDistance <= upperLeftDistance) return above;
+  return upperLeft;
+}
+
+type DateLayoutMetrics = {
+  contentWidth: number;
+  expectedTextWidth: number;
+  inputWidth: number;
+  paddingLeft: number;
+  paddingRight: number;
+};
+
+function analyzeDateScreenshots(
+  filledBuffer: Buffer,
+  blankBuffer: Buffer,
+  layout: DateLayoutMetrics,
+): DateVisualMetrics {
+  const filled = decodePng(filledBuffer);
+  const blank = decodePng(blankBuffer);
+  const scale = filled.width / Math.max(layout.inputWidth, 1);
+  const textRegionRight = Math.floor(filled.width - Math.max(42, layout.paddingRight) * scale);
+  const textRegionLeft = Math.max(4, Math.floor(layout.paddingLeft * scale - 2));
+  const changedColumns = new Uint8Array(filled.width);
+  const width = Math.min(filled.width, blank.width);
+  const height = Math.min(filled.height, blank.height);
+  for (let y = 6; y < height - 6; y += 1) {
+    for (let x = textRegionLeft; x < Math.min(textRegionRight, width); x += 1) {
+      const index = (y * width + x) * 4;
+      const difference =
+        Math.abs(filled.data[index]! - blank.data[index]!) +
+        Math.abs(filled.data[index + 1]! - blank.data[index + 1]!) +
+        Math.abs(filled.data[index + 2]! - blank.data[index + 2]!);
+      if (difference >= 32) changedColumns[x] = 1;
+    }
+  }
+  const changed = Array.from(changedColumns.entries())
+    .filter(([, value]) => value === 1)
+    .map(([column]) => column);
+  return {
+    contentWidth: layout.contentWidth,
+    expectedTextWidth: layout.expectedTextWidth,
+    inputWidth: layout.inputWidth,
+    inkLeft: changed.length ? changed[0]! / scale : null,
+    inkRight: changed.length ? changed[changed.length - 1]! / scale : null,
+    inkWidth: changed.length ? (changed[changed.length - 1]! - changed[0]! + 1) / scale : 0,
+    textRegionRight: textRegionRight / scale,
+  };
+}
+
+async function inspectDateVisual(
+  page: Page,
+  input: Locator,
+  value: string,
+  focused: boolean,
+): Promise<DateVisualMetrics> {
+  const setFocusState = async () => {
+    if (focused) {
+      await input.focus();
+      return;
+    }
+    await page.evaluate(() => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement) active.blur();
+    });
+  };
+
+  const capture = async (nextValue: string) => {
+    await input.fill(nextValue);
+    await expect(input).toHaveValue(nextValue);
+    await setFocusState();
+    return input.screenshot({ animations: 'disabled' });
+  };
+
+  const filled = await capture(value);
+  const blank = await capture('');
+  await input.fill(value);
+  await expect(input).toHaveValue(value);
+  await setFocusState();
+  const id = await input.getAttribute('id');
+  if (!id) throw new Error('Date input must have an id for visual regression');
+  const layout = await page.locator(`#${id}`).evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const style = getComputedStyle(input);
+    const rect = input.getBoundingClientRect();
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas is unavailable for font measurement');
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    return {
+      contentWidth:
+        input.clientWidth -
+        (Number.parseFloat(style.paddingLeft) || 0) -
+        (Number.parseFloat(style.paddingRight) || 0),
+      expectedTextWidth: Math.max(
+        context.measureText('01.01.2025').width,
+        context.measureText('2025-01-01').width,
+      ),
+      inputWidth: rect.width,
+      paddingLeft: Number.parseFloat(style.paddingLeft) || 0,
+      paddingRight: Number.parseFloat(style.paddingRight) || 0,
+    };
+  });
+  return analyzeDateScreenshots(filled, blank, layout);
+}
 
 function shiftDate(value: string, days: number): string {
   const date = new Date(`${value}T12:00:00Z`);
@@ -2135,6 +2333,24 @@ test('progress header keeps expanded help and custom period in normal flow', asy
           summaryBox!.bottom,
           `${theme} ${width}px ${state}: ${JSON.stringify(geometry)}`,
         ).toBeGreaterThan(headingBox!.top);
+        if (width >= 1280) {
+          const customTabText = await customTab.evaluate((tab) => {
+            const range = document.createRange();
+            range.selectNodeContents(tab);
+            const box = tab.getBoundingClientRect();
+            return {
+              clientWidth: tab.clientWidth,
+              height: box.height,
+              scrollWidth: tab.scrollWidth,
+              textRectCount: range.getClientRects().length,
+            };
+          });
+          expect(
+            customTabText.textRectCount,
+            `${theme} ${width}px ${state}: custom period label wrapped unexpectedly`,
+          ).toBe(1);
+          expect(customTabText.scrollWidth).toBeLessThanOrEqual(customTabText.clientWidth);
+        }
         if (state.includes('help')) {
           const helpBodyBox = geometry.boxes.helpBody;
           expect(helpBodyBox, `${theme} ${width}px ${state} help body`).not.toBeNull();
@@ -2150,28 +2366,55 @@ test('progress header keeps expanded help and custom period in normal flow', asy
           expect(geometry.boxes.from).not.toBeNull();
           expect(geometry.boxes.to).not.toBeNull();
           expect(geometry.boxes.actions).not.toBeNull();
-          const dateContract = await page.locator('#progress-period-from').evaluate((input) => {
-            const style = getComputedStyle(input);
-            const webkitValue = getComputedStyle(input, '::-webkit-date-and-time-value');
-            const control = input.closest('.date-control');
-            return {
-              value: (input as HTMLInputElement).value,
-              width: input.getBoundingClientRect().width,
-              textAlign: style.textAlign,
-              textAlignLast: style.textAlignLast,
-              overflow: style.overflow,
-              controlOverflow: control ? getComputedStyle(control).overflow : null,
-              webkitTextAlign: webkitValue.textAlign,
-            };
-          });
-          expect(dateContract.value).toBe('2025-01-01');
-          expect(dateContract.width).toBeGreaterThanOrEqual(140);
-          expect(dateContract.textAlign).toBe('start');
-          expect(dateContract.textAlignLast).toBe('start');
-          expect(['clip', 'visible']).toContain(dateContract.overflow);
-          expect(dateContract.controlOverflow).toBe('visible');
-          // WebKit does not expose this pseudo-element through computed styles.
-          expect(['', 'start']).toContain(dateContract.webkitTextAlign);
+          for (const [id, value] of [
+            ['#progress-period-from', '2025-01-01'],
+            ['#progress-period-to', '2025-01-30'],
+          ] as const) {
+            const input = page.locator(id);
+            const dateContract = await input.evaluate((element) => {
+              const input = element as HTMLInputElement;
+              const style = getComputedStyle(input);
+              const webkitValue = getComputedStyle(input, '::-webkit-date-and-time-value');
+              const control = input.closest('.date-control');
+              return {
+                value: input.value,
+                width: input.getBoundingClientRect().width,
+                textAlign: style.textAlign,
+                textAlignLast: style.textAlignLast,
+                overflow: style.overflow,
+                controlOverflow: control ? getComputedStyle(control).overflow : null,
+                webkitTextAlign: webkitValue.textAlign,
+              };
+            });
+            expect(dateContract.value).toBe(value);
+            expect(dateContract.width).toBeGreaterThanOrEqual(140);
+            expect(dateContract.textAlign).toBe('start');
+            expect(dateContract.textAlignLast).toBe('start');
+            expect(['clip', 'visible']).toContain(dateContract.overflow);
+            expect(dateContract.controlOverflow).toBe('visible');
+            // WebKit does not expose this pseudo-element through computed styles.
+            expect(['', 'start']).toContain(dateContract.webkitTextAlign);
+
+            if (state === 'custom-open') {
+              for (const focused of [true, false]) {
+                const visual = await inspectDateVisual(page, input, value, focused);
+                const stateLabel = focused ? 'focused' : 'blurred';
+                const context = `${theme} ${width}px ${id} ${stateLabel}`;
+                expect(visual.inkLeft, `${context}: no value pixels`).not.toBeNull();
+                expect(visual.inkRight, `${context}: no value pixels`).not.toBeNull();
+                expect(visual.contentWidth, `${context}: content box`).toBeGreaterThanOrEqual(
+                  visual.expectedTextWidth,
+                );
+                expect(visual.inkWidth, `${context}: rendered date pixels`).toBeGreaterThanOrEqual(
+                  visual.expectedTextWidth - 8,
+                );
+                expect(
+                  visual.inkRight,
+                  `${context}: value reaches calendar reserve`,
+                ).toBeLessThanOrEqual(visual.textRegionRight + 1);
+              }
+            }
+          }
         }
         if (captureDirectory) {
           await mkdir(captureDirectory, { recursive: true });
