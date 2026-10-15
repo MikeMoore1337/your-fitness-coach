@@ -175,7 +175,7 @@ for (const platform of ['web', 'mocked-tma'] as const) {
         await expect(page.getByRole('dialog')).toHaveCount(0);
         await openQuickAction(page, 'Самочувствие');
         await wellbeing.getByRole('radio', { name: 'Очень плохо' }).check();
-        await wellbeing.getByLabel('Сколько спали, минут').fill('420');
+        await wellbeing.getByLabel('Сколько спали, часов').fill('7');
         await page.locator('.daily-wellbeing__note > summary').click();
         const note = wellbeing.getByLabel('Заметка для себя');
         const noteText = 'Синтетическая заметка для проверки выхода. '.repeat(8);
@@ -216,7 +216,7 @@ for (const platform of ['web', 'mocked-tma'] as const) {
         if (platform === 'mocked-tma') await tma.setViewport(844, 844, true);
         await openQuickAction(page, 'Самочувствие');
         await expect(wellbeing.getByRole('radio', { name: 'Очень плохо' })).not.toBeChecked();
-        await expect(wellbeing.getByLabel('Сколько спали, минут')).toHaveValue('');
+        await expect(wellbeing.getByLabel('Сколько спали, часов')).toHaveValue('');
         expect(api.measurementSaveCalls()).toBe(0);
         expect(writes).toEqual([]);
       });

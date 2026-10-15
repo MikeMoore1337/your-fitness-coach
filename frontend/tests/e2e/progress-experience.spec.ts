@@ -857,7 +857,7 @@ test('progress remains clear and free of horizontal overflow at supported widths
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тренировки/ })
+    .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
   await expect(page.getByText('Грудные')).toBeVisible();
@@ -924,7 +924,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тренировки/ })
+    .getByRole('tab', { name: /^Тренировки/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
   const trainingConfidence = page
@@ -946,7 +946,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тело/ })
+    .getByRole('tab', { name: /^Тело/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
   const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
@@ -1040,7 +1040,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тело/ })
+    .getByRole('tab', { name: /^Тело/ })
     .click();
 
   const body = page.locator('#progress-body');
@@ -1208,7 +1208,7 @@ test('nutrition report preserves truthful period context, daily drill-down and r
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Питание/ })
+    .getByRole('tab', { name: /^Питание/ })
     .click();
 
   const report = page.locator('#nutrition-period-report');
@@ -1421,7 +1421,7 @@ for (const width of [320, 360, 390, 393, 430]) {
         .click();
       await page
         .getByRole('navigation', { name: 'Разделы прогресса' })
-        .getByRole('link', { name: /^Питание/ })
+        .getByRole('tab', { name: /^Питание/ })
         .click();
 
       const report = page.locator('#nutrition-period-report');
@@ -1548,7 +1548,7 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
 
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Питание/ })
+    .getByRole('tab', { name: /^Питание/ })
     .click();
 
   const report = page.locator('#nutrition-period-report');

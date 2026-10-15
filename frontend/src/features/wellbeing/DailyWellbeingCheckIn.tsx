@@ -47,25 +47,53 @@ const moodOptions = [
 
 type WellbeingForm = {
   sleepQuality: string;
-  sleepDurationMinutes: string;
+  sleepDurationHours: string;
   mood: string;
   note: string;
 };
 
 const emptyForm: WellbeingForm = {
   sleepQuality: '',
-  sleepDurationMinutes: '',
+  sleepDurationHours: '',
   mood: '',
   note: '',
 };
 
+const sleepHoursPattern = /^\d+(?:[.,]\d*)?$/;
+
+function normalizeSleepHours(value: string): string {
+  return value.trim().replace(',', '.');
+}
+
+function sleepDurationError(value: string): string | null {
+  const normalized = normalizeSleepHours(value);
+  if (!normalized) return null;
+  if (!sleepHoursPattern.test(normalized)) {
+    return 'Укажите количество часов числом, например 7,5.';
+  }
+  const minutes = Math.round(Number(normalized) * 60);
+  return Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440
+    ? null
+    : 'Укажите длительность от 1 минуты до 24 часов.';
+}
+
+export function minutesFromSleepHours(value: string): number | null {
+  if (!value.trim() || sleepDurationError(value)) return null;
+  return Math.round(Number(normalizeSleepHours(value)) * 60);
+}
+
+export function hoursFromMinutes(minutes: number | null | undefined): string {
+  if (minutes == null) return '';
+  return String(Number((minutes / 60).toFixed(2))).replace('.', ',');
+}
+
 function formsEqual(left: WellbeingForm, right: WellbeingForm): boolean {
+  const leftMinutes = minutesFromSleepHours(left.sleepDurationHours);
+  const rightMinutes = minutesFromSleepHours(right.sleepDurationHours);
   return (
     left.sleepQuality === right.sleepQuality &&
-    (left.sleepDurationMinutes === right.sleepDurationMinutes ||
-      (left.sleepDurationMinutes !== '' &&
-        right.sleepDurationMinutes !== '' &&
-        Number(left.sleepDurationMinutes) === Number(right.sleepDurationMinutes))) &&
+    (left.sleepDurationHours === right.sleepDurationHours ||
+      (leftMinutes !== null && rightMinutes !== null && leftMinutes === rightMinutes)) &&
     left.mood === right.mood &&
     left.note.trim() === right.note.trim()
   );
@@ -74,8 +102,7 @@ function formsEqual(left: WellbeingForm, right: WellbeingForm): boolean {
 function formFromRecord(record: DailyWellbeingRecord | null | undefined): WellbeingForm {
   return {
     sleepQuality: record?.sleep_quality == null ? '' : String(record.sleep_quality),
-    sleepDurationMinutes:
-      record?.sleep_duration_minutes == null ? '' : String(record.sleep_duration_minutes),
+    sleepDurationHours: hoursFromMinutes(record?.sleep_duration_minutes),
     mood: record?.mood == null ? '' : String(record.mood),
     note: record?.note ?? '',
   };
@@ -98,13 +125,10 @@ function formatDay(value: string): string {
   return formatCalendarDate(value, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-function formatDuration(minutes: number | null | undefined): string {
+function formatSleepDuration(minutes: number | null | undefined): string {
   if (minutes == null) return 'не заполнено';
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  if (!hours) return `${rest} мин`;
-  if (!rest) return `${hours} ч`;
-  return `${hours} ч ${rest} мин`;
+  const hours = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(minutes / 60);
+  return `${hours} ч`;
 }
 
 function errorMessage(reason: unknown): string {
@@ -142,7 +166,12 @@ function OptionField({
         {options.map((option) => {
           const optionId = `${id}-${option.value}`;
           return (
-            <label className="daily-wellbeing__option" key={option.value} htmlFor={optionId}>
+            <label
+              className="daily-wellbeing__option"
+              data-yfc-choice="compact"
+              key={option.value}
+              htmlFor={optionId}
+            >
               <input
                 checked={value === String(option.value)}
                 id={optionId}
@@ -174,7 +203,7 @@ function SavedWellbeingCard({ record, onEdit }: { record: DailyWellbeingRecord; 
       summary={
         <>
           <span>{selectedLabel(sleepOptions, record.sleep_quality)}</span>
-          <span> · {formatDuration(record.sleep_duration_minutes)}</span>
+          <span> · {formatSleepDuration(record.sleep_duration_minutes)}</span>
           <span> · настроение: {selectedLabel(moodOptions, record.mood).toLowerCase()}</span>
         </>
       }
@@ -287,7 +316,8 @@ export function DailyWellbeingCheckIn({
 
   const today = current.data?.today || dateInputValue(new Date(), resolvedTimeZone);
   const isDateAllowed = localDate <= today;
-  const isEmpty = !form.sleepQuality && !form.sleepDurationMinutes && !form.mood;
+  const durationError = sleepDurationError(form.sleepDurationHours);
+  const isEmpty = !form.sleepQuality && !form.sleepDurationHours && !form.mood;
   const isDirty = !formsEqual(form, record ? formFromRecord(record) : emptyForm);
   const saveError = save.error ? errorMessage(save.error) : null;
   const removeError = remove.error ? errorMessage(remove.error) : null;
@@ -349,7 +379,7 @@ export function DailyWellbeingCheckIn({
 
   const savePayload: DailyWellbeingSave = {
     sleep_quality: numericOrNull(form.sleepQuality),
-    sleep_duration_minutes: numericOrNull(form.sleepDurationMinutes),
+    sleep_duration_minutes: minutesFromSleepHours(form.sleepDurationHours),
     mood: numericOrNull(form.mood),
     note: form.note.trim() || null,
   };
@@ -413,7 +443,15 @@ export function DailyWellbeingCheckIn({
         }}
         onSubmit={(event) => {
           event.preventDefault();
-          if (save.isPending || remove.isPending || isEmpty || !online || !isDateAllowed) return;
+          if (
+            save.isPending ||
+            remove.isPending ||
+            isEmpty ||
+            durationError ||
+            !online ||
+            !isDateAllowed
+          )
+            return;
           setLastPayload(savePayload);
           save.mutate({ date: localDate, payload: savePayload });
         }}
@@ -482,27 +520,32 @@ export function DailyWellbeingCheckIn({
           value={form.mood}
         />
 
-        <Field
-          hint="Необязательно, от 1 до 1440 минут."
-          label="Сколько спали, минут"
-          labelFor={`${instanceId}-duration`}
-        >
+        <Field label="Сколько спали, часов" labelFor={`${instanceId}-duration`}>
           <Input
+            aria-describedby={`${instanceId}-duration-${durationError ? 'error' : 'hint'}`}
+            aria-invalid={durationError ? true : undefined}
             disabled={save.isPending || remove.isPending}
             id={`${instanceId}-duration`}
-            inputMode="numeric"
-            max={1440}
-            min={1}
+            inputMode="decimal"
             onChange={(event) =>
               setDraft((currentDraft) => ({
                 ...(currentDraft ?? form),
-                sleepDurationMinutes: event.target.value,
+                sleepDurationHours: event.target.value,
               }))
             }
-            placeholder="Например, 420"
-            type="number"
-            value={form.sleepDurationMinutes}
+            placeholder="Например, 7,5"
+            type="text"
+            value={form.sleepDurationHours}
           />
+          {durationError ? (
+            <span className="ui-field__error" id={`${instanceId}-duration-error`} role="alert">
+              {durationError}
+            </span>
+          ) : (
+            <span className="ui-field__hint" id={`${instanceId}-duration-hint`}>
+              Необязательно. Например, 7,5; допустимый диапазон — от 1 минуты до 24 часов.
+            </span>
+          )}
         </Field>
 
         <details
@@ -548,7 +591,14 @@ export function DailyWellbeingCheckIn({
         )}
         <div className="daily-wellbeing__actions">
           <Button
-            disabled={save.isPending || remove.isPending || isEmpty || !online || !isDateAllowed}
+            disabled={
+              save.isPending ||
+              remove.isPending ||
+              isEmpty ||
+              Boolean(durationError) ||
+              !online ||
+              !isDateAllowed
+            }
             type="submit"
           >
             {save.isPending ? 'Сохраняем…' : 'Сохранить отметку'}

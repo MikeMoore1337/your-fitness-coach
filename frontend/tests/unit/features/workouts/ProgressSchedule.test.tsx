@@ -475,8 +475,8 @@ describe('ProgressSchedule', () => {
     expect(await screen.findByText('80%', { exact: true })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Прогресс' })).toBeInTheDocument();
     fireEvent.click(
-      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('link', {
-        name: /^Тело/,
+      within(screen.getByRole('navigation', { name: 'Разделы прогресса' })).getByRole('tab', {
+        name: 'Тело',
       }),
     );
     expect(await screen.findByText('Мало данных для динамики')).toBeVisible();

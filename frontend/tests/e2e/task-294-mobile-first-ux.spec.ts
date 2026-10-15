@@ -443,9 +443,9 @@ test('Task 294 keeps period tabs balanced and custom period truthful when opened
   await page.setViewportSize({ width: 320, height: 568 });
   await openApp(page, 'progress');
 
-  const tabs = page.getByRole('tab');
-  await expect(tabs).toHaveCount(4);
   const tabContainer = page.locator('.progress-period-controls__tabs');
+  const tabs = tabContainer.getByRole('tab');
+  await expect(tabs).toHaveCount(4);
   const containerBox = await tabContainer.boundingBox();
   const tabBoxes = await Promise.all((await tabs.all()).map((tab) => tab.boundingBox()));
   expect(containerBox).not.toBeNull();
@@ -457,13 +457,13 @@ test('Task 294 keeps period tabs balanced and custom period truthful when opened
   );
   expect(tabBoxes.at(-1)!.x + tabBoxes.at(-1)!.width - tabBoxes[0]!.x).toBeGreaterThan(0);
 
-  await page.getByRole('tab', { name: 'Свой период', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Свой период', exact: true })).toHaveAttribute(
+  await tabContainer.getByRole('tab', { name: 'Свой период', exact: true }).click();
+  await expect(tabContainer.getByRole('tab', { name: 'Свой период', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );
   await expect(page.locator('.progress-period-controls__custom')).toBeVisible();
-  await expect(page.locator('[role="tab"][aria-selected="true"]')).toHaveCount(1);
+  await expect(tabContainer.locator('[role="tab"][aria-selected="true"]')).toHaveCount(1);
   await expectNoHorizontalOverflow(page);
 });
 
@@ -490,21 +490,19 @@ test('Task 294 keeps Profile and approved Progress navigation accessible on mobi
   await openApp(page, 'progress');
   const progressNavigation = page.locator('.progress-category-nav.section-navigation');
   await expect(progressNavigation).toBeVisible();
-  const progressNavigationMetrics = await progressNavigation
-    .locator('.progress-category-nav__rail')
-    .evaluate((rail) => ({
-      display: getComputedStyle(rail).display,
-      overflow: getComputedStyle(rail).overflowX,
-      itemHeights: Array.from(rail.children).map((item) => item.getBoundingClientRect().height),
-    }));
+  const progressTabs = progressNavigation.getByRole('tablist');
+  const progressNavigationMetrics = await progressTabs.evaluate((tabs) => ({
+    display: getComputedStyle(tabs).display,
+    overflow: getComputedStyle(tabs).overflowX,
+    itemHeights: Array.from(tabs.querySelectorAll('[role="tab"]')).map((item) =>
+      Math.round(item.getBoundingClientRect().height),
+    ),
+  }));
   expect(progressNavigationMetrics.display).toBe('flex');
   expect(progressNavigationMetrics.overflow).toBe('auto');
   expect(Math.min(...progressNavigationMetrics.itemHeights)).toBeGreaterThanOrEqual(44);
   expect(Math.max(...progressNavigationMetrics.itemHeights)).toBeLessThanOrEqual(60);
-  await expect(progressNavigation.getByRole('link').first()).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(progressTabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await expectNoHorizontalOverflow(page);
 });
 

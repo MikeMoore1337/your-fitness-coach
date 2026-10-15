@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { createTelegramMock } from '../../../helpers/telegramMock';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DailyWellbeingCheckIn } from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
+import {
+  DailyWellbeingCheckIn,
+  hoursFromMinutes,
+  minutesFromSleepHours,
+} from '../../../../src/features/wellbeing/DailyWellbeingCheckIn';
 import type {
   DailyWellbeingCheckIn as DailyWellbeingRecord,
   DailyWellbeingSave,
@@ -114,11 +118,11 @@ describe('DailyWellbeingCheckIn', () => {
     renderCheckIn(true, onExit);
     await screen.findByRole('button', { name: 'Вернуться' });
     await user.click(screen.getAllByRole('radio', { name: 'Хорошо' })[0]!);
-    await user.type(screen.getByLabelText('Сколько спали, минут'), '420');
+    await user.type(screen.getByLabelText('Сколько спали, часов'), '7');
     await user.click(screen.getByRole('button', { name: 'Вернуться' }));
     expect(onExit).not.toHaveBeenCalled();
     expect(screen.getAllByRole('radio', { name: 'Хорошо' })[0]).toBeChecked();
-    expect(screen.getByLabelText('Сколько спали, минут')).toHaveValue(420);
+    expect(screen.getByLabelText('Сколько спали, часов')).toHaveValue('7');
     expect(feedbackMock.confirm).toHaveBeenCalledWith(
       expect.objectContaining({ message: expect.stringContaining('будут потеряны') }),
     );
@@ -127,7 +131,7 @@ describe('DailyWellbeingCheckIn', () => {
     expect(apiMock.mock.calls.every(([, options]) => !options?.method)).toBe(true);
   });
 
-  it.each(['0420', '420.0'])(
+  it.each(['07', '7.0'])(
     'compares equivalent duration %s and trimmed notes without a false discard warning',
     async (duration) => {
       const user = userEvent.setup();
@@ -135,7 +139,7 @@ describe('DailyWellbeingCheckIn', () => {
       currentRecord = baseRecord;
       renderCheckIn(true, onExit);
       await screen.findByRole('button', { name: 'Вернуться' });
-      fireEvent.change(screen.getByLabelText('Сколько спали, минут'), {
+      fireEvent.change(screen.getByLabelText('Сколько спали, часов'), {
         target: { value: duration },
       });
       await user.click(screen.getByText('Добавить заметку'));
@@ -162,7 +166,7 @@ describe('DailyWellbeingCheckIn', () => {
     expect(currentRecord).toEqual(baseRecord);
     fireEvent.change(screen.getByLabelText('День'), { target: { value: '2026-08-31' } });
     await waitFor(() => expect(screen.getByLabelText('День')).toHaveValue('2026-08-31'));
-    expect(await screen.findByLabelText('Сколько спали, минут')).toHaveValue(420);
+    expect(await screen.findByLabelText('Сколько спали, часов')).toHaveValue('7');
     expect(screen.getAllByRole('radio', { name: 'Хорошо' })[0]).toBeChecked();
     expect(currentRecord).toEqual(baseRecord);
     expect(apiMock.mock.calls.every(([, options]) => !options?.method)).toBe(true);
@@ -195,6 +199,13 @@ describe('DailyWellbeingCheckIn', () => {
     currentRecord = baseRecord;
     resolveSave(baseRecord);
     expect(await screen.findByRole('button', { name: 'Изменить' })).toBeVisible();
+  });
+
+  it('round-trips every whole sleep duration minute through the Russian hour field', () => {
+    for (let minutes = 1; minutes <= 1440; minutes += 1) {
+      const hours = hoursFromMinutes(minutes);
+      expect(minutesFromSleepHours(hours)).toBe(minutes);
+    }
   });
 
   it('exposes a compact entry point on Today before the first check-in', async () => {
@@ -268,11 +279,26 @@ describe('DailyWellbeingCheckIn', () => {
     expect(screen.queryByText('Личная заметка')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Изменить' }));
+    const duration = screen.getByRole('textbox', { name: 'Сколько спали, часов' });
+    expect(duration).toHaveValue('7');
+    await user.clear(duration);
+    await user.type(duration, '7,5');
     await user.click(screen.getAllByRole('radio', { name: 'Отлично' })[1]!);
     await user.click(screen.getByRole('button', { name: 'Сохранить отметку' }));
+    await waitFor(() =>
+      expect(apiMock).toHaveBeenCalledWith(
+        '/api/v1/check-ins/daily/2026-09-01',
+        expect.objectContaining({
+          method: 'PUT',
+          body: expect.objectContaining({ sleep_duration_minutes: 450 }),
+        }),
+      ),
+    );
     await waitFor(() => expect(feedbackMock.toast).toHaveBeenCalledWith('Отметка сохранена'));
 
+    expect(await screen.findByText(/7,5 ч/)).toBeVisible();
     await user.click(await screen.findByRole('button', { name: 'Изменить' }));
+    expect(screen.getByRole('textbox', { name: 'Сколько спали, часов' })).toHaveValue('7,5');
     await user.click(screen.getByRole('button', { name: 'Удалить' }));
     await waitFor(() =>
       expect(apiMock).toHaveBeenCalledWith('/api/v1/check-ins/daily/2026-09-01', {
@@ -281,5 +307,23 @@ describe('DailyWellbeingCheckIn', () => {
     );
     expect(await screen.findByRole('button', { name: 'Сохранить отметку' })).toBeVisible();
     expect(feedbackMock.confirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('validates sleep hours without sending an invalid minute payload', async () => {
+    const user = userEvent.setup();
+    renderCheckIn(true);
+
+    await screen.findByRole('heading', { name: 'Сон и настроение' });
+    await user.click(screen.getAllByRole('radio', { name: 'Хорошо' })[0]!);
+    const duration = screen.getByRole('textbox', { name: 'Сколько спали, часов' });
+    await user.type(duration, '25');
+
+    expect(duration).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent('от 1 минуты до 24 часов');
+    expect(screen.getByRole('button', { name: 'Сохранить отметку' })).toBeDisabled();
+    expect(apiMock).not.toHaveBeenCalledWith(
+      '/api/v1/check-ins/daily/2026-09-01',
+      expect.objectContaining({ method: 'PUT' }),
+    );
   });
 });
