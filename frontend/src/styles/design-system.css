@@ -626,6 +626,7 @@ h3 {
   font: inherit;
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
   cursor: pointer;
 }
 

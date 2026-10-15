@@ -1,0 +1,166 @@
+{
+  "source": "Local Playwright Chromium/WebKit, synthetic data",
+  "previousHead": "a8b8b3ad25e3cdd77fa6f74fadf11f26a8082501",
+  "files": [
+    {
+      "filename": "chromium-typography-computed.json",
+      "bytes": 8379,
+      "sha256": "b7cc601589fef05161f25fa83ebc15426e73e1ae855ca058beb3562eb287ce29"
+    },
+    {
+      "filename": "chromium-wellbeing-action-bounds.json",
+      "bytes": 17367,
+      "sha256": "6d188a59f413c2f6fc6d1a13c8ee0c351052dc39dab12073bb13ef39c9b01892"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-320-dark.png",
+      "bytes": 207057,
+      "sha256": "33783c11ecbbafbcc51c7562b02844b67205b0cbc827f9e622361860309c6bdf"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-320-light.png",
+      "bytes": 197119,
+      "sha256": "68221d5be6434a6044acb246c088c7abcd57df094db2af7fc94f246250792817"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-360-dark.png",
+      "bytes": 215634,
+      "sha256": "17d6708374d79d5b297964db46a968eb341e79e171ff0c865cadc47134be9171"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-360-light.png",
+      "bytes": 205676,
+      "sha256": "fa704f725fac015492cc2a14ea010cf333894db020c920eddac57071548249c6"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-390-dark.png",
+      "bytes": 218980,
+      "sha256": "ba606989bdc7197f6cd28e46a7fd3c2c71be2fdf21bbd894aadec90691d0817c"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-390-light.png",
+      "bytes": 209432,
+      "sha256": "626e832058fdd5fdc3cbd583faf4174966bf7900a9287c9be5ff71f11c86b70b"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-430-dark.png",
+      "bytes": 222846,
+      "sha256": "fc8e255e713fb1593dd7d2416759952f99535f678e2736b265596d998d8a366b"
+    },
+    {
+      "filename": "chromium-wellbeing-actions-430-light.png",
+      "bytes": 213766,
+      "sha256": "3dcde6a84633d04b16af7b02818569de38e08aa340eba59819f811f0f4365417"
+    },
+    {
+      "filename": "progress-393-history-dark-chromium.png",
+      "bytes": 80563,
+      "sha256": "570f3d967751014309b44fbeb775d45473620466df301fcbb98b498fad48baab"
+    },
+    {
+      "filename": "progress-393-history-dark-webkit.png",
+      "bytes": 129188,
+      "sha256": "ef5ceb5a65703c2d98cb2a9d254eac29101c2e8b4a482b12c283cff75aceed75"
+    },
+    {
+      "filename": "progress-393-history-direct-dark-chromium.png",
+      "bytes": 79614,
+      "sha256": "46db3d677190314f602920025df056a99247e8522c012cccc65305b3fe2c8998"
+    },
+    {
+      "filename": "progress-393-history-direct-dark-webkit.png",
+      "bytes": 128923,
+      "sha256": "da2f3e4a5732f94b780b852b7b5fb6a4efe747f2a88e4731d0774ec84a1d9f9d"
+    },
+    {
+      "filename": "progress-393-history-direct-light-chromium.png",
+      "bytes": 80900,
+      "sha256": "c6df1b14ea3219185cf740ccdce273c7b92e6d5eb53a9edaa00f01e90359f2e3"
+    },
+    {
+      "filename": "progress-393-history-direct-light-webkit.png",
+      "bytes": 116960,
+      "sha256": "840480f88eae70bc8008e80632405c36a2a2f758e9ffbf2ca1e1d69583a5cfa3"
+    },
+    {
+      "filename": "progress-393-history-light-chromium.png",
+      "bytes": 81691,
+      "sha256": "1d1db610dc9c9aab9332eb452030b4c6fdb6c276b9637d1384479ccad97d2e7b"
+    },
+    {
+      "filename": "progress-393-history-light-webkit.png",
+      "bytes": 117152,
+      "sha256": "3a7b74140540aa946b95573b4a5e41a56d6460730f59d4e11a80c5f8dab0bc6b"
+    },
+    {
+      "filename": "progress-393-initial-dark-chromium.png",
+      "bytes": 184681,
+      "sha256": "dd85db5bb92339509e70eff27d01f524980ede7567676dc9e52d1fd0399ac0ee"
+    },
+    {
+      "filename": "progress-393-initial-dark-webkit.png",
+      "bytes": 300685,
+      "sha256": "fabfeadfe671472285eab01745d6ca5b00fa2891b2fba630a861ec273c43cb9d"
+    },
+    {
+      "filename": "progress-393-initial-light-chromium.png",
+      "bytes": 177829,
+      "sha256": "688017373342eff76ae076afdbf1f4872aa957de65b94aebbd07ce5a3e0c9fdc"
+    },
+    {
+      "filename": "progress-393-initial-light-webkit.png",
+      "bytes": 277304,
+      "sha256": "c3107d5153edd7a713c2bd5c98056d4fa83a8595b4c6bd3aa2d2b54cb3e84d69"
+    },
+    {
+      "filename": "webkit-typography-computed.json",
+      "bytes": 8293,
+      "sha256": "614b8876082a81389ceac9a58897ba00cb72ceaabbb444cb65872db3f04294c6"
+    },
+    {
+      "filename": "webkit-wellbeing-action-bounds.json",
+      "bytes": 17371,
+      "sha256": "24ef677ed1c433fa115b52c8817a7330bff31519d46bbc2760f850ff32e54842"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-320-dark.png",
+      "bytes": 439580,
+      "sha256": "01e532d1823cb24ca7829dc0d7a1291c7ede055875f19ff2d1b6724b7c02738f"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-320-light.png",
+      "bytes": 428325,
+      "sha256": "c8925b1b281c14bf69dcf1989009b20c11b8cbaf0c16e5d38aa1b5638eb5c6ca"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-360-dark.png",
+      "bytes": 463806,
+      "sha256": "0d0c49c9fec678ec38a358a60407d47bceea43b9f666cdf6a8010c2ed086f742"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-360-light.png",
+      "bytes": 452757,
+      "sha256": "03472e596a9734c7cc2931c3101a6a8327f49d9949ab82346cbf68daf71553bb"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-390-dark.png",
+      "bytes": 474408,
+      "sha256": "c480046ded641bc2d2b3512785a26071e5fcf45239329b599d3feb773e1b0736"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-390-light.png",
+      "bytes": 463193,
+      "sha256": "15fceb6f3af4e9d95a9c59e2d959fd1e539769f7d8a21f0daf20b22a8d38bc0d"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-430-dark.png",
+      "bytes": 486178,
+      "sha256": "f0b206730badae90d6b8e98ca7e1433306494d64d982bba51f8652008feeb555"
+    },
+    {
+      "filename": "webkit-wellbeing-actions-430-light.png",
+      "bytes": 476404,
+      "sha256": "3694e44c3a03e4fb28ecdd29792452a6ecbbd5641c2f29f78f705b7888d47a49"
+    }
+  ]
+}

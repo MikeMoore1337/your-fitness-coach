@@ -97,6 +97,8 @@ Approved #388 trainer pattern — короткий `Сегодня`, отдел�
 - Не дублируй global destinations одновременно в dock + horizontal tabs или sidebar + horizontal
   tabs.
 - Tabs/segmented controls используются только для реальной local subsection navigation.
+- Peer destinations in a local horizontal selector use the shared `SegmentedControl`: the
+  selector has text labels, keyboard tab semantics and no directional arrow/chevron controls.
 - Workspace/context switch не является destination tab.
 - В trainer context trainer dock/sidebar остаётся trainer navigation; personal dock остаётся
   personal navigation; `Для себя / Клиенты` — отдельный workspace switch.
@@ -141,11 +143,19 @@ Baseline активируется при успешной согласованн
 
 Navigation action обязан иметь affordance: semantic control, достаточный touch target и видимый
 row/button treatment. Text-only text, который фактически ведёт по navigation, запрещён.
-Chevron допустим для compact navigation row.
+Chevron допустим для compact navigation row, который раскрывает конкретное destination; он не
+заменяет peer selector и не добавляется к каждой option горизонтального segmented control.
+
+Functional glyphs use `Icon` or its shared adapters and inherit `currentColor`. CSS-drawn shapes,
+Unicode arrows and page-local SVG substitutes are not functional iconography.
 
 ## Typography, surfaces и responsive behavior
 
 - Сохраняй current production typography roles и scale.
+- Роли display/page/section/body/meta/data используют shared `--font-*` tokens и line-height
+  tokens; page-local font sizes/weights допускаются только для зафиксированной density-необходимости.
+- Измеримые значения, время, вес, повторы, КБЖУ и аналитические числа используют tabular
+  numerals; локаль и единицы следуют фактическому API/domain contract.
 - Не добавляй giant authenticated hero/marketing language в частые рабочие surfaces.
 - Cards/surfaces должны поддерживать task hierarchy, а не превращать страницу в декоративную
   стопку одинаковых rectangles.

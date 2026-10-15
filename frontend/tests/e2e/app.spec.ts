@@ -2512,7 +2512,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await openAppDestination(page, 'Прогресс');
   await page
     .getByRole('navigation', { name: 'Разделы прогресса' })
-    .getByRole('link', { name: /^Тело$/ })
+    .getByRole('tab', { name: /^Тело$/ })
     .click();
   await page.locator('.progress-measurement-editor > summary').click();
   const measurementForm = page.locator('.measurement-diary__form');
@@ -3005,7 +3005,7 @@ test('сенсорное поле даты сохраняет нативный �
     await openAppDestination(page, 'Прогресс');
     await page
       .getByRole('navigation', { name: 'Разделы прогресса' })
-      .getByRole('link', { name: /^Тело$/ })
+      .getByRole('tab', { name: /^Тело$/ })
       .click();
     await page.locator('.progress-measurement-editor > summary').click();
     const dateField = page.getByLabel('Дата');
