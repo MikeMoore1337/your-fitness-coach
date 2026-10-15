@@ -11187,13 +11187,13 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     letter-spacing: -0.035em;
   }
   .app-section--progress .progress-experience .progress-hero {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 172px);
     grid-template-areas:
       'copy help'
       'period period'
       'download download';
     gap: 12px;
-    align-items: center;
+    align-items: start;
   }
   .app-section--progress .progress-hero__copy {
     grid-column: 1;
@@ -11206,6 +11206,9 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .app-section--progress .progress-hero__help .contextual-help > summary {
     max-width: 172px;
     min-height: 44px;
+  }
+  .app-section--progress .progress-hero__help .contextual-help {
+    width: min(100%, 172px);
   }
   .app-section--progress .progress-experience--bento {
     /* The category rail adds its own 4px focus gutter around the 44px targets. */

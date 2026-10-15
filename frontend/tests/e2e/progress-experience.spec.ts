@@ -2007,3 +2007,165 @@ test('progress header aligns help and report without clipping the period selecto
     }
   }
 });
+
+test('progress header keeps expanded help and custom period in normal flow', async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.addInitScript(() => localStorage.setItem('app-theme', 'light'));
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_period=days_30');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  const captureDirectory = CAPTURE_PROGRESS_865
+    ? resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux',
+        'final-issues-acceptance',
+        'evidence',
+        '865',
+        CAPTURE_PROGRESS_865,
+      )
+    : null;
+
+  for (const theme of ['light', 'dark'] as const) {
+    if (theme === 'dark') {
+      await page.evaluate(() => {
+        localStorage.setItem('app-theme', 'dark');
+        window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+      });
+    }
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+
+    for (const width of [320, 360, 390, 393, 430, 1280, 1440, 1920, 2560]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 900 });
+      const summary = page.locator('.progress-hero__help summary');
+      const helpBody = page.locator('.progress-hero__help .contextual-help__body');
+      const period = page.locator('.progress-hero__period');
+      const customTab = period.getByRole('tab', { name: 'Свой период' });
+      const customForm = period.locator('.progress-period-controls__custom');
+
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await expect(customForm).toBeHidden();
+
+      const measureGeometry = async () =>
+        page.evaluate(() => {
+          type Box = { bottom: number; left: number; right: number; top: number; width: number };
+          const box = (selector: string): Box | null => {
+            const element = document.querySelector<HTMLElement>(selector);
+            if (!element) return null;
+            const rect = element.getBoundingClientRect();
+            return {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+            };
+          };
+          const boxes = {
+            heading: box('.progress-hero__copy h1'),
+            help: box('.progress-hero__help'),
+            helpBody: box('.progress-hero__help .contextual-help__body'),
+            period: box('.progress-hero__period'),
+            custom: box('.progress-period-controls__custom'),
+            from: box('#progress-period-from'),
+            to: box('#progress-period-to'),
+            actions: box('.progress-period-controls__custom-actions'),
+            download: box('.progress-hero__download'),
+          };
+          const overlaps = (left: Box | null, right: Box | null) =>
+            Boolean(
+              left &&
+              right &&
+              left.left < right.right &&
+              left.right > right.left &&
+              left.top < right.bottom &&
+              left.bottom > right.top,
+            );
+          const topLevel = ['heading', 'help', 'period', 'download'] as const;
+          const internal = ['from', 'to', 'actions'] as const;
+          const overlapPairs = [
+            ...topLevel.flatMap((left, index) =>
+              topLevel.slice(index + 1).map((right) => `${left}:${right}`),
+            ),
+            ...internal.flatMap((left, index) =>
+              internal.slice(index + 1).map((right) => `${left}:${right}`),
+            ),
+            'helpBody:custom',
+            'helpBody:download',
+          ] as const;
+          const outOfViewport = Object.entries(boxes)
+            .filter(([, value]) => value)
+            .filter(([, value]) => value!.left < -0.5 || value!.right > window.innerWidth + 0.5)
+            .map(([name]) => name);
+          return {
+            boxes,
+            overlapPairs: overlapPairs.filter((pair) => {
+              const [left, right] = pair.split(':') as [keyof typeof boxes, keyof typeof boxes];
+              return overlaps(boxes[left], boxes[right]);
+            }),
+            outOfViewport,
+            scrollWidth: document.documentElement.scrollWidth,
+            viewportWidth: window.innerWidth,
+          };
+        });
+
+      const assertGeometry = async (state: string) => {
+        const geometry = await measureGeometry();
+        expect(geometry.overlapPairs, `${theme} ${width}px ${state}`).toEqual([]);
+        expect(geometry.outOfViewport, `${theme} ${width}px ${state}`).toEqual([]);
+        expect(geometry.scrollWidth, `${theme} ${width}px ${state}`).toBeLessThanOrEqual(
+          geometry.viewportWidth,
+        );
+        if (state.includes('custom')) {
+          expect(geometry.boxes.custom).not.toBeNull();
+          expect(geometry.boxes.from).not.toBeNull();
+          expect(geometry.boxes.to).not.toBeNull();
+          expect(geometry.boxes.actions).not.toBeNull();
+        }
+        if (captureDirectory) {
+          await mkdir(captureDirectory, { recursive: true });
+          await page.locator('.progress-hero').screenshot({
+            path: resolve(
+              captureDirectory,
+              `${test.info().project.name}-${width}-${theme}-${state}.png`,
+            ),
+          });
+        }
+      };
+
+      await assertGeometry('closed-closed');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'true');
+      await expect(helpBody).toBeVisible();
+      await assertGeometry('help-open');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await expect(summary).toBeFocused();
+      await expect(helpBody).toBeHidden();
+
+      await customTab.click();
+      await expect(customForm).toBeVisible();
+      await page.getByLabel('Начало периода').fill('2025-01-01');
+      await page.getByLabel('Конец периода').fill('2025-01-30');
+      await assertGeometry('custom-open');
+
+      await summary.click();
+      await expect(summary).toHaveAttribute('aria-expanded', 'true');
+      await expect(helpBody).toBeVisible();
+      await assertGeometry('help-and-custom-open');
+
+      await summary.focus();
+      await page.keyboard.press('Enter');
+      await expect(summary).toHaveAttribute('aria-expanded', 'false');
+      await period.getByRole('button', { name: 'Отмена' }).click();
+      await expect(customForm).toBeHidden();
+    }
+  }
+});
