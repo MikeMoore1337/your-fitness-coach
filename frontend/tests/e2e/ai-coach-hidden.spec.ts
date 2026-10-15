@@ -21,6 +21,8 @@ async function expectAiCoachHidden(page: Page, requests: string[]): Promise<void
       '[href*="profile-ai-coach"], [data-testid*="ai-coach"], [aria-label*="AI Coach"], [aria-describedby*="ai-coach"], [aria-labelledby*="ai-coach"]',
     ),
   ).toHaveCount(0);
+  await expect(page.locator('main').first()).not.toContainText(/AI Coach/i);
+  expect(await page.locator('main').first().ariaSnapshot()).not.toMatch(/AI Coach/i);
   expect(requests.filter((pathname) => !pathname.endsWith('/status'))).toEqual([]);
 }
 
