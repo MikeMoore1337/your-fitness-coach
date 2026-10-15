@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
@@ -1480,15 +1480,29 @@ export function RestTimer({
   const [now, setNow] = useState(() => Date.now());
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
   const [compact, setCompact] = useState(false);
-  const [dismissRequested, setDismissRequested] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const panel = useRef<HTMLElement>(null);
   const pressedPointers = useRef(new Set<number>());
+  const compactWhenPointersRelease = useRef(false);
   const layoutAnchor = useRef<{ element: Element; top: number } | null>(null);
   const wasBackgrounded = useRef(
     typeof document !== 'undefined' && document.visibilityState === 'hidden',
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const captureLayoutAnchor = useCallback(() => {
+    const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
+    if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
+  }, []);
+  const compactNotice = useCallback(() => {
+    if (pressedPointers.current.size) {
+      // Keep the current hit surface until the active pointer sequence ends.
+      compactWhenPointersRelease.current = true;
+      return;
+    }
+    compactWhenPointersRelease.current = false;
+    captureLayoutAnchor();
+    setCompact(true);
+  }, [captureLayoutAnchor]);
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (
@@ -1500,8 +1514,8 @@ export function RestTimer({
       setDeadline(nextDeadline);
       setCompletedNotice(null);
       setCompact(false);
-      setDismissRequested(false);
       setAnnouncement('');
+      compactWhenPointersRelease.current = false;
       wasBackgrounded.current = document.visibilityState === 'hidden';
       writeStorage(storageKey, nextDeadline);
     };
@@ -1509,18 +1523,27 @@ export function RestTimer({
     return () => window.removeEventListener('fit:rest', handler);
   }, [storageKey, workoutId]);
   useEffect(() => {
+    const flushPendingCompact = () => {
+      if (!compactWhenPointersRelease.current || pressedPointers.current.size) return;
+      compactNotice();
+    };
     const markBackgrounded = () => {
       if (document.visibilityState === 'hidden') {
         wasBackgrounded.current = true;
         pressedPointers.current.clear();
+        flushPendingCompact();
       }
     };
     const markPageHidden = () => {
       wasBackgrounded.current = true;
       pressedPointers.current.clear();
+      flushPendingCompact();
     };
     const startPointer = (event: PointerEvent) => pressedPointers.current.add(event.pointerId);
-    const endPointer = (event: PointerEvent) => pressedPointers.current.delete(event.pointerId);
+    const endPointer = (event: PointerEvent) => {
+      pressedPointers.current.delete(event.pointerId);
+      flushPendingCompact();
+    };
     window.addEventListener('pageshow', markBackgrounded);
     window.addEventListener('pagehide', markPageHidden);
     document.addEventListener('visibilitychange', markBackgrounded);
@@ -1535,7 +1558,7 @@ export function RestTimer({
       document.removeEventListener('pointerup', endPointer, true);
       document.removeEventListener('pointercancel', endPointer, true);
     };
-  }, []);
+  }, [compactNotice]);
   useEffect(() => {
     if (!deadline) return;
     let timer: number | undefined;
@@ -1554,8 +1577,7 @@ export function RestTimer({
         removeStorage(storageKey);
         setDeadline(0);
         setCompletedNotice(`Отдых завершён · дальше: ${nextLabel}`);
-        setCompact(false);
-        setDismissRequested(false);
+        compactNotice();
         if (
           wasHidden &&
           typeof Notification !== 'undefined' &&
@@ -1581,37 +1603,7 @@ export function RestTimer({
       document.removeEventListener('visibilitychange', update);
       window.removeEventListener('pageshow', update);
     };
-  }, [deadline, nextLabel, storageKey, workoutId]);
-
-  useEffect(() => {
-    if (!completedNotice || (compact && !dismissRequested)) return;
-    const outside = (target: EventTarget | null) =>
-      target instanceof Node && !panel.current?.contains(target);
-    const settle = () => {
-      if (pressedPointers.current.size) return;
-      const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
-      if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
-      if (dismissRequested) setCompletedNotice(null);
-      else setCompact(true);
-    };
-    const click = (event: MouseEvent) => {
-      if (outside(event.target)) settle();
-    };
-    const focus = (event: FocusEvent) => {
-      if (outside(event.target)) settle();
-    };
-    // Keep the old hit surface until a separate outside action or a cancelled scroll gesture.
-    document.addEventListener('click', click);
-    document.addEventListener('focusin', focus);
-    document.addEventListener('pointercancel', settle);
-    document.addEventListener('wheel', settle, { passive: true });
-    return () => {
-      document.removeEventListener('click', click);
-      document.removeEventListener('focusin', focus);
-      document.removeEventListener('pointercancel', settle);
-      document.removeEventListener('wheel', settle);
-    };
-  }, [compact, completedNotice, dismissRequested]);
+  }, [compactNotice, deadline, nextLabel, storageKey, workoutId]);
   useLayoutEffect(() => {
     const anchor = layoutAnchor.current;
     layoutAnchor.current = null;
@@ -1679,7 +1671,7 @@ export function RestTimer({
             setDeadline(0);
             setNow(Date.now());
             setCompletedNotice(`Отдых пропущен · ${nextPosition}`);
-            setCompact(false);
+            compactNotice();
           }}
         >
           Пропустить
@@ -1687,17 +1679,18 @@ export function RestTimer({
       </div>
       {compact && (
         <>
-          <span className="active-workout-rest__complete-copy">
-            {dismissRequested ? 'Сообщение скрыто' : completedNotice}
-          </span>
+          <span className="active-workout-rest__complete-copy">{completedNotice}</span>
           <Button
             type="button"
             variant="secondary"
             glass="clear"
-            aria-disabled={dismissRequested}
-            onClick={() => setDismissRequested(true)}
+            onClick={() => {
+              captureLayoutAnchor();
+              setCompletedNotice(null);
+              setCompact(false);
+            }}
           >
-            {dismissRequested ? 'Скрыто' : 'Скрыть'}
+            Скрыть
           </Button>
         </>
       )}
