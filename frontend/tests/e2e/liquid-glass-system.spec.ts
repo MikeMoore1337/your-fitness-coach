@@ -95,10 +95,9 @@ for (const theme of ['light', 'dark'] as const) {
       await rest.getByRole('button', { name: 'Пропустить', exact: true }).click();
       await expect(rest.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
       await expect(rest).toContainText('Отдых пропущен');
-      await expect(rest.getByRole('button', { name: 'Пропустить' })).toHaveAttribute(
-        'aria-disabled',
-        'true',
-      );
+      await expect(rest.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+      await rest.getByRole('button', { name: 'Скрыть' }).click();
+      await expect(rest).toHaveCount(0);
 
       await page.goto('/app?section=progress');
       const tabs = page.getByRole('tablist').first();

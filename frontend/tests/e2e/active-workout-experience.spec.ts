@@ -3979,7 +3979,11 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
   await expect(timer).toHaveCount(0);
-  await expect(page.locator('.active-workout-rest--complete')).toContainText('Отдых завершён');
+  const panel = page.locator('.active-workout-rest--complete');
+  await expect(panel).toHaveClass(/is-compact/);
+  await expect(panel).toContainText('Отдых завершён · дальше: Жим штанги лёжа, подход 2');
+  await expect(panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Скрыть' })).toBeVisible();
   await expect
     .poll(() =>
       page.evaluate(
@@ -4010,8 +4014,15 @@ test('rest timer reaches its final state from the deadline without user events',
   await page.clock.runFor(90_000);
 
   await expect(timer).toHaveCount(0);
-  await expect(page.locator('.active-workout-rest--complete')).toContainText('Отдых завершён');
-  await expect(page.locator('.active-workout-rest--complete')).not.toContainText('Отдых пропущен');
+  const panel = page.locator('.active-workout-rest--complete');
+  await expect(panel).toHaveClass(/is-compact/);
+  await expect(panel).toContainText('Отдых завершён · дальше: Жим штанги лёжа, подход 2');
+  await expect(panel).not.toContainText('Отдых пропущен');
+  await expect(panel.getByRole('button', { name: '+30 сек' })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: '+60 сек' })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Скрыть' }).click();
+  await expect(panel).toHaveCount(0);
 });
 
 test.describe('#914 rest timer pointer lifecycle', () => {
@@ -4337,22 +4348,17 @@ test.describe('#914 rest timer pointer lifecycle', () => {
           await page.screenshot({ path: testInfo.outputPath(`plus${extra}.png`) });
         }
         const point = await alignPrevious(page, true);
-        const skip = context.panel.getByRole('button', { name: 'Пропустить' });
+        const currentBeforeSkip = (await context.current.boundingBox())!;
         const skipScroll = await page.evaluate(() => scrollY);
-        await page.touchscreen.tap(point.x, point.y);
-        await page.touchscreen.tap(point.x, point.y);
         await page.clock.setFixedTime(new Date('2026-10-10T12:00:12Z'));
         await page.touchscreen.tap(point.x, point.y);
-        await expect(skip).toHaveAttribute('aria-disabled', 'true');
-        expect(await page.evaluate(() => scrollY)).toBe(skipScroll);
         await expect(field).toBeFocused();
         await unchanged(page, context);
-        await page.screenshot({ path: testInfo.outputPath('skip-pending.png') });
-        await field.evaluate((element) =>
-          element.scrollIntoView({ block: 'center', behavior: 'instant' }),
-        );
-        await field.tap();
         await expect(context.panel).toHaveClass(/is-compact/);
+        await expect(context.panel).toContainText('Отдых пропущен · Подход 2 из 3');
+        await expect(context.panel.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+        const currentAfterSkip = (await context.current.boundingBox())!;
+        expect(Math.abs(currentAfterSkip.y - currentBeforeSkip.y)).toBeLessThan(1);
         await unchanged(page, context);
         await page.screenshot({ path: testInfo.outputPath('skip.png') });
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -4462,10 +4468,14 @@ test.describe('#914 rest timer pointer lifecycle', () => {
       body: JSON.stringify({ writes: context.writes, point }),
       contentType: 'application/json',
     });
+    await expect(context.panel).toHaveClass(/is-compact/);
+    await unchanged(page, context);
+    await context.panel.getByRole('button', { name: 'Скрыть' }).click();
+    await expect(context.panel).toHaveCount(0);
     await unchanged(page, context);
   });
 
-  test('expiry retains a pressed control and its hit surface until another gesture', async ({
+  test('expiry completes a pressed control before compacting without another gesture', async ({
     page,
   }) => {
     const context = await prepare(page, 360, 'dark');
@@ -4479,15 +4489,14 @@ test.describe('#914 rest timer pointer lifecycle', () => {
       'true',
     );
     await page.mouse.up();
-    await page.touchscreen.tap(point.x, point.y);
-    await unchanged(page, context);
-    await page.getByRole('button', { name: 'К сводке' }).focus();
     await expect(context.panel).toHaveClass(/is-compact/);
+    await expect(context.panel).toContainText('Отдых завершён');
+    await expect(context.panel).not.toContainText('Отдых пропущен');
+    await expect(context.panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
+    await unchanged(page, context);
     const hide = context.panel.getByRole('button', { name: 'Скрыть' });
-    const box = (await hide.boundingBox())!;
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
-    await expect(context.panel).toBeVisible();
+    await hide.click();
+    await expect(context.panel).toHaveCount(0);
     await unchanged(page, context);
   });
 });
