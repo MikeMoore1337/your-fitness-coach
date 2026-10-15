@@ -1826,22 +1826,51 @@ export function TodayWorkout({
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        if (!editingWorkoutField()) return;
+        const editingRir = document.activeElement?.matches('.active-workout-rir button');
+        if (!editingWorkoutField() && !editingRir) return;
         const input = document.activeElement as HTMLElement;
-        const controls = input.closest('.active-workout-set__controls') ?? input;
-        const box = controls.getBoundingClientRect();
+        const controls =
+          input.closest('.active-workout-set')?.querySelector('.active-workout-set__controls') ??
+          input;
+        const controlsBox = controls.getBoundingClientRect();
+        const inputBox = input.getBoundingClientRect();
+        const box = {
+          top: Math.min(controlsBox.top, inputBox.top),
+          bottom: Math.max(controlsBox.bottom, inputBox.bottom),
+        };
         const viewport = window.visualViewport;
         const top = viewport?.offsetTop ?? 0;
-        const bottom = top + (viewport?.height ?? window.innerHeight);
+        const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+        const bottom = Math.min(
+          top + (viewport?.height ?? window.innerHeight),
+          dock && dock.height > 0 ? dock.top - 8 : Infinity,
+        );
         const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
         const safeTop = Math.max(
           top,
           timer && timer.bottom > top && timer.top < bottom ? timer.bottom : top,
         );
-        const target = box.height <= bottom - safeTop ? box : input.getBoundingClientRect();
-        const delta =
+        const target = box.bottom - box.top <= bottom - safeTop ? box : inputBox;
+        let delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
-        if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+        const nextRow = input.closest('.active-workout-set')?.nextElementSibling;
+        const nextDone = nextRow?.querySelector('[data-workout-field="done"]');
+        if (
+          editingRir &&
+          nextRow &&
+          nextDone &&
+          nextRow.getBoundingClientRect().top < top + (viewport?.height ?? window.innerHeight)
+        ) {
+          delta = Math.max(
+            delta,
+            Math.min(nextDone.getBoundingClientRect().bottom - bottom, target.top - safeTop),
+          );
+        }
+        if (delta)
+          window.scrollBy({
+            top: delta < 0 ? Math.floor(delta) : Math.ceil(delta),
+            behavior: 'instant',
+          });
       });
     };
     const viewport = window.visualViewport;
@@ -1855,7 +1884,10 @@ export function TodayWorkout({
     const focus = () => {
       observer.disconnect();
       const row = document.activeElement?.closest('.active-workout-set');
-      if (row && editingWorkoutField()) {
+      if (
+        row &&
+        (editingWorkoutField() || document.activeElement?.matches('.active-workout-rir button'))
+      ) {
         // Stop an in-flight completion scroll before the keyboard takes over positioning.
         window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
         observer.observe(row);
@@ -1914,7 +1946,21 @@ export function TodayWorkout({
       const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
       const box = controls.getBoundingClientRect();
       const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
-      window.scrollBy({ top: box.top - targetTop, behavior: 'instant' });
+      let delta = box.top - targetTop;
+      const nextRow = row?.nextElementSibling;
+      const nextDone = nextRow?.querySelector<HTMLElement>('[data-workout-field="done"]');
+      const rir = row?.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
+      if (nextDone) {
+        // Clear the adjacent set only within the space that keeps the current inputs visible.
+        delta = Math.max(
+          delta,
+          Math.min(
+            nextDone.getBoundingClientRect().bottom - safeBottom,
+            Math.min(box.top, rir?.top ?? box.top) - safeTop,
+          ),
+        );
+      }
+      window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [completionNavigation, currentSetId]);
