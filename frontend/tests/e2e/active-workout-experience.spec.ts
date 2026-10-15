@@ -81,6 +81,7 @@ async function mockActiveWorkout(
   mediaState: 'approved_animated' | 'blocked' = 'approved_animated',
   targetStarted = false,
   setupMemoryBody: string | null = null,
+  longWorkout = false,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
@@ -232,6 +233,23 @@ async function mockActiveWorkout(
               sets: [{ id: 204, set_number: 1, ...sets.get(204)! }],
             },
           ]
+        : []),
+      ...(longWorkout
+        ? Array.from({ length: 5 }, (_, exerciseIndex) => ({
+            id: 110 + exerciseIndex,
+            exercise_id: 11,
+            exercise_title: `Дополнительное упражнение ${exerciseIndex + 1}`,
+            metric_type: 'strength',
+            sort_order: 3 + exerciseIndex,
+            prescribed_sets: 4,
+            prescribed_reps: '10',
+            rest_seconds: 90,
+            sets: Array.from({ length: 4 }, (_, setIndex) => ({
+              ...sets.get(203)!,
+              id: 500 + exerciseIndex * 4 + setIndex,
+              set_number: setIndex + 1,
+            })),
+          }))
         : []),
     ],
   });
@@ -743,6 +761,138 @@ async function activeWorkoutQueueLength(page: Page) {
     return stored ? ((JSON.parse(stored) as { queue?: unknown[] }).queue?.length ?? 0) : 0;
   });
 }
+
+test.describe('#1001 keyboard input stability', () => {
+  test.use({
+    isMobile: async ({ browserName }, use) => use(browserName !== 'firefox'),
+    hasTouch: true,
+    deviceScaleFactor: 3,
+  });
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`autosave preserves focused fields at ${width}px ${theme}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({
+          colorScheme: theme,
+          reducedMotion: theme === 'dark' ? 'reduce' : 'no-preference',
+        });
+        await page.addInitScript((value) => {
+          localStorage.setItem('app-theme', value);
+          const viewport = new EventTarget();
+          Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+          Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+        }, theme);
+        const server = await mockActiveWorkout(page, true, 'approved_animated', false, null, true);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        const first = page.locator('[data-workout-set-id="201"]');
+        await first.getByLabel(/^Вес,/).fill('40');
+        await first.getByLabel(/^Повторы,/).fill('10');
+        await first.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+        await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+        await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+        const row = page.locator('[data-workout-set-id="202"]');
+        const weight = row.getByLabel(/^Вес,/);
+        const reps = row.getByLabel(/^Повторы,/);
+        // Model an iOS keyboard without resizing the layout viewport.
+        await page.evaluate(() => {
+          Object.assign(window.visualViewport!, { height: 420 });
+          window.visualViewport!.dispatchEvent(new Event('resize'));
+        });
+        await weight.focus();
+        const assertFields = async () => {
+          await expect
+            .poll(() =>
+              row.evaluate((element) => {
+                const viewport = window.visualViewport!;
+                const timer = document
+                  .querySelector('.active-workout-rest')!
+                  .getBoundingClientRect();
+                const boxes = [...element.querySelectorAll('[data-workout-field]')].map((input) =>
+                  input.getBoundingClientRect(),
+                );
+                return Math.max(
+                  ...boxes.map((box) =>
+                    Math.max(
+                      Math.max(viewport.offsetTop, timer.bottom) - box.top,
+                      box.bottom - viewport.offsetTop - viewport.height,
+                    ),
+                  ),
+                );
+              }),
+            )
+            .toBeLessThanOrEqual(0.5);
+        };
+        await assertFields();
+        for (let index = 0; index < 3; index++) {
+          await weight.focus();
+          await weight.fill('');
+          await weight.pressSequentially(index === 1 ? '6.5' : '5.5');
+          await expect.poll(() => server.readSet(202).actual_weight).toBe(index === 1 ? 6.5 : 5.5);
+          await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          await expect(weight).toBeFocused();
+          await assertFields();
+          await reps.focus();
+          await reps.fill('');
+          await reps.pressSequentially(index === 1 ? '11' : '12');
+          await expect.poll(() => server.readSet(202).actual_reps).toBe(index === 1 ? 11 : 12);
+          await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          await expect(reps).toBeFocused();
+          await assertFields();
+          await page.evaluate(
+            (height) => {
+              Object.assign(window.visualViewport!, { height });
+              window.visualViewport!.dispatchEvent(new Event('resize'));
+            },
+            index === 1 ? 460 : 420,
+          );
+          await assertFields();
+        }
+        expect(server.readSet(202).is_completed).toBe(false);
+        expect(server.readSet(203).actual_weight).toBeNull();
+        await page.evaluate(() => {
+          Object.assign(window.visualViewport!, { height: 844, offsetTop: 0 });
+          window.visualViewport!.dispatchEvent(new Event('resize'));
+          (document.activeElement as HTMLElement).blur();
+        });
+        await reps.focus();
+        await page.evaluate(() => {
+          Object.assign(window.visualViewport!, { height: 420, offsetTop: 20 });
+          window.visualViewport!.dispatchEvent(new Event('resize'));
+          window.visualViewport!.dispatchEvent(new Event('scroll'));
+        });
+        await assertFields();
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+            ),
+        );
+        await page.evaluate(() => window.scrollBy({ top: 40, behavior: 'instant' }));
+        const manualScroll = await page.evaluate(() => scrollY);
+        await reps.fill('13');
+        await expect.poll(() => server.readSet(202).actual_reps).toBe(13);
+        await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+        expect(await page.evaluate(() => scrollY)).toBe(manualScroll);
+        await reps.fill('12');
+        await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
+        await row.getByRole('button', { name: /^Завершить:/ }).click();
+        await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+        await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+        await page.reload();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        await expect(row.getByLabel(/^Вес,/)).toHaveValue('5.5');
+        await expect(row.getByLabel(/^Повторы,/)).toHaveValue('12');
+        await first.getByRole('button', { name: 'Редактировать', exact: true }).click();
+        await first.getByLabel(/^Вес,/).fill('41');
+        await expect(first.getByLabel(/^Вес,/)).toBeFocused();
+        expect(server.readSet(201).is_completed).toBe(true);
+      });
+    }
+  }
+});
 
 test('P1 completion waits for acceptance behind an in-flight autosave', async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });

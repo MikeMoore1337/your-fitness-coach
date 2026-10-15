@@ -166,7 +166,14 @@ export function formatPlannedGroupKind(kind: WorkoutSet['planned_group_kind']): 
 function focusWorkoutControl(row: HTMLDivElement | null, field: 'reps' | 'distance' | 'done') {
   const control = row?.querySelector<HTMLElement>(`[data-workout-field="${field}"]`);
   control?.focus();
-  control?.scrollIntoView({ block: 'nearest' });
+}
+
+function editingWorkoutField(): boolean {
+  return (
+    document.activeElement?.matches(
+      '.active-workout-set input, .active-workout-set select, .active-workout-set textarea',
+    ) ?? false
+  );
 }
 
 function formatWorkoutNumber(value: number): string {
@@ -1784,6 +1791,62 @@ export function TodayWorkout({
   const currentSetId = currentSet?.set.id;
   const clearActiveState = activeSync.clear;
   const pendingActiveCount = activeSync.pendingCount;
+  const reconciledCompletion = useRef<string | null>(null);
+
+  useEffect(() => {
+    let frame: number | undefined;
+    const keepFieldsVisible = () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        if (!editingWorkoutField()) return;
+        const input = document.activeElement as HTMLElement;
+        const controls = input.closest('.active-workout-set__controls') ?? input;
+        const box = controls.getBoundingClientRect();
+        const viewport = window.visualViewport;
+        const top = viewport?.offsetTop ?? 0;
+        const bottom = top + (viewport?.height ?? window.innerHeight);
+        const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+        const safeTop = Math.max(
+          top,
+          timer && timer.bottom > top && timer.top < bottom ? timer.bottom : top,
+        );
+        const target = box.height <= bottom - safeTop ? box : input.getBoundingClientRect();
+        const delta =
+          target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
+        if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+      });
+    };
+    const viewport = window.visualViewport;
+    let viewportTop = viewport?.offsetTop;
+    const panViewport = () => {
+      if (viewport?.offsetTop === viewportTop) return;
+      viewportTop = viewport?.offsetTop;
+      keepFieldsVisible();
+    };
+    const observer = new ResizeObserver(keepFieldsVisible);
+    const focus = () => {
+      observer.disconnect();
+      const row = document.activeElement?.closest('.active-workout-set');
+      if (row && editingWorkoutField()) {
+        // Stop an in-flight completion scroll before the keyboard takes over positioning.
+        window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
+        observer.observe(row);
+      }
+      keepFieldsVisible();
+    };
+    document.addEventListener('focusin', focus);
+    viewport?.addEventListener('resize', keepFieldsVisible);
+    viewport?.addEventListener('scroll', panViewport);
+    window.addEventListener('resize', keepFieldsVisible);
+    return () => {
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.removeEventListener('focusin', focus);
+      viewport?.removeEventListener('resize', keepFieldsVisible);
+      viewport?.removeEventListener('scroll', panViewport);
+      window.removeEventListener('resize', keepFieldsVisible);
+    };
+  }, []);
 
   useEffect(() => {
     if (
@@ -1798,7 +1861,7 @@ export function TodayWorkout({
   }, [clearActiveState, pendingActiveCount, user, workout.error]);
 
   useLayoutEffect(() => {
-    if (!currentSetId || completed === 0) return;
+    if (!currentSetId || completed === 0 || editingWorkoutField()) return;
     const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const getCurrentElement = () =>
       document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
@@ -1811,6 +1874,7 @@ export function TodayWorkout({
     });
 
     const settleDockClearance = () => {
+      if (editingWorkoutField()) return;
       const activeElement = getCurrentElement();
       if (!activeElement) return;
       const navigation = document.getElementById('appBottomNav');
@@ -1844,16 +1908,25 @@ export function TodayWorkout({
     };
     // A pending workout sync can replace the set row before the next frame. Re-querying
     // there keeps the clearance pass attached to the committed row instead of a detached node.
-    window.requestAnimationFrame(settleDockClearance);
-    window.setTimeout(settleDockClearance, 0);
+    const frame = window.requestAnimationFrame(settleDockClearance);
+    const timeout = window.setTimeout(settleDockClearance, 0);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
   }, [completed, currentSetId]);
 
   // The queue acknowledgement can restore the browser's pre-submit scroll position.
   // Reconcile the active completion control after that final render while rest is visible.
   useEffect(() => {
     if (!currentSetId || completed === 0 || pendingActiveCount !== 0) return;
+    const completion = `${workout.data?.id}:${completed}:${currentSetId}`;
+    if (reconciledCompletion.current === completion) return;
+    reconciledCompletion.current = completion;
+    if (editingWorkoutField()) return;
     if (!document.querySelector('.active-workout-rest')) return;
     const frameId = window.requestAnimationFrame(() => {
+      if (editingWorkoutField()) return;
       const currentElement = document.querySelector<HTMLElement>(
         `[data-workout-set-id="${currentSetId}"]`,
       );
@@ -1882,7 +1955,7 @@ export function TodayWorkout({
       if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'instant' });
     });
     return () => window.cancelAnimationFrame(frameId);
-  }, [completed, currentSetId, pendingActiveCount]);
+  }, [completed, currentSetId, pendingActiveCount, workout.data?.id]);
 
   if (workout.isLoading)
     return (
