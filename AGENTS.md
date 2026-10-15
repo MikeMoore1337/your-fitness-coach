@@ -105,8 +105,6 @@ workflow and do not require this visual gate.
   `npm run lint`; the guard is part of the required `frontend-checks` CI group. Do not add inline
   bypasses. Legacy English UI is tracked separately and must not be expanded by new changes.
 
-## Verification and security
-
 ## Adaptive delivery for non-trivial features
 
 For a multi-component, ambiguous or higher-risk Issue, apply the **optional, stateless**
@@ -116,6 +114,8 @@ acceptance criteria to real evidence, and disclose unverified environments. For 
 clear, small fix, implement directly; no extra planning ceremony or reviewer agent.
 This guidance does not add an owner, local task state, orchestration, CI gate or
 approval, and cannot override Issue governance, existing skills or owner decisions.
+
+## Verification and security
 
 
 
