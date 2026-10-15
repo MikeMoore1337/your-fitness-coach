@@ -894,6 +894,155 @@ test.describe('#1001 keyboard input stability', () => {
   }
 });
 
+test.describe('#1001 completion navigation', () => {
+  test.use({
+    isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
+    hasTouch: true,
+  });
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      test(`one accepted transition at ${width}px ${theme}`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await page.emulateMedia({ colorScheme: theme, reducedMotion: 'no-preference' });
+        await page.addInitScript((theme) => {
+          localStorage.setItem('app-theme', theme);
+          const viewport = new EventTarget();
+          Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+          Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+          const calls: string[] = [];
+          Object.assign(window, { completionScrolls: calls });
+          for (const method of ['scrollBy', 'scrollTo'] as const) {
+            const original = window[method].bind(window);
+            window[method] = (options?: ScrollToOptions | number, y?: number) => {
+              calls.push(method);
+              if (typeof options === 'number') original(options, y ?? 0);
+              else original(options);
+            };
+          }
+          const original = Element.prototype.scrollIntoView;
+          Element.prototype.scrollIntoView = function (options) {
+            calls.push('scrollIntoView');
+            original.call(this, options);
+          };
+        }, theme);
+        const server = await mockActiveWorkout(page, true, 'approved_animated', false, null, true);
+        await page.goto('/app');
+        await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+        await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        for (const [id, nextId] of [
+          [201, 202],
+          [202, 203],
+          [203, 204],
+          [204, 500],
+        ] as const) {
+          const row = page.locator(`[data-workout-set-id="${id}"]`);
+          const releaseAutosave = id === 203 ? server.holdNextPatch() : null;
+          if (id === 204) await row.getByLabel(/^Длительность,/).fill('25');
+          else {
+            await row.getByLabel(/^Вес,/).fill('50');
+            if (releaseAutosave) await expect.poll(() => server.patches.at(-1)?.setId).toBe(id);
+            await row.getByLabel(/^Повторы,/).fill('15');
+          }
+          if (!releaseAutosave) await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          if (id === 202) await setNetworkOffline(page, true);
+          const patchCount = server.patches.length;
+          const releaseCompletion = id === 201 ? server.holdNextPatch() : null;
+          const release = releaseAutosave ?? releaseCompletion;
+          await page.evaluate(
+            (keyboard) => {
+              Object.assign(window.visualViewport!, { height: keyboard ? 420 : 844, offsetTop: 0 });
+              window.visualViewport!.dispatchEvent(new Event('resize'));
+            },
+            id === 202 || id === 203,
+          );
+          const done = row.locator('[data-workout-field="done"]');
+          await done.scrollIntoViewIfNeeded();
+          await page.evaluate(
+            () =>
+              new Promise<void>((resolve) =>
+                requestAnimationFrame(() => {
+                  (window as unknown as { completionScrolls: string[] }).completionScrolls.length =
+                    0;
+                  resolve();
+                }),
+              ),
+          );
+          await done.click();
+          if (release) {
+            try {
+              if (releaseCompletion) {
+                await expect.poll(() => server.patches.length).toBe(patchCount + 1);
+                expect(server.patches.at(-1)?.body.is_completed).toBe(true);
+              }
+              expect(server.readSet(id).is_completed).toBe(false);
+              await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+                'data-workout-set-id',
+                String(id),
+              );
+              expect(
+                await page.evaluate(
+                  () => (window as unknown as { completionScrolls: string[] }).completionScrolls,
+                ),
+              ).toEqual([]);
+            } finally {
+              release();
+            }
+          }
+          await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+            'data-workout-set-id',
+            String(nextId),
+          );
+          const next = page.locator(`[data-workout-set-id="${nextId}"]`);
+          await expect
+            .poll(() =>
+              next.evaluate((element) => {
+                const viewport = window.visualViewport!;
+                const timer = document
+                  .querySelector('.active-workout-rest')
+                  ?.getBoundingClientRect();
+                const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+                const top = Math.max(viewport.offsetTop, timer?.bottom ?? 0);
+                const bottom = Math.min(
+                  viewport.offsetTop + viewport.height,
+                  dock?.height ? dock.top : Infinity,
+                );
+                const controls = element
+                  .querySelector('.active-workout-set__controls')!
+                  .getBoundingClientRect();
+                return Math.max(top - controls.top, controls.bottom - bottom);
+              }),
+            )
+            .toBeLessThanOrEqual(1);
+          if (id === 202) await setNetworkOffline(page, false);
+          await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+          await page.evaluate(() => {
+            Object.assign(window.visualViewport!, { height: 844 });
+            window.visualViewport!.dispatchEvent(new Event('resize'));
+          });
+          await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
+          await page.evaluate(
+            () =>
+              new Promise<void>((resolve) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+              ),
+          );
+          expect(
+            await page.evaluate(
+              () => (window as unknown as { completionScrolls: string[] }).completionScrolls,
+            ),
+          ).toEqual(['scrollBy']);
+          expect(server.readSet(id)).toMatchObject(
+            id === 204
+              ? { is_completed: true, duration_minutes: 25 }
+              : { is_completed: true, actual_weight: 50, actual_reps: 15 },
+          );
+          if (id !== 204) await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+        }
+      });
+    }
+  }
+});
+
 test('P1 completion waits for acceptance behind an in-flight autosave', async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 393, height: 844 });
