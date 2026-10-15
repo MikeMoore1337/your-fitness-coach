@@ -1,8 +1,10 @@
 # Issue #1002 — доказательный аудит толстых односторонних лаймовых граней
 
-Дата аудита: 2026-10-16. Базовая ревизия: `origin/master` = `474d920d29e373043d4216586095ad7c90f7eb2e`.
+Дата аудита: 2026-10-16. Базовая ревизия на старте: `origin/master` = `474d920d29e373043d4216586095ad7c90f7eb2e`.
 
 Это подготовительный audit-only пакет. В приложенные исходники Web/PWA/TMA не внесены изменения; временный Playwright harness после сбора доказательств удалён. Issue #1002 остаётся `Backlog`, а owner visual approval, merge и deploy не выполнялись.
+
+При финальной проверке live `origin/master` уже продвинулся до `34fee7003e0ea280abda9579194acb70dabd50bb` после merge PR #1013. Его diff затронул Progress hero/flow, но не изменил подтверждённые A-селекторы (`progress-report-*` или `.cardio-log`); поэтому Draft PR #1023 помечен GitHub как `BEHIND`. Перед реализацией A-правок нужно повторить exact-head computed check на актуальном master.
 
 ## Критерий классификации
 

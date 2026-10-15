@@ -1,6 +1,6 @@
 # Issue #1002 — компактная computed-style сводка
 
-Baseline: `origin/master` `474d920d29e373043d4216586095ad7c90f7eb2e`; fixture data synthetic; browser audit local-only.
+Audit baseline: `origin/master` `474d920d29e373043d4216586095ad7c90f7eb2e`; fixture data synthetic; browser audit local-only. At final verification live `origin/master` was `34fee7003e0ea280abda9579194acb70dabd50bb` after #1013; the relevant A selectors were unchanged, but implementation must refresh exact-head evidence.
 
 ## Matrix
 
