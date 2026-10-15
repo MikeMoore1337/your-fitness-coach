@@ -44,6 +44,15 @@ afterEach(() => {
 });
 
 describe('RestTimer', () => {
+  it('settles an already-expired stored deadline without a user event', () => {
+    localStorage.setItem(key, JSON.stringify(initialTime - 1));
+
+    mount();
+
+    expect(screen.queryByRole('timer', { name: 'Отдых' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Отдых завершён');
+  });
+
   it('extends the existing scoped deadline with native clicks and preserves field focus', () => {
     mount();
     const weight = screen.getByRole('textbox', { name: 'Вес' });
@@ -129,6 +138,20 @@ describe('RestTimer', () => {
       'false',
     );
     expect(JSON.parse(localStorage.getItem(key)!)).toBe(initialTime + 185_000);
+  });
+
+  it('keeps one deadline timer across resume events and clears it on unmount', () => {
+    const timersBeforeMount = vi.getTimerCount();
+    const view = mount();
+    const timersWithRest = vi.getTimerCount();
+
+    expect(timersWithRest).toBe(timersBeforeMount + 1);
+    fireEvent(window, new Event('pageshow'));
+    fireEvent(document, new Event('visibilitychange'));
+    expect(vi.getTimerCount()).toBe(timersWithRest);
+
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(timersBeforeMount);
   });
 
   it('releases interrupted pointers on pagehide without removing the skip hit surface', () => {
