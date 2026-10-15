@@ -347,7 +347,10 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
       await tma.setTheme(theme);
       await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
 
-      const actions = tmaPage.locator('.daily-wellbeing__actions .ui-button');
+      // The optional edit-cancellation action is separate from Save/Delete geometry.
+      const actions = tmaPage
+        .locator('.daily-wellbeing__actions .ui-button')
+        .filter({ hasText: /^(Сохранить отметку|Удалить)$/ });
       await expect(actions).toHaveCount(2);
       await expect(actions.first()).toHaveText('Сохранить отметку');
       await expect(actions.last()).toHaveText('Удалить');
