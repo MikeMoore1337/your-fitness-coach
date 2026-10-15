@@ -402,6 +402,7 @@ function WorkoutSetRow({
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
+    completing?: boolean,
   ) => Promise<boolean>;
 }) {
   const [reps, setReps] = useState<string>(
@@ -481,6 +482,7 @@ function WorkoutSetRow({
           is_completed: nextCompleted,
         },
         immediate,
+        immediate && startRest && nextCompleted,
       );
       if (accepted && immediate && startRest && nextCompleted) {
         haptic('success');
@@ -976,6 +978,7 @@ function CardioWorkoutRow({
     serverVersion: number,
     values: ActiveWorkoutSetValues,
     immediate?: boolean,
+    completing?: boolean,
   ) => Promise<boolean>;
 }) {
   const [duration, setDuration] = useState(
@@ -1052,6 +1055,7 @@ function CardioWorkoutRow({
           is_completed: nextCompleted,
         },
         immediate,
+        immediate && startRest && nextCompleted,
       );
       if (accepted && immediate && startRest && nextCompleted) haptic('success');
       return accepted;
@@ -1777,13 +1781,40 @@ export function TodayWorkout({
     () => workout.data?.exercises.flatMap((item) => item.sets).length ?? 0,
     [workout.data],
   );
+  const [completionNavigation, setCompletionNavigation] = useState<{
+    setId: number;
+    accepted: boolean;
+  } | null>(null);
+  const navigatedCompletion = useRef<typeof completionNavigation>(null);
+  const autosaveSetId = useRef<number | null>(null);
+  const enqueueSet = async (
+    setId: number,
+    version: number,
+    values: ActiveWorkoutSetValues,
+    immediate?: boolean,
+    completing = false,
+  ) => {
+    autosaveSetId.current = !immediate && !values.is_completed ? setId : null;
+    const navigation = completing ? { setId, accepted: false } : null;
+    if (navigation) setCompletionNavigation(navigation);
+    const accepted = await activeSync.enqueue(setId, version, values, immediate);
+    if (navigation)
+      setCompletionNavigation((current) =>
+        current === navigation ? (accepted ? { setId, accepted: true } : null) : current,
+      );
+    return accepted;
+  };
   const currentSet = (() => {
     if (!workout.data) return null;
     for (const exercise of workout.data.exercises) {
       for (const set of exercise.sets) {
         const isCompleted =
           activeSync.pendingBySet.get(set.id)?.values.is_completed ?? set.is_completed;
-        if (!isCompleted) return { exercise, set };
+        if (
+          !isCompleted ||
+          (completionNavigation?.setId === set.id && !completionNavigation.accepted)
+        )
+          return { exercise, set };
       }
     }
     return null;
@@ -1794,10 +1825,19 @@ export function TodayWorkout({
 
   useEffect(() => {
     let frame: number | undefined;
+    let pointerActive = false;
+    let correctionPending = false;
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
-        if (!editingWorkoutField()) return;
+        // A pressed control must stay under the pointer until its click is delivered.
+        if (pointerActive) {
+          correctionPending = true;
+          return;
+        }
+        correctionPending = false;
+        const editingRir = document.activeElement?.matches('.active-workout-rir button');
+        if (!editingWorkoutField() && !editingRir) return;
         const input = document.activeElement as HTMLElement;
         const controls = input.closest('.active-workout-set__controls') ?? input;
         const box = controls.getBoundingClientRect();
@@ -1815,6 +1855,13 @@ export function TodayWorkout({
         if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
       });
     };
+    const pointerDown = () => {
+      pointerActive = true;
+    };
+    const pointerEnd = () => {
+      pointerActive = false;
+      if (correctionPending) keepFieldsVisible();
+    };
     const viewport = window.visualViewport;
     let viewportTop = viewport?.offsetTop;
     const panViewport = () => {
@@ -1826,7 +1873,10 @@ export function TodayWorkout({
     const focus = () => {
       observer.disconnect();
       const row = document.activeElement?.closest('.active-workout-set');
-      if (row && editingWorkoutField()) {
+      if (
+        row &&
+        (editingWorkoutField() || document.activeElement?.matches('.active-workout-rir button'))
+      ) {
         // Stop an in-flight completion scroll before the keyboard takes over positioning.
         window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
         observer.observe(row);
@@ -1834,6 +1884,9 @@ export function TodayWorkout({
       keepFieldsVisible();
     };
     document.addEventListener('focusin', focus);
+    document.addEventListener('pointerdown', pointerDown, true);
+    document.addEventListener('pointerup', pointerEnd, true);
+    document.addEventListener('pointercancel', pointerEnd, true);
     viewport?.addEventListener('resize', keepFieldsVisible);
     viewport?.addEventListener('scroll', panViewport);
     window.addEventListener('resize', keepFieldsVisible);
@@ -1841,6 +1894,9 @@ export function TodayWorkout({
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       observer.disconnect();
       document.removeEventListener('focusin', focus);
+      document.removeEventListener('pointerdown', pointerDown, true);
+      document.removeEventListener('pointerup', pointerEnd, true);
+      document.removeEventListener('pointercancel', pointerEnd, true);
       viewport?.removeEventListener('resize', keepFieldsVisible);
       viewport?.removeEventListener('scroll', panViewport);
       window.removeEventListener('resize', keepFieldsVisible);
@@ -1860,95 +1916,83 @@ export function TodayWorkout({
   }, [clearActiveState, pendingActiveCount, user, workout.error]);
 
   useLayoutEffect(() => {
-    if (!currentSetId || completed === 0 || editingWorkoutField()) return;
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    const getCurrentElement = () =>
-      document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
-    const currentElement = getCurrentElement();
-    if (!currentElement) return;
-    currentElement.scrollIntoView?.({
-      behavior: reducedMotion ? 'auto' : 'smooth',
-      // Keep the newly active set away from the fixed mobile dock.
-      block: 'center',
+    if (!completionNavigation?.accepted || navigatedCompletion.current === completionNavigation)
+      return;
+    const frame = window.requestAnimationFrame(() => {
+      navigatedCompletion.current = completionNavigation;
+      // Only acceptance owns navigation; autosave and later queue acknowledgements do not.
+      const focused = document.activeElement;
+      if (
+        focused instanceof HTMLElement &&
+        focused.closest(`[data-workout-set-id="${completionNavigation.setId}"]`)
+      )
+        focused.blur();
+      if (!currentSetId || editingWorkoutField()) return;
+      const row = document.querySelector<HTMLElement>(`[data-workout-set-id="${currentSetId}"]`);
+      const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+      if (!controls) return;
+      const viewport = window.visualViewport;
+      const top = viewport?.offsetTop ?? 0;
+      const bottom = top + (viewport?.height ?? window.innerHeight);
+      const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+      const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+      const safeTop =
+        Math.max(top, timer && timer.top < bottom && timer.bottom > top ? timer.bottom : top) + 8;
+      const safeBottom = Math.min(bottom, dock && dock.height > 0 ? dock.top : bottom) - 8;
+      const box = controls.getBoundingClientRect();
+      const targetTop = safeTop + Math.max(0, (safeBottom - safeTop - box.height) / 2);
+      let delta = box.top - targetTop;
+      const nextRow = row?.nextElementSibling;
+      const nextDone = nextRow?.querySelector<HTMLElement>('[data-workout-field="done"]');
+      const rir = row?.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
+      if (nextDone) {
+        // Clear the adjacent set only within the space that keeps the current inputs visible.
+        delta = Math.max(
+          delta,
+          Math.min(
+            nextDone.getBoundingClientRect().bottom - safeBottom,
+            Math.min(box.top, rir?.top ?? box.top) - safeTop,
+          ),
+        );
+      }
+      window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
+    return () => window.cancelAnimationFrame(frame);
+  }, [completionNavigation, currentSetId]);
 
-    const settleDockClearance = () => {
-      if (editingWorkoutField()) return;
-      const activeElement = getCurrentElement();
-      if (!activeElement) return;
-      const navigation = document.getElementById('appBottomNav');
-      if (!navigation || window.matchMedia?.('(min-width: 900px)').matches) return;
-      const doneControls = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
-      );
-      const currentIndex = doneControls.findIndex((control) => activeElement.contains(control));
-      const nextControl = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
-      const navigationTop = navigation.getBoundingClientRect().top;
-      const currentControls = Array.from(
-        activeElement.querySelectorAll<HTMLElement>('input, button, select, textarea, summary'),
-      ).filter((control) => {
-        const rect = control.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0 && rect.bottom > 0;
-      });
-      const nextRect = nextControl?.closest('.active-workout-set')?.getBoundingClientRect();
-      const controlsToClear = [
-        ...currentControls,
-        ...(nextControl && nextRect && nextRect.top < window.innerHeight ? [nextControl] : []),
-      ];
-      if (!controlsToClear.length) return;
-      const overlap = Math.max(
-        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - navigationTop),
-      );
-      if (overlap <= 0) return;
-      window.scrollBy({
-        top: overlap + 8,
-        behavior: reducedMotion ? 'auto' : 'smooth',
-      });
-    };
-    // A pending workout sync can replace the set row before the next frame. Re-querying
-    // there keeps the clearance pass attached to the committed row instead of a detached node.
-    const frame = window.requestAnimationFrame(settleDockClearance);
-    const timeout = window.setTimeout(settleDockClearance, 0);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      window.clearTimeout(timeout);
-    };
-  }, [completed, currentSetId]);
-
-  // The queue acknowledgement can restore the browser's pre-submit scroll position.
-  // Reconcile the active completion control after that final render while rest is visible.
   useEffect(() => {
-    if (!currentSetId || completed === 0 || pendingActiveCount !== 0) return;
-    if (editingWorkoutField()) return;
-    if (!document.querySelector('.active-workout-rest')) return;
-    const frameId = window.requestAnimationFrame(() => {
-      if (editingWorkoutField()) return;
-      const currentElement = document.querySelector<HTMLElement>(
-        `[data-workout-set-id="${currentSetId}"]`,
+    if (pendingActiveCount !== 0 || autosaveSetId.current !== currentSetId || editingWorkoutField())
+      return;
+    const frame = window.requestAnimationFrame(() => {
+      if (editingWorkoutField() || autosaveSetId.current !== currentSetId) return;
+      const row = document.querySelector<HTMLElement>(
+        '[data-workout-set-id="' + currentSetId + '"]',
       );
-      const navigation = document.getElementById('appBottomNav');
-      const done = currentElement?.querySelector<HTMLElement>('[data-workout-field="done"]');
-      if (!currentElement || !navigation || !done) return;
-      if (navigation.getBoundingClientRect().height === 0) return;
-      const navigationTop = navigation.getBoundingClientRect().top;
-      const safeBottom = navigationTop - 8;
-      const doneControls = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-workout-field="done"]'),
-      );
-      const currentIndex = doneControls.findIndex((control) => currentElement.contains(control));
-      const nextDone = currentIndex >= 0 ? doneControls[currentIndex + 1] : undefined;
-      const nextRect = nextDone?.closest('.active-workout-set')?.getBoundingClientRect();
-      const controlsToClear = [
-        done,
-        ...(nextDone && nextRect && nextRect.top < window.innerHeight ? [nextDone] : []),
-      ];
+      const controls = row?.querySelector('.active-workout-set__controls')?.getBoundingClientRect();
+      const dock = document.getElementById('appBottomNav')?.getBoundingClientRect();
+      const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+      if (!row || !controls || !dock?.height || !timer) return;
+      const viewport = window.visualViewport;
+      const top = Math.max(viewport?.offsetTop ?? 0, timer.bottom);
+      const bottom =
+        Math.min((viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight), dock.top) - 8;
+      const nextRow = row.nextElementSibling;
+      const next = nextRow?.querySelector('[data-workout-field="done"]')?.getBoundingClientRect();
+      const visibleNext =
+        nextRow &&
+        nextRow.getBoundingClientRect().top <
+          (viewport?.offsetTop ?? 0) + (viewport?.height ?? innerHeight);
+      const rir = row.querySelector('.active-workout-rir--quick')?.getBoundingClientRect();
       const overlap = Math.max(
-        ...controlsToClear.map((control) => control.getBoundingClientRect().bottom - safeBottom),
+        0,
+        controls.bottom - bottom,
+        visibleNext && next ? next.bottom - bottom : 0,
       );
-      if (overlap > 0) window.scrollBy({ top: overlap + 1, behavior: 'instant' });
+      const delta = Math.min(overlap, Math.min(controls.top, rir?.top ?? controls.top) - top);
+      if (delta > 0) window.scrollBy({ top: Math.ceil(delta), behavior: 'instant' });
     });
-    return () => window.cancelAnimationFrame(frameId);
-  }, [completed, currentSetId, pendingActiveCount]);
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentSetId, pendingActiveCount]);
 
   if (workout.isLoading)
     return (
@@ -2385,7 +2429,7 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
-                          enqueue={activeSync.enqueue}
+                          enqueue={enqueueSet}
                         />
                       ) : (
                         <WorkoutSetRow
@@ -2410,7 +2454,7 @@ export function TodayWorkout({
                           durable={activeSync.durable}
                           syncing={activeSync.syncState === 'syncing'}
                           syncFailed={syncFailed}
-                          enqueue={activeSync.enqueue}
+                          enqueue={enqueueSet}
                         />
                       );
                     })}
