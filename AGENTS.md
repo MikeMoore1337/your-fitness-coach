@@ -107,8 +107,8 @@ workflow and do not require this visual gate.
 
 ## Adaptive delivery for non-trivial features
 
-For a multi-component, ambiguous or higher-risk Issue, apply the **optional, stateless**
-[feature-delivery playbook](docs/development/feature-delivery-playbook.md):
+For a multi-component, ambiguous or higher-risk Issue, the **optional, stateless**
+[feature-delivery playbook](docs/development/feature-delivery-playbook.md) is available when useful:
 use existing Issue criteria, choose the smallest sufficient analysis, map important
 acceptance criteria to real evidence, and disclose unverified environments. For a
 clear, small fix, implement directly; no extra planning ceremony or reviewer agent.
@@ -116,8 +116,6 @@ This guidance does not add an owner, local task state, orchestration, CI gate or
 approval, and cannot override Issue governance, existing skills or owner decisions.
 
 ## Verification and security
-
-
 
 Run risk-based targeted checks, then the applicable repository checks. Meaningful checks include
 pytest, frontend tests/build/typecheck/lint/format, mypy, migrations, integration/E2E, CodeQL,
