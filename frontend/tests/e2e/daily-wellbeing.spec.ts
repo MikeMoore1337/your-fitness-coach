@@ -195,7 +195,7 @@ test('daily wellbeing covers empty, partial, filled, offline and error states on
       .locator('.daily-wellbeing__option')
       .filter({ has: tmaPage.locator('input:checked') })
       .first(),
-  ).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
+  ).toHaveCSS('box-shadow', 'none');
   await expectNoHorizontalOverflow(tmaPage);
   await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await tmaPage.screenshot({
@@ -214,7 +214,7 @@ test('daily wellbeing covers empty, partial, filled, offline and error states on
       .locator('.daily-wellbeing__option')
       .filter({ has: tmaPage.locator('input:checked') })
       .first(),
-  ).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
+  ).toHaveCSS('box-shadow', 'none');
   await expectNoHorizontalOverflow(tmaPage);
   await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await tmaPage.screenshot({
@@ -324,9 +324,10 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
   await tmaPage.goto(wellbeingUrl(localDate));
 
   for (const theme of ['dark', 'light'] as const) {
-    for (const width of [320, 360, 390, 430]) {
+    for (const width of [320, 360, 390, 393, 430]) {
       await tmaPage.setViewportSize({ width, height: 844 });
-      dailyApi.setState('partial');
+      // Both groups must be selected to verify the same edge-free state.
+      dailyApi.setState('filled');
       await tmaPage.goto(wellbeingUrl(localDate));
       await tma.setTheme(theme);
       await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
@@ -387,21 +388,27 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
         uncheckedRadios.every((radio) => radio.accentColor !== checkedRadio!.accentColor),
       ).toBe(true);
 
-      const selectedOption = tmaPage.locator(
+      const selectedOptions = tmaPage.locator(
         '.daily-wellbeing__option[data-yfc-choice="compact"]:has(> input:checked)',
       );
-      await expect(selectedOption).toHaveCSS('border-bottom-width', '1px');
-      const selectedOutline = await selectedOption.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return {
-          topColor: style.borderTopColor,
-          bottomColor: style.borderBottomColor,
-          boxShadow: style.boxShadow,
-        };
-      });
-      expect(selectedOutline.bottomColor).toBe(selectedOutline.topColor);
-      expect(selectedOutline.bottomColor).not.toBe('rgb(178, 245, 32)');
-      expect(selectedOutline.boxShadow).not.toContain('rgb(178, 245, 32)');
+      await expect(selectedOptions).toHaveCount(2);
+      const selectedOutlines = await selectedOptions.evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            topColor: style.borderTopColor,
+            bottomColor: style.borderBottomColor,
+            bottomWidth: style.borderBottomWidth,
+            boxShadow: style.boxShadow,
+          };
+        }),
+      );
+      for (const selectedOutline of selectedOutlines) {
+        expect(selectedOutline.bottomWidth).toBe('1px');
+        expect(selectedOutline.bottomColor).toBe(selectedOutline.topColor);
+        expect(selectedOutline.bottomColor).not.toBe('rgb(178, 245, 32)');
+        expect(selectedOutline.boxShadow).toBe('none');
+      }
 
       const unchecked = tmaPage.locator('.daily-wellbeing__option input:not(:checked)').first();
       await unchecked.focus();
@@ -409,19 +416,13 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
       await expect(unchecked.locator('..')).toHaveCSS('outline-style', 'solid');
       await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
       await expectNoHorizontalOverflow(tmaPage);
-      const selectedBorder = await selectedOption.evaluate((element) => {
-        const style = getComputedStyle(element);
-        return {
-          borderBottomColor: style.borderBottomColor,
-          borderBottomWidth: style.borderBottomWidth,
-          boxShadow: style.boxShadow,
-        };
-      });
-      measurements.push({ theme, width, actions: styles, radioStyles, selectedBorder });
-      if (width === 390) {
-        await selectedOption.screenshot({
-          path: testInfo.outputPath(`wellbeing-selected-border-${theme}.png`),
-        });
+      measurements.push({ theme, width, actions: styles, radioStyles, selectedOutlines });
+      if (width === 390 || width === 393) {
+        for (const [index, group] of ['sleep', 'mood'].entries()) {
+          await selectedOptions.nth(index).screenshot({
+            path: testInfo.outputPath(`wellbeing-selected-${group}-${width}-${theme}.png`),
+          });
+        }
       }
       await tmaPage.screenshot({
         fullPage: true,

@@ -4339,7 +4339,8 @@ html[data-color-scheme='light'] .daily-wellbeing__option input {
 :root .daily-wellbeing__option[data-yfc-choice='compact']:has(> input:checked) {
   border-color: var(--v2-selected-outline);
   background: var(--v2-selected-surface);
-  box-shadow: var(--v2-selected-relief);
+  /* No lower relief/edge for wellbeing choices in either theme. */
+  box-shadow: none;
   color: var(--v2-selected-ink);
 }
 
