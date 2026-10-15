@@ -4346,6 +4346,15 @@ html[data-color-scheme='light'] .daily-wellbeing__option input {
   color: var(--v2-selected-ink);
 }
 
+/* В светлой теме нижний лаймовый край должен оставаться заметным поверх светлого рельефа. */
+:root[data-color-scheme='light']
+  .daily-wellbeing__option[data-yfc-choice='compact']:has(> input:checked) {
+  border-bottom: 3px solid var(--v2-lime);
+  box-shadow:
+    inset 0 -2px 0 var(--v2-lime),
+    var(--v2-selected-relief);
+}
+
 .daily-wellbeing__option:has(input:focus-visible) {
   outline: var(--focus-width) solid var(--color-focus);
   outline-offset: 2px;

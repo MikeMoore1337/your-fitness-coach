@@ -387,13 +387,41 @@ test('final visual evidence keeps wellbeing actions on one row in both themes', 
         uncheckedRadios.every((radio) => radio.accentColor !== checkedRadio!.accentColor),
       ).toBe(true);
 
+      const selectedOption = tmaPage.locator(
+        '.daily-wellbeing__option[data-yfc-choice="compact"]:has(> input:checked)',
+      );
+      await expect(selectedOption).toHaveCSS('border-bottom-color', 'rgb(178, 245, 32)');
+      await expect(selectedOption).toHaveCSS(
+        'border-bottom-width',
+        theme === 'light' ? '3px' : '1px',
+      );
+      if (theme === 'light') {
+        const selectedShadow = await selectedOption.evaluate(
+          (element) => getComputedStyle(element).boxShadow,
+        );
+        expect(selectedShadow).toMatch(/rgb\(178,\s*245,\s*32\)\s+0px\s+-2px\s+0px\s+0px\s+inset/);
+      }
+
       const unchecked = tmaPage.locator('.daily-wellbeing__option input:not(:checked)').first();
       await unchecked.focus();
       await expect(unchecked).toBeFocused();
       await expect(unchecked.locator('..')).toHaveCSS('outline-style', 'solid');
       await tmaPage.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
       await expectNoHorizontalOverflow(tmaPage);
-      measurements.push({ theme, width, actions: styles, radioStyles });
+      const selectedBorder = await selectedOption.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderBottomColor: style.borderBottomColor,
+          borderBottomWidth: style.borderBottomWidth,
+          boxShadow: style.boxShadow,
+        };
+      });
+      measurements.push({ theme, width, actions: styles, radioStyles, selectedBorder });
+      if (width === 390) {
+        await selectedOption.screenshot({
+          path: testInfo.outputPath(`wellbeing-selected-border-${theme}.png`),
+        });
+      }
       await tmaPage.screenshot({
         fullPage: true,
         path: testInfo.outputPath(`wellbeing-actions-${width}-${theme}.png`),
