@@ -11277,6 +11277,11 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
     gap: 12px;
     align-items: start;
   }
+  .app-section--progress
+    .progress-hero__heading:not(:has(.contextual-help[open]))
+    .progress-hero__copy {
+    align-self: center;
+  }
   .app-section--progress .progress-experience--bento {
     /* The category rail adds its own 4px focus gutter around the 44px targets. */
     gap: var(--v2-space-1);
