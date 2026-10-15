@@ -764,7 +764,7 @@ async function activeWorkoutQueueLength(page: Page) {
 
 test.describe('#1001 keyboard input stability', () => {
   test.use({
-    isMobile: async ({ browserName }, use) => use(browserName !== 'firefox'),
+    isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
     hasTouch: true,
     deviceScaleFactor: 3,
   });
