@@ -43,6 +43,11 @@ asset ID/path/bytes, candidate male/female paths и размеры, Git blob SHA
 tree, poster presence, evidence scope, technical constraints, recommendation и
 status.
 
+Полная metadata-only инвентаризация candidate media находится в
+[`986_SOURCE_INVENTORY.csv`](./986_SOURCE_INVENTORY.csv): 1,186 строк для 593 MP4 и
+593 JPG poster. В ней нет бинарных данных; для нескачанных файлов технические поля
+явно отмечены `NOT_MEASURED`.
+
 ## Текущий YFC baseline
 
 `backend/assets/exercise-guides/manifest.json` имеет schema v3 и на этом SHA содержит:
