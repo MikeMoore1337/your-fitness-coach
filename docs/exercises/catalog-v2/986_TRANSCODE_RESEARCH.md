@@ -17,6 +17,22 @@
   Для 720p: `scale=1280:720`, `-crf 28`. Стабильность SHA результатов зависит от точно закреплённой сборки FFmpeg/libx264; output SHA-256 и source SHA-256 для каждой строки заданы в [986_TRANSCODE_BENCH.csv](./986_TRANSCODE_BENCH.csv). Пример запуска через `uv run --no-project --with imageio-ffmpeg python` с `imageio_ffmpeg.get_ffmpeg_exe()`.
 - SSIM рассчитан FFmpeg `ssim` после приведения source и result к **одинаковым разрешению и частоте кадров**, поэтому это сравнение качества кодирования **относительно уменьшенного original**, а не доказательство отсутствия потерь от даунскейла относительно 1080p, пригодности техники/амплитуды или человеческой визуальной оценки. Скрипт использовал нормализацию `fps=24,scale=W:H:flags=lanczos,format=yuv420p` для обеих дорожек. Full 1080p source canvas не равнозначен genuine photographic detail.
 
+## Автоматизированное воспроизведение исследования
+
+Исследовательские скрипты включены в Git, но бинарники по-прежнему остаются **только локально**:
+
+- [`scripts/research_exercise_media_transcode.py`](../../../scripts/research_exercise_media_transcode.py): читает pinned CSV, **до перекодирования проверяет SHA-256 каждого исходника**, принимает только локальные `public/videos/` пути внутри ignored raw-root, обрабатывает четыре явных `gender:slug` и считает SSIM; отсутствующие/изменённые источники не скачивает и отклоняет.
+- [`scripts/research_exercise_media_playback.cjs`](../../../scripts/research_exercise_media_playback.cjs): тестирует ровно восемь MP4 в локальном Chromium и WebKit, проверяя metadata и реальное продвижение времени. Выходной CSV и fixture-HTML по умолчанию сохраняются в **ignored** каталоге, не заменяют зафиксированные измерения в документации.
+
+```powershell
+# Из корня выделенного worktree; скачивание/публикация медиа не выполняется.
+uv run --no-project --with imageio-ffmpeg python scripts/research_exercise_media_transcode.py
+# После установки frontend зависимости и локальных браузеров Playwright:
+node scripts/research_exercise_media_playback.cjs
+```
+
+Скрипт Python требует заранее помещённые правомерно полученные MP4 под `.artifacts/tasks/986/pilot/raw/videos/{male,female}/` с точно совпадающими хешами из `986_PILOT_RESULTS.csv`. Иные исходники не подменять. FFmpeg bundle может обновляться при повторном `uv --with`: для строгой битовой сопоставимости использовать указанный выше binary SHA-256. CSV `986_TRANSCODE_BENCH.csv` и `986_BROWSER_COMPAT.csv` хранят **результат исходного прогона**, а не автоматически обновляются скриптами; свои повторные измерения следует сравнивать отдельно. Отсутствие binaries или прав — ожидаемый **fail closed**, а не повод загружать или публиковать исходники.
+
 ## Измерения (локальные, raw assets не включены)
 
 | Source | 480p bytes | 480p к GIF | 720p bytes | 720p к GIF | SSIM 480p / 720p |
