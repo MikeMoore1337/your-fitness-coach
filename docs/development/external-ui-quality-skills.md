@@ -48,3 +48,16 @@
    Не вводить новый оркестратор, CI gate, auto-merge, внешнего агента-проверяющего.
 5. Обновлять источники только отдельным PR после просмотра upstream diff и
    изменения pinned `commit` и `git_blob_sha` в lockfile.
+
+## Локальный поиск по каталогу Pro Max
+
+Вместо полной установки Pro Max CLI можно искать по закреплённым CSV без
+сетевых запросов, Node или ключей:
+
+```powershell
+python scripts/search_ui_ux_catalog.py --catalog charts --query progress
+python scripts/search_ui_ux_catalog.py --catalog app-interface --query dashboard
+python scripts/search_ui_ux_catalog.py --catalog ux-guidelines --query focus
+```
+
+Результаты - справочные предложения, не команда менять действующую дизайн-систему.
