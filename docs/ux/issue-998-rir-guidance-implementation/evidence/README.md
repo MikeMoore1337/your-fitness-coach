@@ -2,7 +2,7 @@
 
 Все captures сняты Chromium Playwright из локального YFC browser harness на synthetic fixture
 данных. `before-*` — baseline `origin/master` `4c92832415d4eb994cf6b849a67074742f07ea50`;
-`after-*` — финальный исходник implementation branch перед commit. Surface capture —
+`after-*` — implementation commit `923442725d68f319bdb9f2815f17000a7a6fc2a8`. Surface capture —
 отрендеренная область `.active-workout`, не приватный пользовательский скриншот.
 
 Ширины: 320, 360, 393, 430 и desktop 1440 CSS px. `after-*-open.png` содержит одновременно

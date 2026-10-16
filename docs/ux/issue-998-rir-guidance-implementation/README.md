@@ -9,6 +9,7 @@
 - Утверждённое направление: Variant A — компактная подсказка рядом с соответствующим понятием.
 - Discovery-пакет: `codex/issue-998-rir-guidance-discovery-local` на `24e77a1a9f3e72420a570bb988c5bcaaf6ed7455`.
 - Baseline: `origin/master` на `4c92832415d4eb994cf6b849a67074742f07ea50`.
+- Реализация и screenshots: `923442725d68f319bdb9f2815f17000a7a6fc2a8`.
 - Изоляция: ветка `codex/issue-998-rir-guidance-implementation` в отдельном worktree.
 
 Изменения не трогают выполнение подхода, расчёт прогрессии, назначение программ, редактор, API,
