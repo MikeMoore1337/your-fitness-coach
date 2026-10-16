@@ -6,6 +6,12 @@
 Проверенная база: `origin/master` SHA `4c92832415d4eb994cf6b849a67074742f07ea50`.
 Рабочая ветка: `codex/issue-997-program-preview-design`.
 
+После решения владельца подпись `до назначения` закреплена как единый неразрывный токен во
+всех трёх встречах в прототипе: вводном тексте, статусном чипе карточки и ownership-строке.
+У токена `white-space: nowrap`; на узких экранах статусный чип переходит в отдельную строку,
+а provenance-источники фактов переносятся внутри своих карточек через `overflow-wrap:anywhere`.
+Это не уменьшает кегль и не меняет production-композицию: preview остаётся только макетом.
+
 Единый финальный макет: [`prototype.html`](prototype.html). В нём одна композиция предпросмотра,
 переключаемая на синтетические состояния готового шаблона, собственной программы, программы,
 назначенной тренером, многонедельного источника и legacy без метаданных. Переключатель темы и
@@ -121,6 +127,32 @@ confirm/assign пути, а не в preview.
 Физический iPhone/Safari, native TMA и VoiceOver в этом пакете **NOT_VERIFIED**. Chromium
 viewport и условный keyboard focus не являются доказательством этих сред.
 
+## Реальное браузерное evidence текущего макета
+
+PNG и машинный отчёт созданы из `file://`-прототипа в установленном Microsoft Edge
+`141.0.3537.57` через Playwright Chromium; это реальные браузерные captures, не синтетически
+нарисованные изображения. Матрица — Dark/Light, `320/360/393/430/1440 × 900`:
+
+- [`dark-320.png`](evidence/dark-320.png), [`dark-360.png`](evidence/dark-360.png),
+  [`dark-393.png`](evidence/dark-393.png), [`dark-430.png`](evidence/dark-430.png),
+  [`dark-1440.png`](evidence/dark-1440.png);
+- [`light-320.png`](evidence/light-320.png), [`light-360.png`](evidence/light-360.png),
+  [`light-393.png`](evidence/light-393.png), [`light-430.png`](evidence/light-430.png),
+  [`light-1440.png`](evidence/light-1440.png);
+- [`card-dark-320.png`](evidence/card-dark-320.png) и [`card-light-320.png`](evidence/card-light-320.png)
+  показывают карточку с видимым чипом после закрытия предпросмотра;
+- [`long-title-light-393.png`](evidence/long-title-light-393.png),
+  [`text-size-125-light-393.png`](evidence/text-size-125-light-393.png) и
+  [`confirmation-dark-393.png`](evidence/confirmation-dark-393.png) покрывают длинный заголовок,
+  диагностическое увеличение размера текста 125% и явное подтверждение назначения;
+- [`checks.json`](evidence/checks.json) содержит viewport-геометрию, `nowrap`, отсутствие
+  горизонтального overflow/клиппинга, матрицу фикстур, различие действий и keyboard/focus.
+
+Все assertions этого run прошли: две встречи видимой подписи имеют `white-space: nowrap`,
+статусный чип остаётся внутри карточки, источники фактов не расширяют контейнер, а `Нет данных`
+сохраняется для неполных и legacy-полей. Увеличение текста проверено браузерным root-text
+diagnostic 125%; системные настройки доступности ОС не проверялись.
+
 ## Что не входит
 
 - новый endpoint, migration, длительный estimator или алгоритм подбора;
@@ -138,4 +170,5 @@ viewport и условный keyboard focus не являются доказат
 `TemplatesList`/preview, затем real AFTER evidence, отдельное owner visual acceptance и только
 после отдельного разрешения — merge/release.
 
-Draft PR, merge, auto-merge и deploy в этой design-only стадии не создавались и не выполнялись.
+Существующий [Draft PR #1043](https://github.com/MikeMoore1337/your-fitness-coach/pull/1043)
+обновляется этим пакетом. Merge, auto-merge и deploy в этой design-only стадии не выполнялись.

@@ -256,7 +256,12 @@
         gap: 12px;
       }
       .library-card__top {
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
+        align-items: start;
+      }
+      .library-card__top > div {
+        min-width: 0;
       }
       .library-card__top h2 {
         margin-top: 7px;
@@ -291,6 +296,12 @@
       }
       .status-chip {
         background: transparent;
+        flex: 0 0 auto;
+        justify-self: end;
+        white-space: nowrap;
+      }
+      .pre-assignment-label {
+        white-space: nowrap;
       }
       .synthetic-ribbon {
         align-self: start;
@@ -420,6 +431,7 @@
         margin-top: 5px;
         color: var(--subtle);
         font-size: 11px;
+        overflow-wrap: anywhere;
       }
       .section-block {
         display: grid;
@@ -620,6 +632,12 @@
         .library-card {
           padding: 18px;
         }
+        .library-card__top {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .status-chip {
+          justify-self: start;
+        }
         .preview-dialog {
           width: 100vw;
           border-left: 0;
@@ -693,7 +711,7 @@
               <option value="multi">Готовый шаблон · 12 недель в источнике</option>
               <option value="own">Моя программа · метаданные неполные</option>
               <option value="coach">Назначено тренером · 4 недели</option>
-              <option value="legacy">Legacy · нет метаданных</option>
+              <option value="legacy">Устаревший шаблон · нет метаданных</option>
             </select>
           </label>
           <button class="theme-toggle" id="themeToggle" type="button">Светлая тема</button>
@@ -706,8 +724,9 @@
             <span class="eyebrow">Библиотека программ</span>
             <h1 id="library-title">Выберите основу без лишних шагов</h1>
             <p>
-              Карточка хранит только подтверждённые сведения. Полный состав и права видны до
-              назначения, а замена активной программы подтверждается отдельно.
+              Карточка хранит только подтверждённые сведения. Полный состав и права видны
+              <span class="pre-assignment-label">до назначения</span>, а замена активной программы
+              подтверждается отдельно.
             </p>
           </div>
 
@@ -720,7 +739,7 @@
               <span class="status-chip">до назначения</span>
             </div>
             <p class="library-card__description" id="libraryDescription">
-              Синтетическая карточка для проверки factual preview.
+              Синтетическая карточка для проверки достоверного предпросмотра.
             </p>
             <div class="library-card__facts" id="libraryFacts"></div>
             <div class="library-card__bottom">
@@ -758,7 +777,7 @@
               <span class="synthetic-label">синтетическая фикстура</span>
             </div>
             <h1 id="previewTitle">Силовая база · 4 дня</h1>
-            <p class="ownership-line" id="ownershipLine">Данные доступны до назначения.</p>
+            <p class="ownership-line" id="ownershipLine">Данные доступны <span class="pre-assignment-label">до назначения</span>.</p>
             <p class="version-line" id="versionLine"></p>
           </div>
           <button class="close-button" id="closePreview" type="button">Закрыть</button>
@@ -900,13 +919,13 @@
           kind: 'Моя программа',
           title: 'Домашняя база · моя программа',
           description: 'Ручная программа с неполными метаданными: неизвестное остаётся неизвестным.',
-          ownership: 'Владелец: текущий пользователь. Редактирование доступно по праву can_edit.',
+          ownership: 'Владелец: текущий пользователь. Редактирование доступно владельцу.',
           version: 'Версия назначения: нет — программа ещё не назначена.',
           facts: [
             ['Дни', '3 в составе шаблона', 'ProgramTemplateResponse.days'],
             ['Частота', UNKNOWN, 'program_metadata.days_per_week отсутствует'],
             ['Уровень', 'Начальный', 'template.level'],
-            ['Оборудование', UNKNOWN, 'нет полного списка в metadata'],
+            ['Оборудование', UNKNOWN, 'нет полного списка метаданных'],
             ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
             ['Срок источника', UNKNOWN, 'default_duration_weeks не задан'],
           ],
@@ -943,9 +962,9 @@
           actions: { select: false, assign: false, copy: false, edit: false, readonly: true },
         },
         legacy: {
-          kind: 'Legacy-шаблон',
+          kind: 'Устаревший шаблон',
           title: 'Старая базовая программа',
-          description: 'Старые записи без program_metadata не получают выдуманные значения.',
+          description: 'Старые записи без метаданных не получают выдуманные значения.',
           ownership: 'Источник доступен для просмотра. Владелец и дополнительные права не определены.',
           version: 'Версия назначения: нет данных.',
           facts: [
@@ -957,11 +976,11 @@
             ['Срок источника', UNKNOWN, 'default_duration_weeks отсутствует'],
           ],
           days: [
-            { title: 'Тренировка A', count: 'состав доступен', exercises: [['Упражнение 1', 'prescription не задан'], ['Упражнение 2', 'prescription не задан']] },
-            { title: 'Тренировка B', count: 'состав доступен', exercises: [['Упражнение 3', 'prescription не задан']] },
+            { title: 'Тренировка A', count: 'состав доступен', exercises: [['Упражнение 1', 'назначение не задано'], ['Упражнение 2', 'назначение не задано']] },
+            { title: 'Тренировка B', count: 'состав доступен', exercises: [['Упражнение 3', 'назначение не задано']] },
           ],
           weekSummary: 'Только доступные строки исходного шаблона',
-          sourceNote: '<strong>Legacy без метаданных</strong><span>«Нет данных» — намеренный результат. Не подставляются одна неделя, минуты, уровень, оборудование или периодизация.</span>',
+          sourceNote: '<strong>Устаревший шаблон без метаданных</strong><span>«Нет данных» — намеренный результат. Не подставляются одна неделя, минуты, уровень, оборудование или периодизация.</span>',
           actions: { select: true, assign: true, copy: true, edit: false, readonly: false },
         },
       };
@@ -1055,7 +1074,7 @@
         body.dataset.variant = fixtureKey;
         document.querySelector('#kindBadge').textContent = fixture.kind;
         document.querySelector('#previewTitle').textContent = fixture.title;
-        document.querySelector('#ownershipLine').textContent = fixture.ownership;
+        document.querySelector('#ownershipLine').innerHTML = escapeHtml(fixture.ownership).replaceAll('до назначения', '<span class="pre-assignment-label">до назначения</span>');
         document.querySelector('#versionLine').textContent = fixture.version;
         document.querySelector('#weekSummary').textContent = fixture.weekSummary;
         sourceNote.innerHTML = fixture.sourceNote;
@@ -1129,7 +1148,7 @@
         actionStatus.textContent = 'Макет: сценарий копирования выбран. Владение становится личным только после серверной операции.';
       });
       document.querySelector('#editAction').addEventListener('click', () => {
-        actionStatus.textContent = 'Макет: редактор доступен только владельцу через право can_edit.';
+        actionStatus.textContent = 'Макет: редактор доступен только владельцу программы.';
       });
       dayList.addEventListener('click', (event) => {
         const button = event.target.closest('[data-day-index]');
