@@ -4767,15 +4767,24 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
     96px,
     calc(
       var(--app-bottom-nav-height) + 24px + max(8px, var(--yfc-layout-safe-bottom)) +
-        var(--yfc-viewport-bottom, 0px)
+        var(--yfc-viewport-bottom-effective, 0px)
     )
   );
   --yfc-mobile-action-clearance: max(
     104px,
     calc(
       var(--app-bottom-nav-height) + 32px + max(8px, var(--yfc-layout-safe-bottom)) +
-        var(--yfc-viewport-bottom, 0px)
+        var(--yfc-viewport-bottom-effective, 0px)
     )
+  );
+  --yfc-viewport-bottom-effective: var(--yfc-viewport-bottom, 0px);
+}
+
+/* Browser visualViewport can already end at the physical bottom safe area. */
+:root[data-yfc-layout-surface='browser'] {
+  --yfc-viewport-bottom-effective: max(
+    0px,
+    calc(var(--yfc-viewport-bottom, 0px) - var(--yfc-layout-safe-bottom))
   );
 }
 
@@ -4836,13 +4845,13 @@ html[data-color-scheme='light'] .progress-report-section--wellbeing {
   body:has(.app-shell--design-v2 #appBottomNav) .toast:not(.hidden) {
     bottom: calc(
       var(--app-bottom-nav-height) + 12px + var(--yfc-layout-safe-bottom) +
-        var(--yfc-viewport-bottom, 0px)
+        var(--yfc-viewport-bottom-effective, 0px)
     );
   }
 
   .app-shell--design-v2 .app-bottom-nav {
     inset: auto max(10px, var(--yfc-layout-safe-right))
-      calc(max(8px, var(--yfc-layout-safe-bottom)) + var(--yfc-viewport-bottom, 0px))
+      calc(max(8px, var(--yfc-layout-safe-bottom)) + var(--yfc-viewport-bottom-effective, 0px))
       max(10px, var(--yfc-layout-safe-left));
     width: auto;
     padding: 6px;
