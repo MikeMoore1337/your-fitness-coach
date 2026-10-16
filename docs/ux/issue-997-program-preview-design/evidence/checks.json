@@ -1,0 +1,729 @@
+{
+  "browser": "Microsoft Edge 141.0.3537.57 via Playwright Chromium",
+  "engine": "chromium",
+  "viewportMatrix": [
+    {
+      "width": 320,
+      "height": 900,
+      "themes": [
+        "dark",
+        "light"
+      ]
+    },
+    {
+      "width": 360,
+      "height": 900,
+      "themes": [
+        "dark",
+        "light"
+      ]
+    },
+    {
+      "width": 393,
+      "height": 900,
+      "themes": [
+        "dark",
+        "light"
+      ]
+    },
+    {
+      "width": 430,
+      "height": 900,
+      "themes": [
+        "dark",
+        "light"
+      ]
+    },
+    {
+      "width": 1440,
+      "height": 900,
+      "themes": [
+        "dark",
+        "light"
+      ]
+    }
+  ],
+  "results": [
+    {
+      "theme": "dark",
+      "width": 320,
+      "fixture": "ready",
+      "screenshot": "dark-320.png",
+      "audit": {
+        "viewport": 320,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 181.65625,
+            "right": 289.1875
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "fixture": "ready",
+      "screenshot": "dark-360.png",
+      "audit": {
+        "viewport": 360,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 16,
+            "right": 123.53125
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 360,
+        "documentClientWidth": 360,
+        "bodyScrollWidth": 360,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 393,
+      "fixture": "ready",
+      "screenshot": "dark-393.png",
+      "audit": {
+        "viewport": 393,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 16,
+            "right": 123.53125
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 393,
+        "documentClientWidth": 393,
+        "bodyScrollWidth": 393,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "fixture": "ready",
+      "screenshot": "dark-430.png",
+      "audit": {
+        "viewport": 430,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 243.375,
+            "right": 350.90625
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 430,
+        "documentClientWidth": 430,
+        "bodyScrollWidth": 430,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "fixture": "ready",
+      "screenshot": "dark-1440.png",
+      "audit": {
+        "viewport": 1440,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 266.453125,
+            "right": 373.984375
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 464.53125,
+            "right": 573.734375
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "bodyScrollWidth": 1440,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "fixture": "ready",
+      "screenshot": "light-320.png",
+      "audit": {
+        "viewport": 320,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 181.65625,
+            "right": 289.1875
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "fixture": "ready",
+      "screenshot": "light-360.png",
+      "audit": {
+        "viewport": 360,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 16,
+            "right": 123.53125
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 360,
+        "documentClientWidth": 360,
+        "bodyScrollWidth": 360,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 393,
+      "fixture": "ready",
+      "screenshot": "light-393.png",
+      "audit": {
+        "viewport": 393,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 16,
+            "right": 123.53125
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 393,
+        "documentClientWidth": 393,
+        "bodyScrollWidth": 393,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 430,
+      "fixture": "ready",
+      "screenshot": "light-430.png",
+      "audit": {
+        "viewport": 430,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 243.375,
+            "right": 350.90625
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 430,
+        "documentClientWidth": 430,
+        "bodyScrollWidth": 430,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "fixture": "ready",
+      "screenshot": "light-1440.png",
+      "audit": {
+        "viewport": 1440,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 266.453125,
+            "right": 373.984375
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 464.53125,
+            "right": 573.734375
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 1440,
+        "documentClientWidth": 1440,
+        "bodyScrollWidth": 1440,
+        "chipInsideCard": true
+      }
+    }
+  ],
+  "cardStates": [
+    {
+      "theme": "dark",
+      "width": 320,
+      "screenshot": "card-dark-320.png",
+      "audit": {
+        "viewport": 320,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 181.65625,
+            "right": 289.1875
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "chipInsideCard": true
+      }
+    },
+    {
+      "theme": "light",
+      "width": 320,
+      "screenshot": "card-light-320.png",
+      "audit": {
+        "viewport": 320,
+        "phraseNodes": [
+          {
+            "tag": "span",
+            "className": "pre-assignment-label",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 107.53125,
+            "height": 19,
+            "lineHeight": 21.75,
+            "left": 181.65625,
+            "right": 289.1875
+          },
+          {
+            "tag": "span",
+            "className": "status-chip",
+            "text": "до назначения",
+            "whiteSpace": "nowrap",
+            "width": 109.203125,
+            "height": 29.390625,
+            "lineHeight": 17.4,
+            "left": 35,
+            "right": 144.203125
+          }
+        ],
+        "outOfBounds": [],
+        "overflowNodes": [],
+        "documentScrollWidth": 320,
+        "documentClientWidth": 320,
+        "bodyScrollWidth": 320,
+        "chipInsideCard": true
+      }
+    }
+  ],
+  "states": {
+    "longTitle": {
+      "screenshot": "long-title-light-393.png"
+    },
+    "textSize125": {
+      "screenshot": "text-size-125-light-393.png"
+    },
+    "fixtureChecks": {
+      "ready": {
+        "variant": "ready",
+        "facts": [
+          "4 в составе шаблона",
+          "4 в неделю",
+          "Средний",
+          "Собственный вес · гантели · скамья",
+          "≈45 мин",
+          "1 неделя"
+        ],
+        "buttons": {
+          "selectAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Выбрать"
+          },
+          "copyAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Создать копию"
+          },
+          "editAction": {
+            "hidden": true,
+            "disabled": false,
+            "text": "Редактировать"
+          },
+          "assignAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Назначить программу"
+          }
+        },
+        "title": "Силовая база · 4 дня"
+      },
+      "multi": {
+        "variant": "multi",
+        "facts": [
+          "4 в составе шаблона",
+          "4 в неделю",
+          "Средний",
+          "Штанга · стойка · скамья",
+          "Нет данных",
+          "12 недель в исходных предписаниях"
+        ],
+        "buttons": {
+          "selectAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Выбрать"
+          },
+          "copyAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Создать копию"
+          },
+          "editAction": {
+            "hidden": true,
+            "disabled": false,
+            "text": "Редактировать"
+          },
+          "assignAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Назначить программу"
+          }
+        },
+        "title": "PHUL · 12 недель в источнике"
+      },
+      "own": {
+        "variant": "own",
+        "facts": [
+          "3 в составе шаблона",
+          "Нет данных",
+          "Начальный",
+          "Нет данных",
+          "Нет данных",
+          "Нет данных"
+        ],
+        "buttons": {
+          "selectAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Выбрать"
+          },
+          "copyAction": {
+            "hidden": true,
+            "disabled": false,
+            "text": "Создать копию"
+          },
+          "editAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Редактировать"
+          },
+          "assignAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Назначить программу"
+          }
+        },
+        "title": "Домашняя база · моя программа"
+      },
+      "coach": {
+        "variant": "coach",
+        "facts": [
+          "3 в составе шаблона",
+          "3 в неделю",
+          "Продвинутый",
+          "Тренажёр · штанга",
+          "Нет данных",
+          "4 недели"
+        ],
+        "buttons": {
+          "selectAction": {
+            "hidden": true,
+            "disabled": true,
+            "text": "Выбрать"
+          },
+          "copyAction": {
+            "hidden": true,
+            "disabled": true,
+            "text": "Создать копию"
+          },
+          "editAction": {
+            "hidden": true,
+            "disabled": true,
+            "text": "Редактировать"
+          },
+          "assignAction": {
+            "hidden": true,
+            "disabled": true,
+            "text": "Назначить программу"
+          }
+        },
+        "title": "Тренировочный блок клиента"
+      },
+      "legacy": {
+        "variant": "legacy",
+        "facts": [
+          "2 в составе шаблона",
+          "Нет данных",
+          "Нет данных",
+          "Нет данных",
+          "Нет данных",
+          "Нет данных"
+        ],
+        "buttons": {
+          "selectAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Выбрать"
+          },
+          "copyAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Создать копию"
+          },
+          "editAction": {
+            "hidden": true,
+            "disabled": false,
+            "text": "Редактировать"
+          },
+          "assignAction": {
+            "hidden": false,
+            "disabled": false,
+            "text": "Назначить программу"
+          }
+        },
+        "title": "Старая базовая программа"
+      }
+    }
+  },
+  "actions": {
+    "selectStatus": "Выбор сохранён только в текущем flow макета. Активная программа не изменена.",
+    "copyStatus": "Макет: сценарий копирования выбран. Владение становится личным только после серверной операции.",
+    "editStatus": "Макет: редактор доступен только владельцу программы."
+  },
+  "keyboard": {
+    "before": {
+      "variant": "ready",
+      "dialogHidden": false,
+      "active": "previewDialog"
+    },
+    "afterClose": {
+      "dialogHidden": true,
+      "active": "reopenButton",
+      "status": "Предпросмотр закрыт. Активная программа не изменена."
+    },
+    "confirmation": {
+      "previewHidden": true,
+      "confirmHidden": false,
+      "status": "Макет: запрос на назначение не отправляется.",
+      "active": "confirmPanel"
+    }
+  },
+  "source": {
+    "statusChipOccurrences": 4,
+    "nowrapStatus": "nowrap",
+    "nowrapToken": "nowrap"
+  },
+  "generatedAt": "2026-10-16T20:46:32.537Z",
+  "limitations": [
+    "Physical iPhone/Safari, native Telegram Mini App and VoiceOver are NOT_VERIFIED.",
+    "Increased text check uses a browser root text-size diagnostic of 125%; OS accessibility settings are NOT_VERIFIED."
+  ]
+}

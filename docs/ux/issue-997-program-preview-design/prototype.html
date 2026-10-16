@@ -1,0 +1,1184 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Предпросмотр программы — Issue #997</title>
+    <style>
+      @font-face {
+        font-family: Inter;
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+      @font-face {
+        font-family: Inter;
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+          U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193,
+          U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: Oswald;
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+
+      :root {
+        color-scheme: dark;
+        --bg: #090b0b;
+        --surface: #151918;
+        --surface-raised: #1d2220;
+        --surface-muted: #252b28;
+        --text: #f2f4ef;
+        --muted: #aeb5ad;
+        --subtle: #7e8980;
+        --border: #3b443e;
+        --border-strong: #59665a;
+        --accent: #b2f520;
+        --accent-soft: #2a391c;
+        --on-accent: #10140d;
+        --warning: #f7c96a;
+        --warning-soft: #3c3019;
+        --shadow: 0 24px 70px rgb(0 0 0 / 34%);
+        --radius: 18px;
+        --control-radius: 12px;
+      }
+      body[data-theme='light'] {
+        color-scheme: light;
+        --bg: #f4f5f2;
+        --surface: #ffffff;
+        --surface-raised: #ffffff;
+        --surface-muted: #eef1ed;
+        --text: #171a18;
+        --muted: #59635b;
+        --subtle: #738075;
+        --border: #d3d9d2;
+        --border-strong: #aab5ab;
+        --accent-soft: #e9f9c5;
+        --warning-soft: #fff3d7;
+        --shadow: 0 24px 70px rgb(16 24 16 / 13%);
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        min-width: 320px;
+        background: var(--bg);
+      }
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        overflow-x: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 15px;
+        line-height: 1.45;
+      }
+      button,
+      select {
+        font: inherit;
+      }
+      button,
+      select {
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        color: var(--text);
+      }
+      button {
+        min-height: 44px;
+        padding: 10px 14px;
+        background: var(--surface-raised);
+        cursor: pointer;
+        transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+      }
+      button:hover:not(:disabled) {
+        border-color: var(--border-strong);
+        background: var(--surface-muted);
+      }
+      button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.48;
+      }
+      button:focus-visible,
+      select:focus-visible,
+      [tabindex='-1']:focus-visible {
+        outline: 3px solid var(--accent);
+        outline-offset: 3px;
+      }
+      select {
+        min-height: 42px;
+        padding: 8px 34px 8px 11px;
+        background: var(--surface-raised);
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      h1,
+      h2,
+      h3 {
+        letter-spacing: -0.025em;
+      }
+      h1 {
+        font-size: clamp(26px, 3vw, 38px);
+        line-height: 1.08;
+      }
+      h2 {
+        font-size: 20px;
+        line-height: 1.2;
+      }
+      h3 {
+        font-size: 16px;
+        line-height: 1.25;
+      }
+      .prototype-frame {
+        min-height: 100vh;
+      }
+      .prototype-header {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        min-height: 74px;
+        padding: 16px clamp(18px, 4vw, 56px);
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .brand-lockup {
+        display: grid;
+        gap: 2px;
+      }
+      .brand-lockup strong {
+        font-size: 16px;
+        letter-spacing: 0.02em;
+      }
+      .brand-lockup span,
+      .eyebrow,
+      .field-label,
+      .fact dt,
+      .source-line,
+      .synthetic-label,
+      .dialog-kicker,
+      .library-card__kind {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .prototype-controls {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+      .prototype-controls label {
+        display: grid;
+        gap: 2px;
+      }
+      .prototype-controls label span {
+        color: var(--subtle);
+        font-size: 11px;
+      }
+      .prototype-controls select {
+        max-width: 280px;
+      }
+      .theme-toggle {
+        white-space: nowrap;
+      }
+      .app-view {
+        display: grid;
+        grid-template-columns: minmax(240px, 0.84fr) minmax(340px, 1.16fr);
+        gap: clamp(20px, 4vw, 68px);
+        min-height: calc(100vh - 74px);
+        padding: clamp(26px, 5vw, 72px) clamp(18px, 7vw, 110px);
+        background:
+          radial-gradient(circle at 15% 10%, rgb(178 245 32 / 7%), transparent 34%),
+          var(--bg);
+      }
+      body[data-theme='light'] .app-view {
+        background:
+          radial-gradient(circle at 15% 10%, rgb(178 245 32 / 22%), transparent 34%),
+          var(--bg);
+      }
+      .library-column {
+        display: grid;
+        align-content: start;
+        gap: 24px;
+        max-width: 540px;
+      }
+      .library-heading {
+        display: grid;
+        gap: 10px;
+      }
+      .library-heading h1 {
+        max-width: 430px;
+      }
+      .library-heading p {
+        max-width: 460px;
+        color: var(--muted);
+      }
+      .library-card {
+        display: grid;
+        gap: 18px;
+        padding: 22px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: color-mix(in srgb, var(--surface) 86%, transparent);
+      }
+      .library-card__top,
+      .library-card__bottom,
+      .dialog-heading-row,
+      .section-heading,
+      .action-row,
+      .confirm-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .library-card__top {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
+        align-items: start;
+      }
+      .library-card__top > div {
+        min-width: 0;
+      }
+      .library-card__top h2 {
+        margin-top: 7px;
+      }
+      .library-card__description {
+        color: var(--muted);
+      }
+      .library-card__facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .pill,
+      .kind-badge,
+      .status-chip,
+      .equipment-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 5px 9px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .kind-badge {
+        border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+        background: var(--accent-soft);
+        color: var(--text);
+      }
+      .status-chip {
+        background: transparent;
+        flex: 0 0 auto;
+        justify-self: end;
+        white-space: nowrap;
+      }
+      .pre-assignment-label {
+        white-space: nowrap;
+      }
+      .synthetic-ribbon {
+        align-self: start;
+        max-width: 430px;
+        padding: 12px 14px;
+        border-left: 3px solid var(--accent);
+        border-radius: 0 var(--control-radius) var(--control-radius) 0;
+        background: var(--accent-soft);
+        color: var(--text);
+        font-size: 13px;
+      }
+      .library-status {
+        min-height: 24px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .backdrop {
+        position: fixed;
+        z-index: 5;
+        inset: 0;
+        background: rgb(3 6 4 / 58%);
+      }
+      body[data-theme='light'] .backdrop {
+        background: rgb(16 22 17 / 28%);
+      }
+      .preview-dialog {
+        position: fixed;
+        z-index: 6;
+        inset: 0 0 0 auto;
+        display: flex;
+        width: min(650px, 100vw);
+        height: 100dvh;
+        flex-direction: column;
+        border-left: 1px solid var(--border-strong);
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+      .preview-dialog[hidden],
+      .backdrop[hidden],
+      .confirm-panel[hidden],
+      .preview-content[hidden],
+      .reopen-button[hidden] {
+        display: none;
+      }
+      .dialog-header {
+        display: grid;
+        gap: 16px;
+        padding: 22px clamp(20px, 4vw, 38px) 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface);
+      }
+      .dialog-heading-row {
+        align-items: flex-start;
+      }
+      .dialog-heading-row > div {
+        min-width: 0;
+      }
+      .dialog-kicker {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .synthetic-label {
+        color: var(--subtle);
+        font-size: 10px;
+      }
+      .dialog-header h1 {
+        overflow-wrap: anywhere;
+      }
+      .ownership-line {
+        margin-top: 9px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .version-line {
+        margin-top: 4px;
+        color: var(--subtle);
+        font-size: 12px;
+      }
+      .close-button {
+        flex: 0 0 auto;
+        min-height: 40px;
+        padding: 8px 12px;
+      }
+      .preview-content,
+      .confirm-panel {
+        min-height: 0;
+        overflow: auto;
+        padding: 24px clamp(20px, 4vw, 38px) 34px;
+      }
+      .preview-content {
+        display: grid;
+        align-content: start;
+        gap: 28px;
+      }
+      .facts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .fact {
+        min-width: 0;
+        padding: 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--surface-raised);
+      }
+      .fact dt {
+        margin-bottom: 8px;
+        color: var(--subtle);
+        font-size: 10px;
+      }
+      .fact dd {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+      .fact dd.is-unknown {
+        color: var(--muted);
+        font-weight: 600;
+      }
+      .fact-source {
+        display: block;
+        margin-top: 5px;
+        color: var(--subtle);
+        font-size: 11px;
+        overflow-wrap: anywhere;
+      }
+      .section-block {
+        display: grid;
+        gap: 13px;
+      }
+      .section-heading {
+        align-items: flex-end;
+      }
+      .section-heading p {
+        color: var(--muted);
+        font-size: 13px;
+        text-align: right;
+      }
+      .day-list {
+        display: grid;
+        gap: 8px;
+      }
+      .day-card {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--surface-raised);
+      }
+      .day-toggle {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 54px;
+        padding: 12px 14px;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        text-align: left;
+      }
+      .day-toggle:hover:not(:disabled) {
+        background: var(--surface-muted);
+      }
+      .day-toggle__title {
+        display: grid;
+        gap: 2px;
+      }
+      .day-toggle__title strong {
+        font-size: 14px;
+      }
+      .day-toggle__title span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .day-toggle__state {
+        flex: 0 0 auto;
+        color: var(--accent);
+        font-size: 12px;
+        font-weight: 800;
+      }
+      .exercise-list {
+        display: grid;
+        gap: 8px;
+        padding: 0 14px 14px;
+      }
+      .exercise-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        padding: 10px 0 0;
+        border-top: 1px solid var(--border);
+      }
+      .exercise-row strong {
+        display: block;
+        overflow-wrap: anywhere;
+        font-size: 13px;
+      }
+      .exercise-row span {
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+        white-space: nowrap;
+      }
+      .source-note {
+        display: grid;
+        gap: 6px;
+        padding: 13px 14px;
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .source-note strong {
+        color: var(--text);
+        font-size: 13px;
+      }
+      .action-section {
+        display: grid;
+        gap: 12px;
+        padding-top: 2px;
+      }
+      .action-section h2 {
+        font-size: 15px;
+      }
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+      .action-grid button {
+        width: 100%;
+      }
+      .button-primary {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--on-accent);
+        font-weight: 800;
+      }
+      .button-primary:hover:not(:disabled) {
+        border-color: var(--accent);
+        background: #c7ff56;
+        color: var(--on-accent);
+      }
+      .button-secondary {
+        background: var(--surface-raised);
+      }
+      .action-status {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .confirm-panel {
+        display: grid;
+        align-content: start;
+        gap: 18px;
+      }
+      .confirm-panel h2 {
+        font-size: 25px;
+      }
+      .confirm-panel p {
+        color: var(--muted);
+      }
+      .confirm-summary {
+        display: grid;
+        gap: 9px;
+        padding: 16px;
+        border: 1px solid var(--border);
+        border-radius: var(--control-radius);
+        background: var(--surface-raised);
+      }
+      .confirm-summary strong {
+        font-size: 15px;
+      }
+      .confirm-warning {
+        padding: 14px;
+        border: 1px solid color-mix(in srgb, var(--warning) 52%, var(--border));
+        border-radius: var(--control-radius);
+        background: var(--warning-soft);
+        color: var(--text);
+      }
+      .confirm-actions {
+        align-items: stretch;
+      }
+      .confirm-actions button {
+        flex: 1;
+      }
+      .reopen-button {
+        position: fixed;
+        z-index: 4;
+        right: 24px;
+        bottom: 24px;
+      }
+      @media (max-width: 780px) {
+        .prototype-header {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 14px;
+        }
+        .prototype-controls {
+          width: 100%;
+          align-items: stretch;
+          justify-content: stretch;
+        }
+        .prototype-controls label {
+          flex: 1;
+        }
+        .prototype-controls select {
+          width: 100%;
+          max-width: none;
+        }
+        .theme-toggle {
+          align-self: end;
+        }
+        .app-view {
+          display: block;
+          padding: 24px 16px 80px;
+        }
+        .library-column {
+          max-width: none;
+        }
+        .library-card {
+          padding: 18px;
+        }
+        .library-card__top {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .status-chip {
+          justify-self: start;
+        }
+        .preview-dialog {
+          width: 100vw;
+          border-left: 0;
+        }
+      }
+      @media (max-width: 440px) {
+        .prototype-controls {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+        .prototype-controls label {
+          grid-column: 1 / -1;
+        }
+        .theme-toggle {
+          align-self: auto;
+        }
+        .dialog-header {
+          padding: 18px 16px 16px;
+        }
+        .preview-content,
+        .confirm-panel {
+          padding: 20px 16px 28px;
+        }
+        .facts-grid {
+          gap: 8px;
+        }
+        .fact {
+          padding: 12px;
+        }
+        .section-heading {
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 3px;
+        }
+        .section-heading p {
+          text-align: left;
+        }
+        .action-grid {
+          gap: 7px;
+        }
+        .action-grid button {
+          min-height: 48px;
+          padding-inline: 9px;
+        }
+        .confirm-actions {
+          flex-direction: column-reverse;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body data-theme="dark">
+    <div class="prototype-frame">
+      <header class="prototype-header">
+        <div class="brand-lockup">
+          <strong>Your Fitness Coach</strong>
+          <span>Issue #997 · единый макет до внедрения</span>
+        </div>
+        <div class="prototype-controls">
+          <label for="fixtureSelect">
+            <span>Состояние макета</span>
+            <select id="fixtureSelect">
+              <option value="ready">Готовый шаблон · 1 неделя</option>
+              <option value="multi">Готовый шаблон · 12 недель в источнике</option>
+              <option value="own">Моя программа · метаданные неполные</option>
+              <option value="coach">Назначено тренером · 4 недели</option>
+              <option value="legacy">Устаревший шаблон · нет метаданных</option>
+            </select>
+          </label>
+          <button class="theme-toggle" id="themeToggle" type="button">Светлая тема</button>
+        </div>
+      </header>
+
+      <main class="app-view">
+        <section class="library-column" aria-labelledby="library-title">
+          <div class="library-heading">
+            <span class="eyebrow">Библиотека программ</span>
+            <h1 id="library-title">Выберите основу без лишних шагов</h1>
+            <p>
+              Карточка хранит только подтверждённые сведения. Полный состав и права видны
+              <span class="pre-assignment-label">до назначения</span>, а замена активной программы
+              подтверждается отдельно.
+            </p>
+          </div>
+
+          <article class="library-card" aria-label="Карточка программы">
+            <div class="library-card__top">
+              <div>
+                <span class="library-card__kind" id="libraryKind">Готовый шаблон</span>
+                <h2 id="libraryTitle">Силовая база · 4 дня</h2>
+              </div>
+              <span class="status-chip">до назначения</span>
+            </div>
+            <p class="library-card__description" id="libraryDescription">
+              Синтетическая карточка для проверки достоверного предпросмотра.
+            </p>
+            <div class="library-card__facts" id="libraryFacts"></div>
+            <div class="library-card__bottom">
+              <span class="source-line">Источник: карточка шаблона</span>
+              <button class="button-primary" id="reopenFromCard" type="button">
+                Посмотреть
+              </button>
+            </div>
+          </article>
+
+          <div class="synthetic-ribbon">
+            Макетная фикстура: значения обезличены и не отправляются в API. Наличие этого экрана
+            не означает, что предпросмотр уже внедрён в продукт.
+          </div>
+          <p class="library-status" id="libraryStatus" aria-live="polite"></p>
+        </section>
+      </main>
+    </div>
+
+    <div class="backdrop" id="backdrop"></div>
+    <article
+      class="preview-dialog"
+      id="previewDialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="previewTitle"
+      aria-describedby="ownershipLine"
+      tabindex="-1"
+    >
+      <header class="dialog-header">
+        <div class="dialog-heading-row">
+          <div>
+            <div class="dialog-kicker">
+              <span class="kind-badge" id="kindBadge">Готовый шаблон</span>
+              <span class="synthetic-label">синтетическая фикстура</span>
+            </div>
+            <h1 id="previewTitle">Силовая база · 4 дня</h1>
+            <p class="ownership-line" id="ownershipLine">Данные доступны <span class="pre-assignment-label">до назначения</span>.</p>
+            <p class="version-line" id="versionLine"></p>
+          </div>
+          <button class="close-button" id="closePreview" type="button">Закрыть</button>
+        </div>
+      </header>
+
+      <div class="preview-content" id="previewContent">
+        <section class="section-block" aria-labelledby="factsTitle">
+          <div class="section-heading">
+            <h2 id="factsTitle">Что известно</h2>
+            <p>Без догадок о сроках и нагрузке</p>
+          </div>
+          <dl class="facts-grid" id="factsGrid"></dl>
+        </section>
+
+        <section class="section-block" aria-labelledby="weekTitle">
+          <div class="section-heading">
+            <div>
+              <h2 id="weekTitle">Состав недели</h2>
+            </div>
+            <p id="weekSummary">Дни из исходного шаблона</p>
+          </div>
+          <div class="day-list" id="dayList"></div>
+        </section>
+
+        <div class="source-note" id="sourceNote"></div>
+
+        <section class="action-section" aria-labelledby="actionTitle">
+          <h2 id="actionTitle">Следующее действие</h2>
+          <div class="action-grid">
+            <button class="button-secondary" id="selectAction" type="button">Выбрать</button>
+            <button class="button-primary" id="assignAction" type="button">
+              Назначить программу
+            </button>
+            <button class="button-secondary" id="copyAction" type="button">
+              Создать копию
+            </button>
+            <button class="button-secondary" id="editAction" type="button">
+              Редактировать
+            </button>
+          </div>
+          <p class="action-status" id="actionStatus" aria-live="polite">
+            Просмотр и закрытие не меняют активную программу.
+          </p>
+        </section>
+      </div>
+
+      <section
+        class="confirm-panel"
+        id="confirmPanel"
+        aria-labelledby="confirmTitle"
+        tabindex="-1"
+        hidden
+      >
+        <span class="eyebrow">Отдельный шаг подтверждения</span>
+        <h2 id="confirmTitle">Подтвердить назначение?</h2>
+        <p>
+          До подтверждения расписание и активная программа не изменены. В продукте этот шаг
+          должен использовать существующий серверный контракт назначения.
+        </p>
+        <div class="confirm-summary">
+          <strong id="confirmProgram">Силовая база · 4 дня</strong>
+          <span id="confirmSchedule">Срок и дни выбираются в расписании.</span>
+        </div>
+        <div class="confirm-warning">
+          Если уже есть активная программа, только явное подтверждение разрешает её заменить.
+          История старой программы сохраняется.
+        </div>
+        <div class="confirm-actions">
+          <button class="button-secondary" id="backToPreview" type="button">
+            Назад к просмотру
+          </button>
+          <button class="button-primary" id="confirmAssignment" type="button">
+            Подтвердить назначение
+          </button>
+        </div>
+        <p class="action-status" id="confirmStatus" aria-live="polite">
+          Макет: запрос на назначение не отправляется.
+        </p>
+      </section>
+    </article>
+
+    <button class="reopen-button button-primary" id="reopenButton" type="button" hidden>
+      Посмотреть предпросмотр
+    </button>
+
+    <script>
+      const UNKNOWN = 'Нет данных';
+      const fixtures = {
+        ready: {
+          kind: 'Готовый шаблон',
+          title: 'Силовая база · 4 дня',
+          description: 'Полные seed-метаданные и короткий путь к выбору основы.',
+          ownership: 'Источник: публичный готовый шаблон. Личный владелец не назначен.',
+          version: 'Версия назначения: нет — программа ещё не назначена.',
+          facts: [
+            ['Дни', '4 в составе шаблона', 'ProgramTemplateResponse.days'],
+            ['Частота', '4 в неделю', 'program_metadata.days_per_week'],
+            ['Уровень', 'Средний', 'template.level'],
+            ['Оборудование', 'Собственный вес · гантели · скамья', 'program_metadata.equipment'],
+            ['Оценка времени', '≈45 мин', 'макетная оценка; не фактическое время'],
+            ['Срок источника', '1 неделя', 'явное значение фикстуры'],
+          ],
+          days: [
+            { title: 'День 1 · всё тело', count: '3 упражнения', exercises: [['Приседания с гантелью', '3 × 8 · отдых 90 с'], ['Жим гантелей лёжа', '3 × 10 · отдых 90 с'], ['Планка', '3 подхода · без минут']] },
+            { title: 'День 2 · тяга', count: '3 упражнения', exercises: [['Румынская тяга', '3 × 8'], ['Тяга гантели в наклоне', '3 × 10'], ['Разведение гантелей', '2 × 12']] },
+            { title: 'День 3 · ноги', count: '3 упражнения', exercises: [['Выпады', '3 × 10'], ['Ягодичный мост', '3 × 12'], ['Подъём на носки', '3 × 15']] },
+            { title: 'День 4 · верх тела', count: '3 упражнения', exercises: [['Жим гантелей сидя', '3 × 8'], ['Тяга к поясу', '3 × 10'], ['Dead bug', '3 подхода']] },
+          ],
+          weekSummary: '4 дня из исходного шаблона',
+          sourceNote: '<strong>Откуда взяты факты</strong><span>Дни, предписания и метаданные карточки. Оценка времени показана только как явно помеченный синтетический пример; без такого источника в продукте будет «Нет данных».</span>',
+          actions: { select: true, assign: true, copy: true, edit: false, readonly: false },
+        },
+        multi: {
+          kind: 'Готовый шаблон',
+          title: 'PHUL · 12 недель в источнике',
+          description: 'Многонедельные предписания видны как факт источника, без нового редактора циклов.',
+          ownership: 'Источник: готовый шаблон. Периодизация не вычисляется предпросмотром.',
+          version: 'Версия назначения: нет — программа ещё не назначена.',
+          facts: [
+            ['Дни', '4 в составе шаблона', 'ProgramTemplateResponse.days'],
+            ['Частота', '4 в неделю', 'program_metadata.days_per_week'],
+            ['Уровень', 'Средний', 'template.level'],
+            ['Оборудование', 'Штанга · стойка · скамья', 'program_metadata.equipment'],
+            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
+            ['Срок источника', '12 недель в исходных предписаниях', 'default_duration_weeks + weekly_prescriptions'],
+          ],
+          days: [
+            { title: 'Верх тела · сила', count: '4 упражнения', exercises: [['Жим лёжа', '5 × 5 · предписания недель'], ['Тяга штанги', '4 × 6 · предписания недель'], ['Жим стоя', '3 × 8 · предписания недель'], ['Подтягивания', '3 подхода · предписания недель']] },
+            { title: 'Низ тела · сила', count: '4 упражнения', exercises: [['Приседания', '5 × 5 · предписания недель'], ['Румынская тяга', '3 × 8 · предписания недель'], ['Разгибание ног', '3 × 10 · предписания недель'], ['Пресс', '3 подхода']] },
+            { title: 'Верх тела · гипертрофия', count: '4 упражнения', exercises: [['Жим гантелей', '4 × 10'], ['Тяга блока', '4 × 10'], ['Разведение', '3 × 12'], ['Сгибание рук', '3 × 12']] },
+            { title: 'Низ тела · гипертрофия', count: '4 упражнения', exercises: [['Жим ногами', '4 × 10'], ['Сгибание ног', '3 × 12'], ['Выпады', '3 × 10'], ['Икры', '4 × 15']] },
+          ],
+          weekSummary: '4 дня · в источнике есть предписания на 12 недель',
+          sourceNote: '<strong>Только явные данные источника</strong><span>«12 недель» не означает новый режим повторения или периодизацию назначения. Типы недель и правила повторов не рисуются без отдельного согласованного контракта #916/#919/#920.</span>',
+          actions: { select: true, assign: true, copy: true, edit: false, readonly: false },
+        },
+        own: {
+          kind: 'Моя программа',
+          title: 'Домашняя база · моя программа',
+          description: 'Ручная программа с неполными метаданными: неизвестное остаётся неизвестным.',
+          ownership: 'Владелец: текущий пользователь. Редактирование доступно владельцу.',
+          version: 'Версия назначения: нет — программа ещё не назначена.',
+          facts: [
+            ['Дни', '3 в составе шаблона', 'ProgramTemplateResponse.days'],
+            ['Частота', UNKNOWN, 'program_metadata.days_per_week отсутствует'],
+            ['Уровень', 'Начальный', 'template.level'],
+            ['Оборудование', UNKNOWN, 'нет полного списка метаданных'],
+            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
+            ['Срок источника', UNKNOWN, 'default_duration_weeks не задан'],
+          ],
+          days: [
+            { title: 'Тренировка A', count: '2 упражнения', exercises: [['Приседания', '3 × 8'], ['Отжимания', '3 подхода']] },
+            { title: 'Тренировка B', count: '2 упражнения', exercises: [['Тяга', '3 × 10'], ['Планка', '3 подхода']] },
+            { title: 'Тренировка C', count: 'состав доступен', exercises: [['Жим', '3 × 8'], ['Тяга', '3 × 10']] },
+          ],
+          weekSummary: '3 дня из сохранённого шаблона',
+          sourceNote: '<strong>Неполные метаданные</strong><span>Показаны только поля, которые присутствуют в шаблоне. Частота, оборудование и длительность не восстанавливаются по названию программы.</span>',
+          actions: { select: true, assign: true, copy: false, edit: true, readonly: false },
+        },
+        coach: {
+          kind: 'От тренера · назначена',
+          title: 'Тренировочный блок клиента',
+          description: 'Назначение тренером остаётся отдельным владением и доступно клиенту только для чтения.',
+          ownership: 'Назначил тренер: Анна Смирнова. Это не личная программа пользователя.',
+          version: 'Срок назначения: 4 недели · ревизия назначения: 3.',
+          facts: [
+            ['Дни', '3 в составе шаблона', 'ProgramTemplateResponse.days'],
+            ['Частота', '3 в неделю', 'assigned_program_schedule_weekdays'],
+            ['Уровень', 'Продвинутый', 'template.level'],
+            ['Оборудование', 'Тренажёр · штанга', 'program_metadata.equipment'],
+            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
+            ['Срок назначения', '4 недели', 'assigned_program_duration_weeks'],
+          ],
+          days: [
+            { title: 'Понедельник · сила', count: '4 упражнения', exercises: [['Приседания', '5 × 5'], ['Жим лёжа', '5 × 5'], ['Тяга', '3 × 5'], ['Пресс', '3 подхода']] },
+            { title: 'Среда · объём', count: '3 упражнения', exercises: [['Жим стоя', '4 × 8'], ['Тяга блока', '4 × 10'], ['Выпады', '3 × 10']] },
+            { title: 'Пятница · техника', count: '2 упражнения', exercises: [['Становая тяга', '3 × 5'], ['Подтягивания', '3 подхода']] },
+          ],
+          weekSummary: '3 дня · 4 недели срока назначения',
+          sourceNote: '<strong>Назначение тренером</strong><span>Срок и ревизия — факт текущего назначения. Просмотр не предлагает тихо редактировать или переназначить чужое владение.</span>',
+          actions: { select: false, assign: false, copy: false, edit: false, readonly: true },
+        },
+        legacy: {
+          kind: 'Устаревший шаблон',
+          title: 'Старая базовая программа',
+          description: 'Старые записи без метаданных не получают выдуманные значения.',
+          ownership: 'Источник доступен для просмотра. Владелец и дополнительные права не определены.',
+          version: 'Версия назначения: нет данных.',
+          facts: [
+            ['Дни', '2 в составе шаблона', 'ProgramTemplateResponse.days'],
+            ['Частота', UNKNOWN, 'program_metadata отсутствует'],
+            ['Уровень', UNKNOWN, 'level отсутствует'],
+            ['Оборудование', UNKNOWN, 'нет полного источника'],
+            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
+            ['Срок источника', UNKNOWN, 'default_duration_weeks отсутствует'],
+          ],
+          days: [
+            { title: 'Тренировка A', count: 'состав доступен', exercises: [['Упражнение 1', 'назначение не задано'], ['Упражнение 2', 'назначение не задано']] },
+            { title: 'Тренировка B', count: 'состав доступен', exercises: [['Упражнение 3', 'назначение не задано']] },
+          ],
+          weekSummary: 'Только доступные строки исходного шаблона',
+          sourceNote: '<strong>Устаревший шаблон без метаданных</strong><span>«Нет данных» — намеренный результат. Не подставляются одна неделя, минуты, уровень, оборудование или периодизация.</span>',
+          actions: { select: true, assign: true, copy: true, edit: false, readonly: false },
+        },
+      };
+
+      const body = document.body;
+      const fixtureSelect = document.querySelector('#fixtureSelect');
+      const themeToggle = document.querySelector('#themeToggle');
+      const previewDialog = document.querySelector('#previewDialog');
+      const backdrop = document.querySelector('#backdrop');
+      const previewContent = document.querySelector('#previewContent');
+      const confirmPanel = document.querySelector('#confirmPanel');
+      const factsGrid = document.querySelector('#factsGrid');
+      const dayList = document.querySelector('#dayList');
+      const sourceNote = document.querySelector('#sourceNote');
+      const actionStatus = document.querySelector('#actionStatus');
+      const libraryStatus = document.querySelector('#libraryStatus');
+      const confirmStatus = document.querySelector('#confirmStatus');
+      let activeKey = fixtureSelect.value;
+      let activeFixture = fixtures[activeKey];
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#039;');
+      }
+
+      function isUnknown(value) {
+        return value === UNKNOWN;
+      }
+
+      function renderFacts(fixture) {
+        factsGrid.innerHTML = fixture.facts
+          .map(([label, value, source]) => {
+            const unknownClass = isUnknown(value) ? ' is-unknown' : '';
+            return `<div class="fact"><dt>${escapeHtml(label)}</dt><dd class="${unknownClass}">${escapeHtml(value)}</dd><span class="fact-source">${escapeHtml(source)}</span></div>`;
+          })
+          .join('');
+      }
+
+      function renderDays(fixture) {
+        dayList.innerHTML = fixture.days
+          .map(
+            (day, index) => `<article class="day-card">
+              <button class="day-toggle" type="button" data-day-index="${index}" aria-expanded="${index === 0}">
+                <span class="day-toggle__title"><strong>${escapeHtml(day.title)}</strong><span>${escapeHtml(day.count)}</span></span>
+                <span class="day-toggle__state">${index === 0 ? 'Скрыть' : 'Показать'}</span>
+              </button>
+              <div class="exercise-list" data-exercises-for="${index}" ${index === 0 ? '' : 'hidden'}>
+                ${day.exercises.map(([title, detail]) => `<div class="exercise-row"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(detail)}</span></div>`).join('')}
+              </div>
+            </article>`,
+          )
+          .join('');
+      }
+
+      function renderActions(fixture) {
+        const buttons = {
+          select: document.querySelector('#selectAction'),
+          assign: document.querySelector('#assignAction'),
+          copy: document.querySelector('#copyAction'),
+          edit: document.querySelector('#editAction'),
+        };
+        Object.entries(buttons).forEach(([key, button]) => {
+          button.hidden = !fixture.actions[key];
+          button.disabled = fixture.actions.readonly;
+        });
+        if (fixture.actions.readonly) {
+          actionStatus.textContent = 'Только просмотр: назначение тренером и владение не изменяются из этого предпросмотра.';
+        } else {
+          actionStatus.textContent = 'Просмотр и закрытие не меняют активную программу.';
+        }
+      }
+
+      function renderLibrary(fixture) {
+        document.querySelector('#libraryKind').textContent = fixture.kind;
+        document.querySelector('#libraryTitle').textContent = fixture.title;
+        document.querySelector('#libraryDescription').textContent = fixture.description;
+        document.querySelector('#libraryFacts').innerHTML = fixture.facts
+          .slice(0, 3)
+          .map(([label, value]) => `<span class="pill">${escapeHtml(label)}: ${escapeHtml(value)}</span>`)
+          .join('');
+      }
+
+      function render(fixtureKey) {
+        activeKey = fixtureKey;
+        activeFixture = fixtures[fixtureKey];
+        const fixture = activeFixture;
+        body.dataset.variant = fixtureKey;
+        document.querySelector('#kindBadge').textContent = fixture.kind;
+        document.querySelector('#previewTitle').textContent = fixture.title;
+        document.querySelector('#ownershipLine').innerHTML = escapeHtml(fixture.ownership).replaceAll('до назначения', '<span class="pre-assignment-label">до назначения</span>');
+        document.querySelector('#versionLine').textContent = fixture.version;
+        document.querySelector('#weekSummary').textContent = fixture.weekSummary;
+        sourceNote.innerHTML = fixture.sourceNote;
+        document.querySelector('#confirmProgram').textContent = fixture.title;
+        renderFacts(fixture);
+        renderDays(fixture);
+        renderActions(fixture);
+        renderLibrary(fixture);
+        previewContent.hidden = false;
+        confirmPanel.hidden = true;
+        confirmStatus.textContent = 'Макет: запрос на назначение не отправляется.';
+        if (!previewDialog.hidden) {
+          previewDialog.focus({ preventScroll: true });
+        }
+      }
+
+      function openPreview() {
+        previewDialog.hidden = false;
+        backdrop.hidden = false;
+        document.querySelector('#reopenButton').hidden = true;
+        previewDialog.focus({ preventScroll: true });
+      }
+
+      function closePreview() {
+        previewDialog.hidden = true;
+        backdrop.hidden = true;
+        document.querySelector('#reopenButton').hidden = false;
+        libraryStatus.textContent = 'Предпросмотр закрыт. Активная программа не изменена.';
+        document.querySelector('#reopenButton').focus();
+      }
+
+      function showConfirmation() {
+        previewContent.hidden = true;
+        confirmPanel.hidden = false;
+        confirmPanel.focus({ preventScroll: true });
+      }
+
+      function restorePreview() {
+        confirmPanel.hidden = true;
+        previewContent.hidden = false;
+        document.querySelector('#assignAction').focus();
+      }
+
+      document.querySelector('#closePreview').addEventListener('click', closePreview);
+      document.querySelector('#reopenButton').addEventListener('click', openPreview);
+      document.querySelector('#reopenFromCard').addEventListener('click', openPreview);
+      backdrop.addEventListener('click', closePreview);
+      document.addEventListener('keydown', (event) => {
+        if (event.key !== 'Escape' || previewDialog.hidden) return;
+        if (!confirmPanel.hidden) {
+          restorePreview();
+        } else {
+          closePreview();
+        }
+      });
+      fixtureSelect.addEventListener('change', (event) => render(event.target.value));
+      themeToggle.addEventListener('click', () => {
+        const nextTheme = body.dataset.theme === 'dark' ? 'light' : 'dark';
+        body.dataset.theme = nextTheme;
+        themeToggle.textContent = nextTheme === 'dark' ? 'Светлая тема' : 'Тёмная тема';
+      });
+      document.querySelector('#assignAction').addEventListener('click', showConfirmation);
+      document.querySelector('#backToPreview').addEventListener('click', restorePreview);
+      document.querySelector('#confirmAssignment').addEventListener('click', () => {
+        confirmStatus.textContent = 'Макет: подтверждение принято, реальный запрос не отправлен. В продукте нужен API назначения.';
+      });
+      document.querySelector('#selectAction').addEventListener('click', () => {
+        actionStatus.textContent = 'Выбор сохранён только в текущем flow макета. Активная программа не изменена.';
+      });
+      document.querySelector('#copyAction').addEventListener('click', () => {
+        actionStatus.textContent = 'Макет: сценарий копирования выбран. Владение становится личным только после серверной операции.';
+      });
+      document.querySelector('#editAction').addEventListener('click', () => {
+        actionStatus.textContent = 'Макет: редактор доступен только владельцу программы.';
+      });
+      dayList.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-day-index]');
+        if (!button) return;
+        const index = button.dataset.dayIndex;
+        const exercises = document.querySelector(`[data-exercises-for="${index}"]`);
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!expanded));
+        button.querySelector('.day-toggle__state').textContent = expanded ? 'Показать' : 'Скрыть';
+        exercises.hidden = expanded;
+      });
+
+      function runPrototypeChecks() {
+        const assert = (condition, message) => {
+          if (!condition) throw new Error(message);
+        };
+        assert(Object.keys(fixtures).length === 5, 'all review fixtures must exist');
+        assert(fixtures.legacy.facts.every(([, value]) => value !== '1 неделя'), 'legacy must not infer one week');
+        assert(fixtures.legacy.facts.some(([, value]) => value === UNKNOWN), 'legacy must expose unknown data');
+        assert(document.querySelector('#previewDialog').getAttribute('role') === 'dialog', 'dialog semantics missing');
+        assert(document.querySelector('#closePreview').type === 'button', 'close must not submit a form');
+        assert(document.querySelector('#confirmPanel').hidden, 'confirmation must be opt-in');
+        return 'prototype checks passed';
+      }
+
+      fixtureSelect.value = 'ready';
+      render('ready');
+      if (new URLSearchParams(window.location.search).has('check')) {
+        window.__prototypeChecks = runPrototypeChecks();
+      }
+    </script>
+  </body>
+</html>
