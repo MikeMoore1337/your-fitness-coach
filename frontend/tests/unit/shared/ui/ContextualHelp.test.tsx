@@ -21,10 +21,12 @@ describe('ContextualHelp', () => {
     const details = summary.closest('details') as HTMLDetailsElement;
     expect(summary).toBeInTheDocument();
     expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
     expect(summary?.querySelector('.disclosure-icon')).toBeInTheDocument();
 
     fireEvent.click(summary);
     expect(details).toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('Короткое объяснение')).toBeVisible();
     expect(screen.getByRole('link', { name: /подробнее на сайте/i })).toHaveAttribute(
       'href',
@@ -42,6 +44,7 @@ describe('ContextualHelp', () => {
     summary.focus();
     fireEvent.click(summary);
     expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveAttribute('aria-expanded', 'false');
     expect(summary).toHaveFocus();
   });
 
