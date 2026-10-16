@@ -1981,3 +1981,420 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     border-top: 1px solid var(--v2-border);
   }
 }
+
+/* Issue #873: approved one-column detail hierarchy with compact factual cards. */
+.app-section--progress .progress-experience--approved {
+  gap: var(--v2-space-5);
+  color: var(--v2-text-primary);
+}
+
+.app-section--progress .progress-experience--approved .progress-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, min(620px, 50%));
+  grid-template-areas:
+    'heading period'
+    'heading download';
+  align-items: start;
+  gap: var(--v2-space-2) var(--v2-space-5);
+  padding-block: var(--v2-space-2) 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-hero__heading {
+  display: grid;
+  grid-area: heading;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 172px);
+  gap: var(--v2-space-3);
+  min-width: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-hero__period {
+  grid-area: period;
+  min-width: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-hero__download {
+  grid-area: download;
+  min-width: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-details {
+  display: grid;
+  gap: var(--v2-space-5);
+  min-width: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-section {
+  padding: var(--v2-space-5) 0 0;
+  border: 0;
+  border-top: 1px solid var(--v2-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-section--progress .progress-experience--approved .progress-detail-card {
+  min-width: 0;
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-experience--approved .progress-detail-card h3 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.6vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+.app-section--progress .progress-experience--approved .progress-detail-card p {
+  max-width: 58ch;
+  margin: var(--v2-space-2) 0 0;
+  color: var(--v2-text-secondary);
+  line-height: 1.5;
+}
+
+.app-section--progress .progress-experience--approved .progress-detail-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v2-space-3);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-hero-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--v2-space-4);
+  align-items: center;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-hero__primary {
+  min-height: 48px;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: var(--v2-space-4) 0;
+  border-block: 1px solid var(--v2-border);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-inline: var(--v2-space-4);
+  border-left: 1px solid var(--v2-border);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts > div:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.76rem;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts dd {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.8vw, 2rem);
+  font-variant-numeric: tabular-nums;
+  font-weight: 850;
+  line-height: 1.05;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-facts dd small {
+  color: var(--v2-text-secondary);
+  font-size: 0.72em;
+  font-weight: 700;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-flow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+  gap: var(--v2-space-4);
+  align-items: start;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-trends {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-3);
+}
+
+.app-section--progress .progress-experience--approved .progress-trend-panel,
+.app-section--progress .progress-experience--approved .progress-body-diary {
+  min-width: 0;
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-diary {
+  margin: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-diary > summary {
+  min-height: 44px;
+}
+
+.app-section--progress .progress-experience--approved .progress-body-diary[open] > summary {
+  margin-bottom: var(--v2-space-3);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-secondary {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-secondary > details,
+.app-section--progress .progress-experience--approved .progress-secondary-disclosure {
+  border-bottom: 1px solid var(--v2-border);
+}
+
+.app-section--progress .progress-experience--approved .progress-body-secondary > details > summary,
+.app-section--progress .progress-experience--approved .progress-secondary-disclosure > summary {
+  min-height: 44px;
+}
+
+.app-section--progress .progress-experience--approved .data-confidence {
+  border: 1px solid var(--v2-border);
+  border-left-width: 1px;
+  border-left-color: var(--v2-lime);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-experience--approved .progress-fact-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.app-section--progress .progress-experience--approved .progress-training-meta {
+  margin: calc(var(--v2-space-3) * -1) 0 0;
+  color: var(--v2-text-secondary);
+  font-size: 0.8rem;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: var(--v2-space-4);
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-coverage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-4);
+}
+
+.app-section--progress .progress-experience--approved .progress-detail-card__metric {
+  flex: 0 0 auto;
+  color: var(--v2-accent-text);
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.05em;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals {
+  padding: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals > summary {
+  min-height: 76px;
+  padding: var(--v2-space-4);
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals > div {
+  padding: 0 var(--v2-space-4) var(--v2-space-4);
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals dt,
+.app-section--progress .progress-experience--approved .progress-nutrition-goals dd {
+  margin: 0;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.76rem;
+}
+
+.app-section--progress .progress-experience--approved .progress-nutrition-goals dd {
+  margin-top: 3px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.app-section--progress .progress-experience--approved .cardio-summary-strip {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.app-section--progress .progress-experience--approved .cardio-session-list {
+  display: grid;
+  gap: 0;
+}
+
+.app-section--progress .progress-experience--approved .cardio-session-row {
+  border: 0;
+  border-bottom: 1px solid var(--v2-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-section--progress .progress-experience--approved .progress-history-week {
+  border-bottom: 1px solid var(--v2-border);
+}
+
+.app-section--progress .progress-experience--approved .progress-history-week > summary {
+  min-height: 52px;
+}
+
+.app-section--progress .progress-experience--approved .progress-history-week__card {
+  margin: var(--v2-space-2) 0 var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+}
+
+.app-section--progress
+  .progress-experience--approved
+  .workout-history--progress
+  .workout-history-card {
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-experience--approved .weekly-review-card--progress {
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface-secondary);
+}
+
+@media (max-width: 1100px) {
+  .app-section--progress .progress-experience--approved .progress-hero {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'heading'
+      'period'
+      'download';
+  }
+}
+
+@media (max-width: 680px) {
+  .app-section--progress .progress-experience--approved {
+    gap: var(--v2-space-3);
+  }
+
+  .app-section--progress .progress-experience--approved .progress-hero {
+    gap: var(--v2-space-3);
+  }
+
+  .app-section--progress .progress-experience--approved .progress-hero__heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--v2-space-2);
+  }
+
+  .app-section--progress .progress-experience--approved .progress-hero__copy {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-hero__help {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: end;
+  }
+
+  .progress-experience--approved .progress-hero__help:has(.contextual-help[open]) {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-hero-card,
+  .app-section--progress .progress-experience--approved .progress-nutrition-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-flow {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-trends {
+    order: 1;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-diary {
+    order: 2;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-detail-card__actions {
+    justify-content: stretch;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-detail-card__actions > * {
+    flex: 1 1 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-facts {
+    gap: 0;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-facts > div {
+    padding-inline: 10px;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-facts > div:first-child {
+    padding-left: 0;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-facts dt {
+    font-size: 0.68rem;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-body-facts dd {
+    font-size: 1.2rem;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-fact-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .app-section--progress .progress-experience--approved .progress-fact-strip > div {
+    padding-inline: 10px;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-fact-strip dt {
+    font-size: 0.66rem;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-fact-strip dd {
+    font-size: 1rem;
+  }
+
+  .app-section--progress .progress-experience--approved .progress-nutrition-coverage {
+    align-items: flex-start;
+  }
+
+  .app-section--progress .progress-experience--approved .cardio-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

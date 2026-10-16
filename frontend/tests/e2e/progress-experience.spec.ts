@@ -561,6 +561,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
             trends: [
               {
                 metric: 'weight_kg',
+                unit: 'kg',
                 first_value: 69.4,
                 latest_value: 68.4,
                 change: -1,
@@ -578,6 +579,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
               },
               {
                 metric: 'waist_cm',
+                unit: 'cm',
                 first_value: 73,
                 latest_value: 72,
                 change: -1,
@@ -1146,7 +1148,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     .getByRole('navigation', { name: 'Разделы прогресса' })
     .getByRole('tab', { name: /^Тело/ })
     .click();
-  await expect(page.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Тело' })).toBeVisible();
   const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
   await expect(limitedConfidence).toContainText(
     'В самой заполненной окружности — 2 замера; для оценки одной окружности нужно минимум 3 замера',
@@ -1242,7 +1244,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .click();
 
   const body = page.locator('#progress-body');
-  await expect(body.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  await expect(body.getByRole('heading', { name: 'Тело' })).toBeVisible();
   await body.getByText('Выбранные мышечные группы').click();
   await expect(body.getByText('Мышцы спины')).toBeVisible();
   await expect(body.getByText('Задняя поверхность тела и ягодичные мышцы')).toBeVisible();
@@ -1259,7 +1261,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   const desktopDiary = await body.locator('.progress-body-diary').boundingBox();
   expect(desktopTrend).not.toBeNull();
   expect(desktopDiary).not.toBeNull();
-  expect(desktopTrend!.y).toBeLessThan(desktopDiary!.y);
+  expect(desktopTrend!.y).toBeLessThanOrEqual(desktopDiary!.y);
   await body.evaluate((element) => element.scrollIntoView({ block: 'start' }));
   await page.screenshot({
     path: '../.artifacts/screenshots/task-60/desktop-1440x1000-light.png',

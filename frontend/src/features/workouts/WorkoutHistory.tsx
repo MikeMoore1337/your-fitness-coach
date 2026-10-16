@@ -6,7 +6,14 @@ import type {
   WorkoutHistorySummary,
   WorkoutScheduleItem,
 } from '../../shared/api/types';
-import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
+import {
+  Badge,
+  Card,
+  DisclosureIcon,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
@@ -24,6 +31,7 @@ const adaptationReasonLabels: Record<string, string> = {
 export type WorkoutNavigationTarget = 'schedule' | 'history';
 
 export function WorkoutHistory({
+  compact = false,
   focusedWorkoutId,
   focusedCommentId,
   focusedExerciseId,
@@ -31,6 +39,7 @@ export function WorkoutHistory({
   readOnly = false,
   timeZone,
 }: {
+  compact?: boolean;
   focusedWorkoutId?: number | null;
   focusedCommentId?: number | null;
   focusedExerciseId?: number | null;
@@ -77,60 +86,82 @@ export function WorkoutHistory({
     row?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
   }, [focusedWorkoutId, rows]);
 
-  return (
-    <div className="stack">
-      <Card title="Неделя">
-        {week.isLoading ? (
-          <LoadingState />
-        ) : week.error ? (
-          <ErrorState message={(week.error as Error).message} />
-        ) : !week.data?.length ? (
-          <EmptyState title="На этой неделе нет тренировок" />
-        ) : (
-          <div className="list-grid top-gap">
-            {week.data.map((item) => {
-              const target: WorkoutNavigationTarget | null =
-                item.status === 'completed'
-                  ? rows.some((row) => row.id === item.id)
-                    ? 'history'
-                    : null
-                  : item.scheduled_date >= today
-                    ? 'schedule'
-                    : null;
-              const content = (
-                <>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p className="muted">{item.scheduled_date}</p>
-                  </div>
-                  <Badge>{workoutStatusLabel(item.status)}</Badge>
-                </>
-              );
-              if (!target) {
-                return (
-                  <article className="list-row" key={item.id}>
-                    {content}
-                  </article>
-                );
-              }
-              const targetId = `workout-${target}-${item.id}`;
+  const weekCard = (
+    <Card
+      className={compact ? 'progress-history-week__card' : undefined}
+      collapsible={!compact}
+      title="Неделя"
+    >
+      {week.isLoading ? (
+        <LoadingState />
+      ) : week.error ? (
+        <ErrorState message={(week.error as Error).message} />
+      ) : !week.data?.length ? (
+        <EmptyState title="На этой неделе нет тренировок" />
+      ) : (
+        <div className="list-grid top-gap">
+          {week.data.map((item) => {
+            const target: WorkoutNavigationTarget | null =
+              item.status === 'completed'
+                ? rows.some((row) => row.id === item.id)
+                  ? 'history'
+                  : null
+                : item.scheduled_date >= today
+                  ? 'schedule'
+                  : null;
+            const content = (
+              <>
+                <div>
+                  <strong>{item.title}</strong>
+                  <p className="muted">{item.scheduled_date}</p>
+                </div>
+                <Badge>{workoutStatusLabel(item.status)}</Badge>
+              </>
+            );
+            if (!target) {
               return (
-                <a
-                  className="list-row workout-day-link"
-                  href={`#${targetId}`}
-                  key={item.id}
-                  aria-label={`Открыть тренировочный день: ${item.title}`}
-                  onClick={() => onWorkoutSelect?.(item.id, target)}
-                >
+                <article className="list-row" key={item.id}>
                   {content}
-                </a>
+                </article>
               );
-            })}
-          </div>
-        )}
-      </Card>
+            }
+            const targetId = `workout-${target}-${item.id}`;
+            return (
+              <a
+                className="list-row workout-day-link"
+                href={`#${targetId}`}
+                key={item.id}
+                aria-label={`Открыть тренировочный день: ${item.title}`}
+                onClick={() => onWorkoutSelect?.(item.id, target)}
+              >
+                {content}
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </Card>
+  );
+
+  return (
+    <div className={`stack${compact ? ' workout-history--progress' : ''}`}>
+      {compact ? (
+        <details className="progress-history-week">
+          <summary className="yfc-disclosure-summary">
+            <span>
+              <small>Контекст недели</small>
+              <strong>План и навигация</strong>
+            </span>
+            <DisclosureIcon />
+          </summary>
+          {weekCard}
+        </details>
+      ) : (
+        weekCard
+      )}
       <Card
         className="workout-history-card"
+        collapsible={!compact || Boolean(focusedWorkoutId)}
         defaultOpen={Boolean(focusedWorkoutId)}
         key={focusedWorkoutId ?? 'history'}
         title="История"
