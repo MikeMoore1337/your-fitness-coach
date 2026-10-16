@@ -2334,7 +2334,8 @@ export function TodayWorkout({
 
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
-                    adaptation={adaptationEntry}
+                    key={`active-session-summary-${exercise.id}`}
+                    adaptation={started ? undefined : adaptationEntry}
                     currentSet={currentSet.set}
                     exercise={exercise}
                     guidance={guidanceElement}
@@ -2351,6 +2352,7 @@ export function TodayWorkout({
                         ?.focus({ preventScroll: true });
                     }}
                     pending={activeSync.pendingBySet.get(currentSet.set.id)}
+                    safetyAction={started ? adaptationEntry : undefined}
                     setupMemory={
                       <ExerciseSetupMemory
                         key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}

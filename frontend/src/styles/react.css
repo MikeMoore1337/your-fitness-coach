@@ -4567,6 +4567,26 @@ button.today-text-link {
   gap: 4px;
   min-width: 0;
 }
+.active-session-summary__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--touch-target);
+  padding: 6px 0;
+  border: 0;
+  border-radius: var(--radius-action);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.active-session-summary__toggle:hover {
+  background: var(--surface-hover);
+}
+.active-session-summary__toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
 .active-session-summary__eyebrow,
 .active-session-summary__primary > div > span,
 .active-session-summary__facts span,
@@ -4594,6 +4614,17 @@ button.today-text-link {
 .active-session-summary__state.is-offline {
   background: var(--warning-soft, var(--bg-soft));
   color: var(--warning-text);
+}
+.active-session-summary__safety {
+  display: grid;
+  gap: 8px;
+}
+.active-session-summary__details {
+  display: grid;
+  gap: 12px;
+}
+.active-session-summary__details[hidden] {
+  display: none;
 }
 .active-session-summary__primary {
   align-items: center;

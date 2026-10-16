@@ -2259,6 +2259,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас' })
+    .getByRole('button', { name: 'Что делать сейчас' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2271,6 +2275,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас' })
+    .getByRole('button', { name: 'Что делать сейчас' })
+    .click();
   const reloadedMemory = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
@@ -2296,6 +2304,10 @@ test('V9-04 fits Mobile Web and mocked TMA widths without moving the next-set ac
   await mockActiveWorkout(page, false, 'approved_animated', false, 'Скамья 30°');
   await page.goto('/app?tgWebAppPlatform=android');
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас' })
+    .getByRole('button', { name: 'Что делать сейчас' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2319,6 +2331,10 @@ test('V9-04 preserves a draft when the memory save is offline', async ({ page })
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас' })
+    .getByRole('button', { name: 'Что делать сейчас' })
+    .click();
 
   const setupMemory = page
     .locator('.active-workout-exercise')

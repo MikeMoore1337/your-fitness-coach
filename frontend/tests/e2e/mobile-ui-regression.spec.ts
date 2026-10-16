@@ -179,6 +179,10 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   const continueWorkout = page.getByRole('button', { name: 'Продолжить тренировку' });
   await expect(continueWorkout).toBeVisible();
   await continueWorkout.click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас' })
+    .getByRole('button', { name: 'Что делать сейчас' })
+    .click();
 
   await expect(page.locator('.active-workout')).toBeVisible();
   await assertMobileShellGeometry(page);
