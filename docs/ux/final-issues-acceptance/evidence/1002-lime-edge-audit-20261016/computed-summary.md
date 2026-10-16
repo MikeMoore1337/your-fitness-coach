@@ -18,7 +18,7 @@ Widths: `320/360/390/393/430/1440 px`. WebKit active-workout capture is valid; r
 | Screen | Selector | Computed evidence | Classification |
 |---|---|---|---|
 | Today active | `.today-workout-focus__header` | `border-bottom: 2px solid rgb(178, 245, 32)`; other borders `0`; rect `369×70` at 393 | C — active state, preserve |
-| Today active | `.active-workout-set.is-current` | all four borders `1px solid rgb(178, 245, 32)`; `box-shadow: rgb(178, 245, 32) 3px 0 0 0 inset`; rect `369×468` at 393 | C — current set, preserve |
+| Today active | `.active-workout-set.is-current` | all four borders `1px solid rgb(178, 245, 32)`; `box-shadow: rgb(178, 245, 32) 3px 0 0 0 inset`; rect `369×468` at 393 | A-06 — remove one-sided 3px lime inset; preserve 1px current-set frame and focus |
 | Today cardio | `.cardio-log` | `border-top: 3px solid rgb(178, 245, 32)`; other sides `1px` neutral; rect `369×632.03` at 393 | A-05 — remove only top edge |
 | Progress report | `.progress-report-factual-summary` | `border-left: 3px solid rgb(178, 245, 32)` + neutral `1px` frame; rect `321×530.59` at 393 | A-02 — remove only left edge |
 | Progress report | `.progress-report-program` | `border-left: 3px solid rgb(178, 245, 32)`; rect `321×314` at 393 | A-03 — remove only left edge |

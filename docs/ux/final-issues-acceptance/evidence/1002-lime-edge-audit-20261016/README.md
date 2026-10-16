@@ -12,10 +12,10 @@
 
 ## Итог
 
-- **A — 6 подтверждённых runtime-инстансов в 5 application-селекторах.** Это 1 desktop rail в overview, 1 factual summary, 1 program card, 2 exercise cards и 1 top edge в cardio log.
+- **A — 7 подтверждённых runtime-инстансов в 6 application-селекторах.** Это 1 desktop rail в overview, 1 factual summary, 1 program card, 2 exercise cards, 1 top edge в cardio log и 1 утолщённая односторонняя inset-грань текущего подхода.
 - **A\* — 1 подтверждённый AI Coach rail**, но он принадлежит пересекающейся области Issue #1003 и не должен меняться в этом worktree.
 - **B — сохранены** обычные равномерные лаймовые рамки, включая профильный control и выбранный audience control Landing.
-- **C — сохранены** active/current/selected/focus/semantic состояния: активная тренировка, выбранная точка графика, data confidence, success/attention/demo-boundary и wellbeing choices из PR #1000.
+- **C — сохранены** active/current/selected/focus/semantic состояния: обычная рамка активного подхода, выбранная точка графика, data confidence, success/attention/demo-boundary и wellbeing choices из PR #1000. Отдельная `3 px` inset-грань подхода перенесена в A-06.
 - **D — оставлены** неоднозначные или owner-approved композиции: Pulse insight/completion rails, auth explanatory context и source-only ветки без browser-confirmed fixture.
 
 ## Browser evidence
@@ -38,6 +38,7 @@
 | A-03 | Progress report program card; `3 px` lime слева | `.progress-report-program`, [`design-v2.css:571`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L571) | Удалить только `border-left` | [Dark 393 Chromium](./before/report-393-dark-chromium.png), [Light 393 Chromium](./before/report-393-light-chromium.png) |
 | A-04 | Две карточки упражнений в report; `3 px` lime слева + нейтральная рамка `1 px` | `.progress-report-exercises article`, [`design-v2.css:590`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L590) | Удалить только `border-left`; рамку и структуру карточек сохранить | [Dark 393 Chromium](./before/report-393-dark-chromium.png), [Light 393 Chromium](./before/report-393-light-chromium.png) |
 | A-05 | Today → Cardio quick entry; `3 px` lime сверху, остальные стороны нейтральные `1 px` | `.cardio-log`, [`design-v2.css:8723`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L8723) | Удалить только `border-top`; остальные грани сохранить | [Dark 393 Chromium](./before/today-cardio-393-dark-chromium.png), [Light 393 Chromium](./before/today-cardio-393-light-chromium.png), [Dark 1440 Chromium](./before/today-cardio-1440-dark-chromium.png), [Light 1440 Chromium](./before/today-cardio-1440-light-chromium.png) |
+| A-06 | Today → Active Workout; утолщённая односторонняя внутренняя лаймовая грань `3 px` у текущего подхода при обычной `1 px` рамке | `.active-workout-set.is-current`, [`design-v2.css:2533`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L2533) | Убрать только одностороннюю lime inset-тень; равномерную лаймовую рамку и current/focus состояние сохранить. Перед реализацией повторно подтвердить наличие в актуальном CSS | [Dark 393 Chromium](./before/today-active-393-dark-chromium.png), [Light 393 Chromium](./before/today-active-393-light-chromium.png), [WebKit Dark](./before/today-active-393-dark-webkit.png), [WebKit Light](./before/today-active-393-light-webkit.png) |
 
 ### A\* — подтверждено, но заблокировано пересечением #1003
 
@@ -53,7 +54,7 @@
 
 ## C — обязательно сохранить: state и доступность
 
-- Active Workout: `.today-workout-focus__header` имеет нижнюю `2 px` лаймовую грань как часть текущего состояния; `.active-workout-set.is-current` имеет равномерную `1 px` рамку и `3 px` lime inset shadow. Это active/current contract, не декоративная рамка. Источники: [`design-v2.css:1740`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L1740), [`design-v2.css:2533`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L2533). [Dark](./before/today-active-393-dark-chromium.png), [Light](./before/today-active-393-light-chromium.png), [WebKit Dark](./before/today-active-393-dark-webkit.png), [WebKit Light](./before/today-active-393-light-webkit.png).
+- Active Workout: `.today-workout-focus__header` имеет нижнюю `2 px` лаймовую грань как часть текущего состояния; `.active-workout-set.is-current` имеет равномерную `1 px` рамку, которую сохраняем вместе с active/current/focus семантикой. Его отдельная `3 px` односторонняя lime inset shadow, напротив, внесена в A-06 для адресного удаления, поскольку текущая формулировка владельца требует убрать подтверждённую утолщённую одностороннюю грань, не теряя обычной рамки. Источники: [`design-v2.css:1740`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L1740), [`design-v2.css:2533`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L2533). [Dark](./before/today-active-393-dark-chromium.png), [Light](./before/today-active-393-light-chromium.png), [WebKit Dark](./before/today-active-393-dark-webkit.png), [WebKit Light](./before/today-active-393-light-webkit.png).
 - Progress success rail `.app-section--progress .progress-insights__column--good` (`ux-ia-redesign.css:571`), selected data point `.data-viz-chart__selection` (`data-viz.css:239`) и `.progress-report-confidence` (`design-v2.css:11609`) являются success/selection/data-completeness semantics; их не удалять.
 - Demo current/safety/conversion edges (`demo.css:160,182,302,331,358`, `demo-cabinet.css:22,75`) сохраняются как synthetic/demo state. [Dark](./before/demo-393-dark-chromium.png), [Light](./before/demo-393-light-chromium.png).
 - Wellbeing selected choice из PR #1000 сохранён: `box-shadow: none`, выбранная рамка и focus outline остаются независимыми. Текущее правило: [`design-v2.css:4339`](https://github.com/MikeMoore1337/your-fitness-coach/blob/474d920d29e373043d4216586095ad7c90f7eb2e/frontend/src/styles/design-v2.css#L4339).
@@ -84,7 +85,7 @@ Representative non-defect screens: [Progress Dark](./before/progress-393-dark-ch
 
 После завершения #1003 и owner visual gate:
 
-1. Внести только пять точечных изменений: удалить `border-left` в A-01…A-04 и `border-top` в A-05.
+1. Внести только шесть точечных изменений: удалить `border-left` в A-01…A-04 и `border-top` в A-05; удалить только утолщённую одностороннюю lime inset-тень A-06, сохранив равномерную `1 px` рамку и семантику текущего подхода.
 2. Не менять палитру, токены, общую толщину рамок, радиусы, box-shadow других состояний, псевдоэлементы и layout.
 3. Для каждого селектора добавить targeted computed assertion: запрещённая сторона не должна быть lime и быть толще обычной рамки; не вводить глобальное правило `border: 0`, `box-shadow: none` или `outline: none`.
 4. Повторить Dark/Light, Chromium/WebKit, widths `320/360/390/393/430/1440`, Web/PWA/mock TMA, keyboard focus и `scrollWidth <= innerWidth`; отдельно повторить active workout, set cards, wellbeing и скрытие AI Coach.
