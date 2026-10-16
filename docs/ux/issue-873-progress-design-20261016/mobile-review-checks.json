@@ -1,0 +1,238 @@
+[
+  {
+    "theme": "light",
+    "state": "body-empty",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "body-many",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "body-one",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "cardio-many",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Кардио",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "cardio-one",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Кардио",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "history",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "История",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "nutrition-empty",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Питание",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "nutrition-filled",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Питание",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "training",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тренировки",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "wellbeing",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Самочувствие",
+    "buttons": 0
+  },
+  {
+    "theme": "light",
+    "state": "body-many",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "theme": "light",
+    "state": "body-many",
+    "width": 360,
+    "overflow": false
+  },
+  {
+    "theme": "light",
+    "state": "body-many",
+    "width": 430,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "state": "body-empty",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "body-many",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "body-one",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тело",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "cardio-many",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Кардио",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "cardio-one",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Кардио",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "history",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "История",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "nutrition-empty",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Питание",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "nutrition-filled",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Питание",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "training",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Тренировки",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "wellbeing",
+    "width": 393,
+    "screenOverflow": false,
+    "documentOverflow": false,
+    "badBento": 0,
+    "section": "Самочувствие",
+    "buttons": 0
+  },
+  {
+    "theme": "dark",
+    "state": "body-many",
+    "width": 320,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "state": "body-many",
+    "width": 360,
+    "overflow": false
+  },
+  {
+    "theme": "dark",
+    "state": "body-many",
+    "width": 430,
+    "overflow": false
+  }
+]
