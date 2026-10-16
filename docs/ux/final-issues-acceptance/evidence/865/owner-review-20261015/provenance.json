@@ -1,0 +1,32 @@
+{
+  "kind": "owner-review-proposal",
+  "issue": 865,
+  "pull_request": 1013,
+  "source_sha": "9cdc742a071e80deafc76c91336ca92a41b40774",
+  "generated_at": "2026-10-15",
+  "owner_visual_approval": "PENDING",
+  "production_code_changed": false,
+  "api_or_business_logic_changed": false,
+  "browser": {
+    "engine": "Chromium",
+    "playwright": "1.62.1",
+    "capture_mode": "local file prototype"
+  },
+  "captures": [
+    { "file": "mockups/chromium-320-light-closed.png", "theme": "light", "state": "closed", "viewport": "320x844" },
+    { "file": "mockups/chromium-320-dark-closed.png", "theme": "dark", "state": "closed", "viewport": "320x844" },
+    { "file": "mockups/chromium-430-light-expanded-custom.png", "theme": "light", "state": "expanded+custom", "viewport": "430x844" },
+    { "file": "mockups/chromium-430-dark-expanded-custom.png", "theme": "dark", "state": "expanded+custom", "viewport": "430x844" },
+    { "file": "mockups/chromium-1280-light-closed.png", "theme": "light", "state": "closed", "viewport": "1280x900" },
+    { "file": "mockups/chromium-1280-dark-closed.png", "theme": "dark", "state": "closed", "viewport": "1280x900" },
+    { "file": "mockups/chromium-1440-light-expanded-custom.png", "theme": "light", "state": "expanded+custom", "viewport": "1440x900" },
+    { "file": "mockups/chromium-1440-dark-expanded-custom.png", "theme": "dark", "state": "expanded+custom", "viewport": "1440x900" }
+  ],
+  "implementation_matrix_required_after_approval": {
+    "engines": ["chromium", "webkit"],
+    "themes": ["light", "dark"],
+    "mobile_widths": [320, 360, 390, 393, 430],
+    "desktop_widths": [1280, 1440, 1920, 2560],
+    "states": ["closed-closed", "help-open", "custom-open", "help-and-custom-open"]
+  }
+}
