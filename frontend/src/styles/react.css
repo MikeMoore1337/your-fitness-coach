@@ -5038,6 +5038,12 @@ button.today-text-link {
   width: 100%;
   min-height: 48px;
 }
+.active-workout-set__contextual-help {
+  min-width: 0;
+}
+.active-workout-set__contextual-help .contextual-help {
+  margin-top: 0;
+}
 .active-workout-set:not(.is-current) .active-workout-set__done {
   border-color: var(--border);
   background: var(--secondary-bg);
