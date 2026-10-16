@@ -48,6 +48,27 @@ node scripts/research_exercise_media_playback.cjs
 
 Использованы локальные `file://` HTML-video (`muted playsinline preload=auto`), Chromium и WebKit Playwright на Windows (390×844 viewport), для **всех восьми output files**. Ждали metadata, `video.play()` и продвижения playhead `currentTime >= 0.2 sec`. **16/16 PASS**: обе браузерные движки фактически декодировали, нет playback error, оба output profile резолюций прочитаны. Детали: [986_BROWSER_COMPAT.csv](./986_BROWSER_COMPAT.csv). `latency_ms` в CSV — грубое время *до 0.2 секунды playhead*, НЕ network/startup latency (само по себе включает ~200ms воспроизведения). Эти результаты **не подтверждают** физический iPhone/Safari, Telegram WebView/TMA, CPU/battery, first-frame on 3G, RAM, accessibility, poster quality или 2×-retina sharpness. Браузерный тест использовал реальные локально перекодированные файлы, а не видео из текущего production UI.
 
+## Poster/JPG/WebP: метаданные, размер и воспроизводимость
+
+Дополнительная **research-only** матрица охватила 16 JPG-постеров из того же pinned `986_PILOT_RESULTS.csv` (1920×1080). Исходные файлы снова сверены по SHA-256, затем локально выполнено downscale Lanczos + контролируемое кодирование четырёх вариантов на постер. Скрипт: [`scripts/research_exercise_poster_bench.py`](../../../scripts/research_exercise_poster_bench.py), итоговый [`986_POSTER_BENCH.csv`](./986_POSTER_BENCH.csv) (64 строки). Запуск из корня выделенного worktree:
+
+```powershell
+uv run --no-project --with pillow python scripts/research_exercise_poster_bench.py
+```
+
+Исходные и результирующие JPG/WebP сохраняются **только в локальных ignored каталогах**. Отчёт по умолчанию пишется туда же и не перезаписывает измерения, уже зафиксированные в Git. Binary files и полные EXIF/XMP-значения не публикуются.
+
+| Формат (16 шт.) | Всего байт | Изменение к исходным 1 234 406 B | PSNR относительно resized source, диапазон |
+| --- | ---: | ---: | ---: |
+| JPEG 480p q83 | 376 768 | −69,5% | 43,28–47,84 dB |
+| WebP 480p q80 | 167 722 | −86,4% | 43,70–46,44 dB |
+| JPEG 720p q83 | 696 595 | −43,6% | 44,79–49,69 dB |
+| WebP 720p q80 | 281 752 | −77,2% | 44,90–48,12 dB |
+
+Из 16 исходных постеров в проверенной выборке: **0 EXIF tags, 0 GPS flags, 0 ICC, 0 XMP и 0 IPTC markers** по Pillow + marker scan. Все 64 производных файла проверены на отсутствие EXIF/ICC/XMP при чтении. Это ограниченный аудит **только этих 16 JPG**; не доказательство отсутствия других типов embedded metadata во всех 593 файлов candidate repo. Не сохранять оригинальные метаданные автоматически при будущем импорте.
+
+PSNR измеряет кодек **относительно предварительно уменьшенного original**, не качество/анатомию/технику относительно исходных 1080px и не человеческую визуальную приёмку. В реальном продукте browser support, fidelity на 2× дисплее и fallback `<picture>` требуют отдельной проверки на Android/iOS/TMA; WebP не внедрялся. `libvips` пока не обязателен: Pillow — ограниченный бенчмарк, ускорение libvips нужно доказывать отдельно на репрезентативной выборке.
+
 ## Права и владельческие решения
 
 В Issue #986 уже записано owner-confirmed permission **использовать именно `akajdid-mostafa/exercises-media` в YFC**. Повторно просить разрешение *на само использование* не нужно. При этом в публичном source отсутствуют `LICENSE/NOTICE/README` с текстом условий; это не равнозначно доказанным правам на **публичную републикацию оригинальных бинарников, изменённых/перекодированных производных файлов, CDN-хостинг и передачу пользователям приложения**. До выбора конкретного способа распространения документировать подтверждённый scope правообладателя/согласование владельца; не публиковать raw/encoded binaries при `REVIEW`.
