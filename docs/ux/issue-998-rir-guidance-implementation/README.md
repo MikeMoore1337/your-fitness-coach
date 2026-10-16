@@ -8,8 +8,10 @@
 - Issue: [#998](https://github.com/MikeMoore1337/your-fitness-coach/issues/998).
 - Утверждённое направление: Variant A — компактная подсказка рядом с соответствующим понятием.
 - Discovery-пакет: `codex/issue-998-rir-guidance-discovery-local` на `24e77a1a9f3e72420a570bb988c5bcaaf6ed7455`.
-- Baseline: `origin/master` на `4c92832415d4eb994cf6b849a67074742f07ea50`.
-- Реализация и screenshots: `923442725d68f319bdb9f2815f17000a7a6fc2a8`.
+- Исходный baseline-аудит: `origin/master` на `4c92832415d4eb994cf6b849a67074742f07ea50`.
+- Актуальный base перед финальной проверкой: `origin/master` на `b6acadfd808fca41ab8a0c10558fad6a08f3cc0b`.
+- Основная реализация и screenshots: `923442725d68f319bdb9f2815f17000a7a6fc2a8`; rest/dock regression fix и
+  обновлённые visual baselines: `f9fe37d77c41b7ad462f8b4adea3885747cea0d0`.
 - Изоляция: ветка `codex/issue-998-rir-guidance-implementation` в отдельном worktree.
 
 Изменения не трогают выполнение подхода, расчёт прогрессии, назначение программ, редактор, API,
@@ -58,6 +60,8 @@ Mini App и VoiceOver не выдаются за проверенные.
 - Targeted WebKit: Issue #998 responsive matrix `10/10`.
 - Typecheck, ESLint и русский UI-copy guard: passed.
 - Production build: passed.
+- Mobile rest/dock regression: 8/8 Chromium (320/360/393/430, Dark/Light) после скрытия
+  вторичной подсказки на время полноразмерного rest-panel.
 - Pre-commit: passed при запуске через проектный `.venv`; первый запуск был заблокирован отсутствующим
   Windows `python` alias, затем тот же hook прошёл с явным `.venv` в PATH.
 - Изменённые файлы проходят Prettier. Repo-wide `prettier --check .` выявляет 512 исторически
