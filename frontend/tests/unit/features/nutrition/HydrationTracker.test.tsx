@@ -185,7 +185,9 @@ describe('HydrationTracker', () => {
       expect(screen.queryByRole('list')).not.toBeInTheDocument();
     }
     if (!toggle) {
-      expect(screen.queryByRole('button', { name: 'Показать всю историю' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Показать всю историю' }),
+      ).not.toBeInTheDocument();
       return;
     }
 

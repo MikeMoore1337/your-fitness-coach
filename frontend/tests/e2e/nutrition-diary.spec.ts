@@ -1348,6 +1348,8 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
       mobileFirstMealBox!.x -
       mobileFirstMealBox!.width,
   ).toBeGreaterThanOrEqual(12);
+  const hydrationPreferences = page.getByRole('region', { name: 'Гидратация' });
+  await hydrationPreferences.getByText('Личный ориентир', { exact: true }).click();
   const saveSex = page.getByText('Сохранить выбранный пол в профиле', { exact: true });
   await expect(saveSex).toBeVisible();
   expect(await saveSex.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
@@ -1356,6 +1358,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
   });
   const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
   await hydration.scrollIntoViewIfNeeded();
   await hydration.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
@@ -1590,6 +1593,7 @@ for (const mode of ['light', 'dark'] as const) {
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
     const hydration = page.getByRole('region', { name: 'Гидратация' });
+    await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
     await expect(hydration.getByText('Термокружка · 420 мл')).toBeVisible();
     await hydration.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-81/desktop-${mode}-expanded.png`,
