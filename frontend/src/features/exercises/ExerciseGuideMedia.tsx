@@ -130,7 +130,9 @@ export function ExerciseGuideMedia({
                     <img
                       src={displayUrl}
                       srcSet={
-                        showPoster || item.type === 'animation' ? undefined : responsiveSources(item)
+                        showPoster || item.type === 'animation'
+                          ? undefined
+                          : responsiveSources(item)
                       }
                       sizes={cardSizes}
                       alt={item.alt}
