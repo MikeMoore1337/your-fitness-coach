@@ -593,7 +593,10 @@ for (const theme of ['light', 'dark'] as const) {
       expect(geometry.surface).toBe('browser');
       expect(geometry.viewportBottom).toBe(34);
       expect(geometry.safeBottom).toBe(34);
-      expect(geometry.dockBottomGap).toBeLessThanOrEqual(geometry.safeBottom + 16);
+      // An iPhone-like 34px safe area should yield the ~20px outer gap
+      // seen in native floating tab bars, not the old 46px gap.
+      expect(geometry.dockBottomGap).toBeGreaterThanOrEqual(19);
+      expect(geometry.dockBottomGap).toBeLessThanOrEqual(21);
       expect(geometry.quickAddVisible).toBe(true);
       expect(geometry.quickAddHit).toBe(true);
       expect(geometry.startWorkoutInViewport).toBe(true);

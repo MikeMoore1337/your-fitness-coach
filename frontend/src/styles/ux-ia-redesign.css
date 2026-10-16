@@ -1477,10 +1477,20 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 
 /* The personal mobile dock owns the add action; the floating trigger remains for desktop and demos. */
 @media (max-width: 899px) {
+  :root {
+    --yfc-personal-dock-bottom-gap: calc(12px + var(--yfc-layout-safe-bottom));
+  }
+
+  /* Browser/PWA: align the outer pill closer to native iOS floating tab bars.
+     Keep the Telegram host safe-area contract unchanged. */
+  :root[data-yfc-layout-surface='browser'] {
+    --yfc-personal-dock-bottom-gap: max(12px, calc(var(--yfc-layout-safe-bottom) - 14px));
+  }
+
   .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     inset: auto max(10px, var(--yfc-layout-safe-right))
-      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px))
+      calc(var(--yfc-personal-dock-bottom-gap) + var(--yfc-viewport-bottom-effective, 0px))
       max(10px, var(--yfc-layout-safe-left));
     gap: 2px;
     padding: 6px;
