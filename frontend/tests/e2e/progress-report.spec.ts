@@ -174,6 +174,10 @@ test('report uses the available mobile canvas width without horizontal overflow'
       expect(geometry.documentWidth).toBeGreaterThanOrEqual(width - 34);
       expect(geometry.contentWidth).toBeGreaterThanOrEqual(width - 50);
       if (width === 393 && process.env.YFC_CAPTURE_1039 === '1') {
+        // Screenshots show identical, collapsed report options in both themes.
+        await page.locator('.progress-report-options').evaluate((node) => {
+          (node as HTMLDetailsElement).open = false;
+        });
         await mkdir(evidenceDir, { recursive: true });
         await page.screenshot({
           path: resolve(evidenceDir, `after-393-${theme}.png`),
