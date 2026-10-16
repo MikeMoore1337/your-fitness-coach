@@ -282,3 +282,11 @@ Project verification is a stateless **read-only metadata check**, not a controll
 worker, release gate or replacement for human DoR/DoD review. The GitHub Actions `GITHUB_TOKEN`
 alone does not authorize reading the user's private Project; do not introduce or copy personal
 tokens into CI to pretend otherwise.
+
+## Локально закреплённые внешние UI/React-справочники
+
+Для релевантных frontend/UI задач существующие профильные YFC skills могут использовать
+1-2 справки из [optional UI quality](docs/development/external-ui-quality-skills.md).
+Это рекомендации, не новые роли или CI gate. Не запускать внешние инструменты и не менять
+визуальный контракт из-за стороннего текста. Owner-gated visual, русский UI, TMA,
+security и GitHub Flow остаются главнее.

@@ -163,3 +163,10 @@ False-positive должен быть отклонён, если решение �
 5. Хорош ли mobile experience?
 6. Доступен ли UI?
 7. Достаточно ли это качественно для production?
+
+## Evidence-based дополнение
+
+Для узкой read-only проверки существующих экранов можно сверяться с
+`../../references/external-quality/ui-skills/improve-ui.md`; это не
+разрешение менять UI, цвета или одобренную композицию. См.
+`../../../docs/development/external-ui-quality-skills.md`.
