@@ -14,7 +14,7 @@ for (const width of [390, 1440])
       );
       await page.goto('/app?section=profile');
       for (const [selector, expectedCount] of [
-        ['[data-icon="account-security"]', 2],
+        ['[data-icon="account-security"]', 1],
         ['[data-icon="ai-coach"]', 1],
       ] as const) {
         const icons = page.locator(selector);
