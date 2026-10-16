@@ -8,6 +8,7 @@ production- и не физическое устройство.
 
 - Base master: `4c92832415d4eb994cf6b849a67074742f07ea50`
 - Approved design package: `18002f8bdf938ba9d7ed0e3b0353f2682000ba6d`
+- Implementation evidence commit: `c4f8c8c2`
 - Implementation branch: `codex/issue-873-progress-implementation-v2`
 - Capture browser: Playwright Chromium, reduced motion; cross-browser regression также
   выполнен в Playwright WebKit.
@@ -55,5 +56,5 @@ Detail captures use the `.progress-details` region. Control captures use the
   acceptance is still pending; merge and deploy are forbidden for this task.
 - No backend, API, database, formula, history, RBAC, privacy, environment-variable or secret
   change is included.
-- The exact implementation commit SHA is recorded in the Draft PR and final task report after
-  the evidence package is committed.
+- The Draft PR head may advance with the provenance-only README update; the implementation
+  evidence itself is pinned to `c4f8c8c2`.
