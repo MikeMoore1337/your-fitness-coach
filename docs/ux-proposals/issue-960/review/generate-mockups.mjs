@@ -10,6 +10,10 @@ const widths = [320, 360, 393, 430, 1280];
 const themes = ['dark', 'light'];
 const states = ['countdown', 'overtime'];
 
+const assert = (condition, message) => {
+  if (!condition) throw new Error(`mockup geometry: ${message}`);
+};
+
 const palette = {
   dark: {
     page: '#090b0b',
@@ -67,6 +71,10 @@ function render(width, theme, state) {
   const actionWidth = (panelWidth - 28 - actionGap * 2) / 3;
   const cardY = panelY + panelHeight + 22;
   const navY = height - 72;
+  assert(panelX >= 0 && panelX + panelWidth <= width, `${width}px panel exceeds viewport`);
+  assert(finishX >= panelX + 14 && finishX + finishWidth <= panelX + panelWidth - 14, `${width}px finish CTA exceeds panel`);
+  assert(actionsY + 44 <= panelY + panelHeight - 14, `${width}px action row exceeds panel`);
+  assert(cardY + (mobile ? 210 : 260) < navY, `${width}px exercise card overlaps bottom navigation`);
   const countdown = state === 'overtime' ? '0:00' : '0:48';
   const fact = state === 'overtime' ? 'Факт 2:14' : 'Факт 0:42';
   const title = state === 'overtime' ? 'План завершён' : 'Далее: Тяга верхнего блока';
