@@ -227,5 +227,3 @@ dimensions, duration, FPS, quality target и SHA-256.
 3. Одобрить semantic mapping для спорных `REVIEW` rows после ручной domain review.
 4. После реализации отдельно принять полный visual AFTER package. Это не merge/deploy
    approval.
-
-
