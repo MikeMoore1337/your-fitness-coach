@@ -764,6 +764,56 @@
         .legacy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 7px; }
         .legacy-item { min-height: 51px; padding: 7px 8px; font-size: 11px; }
         .grid--3 { grid-template-columns: 1fr; }
+        /* Owner feedback: no mobile Bento. Keep Desktop grid and full-width content rows. */
+        html[data-mode='proposed'] .grid--2,
+        html[data-mode='proposed'] .grid--3 {
+          grid-template-columns: minmax(0, 1fr);
+          gap: 10px;
+        }
+        html[data-mode='proposed'] .screen__content > .grid,
+        html[data-mode='proposed'] .card,
+        html[data-mode='proposed'] .body-hero {
+          width: 100%;
+          min-width: 0;
+        }
+        html[data-mode='proposed'] .card__body {
+          padding: 14px 15px;
+        }
+        html[data-mode='proposed'] .fact-strip {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+          border-color: var(--line);
+          background: var(--surface);
+        }
+        html[data-mode='proposed'] .fact-strip__item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 12px;
+          min-height: 48px;
+          padding: 9px 13px;
+          border-block-start: 1px solid var(--line);
+        }
+        html[data-mode='proposed'] .fact-strip__item:first-child {
+          border-block-start: 0;
+        }
+        html[data-mode='proposed'] .fact-strip__item strong {
+          margin: 0;
+          text-align: right;
+          font-size: 18px;
+        }
+        html[data-mode='proposed'] .body-hero {
+          background: var(--surface);
+          padding: 15px;
+        }
+        html[data-mode='proposed'] .body-hero__actions {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr);
+        }
+        html[data-mode='proposed'] .button--primary {
+          width: 100%;
+        }
         .body-hero { flex-direction: column; }
         .body-hero__actions { width: 100%; flex-direction: row; flex-wrap: wrap; }
         .body-hero__actions .button { flex: 1 1 150px; }
