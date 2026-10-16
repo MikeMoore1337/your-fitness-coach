@@ -15,7 +15,7 @@
 Это решение разрешает доработать discovery-контракт и макеты, но не является разрешением на
 production-реализацию.
 
-**Owner gates:** `OWNER_DIRECTION=RECORDED_IN_TASK_AND_ISSUE_COMMENT_PENDING`,
+**Owner gates:** `OWNER_DIRECTION=RECORDED_IN_TASK_AND_ISSUE_BODY`,
 `OWNER_DESIGN_APPROVAL=MINIMAL_BASELINE_PACKAGE_PENDING`,
 `OWNER_IMPLEMENTATION_APPROVAL=PENDING`, `OWNER_VISUAL_ACCEPTANCE=NOT_APPLICABLE_YET`,
 `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`.
@@ -449,7 +449,7 @@ Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible
 
 ## Решения владельца и оставшийся gate
 
-Уже получено в текущем запросе владельца и должно быть записано в Issue #960 отдельным комментарием:
+Уже получено в текущем запросе владельца и зафиксировано в обновлённом body Issue #960:
 
 1. Функционально выбрать `Variant A`.
 2. Сохранить действующий внешний вид `RestTimer`; не переносить standalone Variant A как новый
