@@ -10,20 +10,32 @@
 
 **Ветка:** `codex/issue-960-rest-discovery`
 
-**Owner gates:** `OWNER_DESIGN_APPROVAL=PENDING`, `OWNER_IMPLEMENTATION_APPROVAL=PENDING`,
-`OWNER_VISUAL_ACCEPTANCE=NOT_APPLICABLE_YET`, `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`.
+**Owner direction received 2026-10-16:** `FUNCTIONAL_VARIANT= A_SELECTED` ·
+`VISUAL_BASELINE=EXISTING_REST_TIMER` · `VISUAL_SCOPE=MINIMAL_ADDITIONS_ONLY`.
+Это решение разрешает доработать discovery-контракт и макеты, но не является разрешением на
+production-реализацию.
 
-Этот пакет является предложением для решения владельца. SVG — статические обезличенные макеты,
-не production UI и не AFTER evidence.
+**Owner gates:** `OWNER_DIRECTION=RECORDED_IN_TASK_AND_ISSUE_COMMENT_PENDING`,
+`OWNER_DESIGN_APPROVAL=MINIMAL_BASELINE_PACKAGE_PENDING`,
+`OWNER_IMPLEMENTATION_APPROVAL=PENDING`, `OWNER_VISUAL_ACCEPTANCE=NOT_APPLICABLE_YET`,
+`MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`.
+
+Этот пакет фиксирует выбранную функциональную логику Variant A в пределах существующего
+RestTimer. SVG и static prototype — обезличенные макеты для review, не production UI и не AFTER
+evidence.
 
 ## Решение в одном абзаце
 
-Предлагается отдельная сущность `workout_rest_session`, создаваемая один раз после принятого
+Выбранная функциональная логика Variant A использует отдельную сущность
+`workout_rest_session`, создаваемую один раз после принятого
 завершения рабочего подхода. Она хранит снимок планового отдыха, отдельную скорректированную цель
-и, только после явной отметки пользователя, фактический интервал. `+30 сек` и `+60 сек` меняют
+и, только после явной отметки пользователя, фактический интервал. Визуально сохраняется
+существующий верхний RestTimer: его «Отдых», контекст «Далее», матовый Liquid Glass, размеры,
+скругления и ряд `+30 сек / +60 сек / Пропустить`. Минимальные добавления — строка «Факт» и
+кнопка «Завершить отдых» в той же системе управляющих элементов. `+30 сек` и `+60 сек` меняют
 только цель таймера. После достижения цели обратный счётчик остаётся на нуле, прямой счётчик
 продолжает показывать время от принятого завершения предыдущего подхода до нажатия
-«Закончить отдых». Это не измерение физиологической готовности и не доказательство фактического
+«Завершить отдых». Это не измерение физиологической готовности и не доказательство фактического
 начала следующего подхода.
 
 ## Что проверено на исходном SHA
@@ -95,7 +107,7 @@ NONE
        явная «Закончить отдых» ──────────────────> COMPLETED
        «Пропустить» ────────────────────────────> SKIPPED
        «Прервать отдых» / abort ────────────────> INTERRUPTED
-       нет надёжного восстановления/забытый stop -> UNKNOWN
+       нет надёжного восстановления/истёк hard cutoff -> UNKNOWN
 
 COMPLETED / SKIPPED / INTERRUPTED / UNKNOWN
   └─ повтор того же idempotency key ───────────> тот же terminal response
@@ -109,31 +121,49 @@ COMPLETED / SKIPPED / INTERRUPTED / UNKNOWN
 | `START_ACCEPTED` | Предыдущий set подтверждён/надёжно сохранён; рабочий set; active workout; ownership прошёл. | Создать ровно одну session, зафиксировать план, `adjusted_target=planned`, запустить оба счётчика. |
 | `PLAN_REACHED` | `now >= target_at`. | Один notification/haptic максимум на session; `remaining=0`; `elapsed` продолжает расти. |
 | `ADJUST_TARGET(+30/+60)` | Session `running`, action idempotent. | `target_at = max(previous_target_at, now) + delta`; `started_at` и будущий measured не меняются. |
+| `LONG_NOTICE` | `elapsed` выше выбранного product-порога, но terminal action ещё возможен. | Сменить только нейтральное качество/подсказку UI; session остаётся `running`, число не объявлять недостоверным автоматически. |
 | `COMPLETE` | Явно нажата terminal action. | `ended_at`, `measured`, `status=completed`; следующий set не помечается выполненным. |
+| `CORRECT` | Пользователь после forgotten-stop явно выбирает допустимое время окончания. | `status=completed`, `source=USER_CORRECTED`; сохранить выбранный интервал отдельно от обычного подтверждения. |
 | `SKIP` | Явно нажата `Пропустить`. | `status=skipped`, `measured=null`; это не «быстрый достоверный отдых». |
 | `INTERRUPT` | Явная отмена/прерывание active workout. | `status=interrupted`, `measured=null`; причина — bounded enum, без свободного диагноза. |
-| `UNKNOWN` | Сессия не может быть восстановлена безопасно, clock sequence невозможна или истёк forgotten-stop policy. | История сохраняет факт неизвестности, но не число; в статистику не входит. |
+| `UNKNOWN` | Сессия не может быть восстановлена безопасно, clock sequence невозможна или при resume/reconcile истёк hard cutoff. | `source=SYSTEM_RECOVERY`, `measured=null`; история сохраняет факт неизвестности, но не число, UI больше не считает elapsed. |
 
-`+30/+60` после уже достигнутого плана допустимы: они возобновляют обратный счётчик от текущего
-момента, но не уменьшают уже показанное elapsed и не переписывают начало.
+`+30/+60` после уже достигнутого плана остаются допустимыми как коррекция плановой цели: они
+возобновляют обратный счётчик от текущего момента, но не уменьшают уже показанное elapsed и не
+переписывают начало. Уведомление о первом достижении плана не повторяется.
 
 ### Forgotten stop и длинный интервал
 
-Предложение для owner decision, не медицинский или научный порог:
+Пороги — продуктовая эвристика, не медицинский или научный вывод. До отдельного решения владельца
+в production нельзя зашивать ни один вариант:
 
-- до порога `LONG_REST_THRESHOLD = max(4 × adjusted_target_seconds, 2 часа)` явный finish
-  получает `quality=normal`;
-- после порога явный finish сохраняется как `completed`, но с `quality=long`: он виден в истории,
-  имеет measured и отдельный `n_long`, но не попадает в обычную сводку без явного включения;
-- после `FORGOTTEN_STOP_THRESHOLD = max(8 × adjusted_target_seconds, 12 часов)` при следующем
-  resume/reconcile открытая сессия переводится в `unknown`; приложение не придумывает конец и не
-  считает такой интервал нулевым;
-- до автоматического `unknown` UI показывает спокойное предупреждение «Интервал заметно длиннее
-  плана» без оценки дисциплины. Пользователь может явно завершить или прервать его;
-- оба порога должны быть server-configurable и зафиксированы отдельным owner/domain decision.
+| Политика | `long` | `unknown` / hard cutoff | Преимущества | Недостатки |
+| --- | --- | --- | --- | --- |
+| **A. Относительная к плану (рекомендуется для discovery)** | Явная остановка после `max(4 × adjusted_target_seconds, 30 минут)` получает `quality=long`; до этого — `normal`. | При следующем resume/reconcile без terminal action после `min(max(12 × adjusted_target_seconds, 12 часов), 24 часа)` session становится `unknown`, elapsed больше не растёт. | Учитывает короткий и длинный план, не делает 2-минутный и 60-минутный отдых одинаковыми; есть конечный предел. | Больше правил для объяснения и тестирования; длинный план допускает большой cutoff. |
+| **B. Фиксированное окно** | Явная остановка после 60 минут получает `quality=long`, независимо от плана. | При следующем resume/reconcile через 12 часов без terminal action session становится `unknown`, elapsed больше не растёт. | Простая документация, предсказуемая аналитика и QA-матрица. | Может пометить нормальный длинный отдых как `long` и не учитывает контекст упражнения. |
 
-Если владелец не принимает эти default-пороги, реализация должна оставить их nullable policy
-parameters, а не зашивать непроверенное значение в UI, миграцию или отчёт.
+В обоих вариантах `long` — не ошибка и не автоматический запрет статистики: запись видна в истории
+отдельным качеством и не смешивается с обычной сводкой без явного правила. `unknown` — отсутствие
+достоверной terminal отметки, а не нулевой отдых. Hard cutoff проверяется детерминированно при
+foreground/reload/reconnect/reconcile; отдельный фоновой worker или локальный controller не
+добавляется. Если приложение не возвращается, никакой UI-счётчик не работает бесконечно; при
+следующем открытии он сразу показывает `Нет достоверного замера`.
+
+### Восстановление после забытой остановки
+
+После пересечения `long` UI показывает нейтральное предупреждение без оценки пользователя:
+
+1. `Завершить сейчас` — записать интервал до текущего подтверждённого момента,
+   `source=USER_CONFIRMED`, `quality=long`.
+2. `Исправить время` — выбрать окончание только в диапазоне `started_at…now`; записать
+   `source=USER_CORRECTED`, сохранить факт коррекции и не выдавать его за обычную отметку.
+3. `Не учитывать` — `status=interrupted` или `unknown` по выбранной семантике, всегда
+   `measured=null`.
+
+После hard cutoff «Завершить сейчас» уже не восстанавливает достоверные секунды автоматически:
+сессия сначала становится `unknown`. Так исключается бесконечный elapsed и не создаётся ложное
+измерение «до возвращения из ночи». Любая коррекция — явное действие, bounded timestamp, без
+автоматического запуска/завершения следующего подхода.
 
 ## Additive data model
 
@@ -152,12 +182,13 @@ started_at                      UTC, START_ACCEPTED, immutable
 ended_at                        UTC nullable until terminal
 measured_rest_seconds           nullable; only terminal completed + valid clock
 status                          running | completed | skipped | interrupted | unknown
-source                          USER_CONFIRMED | SYSTEM_RECOVERY
+source                          USER_CONFIRMED | USER_CORRECTED | SYSTEM_RECOVERY
 start_acceptance                SERVER_CONFIRMED | DEVICE_DURABLE
 quality                         normal | long | clock_suspect | unknown
 version                         optimistic concurrency
 start_mutation_id               idempotency key
 terminal_mutation_id            idempotency key nullable
+correction_of_ended_at          UTC nullable; audit value when user corrects a forgotten stop
 created_at / updated_at         UTC audit timestamps
 ```
 
@@ -165,8 +196,10 @@ created_at / updated_at         UTC audit timestamps
 
 - unique `(user_id, completed_set_id)` для одной rest session на одно принятое завершение;
 - `adjusted_target_seconds >= planned_rest_seconds >= 0`;
-- `measured_rest_seconds` не null только для `status=completed` и `quality in {normal,long}`;
+- `measured_rest_seconds` не null только для `status=completed`, `quality in {normal,long}` и
+  terminal source `USER_CONFIRMED` или явно разрешённого `USER_CORRECTED`;
 - `ended_at >= started_at` при валидном measured;
+- `correction_of_ended_at` не меняет `started_at`, не может быть раньше него или позже server-now;
 - `version >= 1`, status transition проверяется на server boundary;
 - индексы `(user_id, started_at)`, `(workout_id, completed_set_id)` и status/period query;
 - `user_id` берётся из auth context, не из request body.
@@ -195,12 +228,13 @@ POST /api/v1/workouts/{workout_id}/rest-sessions/{session_id}/target
 
 POST /api/v1/workouts/{workout_id}/rest-sessions/{session_id}/finish
   body: {
-    action: "complete" | "skip" | "interrupt",
+    action: "complete" | "correct" | "skip" | "interrupt" | "mark_unknown",
     expected_version,
     mutation_id,
-    client_ended_at?
+    client_ended_at?,
+    corrected_ended_at?
   }
-  -> terminal idempotent transition; measured вычисляется только для complete
+  -> terminal idempotent transition; measured вычисляется только для complete/correct
 
 GET /api/v1/workouts/rest-sessions?date_from=&date_to=&exercise_id=
   -> только текущий user; old rows без session отсутствуют и сериализуются как unknown/no measurement
@@ -217,9 +251,17 @@ GET /api/v1/workouts/rest-sessions?date_from=&date_to=&exercise_id=
   `expected_version` получает structured 409 с текущим resource.
 - `finish` с тем же terminal mutation id безопасно повторяется. Другая terminal action после
   terminal state получает 409, кроме точного replay.
-- `skip`/`interrupt` возвращают `measured_rest_seconds=null`. `complete` возвращает измерение
-  только когда server/local timestamps прошли clock validation.
+- `skip`/`interrupt`/`mark_unknown` возвращают `measured_rest_seconds=null`. `complete` возвращает
+  измерение только когда server/local timestamps прошли clock validation. `correct` принимает
+  только bounded `corrected_ended_at` между `started_at` и server-now и помечает источник
+  `USER_CORRECTED`.
 - Не добавлять `is_completed`, `rest_seconds` или произвольный `user_id` в rest payload.
+
+`mark_unknown` — единственный recovery-путь после hard cutoff; он не является скрытым
+автозавершением и не выбирает время окончания за пользователя. Клиент может отправить его при
+resume/reload/reconnect, а сервер повторно проверяет policy/version/idempotency. Если такой
+запрос не дошёл, следующая выдача session всё равно должна остановить display elapsed на
+`unknown_at`; никакой открытый UI-счётчик не имеет права считать бесконечно.
 
 ### Offline и accepted boundary
 
@@ -300,43 +342,33 @@ raw timestamps, mutation keys или данные другого аккаунт�
 - Report handoff remains the existing live authorized report contract; no public link or copied
   rest payload is introduced.
 
-## UX candidates for owner review
+## UX package after owner direction
 
-Both candidates keep the current YFC sport-tech baseline, existing matte Liquid Glass material,
-shared typography/touch tokens and the current `+30 сек / +60 сек / Пропустить` actions. The panel
-stays in the active-workout flow as sticky top content and reserves its own height; it is not an
-overlay over the next set. It uses synthetic data only.
+Функционально выбран **Variant A: два постоянно видимых счётчика**. Визуально это не новый
+компонент и не перенос standalone-макета Variant A в продукт: baseline — действующий
+`RestTimer` из `TodayWorkout.tsx` и его CSS. В review-пакете сохранены:
 
-### Variant A — two equal counters, recommended
+- то же верхнее sticky-положение, матовый Liquid Glass и текущая иерархия `Отдых` → `Далее`;
+- фирменные цвета, типографика, скругления, размеры и системные touch tokens;
+- существующий ряд `+30 сек / +60 сек / Пропустить` без `-30 сек`, pointer pass-through или
+  повторного уведомления;
+- только две минимальные добавки: `Факт 00:42` рядом с текущим countdown и явная кнопка
+  `Завершить отдых` в той же системе `ui-button`;
+- на 320–430 px кнопка завершения получает отдельную строку, на desktop — ту же строку
+  контекста/управления без изменения порядка вторичных действий;
+- оба счётчика показывают один и тот же интервал: `Осталось` не ниже нуля, `Факт` продолжает
+  расти до explicit terminal action. `Далее` — контекст, не начало следующего подхода.
 
-Primary reading is stable in both phases:
+Пакет [baseline-preserving review](review/README.md) содержит static prototype и 20 SVG-снимков:
+countdown/overtime × Light/Dark × 320/360/393/430/desktop. Все данные синтетические; старые
+standalone A/B SVG оставлены как исторический discovery-материал и не являются текущим
+кандидатом на implementation.
 
-- `Осталось 00:48` — plan countdown;
-- `Прошло 00:42` — factual elapsed from accepted completion, with accessible description;
-- after zero, `План завершён` remains visible while `Прошло 02:14` continues;
-- one CTA `Закончить отдых` is separate from the three plan actions;
-- `Далее: Тяга верхнего блока · 2-й подход` is context, not an objective start event.
-
-This is the clearest model when both values must be compared. It costs one extra action row on
-the narrowest screens, so the proposed geometry is: counters/context row, full-width terminal CTA,
-then three 44px secondary actions. No control is below 44px and no negative adjustment is added.
-
-- [Variant A · Dark](rest-time-panel-variant-a-dark.svg)
-- [Variant A · Light](rest-time-panel-variant-a-light.svg)
-
-### Variant B — phase-priority counter, alternate
-
-The same stable panel changes emphasis without changing geometry:
-
-- before plan deadline: large `Осталось`, smaller `Прошло`;
-- after deadline: large `Прошло`, compact `План завершён`;
-- target actions, finish CTA, next-set context and labels remain in the same positions.
-
-It uses less visual competition after zero, but the changing emphasis may be less immediately
-comparable than A.
-
-- [Variant B · Dark](rest-time-panel-variant-b-dark.svg)
-- [Variant B · Light](rest-time-panel-variant-b-light.svg)
+- [Review package и матрица размеров](review/README.md)
+- [Variant A · Dark — исторический discovery](rest-time-panel-variant-a-dark.svg)
+- [Variant A · Light — исторический discovery](rest-time-panel-variant-a-light.svg)
+- [Variant B · Dark — исторический alternate](rest-time-panel-variant-b-dark.svg)
+- [Variant B · Light — исторический alternate](rest-time-panel-variant-b-light.svg)
 
 ### Accessibility and platform intent
 
@@ -364,7 +396,8 @@ This is a plan, not evidence already produced by this discovery branch.
 - no changes to `UserWorkoutSet.is_completed` or `UserWorkoutExercise.rest_seconds` from rest API;
 - ownership, active-program, 401/403/404 boundaries, coach active relationship and revoked access;
 - duplicate start/finish/target mutation, stale version, conflicting terminal action and multi-tab race;
-- reload/background/reconnect, timezone, negative/forward clock jump, forgotten-stop and long quality;
+- reload/background/reconnect, timezone, negative/forward clock jump, forgotten-stop, correction,
+  hard cutoff and both candidate long/unknown policies;
 - old workouts serialize `null`/unknown, never zero; aggregate returns `n` and null at `n=0`.
 
 ### Browser Web/TMA
@@ -373,7 +406,7 @@ Use synthetic fixtures and separate evidence folders for each engine/theme:
 
 | Matrix | Required cases |
 | --- | --- |
-| 320/360/393/430 × Light/Dark × Chromium/WebKit | countdown, overtime elapsed, +30, +60, finish, skip, interrupt, long label, no horizontal overflow |
+| 320/360/393/430 × Light/Dark × Chromium/WebKit | countdown, overtime elapsed, +30, +60, finish, skip, interrupt, long label, no horizontal overflow, unchanged RestTimer geometry |
 | 390/844 baseline | keyboard focus, safe area, fixed/sticky geometry, visualViewport resize, reload |
 | 768 and 1280/1440 | one-line desktop layout, keyboard and focus, no duplicate navigation |
 | mocked TMA | ready/foreground/background, safe-area events, BackButton lifecycle, reconnect, no second auth |
@@ -402,7 +435,7 @@ until actually tested. No production AFTER evidence exists in this branch.
 ## Phasing and gates
 
 ```text
-Owner selects A or B + accepts semantics/thresholds
+Owner confirms Variant A baseline-preserving package + one threshold policy
   -> separate implementation approval
   -> Phase 1: accounting (session API/DB + offline + active-workout panel)
   -> real AFTER Dark/Light Web evidence + owner visual acceptance
@@ -414,15 +447,22 @@ Owner selects A or B + accepts semantics/thresholds
 Phase 1 must not silently ship history aggregates or Coach OS. Phase 2 must not infer readiness.
 Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible API/report tests.
 
-## Requested owner decision
+## Решения владельца и оставшийся gate
 
-1. Выбрать `Variant A` (рекомендуемый) или `Variant B` для дальнейшего mockup approval.
-2. Подтвердить термины: `План`, `Прошло`, `Закончить отдых`, `Пропустить` и явное пояснение
-   «по отметке пользователя».
-3. Подтвердить, что skip/interruption не дают measured value, а `+30/+60` изменяют только plan.
-4. Подтвердить forgotten-stop/long policy либо назначить другие product thresholds.
-5. Отдельно разрешить implementation после этого discovery. Сейчас реализация, PR, merge и
-   deploy не разрешены.
+Уже получено в текущем запросе владельца и должно быть записано в Issue #960 отдельным комментарием:
+
+1. Функционально выбрать `Variant A`.
+2. Сохранить действующий внешний вид `RestTimer`; не переносить standalone Variant A как новый
+   компонент и не менять фирменную композицию.
+3. Разрешить только минимальные дополнения для `Факт` и explicit stop.
+
+Осталось подтвердить перед implementation:
+
+1. Точный текст кнопки и доступного пояснения: `Завершить отдых` / «по отметке пользователя».
+2. Одну из политик long/unknown (A или B) либо собственные пороги; порог не является
+   production default до этого решения.
+3. Отдельное `OWNER_IMPLEMENTATION_APPROVAL` после принятия discovery-контракта. Оно не следует
+   из согласия на этот пакет; merge, deploy и release по-прежнему запрещены.
 
 ## Scope ledger
 
@@ -432,7 +472,8 @@ Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible
 | `origin/master` and source SHA | `VERIFIED`: `4c92832415d4eb994cf6b849a67074742f07ea50` |
 | Current timer, accepted completion, queue and backend set contract | `VERIFIED` read-only; exact paths above |
 | AI Coach hidden boundary | `VERIFIED` against merged PR #1021; no new AI surface proposed |
-| Discovery contract and static Dark/Light mockups | `CREATED` in this directory, synthetic data |
+| Baseline-preserving Variant A contract and static Dark/Light mockups | `UPDATED` in this directory, synthetic data |
+| Exact viewport package 320/360/393/430/desktop | `CREATED` under `review/`, SVG renderables |
 | Production runtime/DB/API/PDF/CSS | `NOT_MODIFIED` |
 | Runtime tests, browser AFTER, physical device, real TMA, VoiceOver | `NOT_RUN` / `NOT_VERIFIED` by design |
 
@@ -443,6 +484,8 @@ Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible
 - [Variant A · Light](rest-time-panel-variant-a-light.svg)
 - [Variant B · Dark](rest-time-panel-variant-b-dark.svg)
 - [Variant B · Light](rest-time-panel-variant-b-light.svg)
+- [Baseline-preserving review package](review/README.md)
 
-**Next gate:** explicit owner design decision on one complete candidate package, followed separately
-by implementation approval. Until then the production timer and all runtime contracts remain unchanged.
+**Next gate:** owner confirms the complete baseline-preserving package and one threshold policy in
+Issue #960, followed separately by explicit implementation approval. Until then the production
+timer and all runtime contracts remain unchanged.
