@@ -11401,8 +11401,9 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .progress-report-page {
     width: 100%;
     min-width: 0;
-    padding: 16px max(12px, var(--yfc-layout-safe-right)) calc(24px + var(--yfc-layout-safe-bottom))
-      max(12px, var(--yfc-layout-safe-left));
+    /* Keep a safe reading gutter without double-insetting the report canvas. */
+    padding: 16px max(8px, var(--yfc-layout-safe-right)) calc(24px + var(--yfc-layout-safe-bottom))
+      max(8px, var(--yfc-layout-safe-left));
   }
   .progress-report-toolbar {
     display: flex;
@@ -11423,7 +11424,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   }
   .progress-report-document {
     margin-top: 20px;
-    padding: 16px;
+    padding: 16px 8px;
     border: 0;
     border-radius: 20px;
   }
