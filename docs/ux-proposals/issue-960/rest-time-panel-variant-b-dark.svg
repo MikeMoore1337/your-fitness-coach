@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="620" viewBox="0 0 780 620" role="img" aria-labelledby="title desc">
+  <title id="title">Issue 960, вариант B, Dark</title>
+  <desc id="desc">Статический макет панели, где до нуля главным является план, а после нуля — фактическое elapsed-время.</desc>
+  <rect width="780" height="620" rx="28" fill="#090b0b"/>
+  <text x="38" y="42" fill="#b2f520" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="800" letter-spacing="1.4">ISSUE #960 · VARIANT B · DARK</text>
+  <text x="38" y="68" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="21" font-weight="800">Приоритет фазы без смены геометрии</text>
+  <text x="38" y="91" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="12">Синтетические данные · после нуля крупным остаётся только факт</text>
+
+  <rect x="30" y="112" width="350" height="330" rx="22" fill="#151a17" stroke="#343c35"/>
+  <rect x="400" y="112" width="350" height="330" rx="22" fill="#151a17" stroke="#343c35"/>
+  <text x="52" y="141" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">ФАЗА 1 · ПЛАН ВЕДУЩИЙ</text>
+  <text x="422" y="141" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">ФАЗА 2 · ФАКТ ВЕДУЩИЙ</text>
+
+  <rect x="48" y="158" width="314" height="263" rx="16" fill="#222a24" stroke="#596f38"/>
+  <rect x="418" y="158" width="314" height="263" rx="16" fill="#222a24" stroke="#596f38"/>
+  <path d="M64 174H346M434 174H716" stroke="#74856d" stroke-opacity=".35"/>
+
+  <text x="66" y="201" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="700">ОСТАЛОСЬ</text>
+  <text x="66" y="247" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="40" font-weight="800" font-variant-numeric="tabular-nums">00:48</text>
+  <text x="66" y="268" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10">Прошло 00:42 · от принятого завершения</text>
+  <text x="66" y="291" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">Далее: Тяга верхнего блока</text>
+  <text x="66" y="307" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10">2-й подход</text>
+
+  <text x="436" y="201" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10" font-weight="700">ПРОШЛО</text>
+  <text x="436" y="247" fill="#b2f520" font-family="Inter, system-ui, sans-serif" font-size="40" font-weight="800" font-variant-numeric="tabular-nums">02:14</text>
+  <text x="436" y="268" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10">План завершён · осталось 00:00</text>
+  <text x="436" y="291" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">Далее: Тяга верхнего блока</text>
+  <text x="436" y="307" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="10">2-й подход · без оценки готовности</text>
+
+  <rect x="66" y="319" width="278" height="40" rx="10" fill="#b2f520"/>
+  <text x="205" y="344" text-anchor="middle" fill="#090b0b" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="800">Закончить отдых</text>
+  <rect x="436" y="319" width="278" height="40" rx="10" fill="#b2f520"/>
+  <text x="575" y="344" text-anchor="middle" fill="#090b0b" font-family="Inter, system-ui, sans-serif" font-size="12" font-weight="800">Закончить отдых</text>
+
+  <rect x="66" y="369" width="82" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <rect x="158" y="369" width="82" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <rect x="250" y="369" width="94" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <text x="107" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">+30 сек</text>
+  <text x="199" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">+60 сек</text>
+  <text x="297" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">Пропустить</text>
+  <rect x="436" y="369" width="82" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <rect x="528" y="369" width="82" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <rect x="620" y="369" width="94" height="40" rx="10" fill="#303a2f" stroke="#596f38"/>
+  <text x="477" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">+30 сек</text>
+  <text x="569" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">+60 сек</text>
+  <text x="667" y="394" text-anchor="middle" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="700">Пропустить</text>
+
+  <rect x="30" y="465" width="720" height="112" rx="18" fill="#151a17" stroke="#343c35"/>
+  <text x="52" y="493" fill="#b2f520" font-family="Inter, system-ui, sans-serif" font-size="11" font-weight="800">КОМПРОМИСС</text>
+  <text x="52" y="519" fill="#f4f6f2" font-family="Inter, system-ui, sans-serif" font-size="13" font-weight="700">Сильнее фокусирует текущую фазу после планового нуля.</text>
+  <text x="52" y="543" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="12">Положение CTA и вторичных действий не меняется.</text>
+  <text x="52" y="563" fill="#b8b8b8" font-family="Inter, system-ui, sans-serif" font-size="12">Риск: сравнить план и факт чуть сложнее, чем в варианте A.</text>
+</svg>
