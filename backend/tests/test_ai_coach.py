@@ -542,7 +542,9 @@ def test_ai_coach_api_requires_authentication(client, monkeypatch) -> None:
     assert status.status_code == 401
 
 
-def test_ai_coach_status_is_available_to_any_authenticated_user(client, monkeypatch) -> None:
+def test_ai_coach_status_separates_ui_visibility_from_runtime_availability(
+    client, monkeypatch
+) -> None:
     login = client.post(
         "/api/v1/auth/dev-login",
         json={"telegram_user_id": 987_656, "username": "ai_status_test"},
@@ -561,7 +563,7 @@ def test_ai_coach_status_is_available_to_any_authenticated_user(client, monkeypa
     disabled = client.get("/api/v1/ai-coach/status", headers=headers)
     assert disabled.status_code == 200
     assert disabled.json() == {
-        "ui_enabled": True,
+        "ui_enabled": False,
         "generic_available": False,
         "personal_available": False,
     }
@@ -574,6 +576,7 @@ def test_ai_coach_status_is_available_to_any_authenticated_user(client, monkeypa
     monkeypatch.setattr(settings, "ai_coach_cost_class", "free")
     monkeypatch.setattr(settings, "ai_coach_data_policy", "verified_generic_only")
     monkeypatch.setattr(settings, "ai_coach_structured_output", True)
+    monkeypatch.setattr(settings, "ai_coach_ui_enabled", True)
 
     enabled = client.get("/api/v1/ai-coach/status", headers=headers)
     assert enabled.status_code == 200
@@ -588,7 +591,7 @@ def test_ai_coach_status_is_available_to_any_authenticated_user(client, monkeypa
     still_available = client.get("/api/v1/ai-coach/status", headers=headers)
     assert still_available.status_code == 200
     assert still_available.json() == {
-        "ui_enabled": True,
+        "ui_enabled": False,
         "generic_available": True,
         "personal_available": True,
     }

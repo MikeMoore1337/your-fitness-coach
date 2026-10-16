@@ -427,13 +427,14 @@ async function openAiCoachSurface(
   if (tma) await installTelegramHarness(page, { colorScheme: theme });
   await installPlatformApi(page, { browserSession: !tma, measurementHistory: 'many' });
   const aiCoachApi = await installAiCoachApi(page, initialQuotaUsed);
-  await page.goto(
-    `/app?section=profile${tma ? '&tgWebAppPlatform=android' : ''}${deepLink ? '#profile-ai-coach' : ''}`,
-  );
+  await page.goto(`/app?section=profile${tma ? '&tgWebAppPlatform=android' : ''}`);
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
   await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
   await expect(page.getByTestId('ai-coach-entry-profile')).toBeVisible();
-  if (deepLink) await expect(page.getByTestId('ai-coach-workspace')).toBeVisible();
+  if (deepLink) {
+    await page.getByTestId('ai-coach-profile-link').click();
+    await expect(page.getByTestId('ai-coach-workspace')).toBeVisible();
+  }
   return aiCoachApi;
 }
 

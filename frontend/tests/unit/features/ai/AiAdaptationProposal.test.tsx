@@ -225,12 +225,16 @@ describe('AiAdaptationProposal', () => {
     ).toBe(false);
   });
 
-  it('fails closed for disabled and malformed responses', async () => {
+  it('hides the proposal and does not call generation when the UI gate is off', async () => {
     mockApi({ status: { ...availableStatus, ui_enabled: false, personal_available: false } });
     renderProposal();
-    await screen.findByRole('button', { name: 'AI-адаптация недоступна' });
-    expect(screen.getByTestId('ai-adaptation')).toHaveAttribute('data-state', 'disabled');
-    expect(screen.getByRole('button', { name: 'AI-адаптация недоступна' })).toBeDisabled();
+    await waitFor(() =>
+      expect(apiMock.mock.calls.some(([path]) => path === '/api/v1/ai-coach/status')).toBe(true),
+    );
+    expect(screen.queryByTestId('ai-adaptation')).not.toBeInTheDocument();
+    expect(
+      apiMock.mock.calls.some(([path]) => path === '/api/v1/ai-coach/adaptations/proposals'),
+    ).toBe(false);
 
     cleanup();
     apiMock.mockReset();

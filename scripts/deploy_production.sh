@@ -88,7 +88,7 @@ python3 scripts/configure_production_food_search.py .env
 echo "Normalizing the production news image provider"
 python3 scripts/normalize_production_news_image_provider.py .env
 
-echo "Enabling the production AI Coach runtime"
+echo "Applying the production AI Coach runtime config with the user UI hidden"
 python3 scripts/configure_production_ai_coach.py .env
 
 echo "Applying the one-time Task 128I Nutrition Label rollout configuration"
