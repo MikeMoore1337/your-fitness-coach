@@ -1,6 +1,6 @@
 # Issue #986 — HQ poster implementation: bounded 13-exercise batch
 
-**Status: Implementation Draft / Owner visual acceptance pending / no merge or deploy.**
+**Status: 13-poster implementation; rights fully confirmed by owner, visual/mobile acceptance explicitly deferred until after release. No claim of completed animation replacement.**
 
 The YFC owner confirmed rights to the source and derivatives of [`akajdid-mostafa/exercises-media`](https://github.com/akajdid-mostafa/exercises-media/tree/18742da40b0627c85925c5dd4441dc3eac0594d0) on 2026-10-16 and requested **eventually replacing all current low-quality 180×180 media**. This PR is an **initial safe 13-poster implementation**, **NOT fulfillment** of replacing all images/animations.
 
@@ -39,6 +39,6 @@ Local catalog validation on this branch reports **206 canonical, 167 approved, 3
 
 - **94 catalog entries `REVIEW`** require checked manual semantic mapping (equivalent movement/equipment, no false matches), **99 `NO_MATCH`** currently lack a safe direct replacement. Out of those 99, 39 are blocked; never automatically unlock them.
 - Current 167 **GIF 180×180 animations remain low-res**. Full replacement requires new verified matched animation sources and compatibility-tested video or alternative HQ animation contract, not a blanket filename-based swap. GIF is not upscaled, merely retained.
-- Review the 13 actual exercise posters for technique/color/crop/design quality on mobile before final owner approval; verify real device Safari/TMA and performance, reduced motion, fallback and cache. Separate owner AFTER visual acceptance and merge/deploy approval required.
+- Owner has explicitly authorized **all kinds of use and redistribution** of candidate and derivatives. Owner can verify technique, visual quality and real iPhone/TMA only **after** a controlled production release; those are post-release acceptance checks with a rollback path. This does not waive required automated CI, semantic matching and media security checks.
 
 This narrow branch is intentionally outside the approved production train #1038 and #873 desktop/mobile design PR.
