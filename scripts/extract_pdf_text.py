@@ -20,6 +20,10 @@ class _PdfObject(NamedTuple):
     stream: bytes | None
 
 
+class PdfTextExtractionError(ValueError):
+    """Raised when a PDF stream cannot be decoded safely."""
+
+
 _OBJECT_RE = re.compile(rb"(?ms)^(\d+)\s+\d+\s+obj\b(.*?)\bendobj\s*")
 _REF_RE = re.compile(rb"(\d+)\s+0\s+R")
 _TEXT_TOKEN_RE = re.compile(
@@ -46,9 +50,22 @@ def _objects(pdf: bytes) -> dict[int, _PdfObject]:
         payload = raw[marker + len(b"stream") : end]
         payload = payload.lstrip(b" \t\r\n")
         if b"/ASCII85Decode" in dictionary:
-            payload = a85decode(payload.rstrip(b"~>"), adobe=False)
+            encoded = payload.rstrip(b" \t\r\n")
+            if encoded.endswith(b"~>"):
+                encoded = encoded[:-2]
+            try:
+                payload = a85decode(encoded, adobe=False)
+            except ValueError as exc:
+                raise PdfTextExtractionError(
+                    f"Invalid ASCII85 stream in PDF object {object_id}"
+                ) from exc
         if b"/FlateDecode" in dictionary:
-            payload = zlib.decompress(payload)
+            try:
+                payload = zlib.decompress(payload)
+            except zlib.error as exc:
+                raise PdfTextExtractionError(
+                    f"Invalid Flate stream in PDF object {object_id}"
+                ) from exc
         result[object_id] = _PdfObject(dictionary, payload)
     return result
 
