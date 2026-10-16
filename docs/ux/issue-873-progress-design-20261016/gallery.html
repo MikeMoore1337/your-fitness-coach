@@ -255,6 +255,14 @@
         color: var(--muted);
         font-size: 12px;
       }
+      .current-base-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 7px;
+        margin: -11px 0 13px;
+        color: var(--muted);
+        font-size: 10px;
+      }
       .segment-nav {
         display: flex;
         gap: 4px;
@@ -545,10 +553,9 @@
       const navItems = [['Обзор', 'overview'], ['Тело', 'body'], ['Тренировки', 'training'], ['Питание', 'nutrition'], ['Кардио', 'cardio'], ['Самочувствие', 'wellbeing'], ['История', 'history']];
 
       function nav(active, isBefore) {
-        if (isBefore) {
-          return `<div class="legacy-grid" aria-label="Повторяющаяся навигационная сетка">${navItems.map(([label, key]) => `<div class="legacy-item ${key === active ? 'legacy-item--active' : ''}">${label}<small>${key === active ? 'выбранный раздел' : 'детали и обзор'}</small></div>`).join('')}</div><div class="detail-back">${icon('arrow', 14)} Обзор <span>·</span> Детали выбранного периода</div>`;
-        }
-        return `<div class="segment-nav" role="tablist" aria-label="Разделы прогресса">${navItems.map(([label, key]) => `<button type="button" role="tab" aria-selected="${key === active}" ${key === active ? '' : 'tabindex="-1"'}>${label}</button>`).join('')}</div>`;
+        const segment = `<div class="segment-nav" role="tablist" aria-label="Разделы прогресса">${navItems.map(([label, key]) => `<button type="button" role="tab" aria-selected="${key === active}" ${key === active ? '' : 'tabindex="-1"'}>${label}</button>`).join('')}</div>`;
+        if (!isBefore) return segment;
+        return `${segment}<div class="current-base-note">${icon('check', 13)} Текущая база: общий SegmentedControl уже заменил историческую повторяющуюся grid; раскрытия в Issue могли быть открыты владельцем вручную.</div><div class="detail-back">${icon('arrow', 14)} Обзор <span>·</span> Детали выбранного периода</div>`;
       }
 
       function sparkline() {
