@@ -21,20 +21,23 @@ export function useMotionPresence({
 }: MotionPresenceOptions) {
   const [phase, setPhase] = useState<MotionPresencePhase>('closed');
   const fallbackTimer = useRef<number | null>(null);
+  const mountedRef = useRef(false);
   const present = phase !== 'closed';
   const isOpen = phase === 'opening' || phase === 'open';
 
   const clearFallback = useCallback(() => {
-    if (fallbackTimer.current != null) window.clearTimeout(fallbackTimer.current);
+    if (fallbackTimer.current != null) globalThis.clearTimeout(fallbackTimer.current);
     fallbackTimer.current = null;
   }, []);
 
   const finishClosing = useCallback(() => {
     clearFallback();
+    if (!mountedRef.current) return;
     setPhase('closed');
   }, [clearFallback]);
 
   const show = useCallback(() => {
+    if (!mountedRef.current) return;
     clearFallback();
     setPhase((current) =>
       current === 'opening' || current === 'open' ? current : reducedMotion() ? 'open' : 'opening',
@@ -42,6 +45,7 @@ export function useMotionPresence({
   }, [clearFallback]);
 
   const hide = useCallback(() => {
+    if (!mountedRef.current) return;
     setPhase((current) => {
       if (current === 'closed' || current === 'closing') return current;
       return reducedMotion() ? 'closed' : 'closing';
@@ -54,10 +58,17 @@ export function useMotionPresence({
     return clearFallback;
   }, [clearFallback, exitDurationMs, finishClosing, phase]);
 
-  useEffect(() => clearFallback, [clearFallback]);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      clearFallback();
+    };
+  }, [clearFallback]);
 
   const onAnimationEnd = useCallback(
     (event: AnimationEvent<HTMLElement>) => {
+      if (!mountedRef.current) return;
       if (event.animationName === openingAnimationName) {
         setPhase((current) => (current === 'opening' ? 'open' : current));
       }

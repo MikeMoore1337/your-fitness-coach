@@ -1,0 +1,25 @@
+﻿{
+    "synthetic":  true,
+    "issue":  867,
+    "theme":  "dark",
+    "browser":  "mobile-chromium",
+    "viewport":  {
+                     "width":  393,
+                     "height":  844
+                 },
+    "after":  {
+                  "surface":  "browser",
+                  "viewportBottom":  34,
+                  "safeBottom":  34,
+                  "effectiveViewportBottom":  "max( 0px, calc(34px - 34px) )",
+                  "dockBottomGap":  20,
+                  "quickAddVisible":  true,
+                  "quickAddHit":  true,
+                  "startWorkoutInViewport":  true,
+                  "startWorkoutOverlapsDock":  false,
+                  "documentWidth":  {
+                                        "client":  393,
+                                        "scroll":  393
+                                    }
+              }
+}
