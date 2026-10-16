@@ -84,7 +84,7 @@ test('AI Coach is hidden across user surfaces, roles, themes and Web/TMA/PWA run
   await installPlatformApi(mobilePage, { browserSession: true });
   await mobilePage.goto('/app?section=profile');
   await expect(mobilePage.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
-  await expect(mobilePage.getByRole('navigation', { name: 'Разделы профиля' })).toBeVisible();
+  await expect(mobilePage.locator('.profile-settings-nav')).toHaveCount(0);
   await expectAiCoachHidden(mobilePage, mobileRequests);
   await mobilePage.screenshot({
     path: `${AFTER_SCREENSHOTS}/mobile-web-390x844-light-profile.png`,

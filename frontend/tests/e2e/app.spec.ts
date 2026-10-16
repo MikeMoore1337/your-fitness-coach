@@ -1649,12 +1649,12 @@ test('профиль содержит уведомления, а карточк�
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
+  await page.goto('/app?section=profile#profile-notifications');
   await expect(page.getByRole('heading', { name: 'Каналы' })).toBeVisible();
   await expect(page.getByText('Личное напоминание', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Подписка' })).toHaveCount(0);
 
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.goto('/app?section=profile#profile-personal');
   const birthDate = page.getByLabel('Дата рождения');
   const birthDateControl = page.locator('.profile-birth-date-control');
   const [birthDateBox, birthDateControlBox] = await Promise.all([
@@ -1769,7 +1769,7 @@ test('notification settings explain unavailable Telegram and stale targets recov
   await page.goto('/app?section=profile#profile-notifications');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
+  await page.goto('/app?section=profile#profile-notifications');
   const templatesDisclosure = page.locator('details.notification-templates');
   await expect(templatesDisclosure).not.toHaveAttribute('open');
   await templatesDisclosure.locator(':scope > summary').click();
@@ -1875,7 +1875,7 @@ test('notification empty and error states keep compact profile rhythm', async ({
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Уведомления' }).click();
+  await page.goto('/app?section=profile#profile-notifications');
   await expect(page.getByText('Настройки временно недоступны')).toBeVisible();
   const notificationCenter = page.locator('details.notification-center');
   await expect(
@@ -1957,7 +1957,7 @@ test('профиль сохраняет иерархию Design V2 в light/dark
     await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
     await expect(page.getByText('Профиль стоит дополнить')).toBeVisible();
     await expect(page.getByText('1 из 3')).toBeVisible();
-    await expect(page.getByRole('navigation', { name: 'Разделы профиля' })).toBeVisible();
+    await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
     await expect(
       page.getByRole('heading', { name: 'Личные данные и фитнес-профиль' }),
     ).toBeVisible();
@@ -1967,18 +1967,19 @@ test('профиль сохраняет иерархию Design V2 в light/dark
     ).toBe(true);
 
     if (current.width <= 390) {
-      const navTargets = await page
-        .getByRole('navigation', { name: 'Разделы профиля' })
-        .getByRole('link')
-        .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
-      expect(navTargets.every((height) => height >= 44)).toBe(true);
+      const summaryHeights = await page
+        .locator('.profile-settings > details.card-disclosure > summary')
+        .evaluateAll((summaries) =>
+          summaries.map((summary) => summary.getBoundingClientRect().height),
+        );
+      expect(summaryHeights.every((height) => height >= 44)).toBe(true);
     }
     await page.screenshot({
       path: `../.artifacts/screenshots/task-113A/profile-${current.width}x${current.height}-${current.theme}.png`,
     });
   }
 
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   await page.getByLabel('Имя').fill('Черновик профиля');
   const saveProfile = page.getByRole('button', { name: 'Сохранить изменения' });
   await expect(saveProfile).toBeDisabled();
@@ -1991,7 +1992,7 @@ test('профиль сохраняет иерархию Design V2 в light/dark
   await expect(saveProfile).toBeEnabled();
   await expect(page.getByLabel('Имя')).toHaveValue('Черновик профиля');
 
-  await page.getByRole('link', { name: 'Безопасность' }).click();
+  await page.goto('/app?section=profile#profile-security');
   await expect(page.getByRole('heading', { name: 'Доступ и безопасность' })).toBeInViewport();
   const [securityHeading, dangerZone] = await Promise.all([
     page.getByRole('heading', { name: 'Доступ и безопасность' }).boundingBox(),
@@ -2013,7 +2014,7 @@ test('профиль не показывает completion prompt после за
   await expect(page.getByText('Настройки программы заполнены')).toHaveCount(0);
   await expect(page.getByText('3 из 3')).toHaveCount(0);
   await expect(page.locator('.profile-status-shell')).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: 'Разделы профиля' })).toBeVisible();
+  await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Личные данные и фитнес-профиль' })).toBeVisible();
   await page.screenshot({
     path: '../.artifacts/screenshots/task-113A/profile-complete-390x844-light.png',
@@ -2406,7 +2407,7 @@ test('рекомендация кардио меняется с целью, а �
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   await page.getByText('Пульс и кардио-ориентиры').click();
 
   await page.getByLabel('Дата рождения').fill('1992-08-12');
@@ -2438,7 +2439,7 @@ test('поля профиля и питания выровнены на деск
   await page.getByRole('button', { name: 'Клиент' }).click();
 
   await openAppDestination(page, 'Профиль');
-  await page.getByRole('link', { name: 'Личные данные' }).click();
+  await page.locator('#profile-personal > summary').click();
   const profileControlTops = await page.locator('.profile-form-grid--fitness').evaluate((grid) =>
     Array.from(grid.querySelectorAll<HTMLElement>(':scope > .field'))
       .slice(0, 3)
