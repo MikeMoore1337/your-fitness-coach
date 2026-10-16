@@ -22,10 +22,10 @@
 
 Финальные JSON-файлы содержат по **72 попытки capture** каждый для Chromium Dark/Light и WebKit Dark/Light. Проверены ширины `320`, `360`, `390`, `393`, `430` и `1440 px`; во всех четырёх наборах `horizontalOverflow = 0` для всех 72 попыток. Фактический DOM был доступен в 32/72 Chromium Dark, 30/72 Chromium Light и 24/72 в каждом WebKit наборе; остальные записи явно сохранены как loading/authorization attempts и не используются как доказательство селектора.
 
-- [Chromium Dark computed](./computed-chromium-dark.json)
-- [Chromium Light computed](./computed-chromium-light.json)
-- [WebKit Dark computed](./computed-webkit-dark.json)
-- [WebKit Light computed](./computed-webkit-light.json)
+- Chromium Dark: `computed-chromium-dark.json` — локальный диагностический файл, не включён в публичный PR
+- Chromium Light: `computed-chromium-light.json` — локальный диагностический файл, не включён в публичный PR
+- WebKit Dark: `computed-webkit-dark.json` — локальный диагностический файл, не включён в публичный PR
+- WebKit Light: `computed-webkit-light.json` — локальный диагностический файл, не включён в публичный PR
 
 Представительные валидные BEFORE-скриншоты ниже именованы по сценарию, viewport, теме и browser. Остальные локальные диагностические captures не включаются в PR, чтобы не превращать evidence в 55 MB dump. Невалидные кадры, оставшиеся на loading-state, намеренно не связываются из этой матрицы.
 
