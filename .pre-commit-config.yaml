@@ -11,8 +11,12 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Third-party snapshots are byte-pinned: preserve upstream whitespace/EOF.
+      # First-party files retain both formatting checks.
       - id: trailing-whitespace
+        exclude: ^\.agents/references/external-quality/
       - id: end-of-file-fixer
+        exclude: ^\.agents/references/external-quality/
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict

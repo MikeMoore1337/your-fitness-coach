@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline integrity verification for SHA-pinned external UI reference snapshots."""
+
 from __future__ import annotations
 
 import hashlib
