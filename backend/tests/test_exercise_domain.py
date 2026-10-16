@@ -769,7 +769,7 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "titles": 207,
         "cardio_records": 14,
         "assets": 334,
-        "derivatives": 0,
+        "derivatives": 13,
         "coverage_decisions": 36,
         "guide_item_content_records": 49,
         "guide_profile_records": 206,

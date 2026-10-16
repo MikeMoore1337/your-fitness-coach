@@ -1939,6 +1939,13 @@ details:not([open]) > :not(summary) {
   object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
 }
+.exercise-guide-image__frame .exercise-guide-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .exercise-guide-image__frame img {
     transition: none;
@@ -2257,6 +2264,16 @@ details:not([open]) > :not(summary) {
   display: block;
   max-width: 100%;
   max-height: calc(100dvh - 125px);
+  margin: auto;
+  border-radius: var(--radius-control);
+  object-fit: contain;
+}
+.exercise-lightbox .exercise-guide-video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 125px);
+  width: 100%;
+  aspect-ratio: 16 / 9;
   margin: auto;
   border-radius: var(--radius-control);
   object-fit: contain;

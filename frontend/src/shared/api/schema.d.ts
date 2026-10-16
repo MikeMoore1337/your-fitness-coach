@@ -10279,6 +10279,8 @@ export interface components {
             sort_order: number;
             /** Sources */
             sources: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Video Sources */
+            video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
         };
         /** ExerciseGuideMediaSource */
         ExerciseGuideMediaSource: {

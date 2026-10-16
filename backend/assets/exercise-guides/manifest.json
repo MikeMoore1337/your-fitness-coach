@@ -305,6 +305,31 @@
             "git_blob_sha1": "c5c74f9f689737cfaa352516bab96d66be6ad0f1",
             "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
             "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          },
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/barbell-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 80755,
+              "sha256": "5d9fd6ba3b5e000b28fc08ef3ad1a30009f652b03fb63e211935bd686fa3a87d"
+            },
+            {
+              "path": "exercises-media/videos/barbell-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 140896,
+              "sha256": "3c1b0fff0dea5fc9e212050912022c7e7c3356e9ccb632da5d8a4c0ef7371100"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-curl.mp4",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-7.1-h264-24fps-crf29-480-crf28-720"
           }
         }
       ]
@@ -883,6 +908,31 @@
             "git_blob_sha1": "a8b4efd7ada263b77a649125c7f0ca570ec38abe",
             "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
             "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          },
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/burpee-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 109332,
+              "sha256": "1360e65d522bf479a323863b0fe5da433ae2f7f849e753269e0019dcde563bb3"
+            },
+            {
+              "path": "exercises-media/videos/burpee-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 200132,
+              "sha256": "9dc4bae155da8be70f3ded77da035995a8c8e3e80ad1c7f42915515ffa266699"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/burpee.mp4",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-7.1-h264-24fps-crf29-480-crf28-720"
           }
         }
       ]
@@ -7778,5 +7828,7 @@
       ]
     }
   },
-  "hq_poster_count": 13
+  "hq_poster_count": 13,
+  "hq_video_count": 2,
+  "hq_video_total_bytes": 531115
 }
