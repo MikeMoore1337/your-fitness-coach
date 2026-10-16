@@ -1,33 +1,57 @@
 {
   "issue": 996,
-  "status": "PROPOSAL_NEEDS_OWNER_DESIGN_APPROVAL",
+  "status": "OWNER_SELECTED_VARIANT_02_FINAL_VISUAL_ACCEPTANCE_PENDING",
   "base_sha": "4c92832415d4eb994cf6b849a67074742f07ea50",
+  "owner_decision": "Variant 02 · Bottom Sheet · Показать изменения | Отмена",
   "browser": "Chromium",
   "primary_capture": {
-    "viewport_mobile": "393x844",
+    "viewport_mobile": ["320x844", "360x844", "393x844", "430x844"],
     "viewport_desktop": "1440x1000",
-    "state": "expanded",
+    "state_mobile": "ready",
+    "state_desktop": "expanded",
+    "directory": "proposal-v2/",
     "files": [
-      "proposal/chromium-393-dark-quick.png",
-      "proposal/chromium-1440-dark-quick.png",
-      "proposal/chromium-393-light-quick.png",
-      "proposal/chromium-1440-light-quick.png",
-      "proposal/chromium-393-dark-sheet.png",
-      "proposal/chromium-1440-dark-sheet.png",
-      "proposal/chromium-393-light-sheet.png",
-      "proposal/chromium-1440-light-sheet.png",
-      "proposal/chromium-393-dark-compare.png",
-      "proposal/chromium-1440-dark-compare.png",
-      "proposal/chromium-393-light-compare.png",
-      "proposal/chromium-1440-light-compare.png"
+      "proposal-v2/chromium-320-dark-sheet-ready.png",
+      "proposal-v2/chromium-320-light-sheet-ready.png",
+      "proposal-v2/chromium-360-dark-sheet-ready.png",
+      "proposal-v2/chromium-360-light-sheet-ready.png",
+      "proposal-v2/chromium-393-dark-sheet-ready.png",
+      "proposal-v2/chromium-393-light-sheet-ready.png",
+      "proposal-v2/chromium-430-dark-sheet-ready.png",
+      "proposal-v2/chromium-430-light-sheet-ready.png",
+      "proposal-v2/chromium-1440-dark-sheet-expanded.png",
+      "proposal-v2/chromium-1440-light-sheet-expanded.png"
     ]
   },
   "state_capture": {
     "viewport": "393x844",
-    "directions": ["quick"],
     "themes": ["dark", "light"],
-    "states": ["loading", "empty", "error", "offline", "conflict", "pain", "started", "preview", "apply-disabled"],
-    "directory": "states/"
+    "states": ["expanded", "loading", "empty", "error", "offline", "conflict", "pain", "started", "preview", "apply-disabled"],
+    "directory": "states-v2/",
+    "files": [
+      "states-v2/chromium-393-dark-sheet-expanded.png",
+      "states-v2/chromium-393-light-sheet-expanded.png",
+      "states-v2/chromium-393-dark-sheet-loading.png",
+      "states-v2/chromium-393-light-sheet-loading.png",
+      "states-v2/chromium-393-dark-sheet-empty.png",
+      "states-v2/chromium-393-light-sheet-empty.png",
+      "states-v2/chromium-393-dark-sheet-error.png",
+      "states-v2/chromium-393-light-sheet-error.png",
+      "states-v2/chromium-393-dark-sheet-offline.png",
+      "states-v2/chromium-393-light-sheet-offline.png",
+      "states-v2/chromium-393-dark-sheet-conflict.png",
+      "states-v2/chromium-393-light-sheet-conflict.png",
+      "states-v2/chromium-393-dark-sheet-pain.png",
+      "states-v2/chromium-393-light-sheet-pain.png",
+      "states-v2/chromium-393-dark-sheet-started.png",
+      "states-v2/chromium-393-light-sheet-started.png",
+      "states-v2/chromium-393-dark-sheet-preview.png",
+      "states-v2/chromium-393-light-sheet-preview.png",
+      "states-v2/chromium-393-dark-sheet-apply-disabled.png",
+      "states-v2/chromium-393-light-sheet-apply-disabled.png"
+    ]
   },
-  "capture_note": "Screenshots are element captures of the selected direction card from a static prototype, not production AFTER evidence and not physical-device proof."
+  "audit": "audit/variant-02-geometry.json",
+  "capture_note": "Screenshots are element captures of the selected direction card from a static synthetic prototype, not production AFTER evidence or physical-device proof.",
+  "not_verified": ["physical iPhone/Safari", "native Telegram Mini App", "OS keyboard", "VoiceOver", "live production data"]
 }

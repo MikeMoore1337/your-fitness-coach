@@ -19,7 +19,7 @@
             <span>Вариант</span>
             <select id="direction-select">
               <option value="quick">01 · Быстрый список</option>
-              <option value="sheet">02 · Нижний лист</option>
+              <option value="sheet">02 · Нижний лист · выбран</option>
               <option value="compare">03 · Сравнение</option>
             </select>
           </label>
@@ -47,17 +47,19 @@
         <section class="review-intro" aria-labelledby="intro-title">
           <div>
             <p class="eyebrow">PROPOSAL · НЕ PRODUCTION</p>
-            <h2 id="intro-title">Три компоновки одного безопасного контракта</h2>
+            <h2 id="intro-title">Вариант 02 · нижний лист — финальный пакет</h2>
             <p>
-              Варианты сокращают визуальный поиск, но не меняют серверную проверку. В каждом варианте
-              сначала выбирается кандидат из ответа <code>GET alternatives</code>, затем отдельным шагом
-              строится <code>preview</code>, и только после него доступен <code>apply</code>.
+              Владелец выбрал нижний лист. Исправленная нижняя область всегда держит две кнопки в одной
+              строке: <strong>Показать изменения</strong> слева и <strong>Отмена</strong> справа. Визуальная
+              компоновка не меняет серверную проверку: сначала выбирается кандидат из полного ответа
+              <code>GET alternatives</code>, затем отдельным шагом строится <code>preview</code>, и только
+              после него доступен <code>apply</code>.
             </p>
           </div>
           <aside class="review-callout">
             <strong>Данные прототипа</strong>
             <span>Обезличенная синтетическая фикстура, повторяющая форму существующего ответа API.</span>
-            <span>Поиск и фильтры действуют только внутри уже возвращенного множества.</span>
+            <span>Поиск и фильтры действуют только внутри уже возвращённого полного множества.</span>
           </aside>
         </section>
 
@@ -74,7 +76,7 @@
           <article class="direction-card" data-direction-card="sheet">
             <header class="direction-header">
               <div><span class="direction-number">02</span><h2>Нижний лист</h2></div>
-              <p>Короткий выбор наверху, поиск раскрывается в отдельном слое.</p>
+              <p>Короткий выбор наверху, поиск раскрывается в отдельном слое. Выбран владельцем.</p>
             </header>
             <div class="mockup" data-prototype="sheet"></div>
             <footer class="direction-footer"><strong>Сильная сторона:</strong> спокойная иерархия на 360–430 px. <span>Риск: дополнительный слой и возврат фокуса.</span></footer>
@@ -96,11 +98,12 @@
             <h2 id="notes-title">Что нужно утвердить</h2>
           </div>
           <ol>
-            <li>Один из трех визуальных вариантов или точечные правки к нему.</li>
-            <li>Показываем ли человекочитаемую причину из allowlist <code>reason_keys</code>; неизвестный ключ не должен превращаться в выдуманное обещание.</li>
-            <li>Разрешается ли локальный поиск по полному ответу без нового API; при пагинации/лимите этот прототип блокируется до отдельного API-решения.</li>
+            <li>Подтвердить исправленную строку: <strong>Показать изменения | Отмена</strong>, без переноса и смены порядка на 320–430 px.</li>
+            <li>Подтвердить нейтральный текст допустимости: оборудование и факт серверного ответа показываются, технические <code>reason_keys</code> пользователю не выводятся.</li>
+            <li>Подтвердить локальный поиск только по полному GET-ответу; при пагинации/лимите нужен отдельный API-контракт.</li>
+            <li>После этой приёмки — отдельные implementation checks, реальные AFTER и второй owner visual acceptance.</li>
           </ol>
-          <p class="gate-status">FINAL STATUS: <strong>STOP_OWNER_UI_APPROVAL</strong> · MERGE=false · DEPLOY=false</p>
+          <p class="gate-status">FINAL STATUS: <strong>STOP_OWNER_FINAL_VISUAL_ACCEPTANCE</strong> · IMPLEMENTATION=false · MERGE=false · DEPLOY=false</p>
         </section>
       </main>
     </div>

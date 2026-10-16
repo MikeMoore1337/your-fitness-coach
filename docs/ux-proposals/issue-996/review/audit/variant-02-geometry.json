@@ -1,0 +1,1817 @@
+{
+  "issue": 996,
+  "kind": "variant-02-static-prototype",
+  "browser": "Chromium",
+  "viewport_height": 844,
+  "cases": [
+    {
+      "width": 320,
+      "theme": "dark",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 889.671875,
+          "bottom": 933.671875,
+          "width": 117,
+          "height": 44,
+          "scrollWidth": 115,
+          "clientWidth": 115,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 889.671875,
+          "bottom": 933.671875,
+          "width": 117,
+          "height": 44,
+          "scrollWidth": 115,
+          "clientWidth": 115,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 257,
+        "bodyClientWidth": 257,
+        "rowScrollWidth": 240,
+        "rowClientWidth": 240,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 876.671875,
+          "width": 272,
+          "height": 69,
+          "top": 876.671875,
+          "right": 296,
+          "bottom": 945.671875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 889.671875,
+          "width": 240,
+          "height": 44,
+          "top": 889.671875,
+          "right": 280,
+          "bottom": 933.671875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 360,
+      "theme": "dark",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.203125,
+          "bottom": 898.203125,
+          "width": 137,
+          "height": 44,
+          "scrollWidth": 135,
+          "clientWidth": 135,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.203125,
+          "bottom": 898.203125,
+          "width": 137,
+          "height": 44,
+          "scrollWidth": 135,
+          "clientWidth": 135,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 297,
+        "bodyClientWidth": 297,
+        "rowScrollWidth": 280,
+        "rowClientWidth": 280,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.203125,
+          "width": 312,
+          "height": 69,
+          "top": 841.203125,
+          "right": 336,
+          "bottom": 910.203125,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.203125,
+          "width": 280,
+          "height": 44,
+          "top": 854.203125,
+          "right": 320,
+          "bottom": 898.203125,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 430,
+      "theme": "dark",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.28125,
+          "bottom": 898.28125,
+          "width": 172,
+          "height": 44,
+          "scrollWidth": 170,
+          "clientWidth": 170,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.28125,
+          "bottom": 898.28125,
+          "width": 172,
+          "height": 44,
+          "scrollWidth": 170,
+          "clientWidth": 170,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 367,
+        "bodyClientWidth": 367,
+        "rowScrollWidth": 350,
+        "rowClientWidth": 350,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.28125,
+          "width": 382,
+          "height": 69,
+          "top": 841.28125,
+          "right": 406,
+          "bottom": 910.28125,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.28125,
+          "width": 350,
+          "height": 44,
+          "top": 854.28125,
+          "right": 390,
+          "bottom": 898.28125,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "state": "expanded",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 867.984375,
+          "bottom": 911.984375,
+          "width": 182.265625,
+          "height": 44,
+          "scrollWidth": 180,
+          "clientWidth": 180,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 867.984375,
+          "bottom": 911.984375,
+          "width": 182.28125,
+          "height": 44,
+          "scrollWidth": 180,
+          "clientWidth": 180,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 390,
+        "bodyClientWidth": 390,
+        "rowScrollWidth": 373,
+        "rowClientWidth": 373,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 517.71875,
+          "y": 854.984375,
+          "width": 404.546875,
+          "height": 69,
+          "top": 854.984375,
+          "right": 922.265625,
+          "bottom": 923.984375,
+          "left": 517.71875
+        },
+        "rowBox": {
+          "x": 533.71875,
+          "y": 867.984375,
+          "width": 372.546875,
+          "height": 44,
+          "top": 867.984375,
+          "right": 906.265625,
+          "bottom": 911.984375,
+          "left": 533.71875
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 320,
+      "theme": "light",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 889.671875,
+          "bottom": 933.671875,
+          "width": 117,
+          "height": 44,
+          "scrollWidth": 115,
+          "clientWidth": 115,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 889.671875,
+          "bottom": 933.671875,
+          "width": 117,
+          "height": 44,
+          "scrollWidth": 115,
+          "clientWidth": 115,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 257,
+        "bodyClientWidth": 257,
+        "rowScrollWidth": 240,
+        "rowClientWidth": 240,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 876.671875,
+          "width": 272,
+          "height": 69,
+          "top": 876.671875,
+          "right": 296,
+          "bottom": 945.671875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 889.671875,
+          "width": 240,
+          "height": 44,
+          "top": 889.671875,
+          "right": 280,
+          "bottom": 933.671875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 360,
+      "theme": "light",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.203125,
+          "bottom": 898.203125,
+          "width": 137,
+          "height": 44,
+          "scrollWidth": 135,
+          "clientWidth": 135,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.203125,
+          "bottom": 898.203125,
+          "width": 137,
+          "height": 44,
+          "scrollWidth": 135,
+          "clientWidth": 135,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 297,
+        "bodyClientWidth": 297,
+        "rowScrollWidth": 280,
+        "rowClientWidth": 280,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.203125,
+          "width": 312,
+          "height": 69,
+          "top": 841.203125,
+          "right": 336,
+          "bottom": 910.203125,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.203125,
+          "width": 280,
+          "height": 44,
+          "top": 854.203125,
+          "right": 320,
+          "bottom": 898.203125,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 430,
+      "theme": "light",
+      "state": "ready",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.28125,
+          "bottom": 898.28125,
+          "width": 172,
+          "height": 44,
+          "scrollWidth": 170,
+          "clientWidth": 170,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.28125,
+          "bottom": 898.28125,
+          "width": 172,
+          "height": 44,
+          "scrollWidth": 170,
+          "clientWidth": 170,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 367,
+        "bodyClientWidth": 367,
+        "rowScrollWidth": 350,
+        "rowClientWidth": 350,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.28125,
+          "width": 382,
+          "height": 69,
+          "top": 841.28125,
+          "right": 406,
+          "bottom": 910.28125,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.28125,
+          "width": 350,
+          "height": 44,
+          "top": 854.28125,
+          "right": 390,
+          "bottom": 898.28125,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "state": "expanded",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 867.984375,
+          "bottom": 911.984375,
+          "width": 182.265625,
+          "height": 44,
+          "scrollWidth": 180,
+          "clientWidth": 180,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 867.984375,
+          "bottom": 911.984375,
+          "width": 182.28125,
+          "height": 44,
+          "scrollWidth": 180,
+          "clientWidth": 180,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 390,
+        "bodyClientWidth": 390,
+        "rowScrollWidth": 373,
+        "rowClientWidth": 373,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 517.71875,
+          "y": 854.984375,
+          "width": 404.546875,
+          "height": 69,
+          "top": 854.984375,
+          "right": 922.265625,
+          "bottom": 923.984375,
+          "left": 517.71875
+        },
+        "rowBox": {
+          "x": 533.71875,
+          "y": 867.984375,
+          "width": 372.546875,
+          "height": 44,
+          "top": 867.984375,
+          "right": 906.265625,
+          "bottom": 911.984375,
+          "left": 533.71875
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    }
+  ],
+  "states": [
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "expanded",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "loading",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "empty",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "error",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "offline",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "conflict",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "pain",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "started",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "preview",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 789.96875,
+          "width": 345,
+          "height": 121,
+          "top": 789.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 802.96875,
+          "width": 313,
+          "height": 44,
+          "top": 802.96875,
+          "right": 353,
+          "bottom": 846.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "dark",
+      "state": "apply-disabled",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 789.96875,
+          "width": 345,
+          "height": 121,
+          "top": 789.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 802.96875,
+          "width": 313,
+          "height": 44,
+          "top": 802.96875,
+          "right": 353,
+          "bottom": 846.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "expanded",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "loading",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "empty",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "error",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "offline",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "conflict",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "pain",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "started",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": true
+        },
+        {
+          "top": 854.96875,
+          "bottom": 898.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 841.96875,
+          "width": 345,
+          "height": 69,
+          "top": 841.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 854.96875,
+          "width": 313,
+          "height": 44,
+          "top": 854.96875,
+          "right": 353,
+          "bottom": 898.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "preview",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 789.96875,
+          "width": 345,
+          "height": 121,
+          "top": 789.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 802.96875,
+          "width": 313,
+          "height": 44,
+          "top": 802.96875,
+          "right": 353,
+          "bottom": 846.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    },
+    {
+      "width": 393,
+      "theme": "light",
+      "state": "apply-disabled",
+      "order": [
+        "Показать изменения",
+        "Отмена"
+      ],
+      "button_boxes": [
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        },
+        {
+          "top": 802.96875,
+          "bottom": 846.96875,
+          "width": 153.5,
+          "height": 44,
+          "scrollWidth": 152,
+          "clientWidth": 152,
+          "whiteSpace": "nowrap",
+          "disabled": false
+        }
+      ],
+      "containers": {
+        "bodyScrollWidth": 330,
+        "bodyClientWidth": 330,
+        "rowScrollWidth": 313,
+        "rowClientWidth": 313,
+        "footerPaddingBottom": 12,
+        "footerBox": {
+          "x": 24,
+          "y": 789.96875,
+          "width": 345,
+          "height": 121,
+          "top": 789.96875,
+          "right": 369,
+          "bottom": 910.96875,
+          "left": 24
+        },
+        "rowBox": {
+          "x": 40,
+          "y": 802.96875,
+          "width": 313,
+          "height": 44,
+          "top": 802.96875,
+          "right": 353,
+          "bottom": 846.96875,
+          "left": 40
+        }
+      },
+      "focus_after_preview_tab": "cancel",
+      "candidate_reason_code_count": 0
+    }
+  ],
+  "not_verified": [
+    "physical iPhone/Safari",
+    "native Telegram Mini App",
+    "OS keyboard",
+    "VoiceOver",
+    "live production data"
+  ]
+}

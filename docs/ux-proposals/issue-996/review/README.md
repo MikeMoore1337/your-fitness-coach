@@ -1,56 +1,43 @@
 # Issue #996 · быстрый выбор проверенной замены
 
-Статус: **PROPOSAL / STOP_OWNER_UI_APPROVAL**. Это законченный изолированный UX-прототип и техническая проверка существующего preview/apply; production UI, API, тесты приложения, merge и deploy не менялись.
+Статус: **OWNER_SELECTED_VARIANT_02 / FINAL_VISUAL_ACCEPTANCE_PENDING**. Владелец выбрал Variant 02 «Нижний лист» и отдельно зафиксировал композицию footer: **Показать изменения | Отмена** в одной горизонтальной строке, в этом порядке, без переноса на 320/360/393/430 px. Это законченный design/evidence-пакет; production UI, API, application tests, merge и deploy не менялись.
 
-[Issue #996](https://github.com/MikeMoore1337/your-fitness-coach/issues/996) · [галерея прототипа](index.html) · [снимки и manifest](manifest.json) · [точный контракт](contract.md) · [baseline-геометрия](audit/baseline-geometry.json) · [план проверок](verification-plan.md).
+[Issue #996](https://github.com/MikeMoore1337/your-fitness-coach/issues/996) · [галерея прототипа](index.html) · [снимки и manifest](manifest.json) · [точный контракт](contract.md) · [baseline-геометрия](audit/baseline-geometry.json) · [план BEFORE/AFTER и проверок](verification-plan.md).
 
 ## Что проверено
 
-- `frontend/src/features/workouts/WorkoutAdaptation.tsx` — текущий путь «только в этой тренировке», отдельные `preview` и `apply`, offline/409/network/error, `pain_or_injury`, повторное открытие, блокировка двойной отправки, фокус ошибки/preview.
-- `backend/fitminiapp_api/api/v1/workouts.py`, `backend/fitminiapp_api/services/workout_adaptation.py`, `backend/fitminiapp_api/schemas/workout.py` — проверка владельца тренировки, сегодняшнего workout, незапущенного target, доступного оборудования, видимых/исключённых упражнений, метрики и существующего `preview_token`.
-- `frontend/tests/unit/features/workouts/WorkoutAdaptation.test.tsx`, `frontend/tests/e2e/active-workout-experience.spec.ts`, `backend/tests/test_workout_adaptation.py` — существующая регрессия preview/apply и защитные границы.
-- Закрытые #860/#861 перепроверены по GitHub Issue/PR истории. #860 закрывает исходную ошибку видимости preview/ошибки; #861 относится к отдельному editor picker. Ни одна из них не реализует быстрый выбор #996.
+- `frontend/src/features/workouts/WorkoutAdaptation.tsx` — текущая последовательность «только в этой тренировке», отдельные preview/apply, offline/409/network/error, `pain_or_injury`, повторное открытие, блокировка двойной отправки, фокус ошибки/preview.
+- `backend/fitminiapp_api/api/v1/workouts.py`, `backend/fitminiapp_api/services/workout_adaptation.py`, `backend/fitminiapp_api/schemas/workout.py` — владелец и текущий workout, незапущенный target, equipment subset, видимые/исключённые/уже использованные упражнения, metric match и `preview_token`.
+- `frontend/tests/unit/features/workouts/WorkoutAdaptation.test.tsx`, `frontend/tests/e2e/active-workout-experience.spec.ts`, `backend/tests/test_workout_adaptation.py` — существующие границы preview/apply и регрессии.
+- Закрытые #860/#861 перепроверены по live Issue/PR истории. Они не реализуют отдельный быстрый выбор #996.
 
-Текущий API уже возвращает полный список для переданного набора оборудования: GET не имеет `limit`, `offset` или пагинации. Поэтому локальный поиск/фильтр в прототипе допустим только как операция над этим конкретным ответом. Если контракт получит пагинацию, лимит или серверную сортировку с потерей хвоста, кнопку «Все подходящие» нельзя реализовывать без отдельного API-решения.
+Текущий GET возвращает полный массив `WorkoutAlternativeItem` без `limit`, `offset` и pagination. Поэтому «Все подходящие», поиск и equipment-фильтры в пакете работают только внутри уже полученного полного ответа. Локальный каталог не является клиентским fallback. Если API станет возвращать неполное множество, функция должна быть заблокирована до отдельного API-решения.
 
-## Три финальных направления
+## Утверждённая композиция Variant 02
 
-Галерея показывает одно и то же безопасное поведение в трех изолированных направлениях. Переключатели сверху позволяют увидеть `ready`, `expanded`, `loading`, `empty`, `error`, `offline`, `conflict`, `pain`, `started`, `preview` и `apply-disabled`, а также Dark/Light.
+1. В верхней части листа остаётся короткий peek и карточка исходного упражнения.
+2. `Все подходящие` раскрывает поиск и фильтры поверх полного ответа сервиса.
+3. Кандидат содержит только название, фактически возвращённое оборудование и нейтральную подпись **«Допустимо при выбранном оборудовании»**. Технические `reason_keys` и `score` не показываются; новые причины не придумываются.
+4. Footer всегда содержит одну строку `Показать изменения | Отмена`. У кнопок одинаковая ширина, `white-space: nowrap`, минимальная высота 44 px и safe-area padding снизу. В состоянии готового preview кнопка `Применить только сегодня` появляется отдельной строкой ниже и не объединяется с preview.
+5. `Показать изменения` только строит preview. До отдельного apply не меняются workout, программа и будущие тренировки.
 
-| Направление | Идея | Сильная сторона | Риск для проверки |
-| --- | --- | --- | --- |
-| 01 · Быстрый список | Три наиболее релевантных результата сразу; «Все подходящие» раскрывает полный ответ | Минимум действий для частой замены | В полном списке нужно удержать фокус и введенный поиск |
-| 02 · Нижний лист | Короткий peek сверху, поиск и фильтр в раскрываемом слое | Спокойнее на 360–430 px | Нужен корректный возврат фокуса при закрытии слоя |
-| 03 · Сравнение | Исходное упражнение и выбранный кандидат видны до preview | Меньше сомнений перед подтверждением | Больше вертикали и текста на узком экране |
+Порядок keyboard focus в footer совпадает с визуальным порядком: `Показать изменения` → `Отмена`; отдельный apply следует после них. Cancel остаётся доступной при 409, offline, ошибке, пустом списке, зафиксированных подходах и pain/injury. После отмены прототип закрывает лист, возвращает кнопку «Открыть замену снова», а повторное открытие возвращает фокус на close control.
 
-Направление не выбирается автоматически: это owner design gate. Все варианты сохраняют текущий YFC material, выбор-токены и русскую локализацию; это не новая глобальная композиция и не работа #997/#1002/#867.
+## Пользовательские объяснения
 
-## Данные и границы
+Допустимость объясняется только наблюдаемыми данными текущего ответа: кандидат присутствует в серверном списке и его `equipment_ids` показаны как теги. Недопустимость не маскируется клиентской фильтрацией: пустой ответ, ошибка сети, offline, конфликт актуальности, зафиксированные факты и pain/injury имеют отдельные тексты и disabled-состояния. Никакие технические ключи причины не выводятся напрямую.
 
-Фикстура прототипа обезличенная и синтетическая. Она повторяет форму ответа `WorkoutAlternativeItem` и показывает 3–5 карточек с equipment/reason, чтобы проверить иерархию, но не является доказательством актуального live-каталога. В production карточка должна строиться только из фактически возвращенных сервером `exercise_id`, `title`, `equipment_ids`, `score`, `reason_keys`; локальный каталог не является fallback для UI.
+## Evidence и BEFORE/AFTER
 
-Причины в текущем ответе — технические `reason_keys` (`curated_pair`, `movement_pattern`, `primary_muscle`, `machine_variant`, `execution_variant`). Прототип использует только allowlist и нейтральный fallback. Нельзя обещать пользователю медицинскую, biomechanical или «лучшую» замену по одному ключу. Если нужны новые человекочитаемые причины, это отдельное API/контентное решение после owner approval.
+- `proposal-v2/` — Dark/Light primary-captures Variant 02 для 320/360/393/430 px и 1440 px.
+- `states-v2/` — Dark/Light loading, empty, error, offline, conflict/409, pain, started, preview и apply-disabled.
+- `audit/baseline-geometry.json` — фактический baseline текущего production-кода: 5 кликов до видимого preview, 4 внутри диалога на 360/393/430, 3 DOM scroll events; preview частично выходил за body viewport.
+- `audit/variant-02-geometry.json` — измерения нового статического прототипа: одна строка footer, порядок, отсутствие overflow, safe-area padding, focus и повторное открытие.
 
-## Preview/apply и состояния
+Сравнение BEFORE/AFTER не объявляет улучшение кликов до реализации: в implementation stage нужно повторить тот же synthetic fixture, браузер, reduced-motion и viewport height, затем сопоставить click count, scroll events, body/preview rects, footer rects, `scrollWidth/clientWidth`, focus order и request trace. Реальные AFTER Dark/Light и owner visual acceptance остаются отдельным gate.
 
-1. Пользователь выбирает только уже полученный и отображаемый кандидат.
-2. «Показать изменения» вызывает существующий `POST /api/v1/workouts/{workout_id}/adaptations/preview` с `reason=replace_exercise`, target, replacement и `available_equipment_ids`.
-3. До успешного preview workout/program не меняются. Preview показывает transfer/load reset и предупреждения сервера.
-4. «Применить только сегодня» отправляет существующий apply с тем же запросом и `preview_token`; повторная отправка блокируется на время запроса.
-5. Ошибки сети, offline и 409 остаются видимыми; после 409 старый preview не применяется. `pain_or_injury`, отсутствие вариантов и уже зафиксированные факты блокируют выбор.
+## Границы
 
-Поиск не закрывает клавиатурную сессию: поле остается в DOM, его value сохраняется при перерисовке списка, focus и caret возвращаются в поле. Это проверено только в headless Chromium-модели; native iOS keyboard/TMA/VoiceOver — `NOT_VERIFIED`.
+Не меняются backend/API, правила совместимости, RBAC, сохранённые подходы, program/future workouts, AI Coach, Product V12/V14, active-set styles, navigation #867 и preview программ #997. Physical iPhone/Safari, native TMA, OS keyboard, VoiceOver, live production data и production smoke в этой стадии — `NOT_VERIFIED`.
 
-## Фактический baseline до нового выбора
-
-На текущем production-коде (Chromium, synthetic existing `mockActiveWorkout`, light, reduced motion, 360/393/430 × 844) путь от открытия замены до видимого preview потребовал **5 кликов**, из них **4 внутри диалога**. Автопрокрутка тела диалога составляла 3 события; после preview карточка preview частично выходила за нижнюю границу body viewport во всех трех ширинах. Числа сохранены без округления в [`audit/baseline-geometry.json`](audit/baseline-geometry.json); это DOM-измерение, а не оценка физического пользовательского жеста.
-
-Физический iPhone/Safari, нативный Telegram Mini App, OS keyboard, VoiceOver, live production data и production smoke в этой стадии не проверялись.
-
-Основные снимки: [01 Dark mobile](proposal/chromium-393-dark-quick.png), [01 Light mobile](proposal/chromium-393-light-quick.png), [02 Dark desktop](proposal/chromium-1440-dark-sheet.png), [02 Light desktop](proposal/chromium-1440-light-sheet.png), [03 Dark mobile](proposal/chromium-393-dark-compare.png), [03 Light desktop](proposal/chromium-1440-light-compare.png). Все 12 primary-captures и 18 state-captures перечислены в [`manifest.json`](manifest.json); state-captures включают loading, empty, error, offline, conflict, pain, started, preview и apply-disabled в Dark/Light.
-
-## Следующий gate
-
-Нужен один явный owner design approval: выбрать 01/02/03, согласовать тексты/причины и подтвердить, что локальный поиск разрешен только над полным GET-ответом. До этого кодирование нового выбора не начинается. После approval потребуются отдельные implementation checks, реальные AFTER Dark/Light, owner visual acceptance и отдельное разрешение на merge/release.
-
-`env change required: no` · `MERGE=false` · `DEPLOY=false` · `FINAL_STATUS=STOP_OWNER_UI_APPROVAL`
+`env change required: no` · `IMPLEMENTATION=false` · `MERGE=false` · `DEPLOY=false` · `NEXT_GATE=OWNER_FINAL_VISUAL_ACCEPTANCE`
