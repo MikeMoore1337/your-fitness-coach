@@ -15,8 +15,7 @@ const avatarFile = {
 };
 
 async function openPersonalData(page: Page) {
-  await page.goto('/app?section=profile');
-  await page.getByRole('link', { name: 'Личные данные', exact: true }).click();
+  await page.goto('/app?section=profile#profile-personal');
   await expect(page.getByRole('button', { name: 'Изменить аватар' })).toBeVisible();
 }
 

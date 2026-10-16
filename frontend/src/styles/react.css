@@ -6446,12 +6446,13 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .hydration-card__header h2,
-.hydration-details h3,
+.hydration-card__section h3,
 .nutrition-hydration-report h3 {
   margin: 3px 0 4px;
 }
 
 .hydration-card__header p,
+.hydration-card__section p,
 .hydration-details p,
 .nutrition-hydration-report p {
   margin: 0;
@@ -6596,25 +6597,70 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   margin: 12px 0 0;
 }
 
-.hydration-expand {
-  width: calc(100% - 40px);
-  margin: 0 20px 20px;
+.hydration-card__section,
+.hydration-details {
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-strong) 62%, transparent);
+}
+
+.hydration-card__section {
+  padding: 18px 20px;
+}
+
+.hydration-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.hydration-section-head p {
+  margin-top: 4px;
+  font-size: 0.82rem;
+}
+
+.hydration-history__count {
+  flex-shrink: 0;
+  text-align: right;
+}
+
+.hydration-history__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.hydration-history__toggle-icon {
+  transition: transform var(--motion-state) var(--motion-ease);
+}
+
+.hydration-history__toggle-icon--expanded {
+  transform: rotate(90deg);
 }
 
 .hydration-details {
   display: grid;
   gap: 0;
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface-strong) 62%, transparent);
 }
 
-.hydration-details > section {
-  padding: 18px 20px;
+.hydration-details > details {
+  padding: 0 20px;
   border-bottom: 1px solid var(--border);
 }
 
-.hydration-details > section:last-child {
+.hydration-details > details:last-child {
   border-bottom: 0;
+}
+
+.hydration-details__summary {
+  min-height: 56px;
+  font-weight: 800;
+}
+
+.hydration-details__body {
+  padding: 0 0 18px;
 }
 
 .hydration-form-row,
@@ -6635,6 +6681,11 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .hydration-form-row > .ui-button {
   align-self: end;
+  grid-column: auto;
+}
+
+.hydration-form-row {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 .hydration-choice {
@@ -6805,11 +6856,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     padding-inline: 14px;
     scrollbar-width: none;
   }
-  .hydration-expand {
-    width: calc(100% - 28px);
-    margin-inline: 14px;
+  .hydration-card__section {
+    padding-inline: 14px;
   }
-  .hydration-details > section {
+  .hydration-details > details {
     padding-inline: 14px;
   }
   .hydration-form-row,
@@ -6817,6 +6867,13 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   .hydration-entry__editor,
   .nutrition-hydration-report {
     grid-template-columns: 1fr;
+  }
+  .hydration-form-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  }
+  .hydration-form-row > .ui-button {
+    grid-column: 1 / -1;
+    justify-self: start;
   }
   .hydration-entry {
     grid-template-columns: minmax(0, 1fr) auto;

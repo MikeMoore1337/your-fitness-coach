@@ -70,7 +70,6 @@ for (const surface of surfaces) {
     });
 
     await page.goto('/app?section=profile#profile-notifications');
-    await page.getByRole('link', { name: 'Уведомления', exact: true }).click();
     const personal = page.locator('.notification-personal');
     await personal.locator(':scope > summary').click();
     const title = personal.getByRole('textbox', { name: 'Заголовок', exact: true });

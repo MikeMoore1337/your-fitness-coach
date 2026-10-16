@@ -87,8 +87,7 @@ for (const theme of ['light', 'dark'] as const) {
       const errors: string[] = [];
       page.on('pageerror', (error) => errors.push(error.message));
 
-      await page.goto('/app?section=profile');
-      await page.getByRole('link', { name: 'Личные данные', exact: true }).click();
+      await page.goto('/app?section=profile#profile-personal');
       const avatarButton = page.getByRole('button', { name: 'Изменить аватар' });
       await avatarButton.press('Enter');
       const avatar = page.getByRole('dialog', { name: 'Аватар', exact: true });

@@ -133,12 +133,6 @@ export function WorkoutCompletionSummary({
           <p>{workout.title}</p>
         </div>
       </header>
-      <AiCoachContextualEntry
-        actionLabel="Разобрать с AI Coach"
-        context={{ surface: 'workout', resourceId: workout.id }}
-        entryPoint="workout"
-      />
-
       <dl className="workout-completion__facts" aria-label="Ключевые факты тренировки">
         <div>
           <dt>Длительность</dt>
@@ -153,52 +147,6 @@ export function WorkoutCompletionSummary({
           <dd>{summary?.completed_sets ?? fallbackCompletedSets}</dd>
         </div>
       </dl>
-
-      <section className="workout-completion__next" aria-labelledby="workout-next-title">
-        <span className="eyebrow">Следующий шаг</span>
-        <h3 id="workout-next-title">План продолжается</h3>
-        <p>{nextWorkoutText(summary?.next_workout ?? null)}</p>
-        <div className="workout-completion__actions app-action-group">
-          {onReturnToday ? (
-            <Button type="button" onClick={onReturnToday}>
-              Вернуться в Сегодня
-            </Button>
-          ) : (
-            <AppLink className="button-link" to="/app?section=today">
-              Вернуться в Сегодня
-            </AppLink>
-          )}
-          <AppLink className="button-link secondary-link" to="/app?section=progress">
-            Посмотреть Прогресс
-          </AppLink>
-        </div>
-      </section>
-
-      {!!summary?.personal_records.length && (
-        <section className="workout-completion__records" aria-labelledby="workout-records-title">
-          <span className="eyebrow">Личные результаты</span>
-          <h3 id="workout-records-title">Новый лучший результат</h3>
-          <ul>
-            {summary.personal_records.map((record) => (
-              <li key={record.exercise_id}>
-                <strong>{record.exercise_title}</strong>
-                <span>
-                  {[
-                    record.kinds.includes('max_load') && record.max_load_kg != null
-                      ? `максимальный вес ${formatLoad(record.max_load_kg)}`
-                      : null,
-                    record.kinds.includes('best_set_volume') && record.best_set_volume_kg != null
-                      ? `лучший подход ${formatLoad(record.best_set_volume_kg)} (вес × повторы)`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       {!!summary?.exercises.length && (
         <details className="workout-completion__results">
@@ -237,6 +185,32 @@ export function WorkoutCompletionSummary({
             ))}
           </ul>
         </details>
+      )}
+
+      {!!summary?.personal_records.length && (
+        <section className="workout-completion__records" aria-labelledby="workout-records-title">
+          <span className="eyebrow">Личные результаты</span>
+          <h3 id="workout-records-title">Новый лучший результат</h3>
+          <ul>
+            {summary.personal_records.map((record) => (
+              <li key={record.exercise_id}>
+                <strong>{record.exercise_title}</strong>
+                <span>
+                  {[
+                    record.kinds.includes('max_load') && record.max_load_kg != null
+                      ? `максимальный вес ${formatLoad(record.max_load_kg)}`
+                      : null,
+                    record.kinds.includes('best_set_volume') && record.best_set_volume_kg != null
+                      ? `лучший подход ${formatLoad(record.best_set_volume_kg)} (вес × повторы)`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {readOnly && (
@@ -309,6 +283,32 @@ export function WorkoutCompletionSummary({
           title: exercise.exercise_title,
         }))}
         viewer="client"
+      />
+
+      <section className="workout-completion__next" aria-labelledby="workout-next-title">
+        <span className="eyebrow">Следующий шаг</span>
+        <h3 id="workout-next-title">План продолжается</h3>
+        <p>{nextWorkoutText(summary?.next_workout ?? null)}</p>
+        <div className="workout-completion__actions app-action-group">
+          {onReturnToday ? (
+            <Button type="button" onClick={onReturnToday}>
+              Вернуться в Сегодня
+            </Button>
+          ) : (
+            <AppLink className="button-link" to="/app?section=today">
+              Вернуться в Сегодня
+            </AppLink>
+          )}
+          <AppLink className="button-link secondary-link" to="/app?section=progress">
+            Посмотреть Прогресс
+          </AppLink>
+        </div>
+      </section>
+
+      <AiCoachContextualEntry
+        actionLabel="Разобрать с AI Coach"
+        context={{ surface: 'workout', resourceId: workout.id }}
+        entryPoint="workout"
       />
     </section>
   );
