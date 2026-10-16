@@ -31,7 +31,7 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         await route.fulfill({ json: user });
       });
       await page.route('**/api/v1/me', (route) => route.fulfill({ json: user }));
-      await page.getByRole('link', { name: 'Цели', exact: true }).click();
+      await page.goto('/app?section=profile#profile-fitness');
       const goal = page.getByRole('combobox', { name: 'Цель', exact: true });
       await goal.selectOption('recomposition');
       const hint = page.locator('#profile-goal-value');
@@ -53,7 +53,7 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
       await page.screenshot({ path: testInfo.outputPath('full-selected-goal.png') });
 
       await page.locator('#profile-personal > summary').click();
-      await page.getByRole('link', { name: 'Цели', exact: true }).click();
+      await page.locator('#profile-personal > summary').click();
       await expect(goal).toHaveValue('recomposition');
       expect(writes).toHaveLength(0);
       await page.getByRole('button', { name: 'Сохранить изменения', exact: true }).click();
@@ -65,7 +65,7 @@ for (const width of [320, 360, 393, 430, 768, 1280]) {
         workouts_per_week: 3,
       });
       await page.reload();
-      await page.getByRole('link', { name: 'Цели', exact: true }).click();
+      await page.goto('/app?section=profile#profile-fitness');
       await expect(goal).toHaveValue('recomposition');
       await expect(hint).toHaveText('Улучшить форму без фокуса на вес');
     });

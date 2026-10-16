@@ -1,10 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { installPlatformApi } from './fixtures/platform-api';
 
-async function openProfileSection(page: import('@playwright/test').Page, name: string) {
-  await page.getByRole('link', { name, exact: true }).click();
-}
-
 test('desktop account entry stays available across primary sections and never opens the mobile sheet', async ({
   browser,
 }) => {
@@ -123,26 +119,13 @@ test('profile stays compact while disclosures, icons and shared provider actions
   await expect(
     page.getByRole('button', { name: 'Открыть профиль и настройки', exact: true }),
   ).toBeVisible();
-  const iconContract = [
-    ['Личные данные', 'nav-profile'],
-    ['Цели', 'nav-plan'],
-    ['Тренер', 'nav-coach'],
-    ['Уведомления', 'nav-today'],
-    ['Безопасность', 'account-security'],
-  ] as const;
-  const profileNavigation = page.getByRole('navigation', { name: 'Разделы профиля' });
-  for (const [name, icon] of iconContract) {
-    await expect(profileNavigation.getByRole('link', { name, exact: true })).toBeVisible();
-    await expect(
-      profileNavigation.getByRole('link', { name, exact: true }).locator(`[data-icon="${icon}"]`),
-    ).toBeVisible();
-  }
+  await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
 
   const majorCards = page.locator('.profile-settings > details.card-disclosure');
   expect(await majorCards.count()).toBeGreaterThanOrEqual(5);
   for (const card of await majorCards.all()) await expect(card).not.toHaveAttribute('open');
 
-  await openProfileSection(page, 'Цели');
+  await page.goto('/app?section=profile#profile-fitness');
   const profileCard = page.locator('#profile-personal');
   await expect(profileCard).toHaveAttribute('open');
   const saveProfile = page.getByRole('button', { name: 'Сохранить изменения' });
@@ -162,7 +145,7 @@ test('profile stays compact while disclosures, icons and shared provider actions
   await scheduleSummary.press('Enter');
   await expect(scheduleDetails).toHaveAttribute('open');
 
-  await openProfileSection(page, 'Уведомления');
+  await page.goto('/app?section=profile#profile-notifications');
   const notificationCenter = page
     .getByText('Центр уведомлений', { exact: true })
     .locator('xpath=ancestor::details[1]');
@@ -171,7 +154,7 @@ test('profile stays compact while disclosures, icons and shared provider actions
   await page.keyboard.press('Space');
   await expect(notificationCenter).toHaveAttribute('open');
 
-  await openProfileSection(page, 'Безопасность');
+  await page.goto('/app?section=profile#profile-security');
   await page.getByText('Способы входа', { exact: true }).click();
   const googleAction = page.getByRole('button', { name: 'Привязать Google' });
   await expect(googleAction).toHaveClass(/oauth-button--google/);
@@ -201,6 +184,7 @@ test('captures matching compact Profile state in light and dark themes', async (
       await page.goto('/app?section=profile');
       await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
       await expect(page.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
+      await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
       await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(5);
       if (surface.hasTouch) {
         await expect(page.locator('.profile-identity')).not.toBeAttached();

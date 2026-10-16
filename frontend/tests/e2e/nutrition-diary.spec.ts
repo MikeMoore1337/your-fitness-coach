@@ -1296,7 +1296,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     nutritionDaySummary(page).getByRole('heading', { name: 'КБЖУ', exact: true }),
     page.locator('.nutrition-completeness > .nutrition-completeness__copy h2'),
     page.locator('.nutrition-food-card__header h2'),
-    page.getByRole('heading', { name: 'Мои кружки и бутылки', exact: true }),
+    page.getByText('Мои кружки и бутылки', { exact: true }),
   ];
   const titlePositions: number[] = [];
   for (const heading of cardTitles) {
@@ -1315,7 +1315,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
   expect(
     foodCardBox!.x + foodCardBox!.width - firstMealBox!.x - firstMealBox!.width,
   ).toBeGreaterThanOrEqual(14);
-  await expect(page.getByRole('heading', { name: 'Мои кружки и бутылки' })).toBeVisible();
+  await expect(page.getByText('Мои кружки и бутылки', { exact: true })).toBeVisible();
   await page.screenshot({
     fullPage: true,
     path: '../.artifacts/runtime/tests/screenshots/task-81A/desktop-light-five-cards.png',
@@ -1348,6 +1348,8 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
       mobileFirstMealBox!.x -
       mobileFirstMealBox!.width,
   ).toBeGreaterThanOrEqual(12);
+  const hydrationPreferences = page.getByRole('region', { name: 'Гидратация' });
+  await hydrationPreferences.getByText('Личный ориентир', { exact: true }).click();
   const saveSex = page.getByText('Сохранить выбранный пол в профиле', { exact: true });
   await expect(saveSex).toBeVisible();
   expect(await saveSex.evaluate((element) => getComputedStyle(element).whiteSpace)).toBe('nowrap');
@@ -1356,6 +1358,7 @@ test('Task 81A groups nutrition into five cards and keeps profile choices compac
     path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-ordered-cards-round-2.png',
   });
   const hydration = page.getByRole('region', { name: 'Гидратация' });
+  await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
   await hydration.scrollIntoViewIfNeeded();
   await hydration.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81A/mobile-light-expanded-profile-and-containers.png',
@@ -1378,6 +1381,46 @@ test('hydration visual evidence: mobile web compact and quick add', async ({ pag
   await hydration.screenshot({
     path: '../.artifacts/runtime/tests/screenshots/task-81/mobile-web-light-quick-add-undo.png',
   });
+});
+
+test('hydration history keeps the last three visible and preserves native disclosures', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-08-19T13:00:00+03:00'));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await mockNutritionApi(page);
+  await page.goto('/app?section=nutrition&date=2026-08-19');
+
+  const hydration = page.getByRole('region', { name: 'Гидратация' });
+  const rows = hydration.locator('.hydration-history .hydration-entry');
+  const preset = hydration.getByRole('button', { name: /Стакан.*250 мл/ });
+  await expect(hydration.getByText('2 записи', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(2);
+  await expect(hydration.getByRole('button', { name: 'Показать всю историю' })).toHaveCount(0);
+
+  await preset.click();
+  await expect(hydration.getByText('3 записи', { exact: true })).toBeVisible();
+  await preset.click();
+  await expect(hydration.getByText('Последние 3 · всего 4', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(3);
+
+  await hydration.getByRole('button', { name: 'Показать всю историю' }).click();
+  await expect(hydration.getByText('Вся история · всего 4', { exact: true })).toBeVisible();
+  await expect(rows).toHaveCount(4);
+  await hydration.getByRole('button', { name: 'Свернуть историю' }).click();
+  await expect(rows).toHaveCount(3);
+
+  const details = hydration.locator('details');
+  await expect(details).toHaveCount(2);
+  for (const detail of await details.all()) {
+    const summary = detail.locator(':scope > summary');
+    await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+    await summary.press('Enter');
+    await expect(detail).toHaveAttribute('open', '');
+    await summary.press('Space');
+    await expect(detail).not.toHaveAttribute('open', '');
+  }
 });
 
 test('hydration visual evidence: mocked TMA dark expanded and reduced motion', async ({ page }) => {
@@ -1412,7 +1455,7 @@ test('hydration visual evidence: mocked TMA dark expanded and reduced motion', a
     '/app?section=nutrition&date=2026-08-19&hydration=quick#tgWebAppPlatform=android',
   );
   const hydration = page.getByRole('region', { name: 'Гидратация' });
-  await expect(hydration.getByRole('heading', { name: 'Личный ориентир' })).toBeVisible();
+  await hydration.getByText('Личный ориентир', { exact: true }).click();
   await expect(hydration.getByText(/для здоровых взрослых/i)).toBeVisible();
   const orbText = hydration.locator('.hydration-orb strong');
   await expect(orbText).toHaveCSS('color', 'rgb(245, 245, 245)');
@@ -1550,6 +1593,7 @@ for (const mode of ['light', 'dark'] as const) {
     await mockNutritionApi(page);
     await page.goto('/app?section=nutrition&date=2026-08-19&hydration=quick');
     const hydration = page.getByRole('region', { name: 'Гидратация' });
+    await hydration.getByText('Мои кружки и бутылки', { exact: true }).click();
     await expect(hydration.getByText('Термокружка · 420 мл')).toBeVisible();
     await hydration.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-81/desktop-${mode}-expanded.png`,
@@ -2698,7 +2742,7 @@ for (const width of [360, 393, 430]) {
         );
         await page.reload();
         await expect(
-          hydration.getByRole('button', { name: 'Другой напиток, история и цель' }),
+          hydration.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
         ).toBeVisible();
         await expect(preset).not.toBeFocused();
       });

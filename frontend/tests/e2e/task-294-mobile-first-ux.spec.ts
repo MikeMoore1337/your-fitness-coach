@@ -176,7 +176,7 @@ test('Task 294 keeps mobile action and section surfaces bounded', async ({ page 
   await expectNoHorizontalOverflow(page);
 });
 
-test('Task 294 keeps Progress desktop hierarchy and Profile nav title-first on mobile', async ({
+test('Task 294 keeps Progress desktop hierarchy and Profile disclosures readable on mobile', async ({
   page,
 }) => {
   await installPlatformApi(page, {
@@ -320,20 +320,13 @@ test('Task 294 keeps Progress desktop hierarchy and Profile nav title-first on m
   for (const width of [320, 360, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     await openApp(page, 'profile');
-    const profileNavigation = page.locator('.profile-settings-nav.section-navigation');
-    await expect(profileNavigation).toBeVisible();
-    await expect(profileNavigation.locator(':scope > a > small')).toHaveCount(5);
-    await expect(profileNavigation.locator(':scope > a > small').first()).toBeHidden();
-    const titleBoxes = await Promise.all(
-      (await profileNavigation.locator(':scope > a > span').all()).map((title) =>
-        title.boundingBox(),
-      ),
-    );
-    const navigationBoxes = await Promise.all(
-      (await profileNavigation.locator(':scope > a').all()).map((item) => item.boundingBox()),
-    );
-    expect(titleBoxes.every((box) => box !== null)).toBe(true);
-    expect(navigationBoxes.every((box) => box !== null && box.height <= 60)).toBe(true);
+    await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
+    const profileSections = page.locator('.profile-settings > details.card-disclosure');
+    await expect(profileSections).toHaveCount(5);
+    const summaryHeights = await profileSections
+      .locator(':scope > summary')
+      .evaluateAll((items) => items.map((item) => item.getBoundingClientRect().height));
+    expect(summaryHeights.every((height) => height >= 44)).toBe(true);
     await expectNoHorizontalOverflow(page);
   }
 });
@@ -467,25 +460,21 @@ test('Task 294 keeps period tabs balanced and custom period truthful when opened
   await expectNoHorizontalOverflow(page);
 });
 
-test('Task 294 keeps Profile and approved Progress navigation accessible on mobile', async ({
+test('Task 294 keeps Profile disclosures and approved Progress navigation accessible on mobile', async ({
   page,
 }) => {
   await installPlatformApi(page, { browserSession: true, fixedDate: FIXED_DATE });
   await page.setViewportSize({ width: 390, height: 844 });
 
   await openApp(page, 'profile');
-  const profileNavigation = page.locator('.profile-settings-nav.section-navigation');
-  await expect(profileNavigation).toBeVisible();
-  const profileNavigationMetrics = await profileNavigation.evaluate((navigation) => ({
-    columns: getComputedStyle(navigation).gridTemplateColumns.split(' ').length,
-    itemHeights: Array.from(navigation.children).map((item) => item.getBoundingClientRect().height),
-  }));
-  expect(profileNavigationMetrics.columns).toBe(1);
-  expect(Math.max(...profileNavigationMetrics.itemHeights)).toBeLessThanOrEqual(60);
-  const profileFitnessLink = profileNavigation.getByRole('link', { name: 'Цели' });
-  await profileFitnessLink.click();
-  await expect(profileFitnessLink).toHaveClass(/is-active/);
-  await expect(profileFitnessLink).toHaveAttribute('aria-current', 'location');
+  await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
+  const profileSections = page.locator('.profile-settings > details.card-disclosure');
+  await expect(profileSections).toHaveCount(5);
+  const profileSummary = profileSections.first().locator(':scope > summary');
+  await profileSummary.focus();
+  await expect(profileSummary).toBeFocused();
+  await profileSummary.press('Enter');
+  await expect(profileSections.first()).toHaveAttribute('open', '');
 
   await openApp(page, 'progress');
   const progressNavigation = page.locator('.progress-category-nav.section-navigation');
