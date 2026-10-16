@@ -151,9 +151,8 @@ def run_pilot(
                 "rights_to_public_redistribute_derivatives": "NOT_DOCUMENTED",
             }
             results.append(record)
-            print(
-                f"MEASURED={pair[0]}:{pair[1]}:{height}p bytes={record['output_bytes']} ssim={ssim}"
-            )
+            # Do not log inventory-derived identifiers or paths from external manifests.
+            print(f"RESEARCH_VARIANT_PROCESSED={height}p")
     if len(results) != 2 * len(selected):
         raise RuntimeError(f"Expected {2 * len(selected)} rows, got {len(results)}")
     report.parent.mkdir(parents=True, exist_ok=True)
@@ -161,7 +160,7 @@ def run_pilot(
         writer = csv.DictWriter(stream, fieldnames=list(results[0]))
         writer.writeheader()
         writer.writerows(results)
-    print(f"RESEARCH_ONLY=1 ROWS={len(results)} REPORT={report}")
+    print(f"RESEARCH_ONLY=1 ROWS={len(results)}")
     return results
 
 
