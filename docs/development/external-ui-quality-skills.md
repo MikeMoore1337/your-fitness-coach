@@ -56,7 +56,7 @@
 
 ```powershell
 python scripts/search_ui_ux_catalog.py --catalog charts --query progress
-python scripts/search_ui_ux_catalog.py --catalog app-interface --query dashboard
+python scripts/search_ui_ux_catalog.py --catalog app-interface --query input
 python scripts/search_ui_ux_catalog.py --catalog ux-guidelines --query focus
 ```
 
