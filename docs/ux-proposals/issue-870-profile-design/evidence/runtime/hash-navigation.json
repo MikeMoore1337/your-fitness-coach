@@ -1,0 +1,77 @@
+{
+  "profile-personal": {
+    "tag": "DETAILS",
+    "detailsOpen": true,
+    "rectTop": 376,
+    "rectHeight": 1107,
+    "hash": "#profile-personal"
+  },
+  "profile-fitness": {
+    "tag": "SECTION",
+    "detailsOpen": true,
+    "rectTop": 710,
+    "rectHeight": 432,
+    "hash": "#profile-fitness"
+  },
+  "profile-trainer": {
+    "tag": "DETAILS",
+    "detailsOpen": false,
+    "rectTop": 1563,
+    "rectHeight": 124,
+    "hash": "#profile-trainer"
+  },
+  "profile-notifications": {
+    "tag": "DETAILS",
+    "detailsOpen": false,
+    "rectTop": 1731,
+    "rectHeight": 124,
+    "hash": "#profile-notifications"
+  },
+  "profile-security": {
+    "tag": "DETAILS",
+    "detailsOpen": false,
+    "rectTop": 1897,
+    "rectHeight": 124,
+    "hash": "#profile-security"
+  },
+  "profile-ai-coach": {
+    "fallback": "not_normalized",
+    "url": "http://127.0.0.1:4173/app?section=profile#profile-ai-coach",
+    "hash": "#profile-ai-coach",
+    "aiUiCount": 0,
+    "aiTextCount": 0
+  },
+  "profile-ai-coach-direct-load": {
+    "url": "http://127.0.0.1:4173/app?section=profile",
+    "hash": "",
+    "aiUiCount": 0,
+    "aiTextCount": 0
+  },
+  "direct-loads": {
+    "profile-personal": {
+      "detailsOpen": true,
+      "hash": "#profile-personal"
+    },
+    "profile-fitness": {
+      "detailsOpen": true,
+      "hash": "#profile-fitness"
+    },
+    "profile-trainer": {
+      "detailsOpen": true,
+      "hash": "#profile-trainer"
+    },
+    "profile-notifications": {
+      "detailsOpen": true,
+      "hash": "#profile-notifications"
+    },
+    "profile-security": {
+      "detailsOpen": true,
+      "hash": "#profile-security"
+    }
+  },
+  "history": {
+    "backUrl": "http://127.0.0.1:4173/app?section=profile",
+    "forwardUrl": "http://127.0.0.1:4173/app?section=profile#profile-fitness",
+    "detailsOpenAfterForward": ""
+  }
+}
