@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Issue #873 — Progress design package</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #eef1f7;
+        --page-strong: #e6eaf2;
+        --surface: #ffffff;
+        --surface-muted: #f5f7fb;
+        --surface-soft: #f0efff;
+        --line: #dfe4ee;
+        --line-strong: #cbd3e2;
+        --text: #1b2230;
+        --muted: #687385;
+        --muted-strong: #475365;
+        --accent: #6457d9;
+        --accent-strong: #5044be;
+        --accent-soft: #e9e7ff;
+        --success: #16825a;
+        --success-soft: #e2f5ed;
+        --warning: #9a6200;
+        --warning-soft: #fff1d0;
+        --danger: #b23a4b;
+        --danger-soft: #fde8ed;
+        --shadow: 0 16px 38px rgb(40 51 75 / 12%);
+        --shadow-soft: 0 5px 18px rgb(40 51 75 / 8%);
+        --radius-xl: 26px;
+        --radius-lg: 18px;
+        --radius-md: 13px;
+        --radius-sm: 9px;
+      }
+
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --page: #0b0e14;
+        --page-strong: #101520;
+        --surface: #151b25;
+        --surface-muted: #1b2230;
+        --surface-soft: #222042;
+        --line: #2d3647;
+        --line-strong: #3e4a60;
+        --text: #f4f6fb;
+        --muted: #9ca8ba;
+        --muted-strong: #c4ccda;
+        --accent: #9e94ff;
+        --accent-strong: #b3abff;
+        --accent-soft: #2a2651;
+        --success: #6be1ae;
+        --success-soft: #14392d;
+        --warning: #ffd37a;
+        --warning-soft: #443416;
+        --danger: #ff91a1;
+        --danger-soft: #451d28;
+        --shadow: 0 18px 40px rgb(0 0 0 / 30%);
+        --shadow-soft: 0 6px 18px rgb(0 0 0 / 25%);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--text);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.4;
+      }
+      button, select { font: inherit; }
+      button { color: inherit; }
+      button:focus-visible, select:focus-visible, summary:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent) 65%, transparent);
+        outline-offset: 3px;
+      }
+      svg { display: block; flex: none; }
+
+      .gallery-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+        max-width: 1480px;
+        margin: 0 auto;
+        padding: 28px 28px 18px;
+      }
+      .gallery-kicker, .eyebrow, .micro-label {
+        margin: 0;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: .11em;
+        line-height: 1.2;
+        text-transform: uppercase;
+      }
+      .gallery-header h1 {
+        margin: 6px 0 0;
+        font-size: clamp(22px, 3vw, 34px);
+        letter-spacing: -.035em;
+        line-height: 1.08;
+      }
+      .gallery-header__controls {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .control {
+        min-height: 40px;
+        padding: 0 12px;
+        border: 1px solid var(--line-strong);
+        border-radius: 10px;
+        background: var(--surface);
+        color: var(--text);
+      }
+      .control-label { color: var(--muted); font-size: 12px; font-weight: 700; }
+      .gallery-main { max-width: 1480px; margin: 0 auto; padding: 0 28px 60px; }
+      .package-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        max-width: 940px;
+        margin: 4px 0 22px;
+        padding: 13px 16px;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        background: var(--surface);
+        box-shadow: var(--shadow-soft);
+        color: var(--muted-strong);
+        font-size: 13px;
+      }
+      .package-note strong { color: var(--text); }
+      .stage {
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-xl);
+        background: var(--page-strong);
+        box-shadow: var(--shadow);
+      }
+      .stage__bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+      }
+      .stage__bar h2 { margin: 0; font-size: 14px; }
+      .stage__bar p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        padding: 0 9px;
+        border-radius: 999px;
+        background: var(--accent-soft);
+        color: var(--accent-strong);
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: .09em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .badge--before { background: var(--warning-soft); color: var(--warning); }
+      .badge--success { background: var(--success-soft); color: var(--success); }
+      .badge--danger { background: var(--danger-soft); color: var(--danger); }
+
+      .screen {
+        min-height: 720px;
+        padding: 22px clamp(16px, 4vw, 50px) 44px;
+        background: var(--page);
+      }
+      .screen__chrome {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        max-width: 1160px;
+        margin: 0 auto 22px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 850; }
+      .brand-mark {
+        display: grid;
+        width: 26px;
+        height: 26px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--accent);
+        color: white;
+        font-size: 11px;
+        font-weight: 900;
+      }
+      .screen__chrome-right { display: flex; align-items: center; gap: 12px; }
+      .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+      .screen__header { max-width: 1160px; margin: 0 auto; }
+      .screen__heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .screen__heading h3 { margin: 3px 0 0; font-size: clamp(26px, 4vw, 38px); letter-spacing: -.04em; line-height: 1.05; }
+      .screen__heading p { max-width: 600px; margin: 7px 0 0; color: var(--muted); font-size: 14px; }
+      .period {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        padding: 0 11px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--surface);
+        color: var(--muted-strong);
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .screen__content { max-width: 1160px; margin: 0 auto; }
+
+      .legacy-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 18px;
+        padding: 10px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: var(--surface-muted);
+      }
+      .legacy-item {
+        display: flex;
+        min-height: 54px;
+        flex-direction: column;
+        justify-content: center;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 11px;
+        background: var(--surface);
+        color: var(--muted-strong);
+        font-size: 12px;
+        font-weight: 750;
+      }
+      .legacy-item small { margin-top: 2px; color: var(--muted); font-size: 10px; font-weight: 550; }
+      .legacy-item--active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+      .detail-back {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        margin: -5px 0 13px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .segment-nav {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        margin-bottom: 20px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--surface-muted);
+        scrollbar-width: none;
+      }
+      .segment-nav::-webkit-scrollbar { display: none; }
+      .segment-nav button {
+        min-height: 44px;
+        flex: 0 0 auto;
+        padding: 0 14px;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--muted-strong);
+        cursor: default;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+      }
+      .segment-nav button[aria-selected='true'] { background: var(--surface); box-shadow: var(--shadow-soft); color: var(--accent-strong); }
+      .section-label { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+      .section-label h4 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+      .section-label p { margin: 0; color: var(--muted); font-size: 12px; }
+      .section-label__line { height: 1px; flex: 1; background: var(--line); }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-lg);
+        background: var(--surface);
+        box-shadow: var(--shadow-soft);
+      }
+      .card--soft { background: var(--surface-muted); box-shadow: none; }
+      .card__body { padding: 17px; }
+      .card__body--compact { padding: 13px 15px; }
+      .grid { display: grid; gap: 12px; }
+      .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .metric { min-width: 0; }
+      .metric__value { margin: 2px 0 0; font-size: clamp(22px, 3vw, 30px); font-weight: 850; letter-spacing: -.05em; line-height: 1; }
+      .metric__unit { color: var(--muted); font-size: 12px; font-weight: 700; }
+      .metric__note { margin: 7px 0 0; color: var(--muted); font-size: 11px; }
+      .button-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        min-height: 44px;
+        padding: 0 14px;
+        border: 1px solid transparent;
+        border-radius: 11px;
+        font-size: 12px;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+      .button--primary { background: var(--accent); color: #fff; box-shadow: 0 7px 16px color-mix(in srgb, var(--accent) 28%, transparent); }
+      .button--secondary { border-color: var(--line-strong); background: var(--surface); color: var(--muted-strong); }
+      .button--quiet { min-height: 38px; padding: 0 11px; border-color: var(--line); background: var(--surface-muted); color: var(--muted-strong); }
+      .button--danger { border-color: color-mix(in srgb, var(--danger) 30%, var(--line)); background: var(--danger-soft); color: var(--danger); }
+      .body-hero {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 12px;
+        padding: 18px;
+        border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line));
+        border-radius: var(--radius-lg);
+        background: linear-gradient(135deg, var(--surface), var(--surface-soft));
+      }
+      .body-hero h5 { margin: 3px 0 0; font-size: 22px; letter-spacing: -.035em; }
+      .body-hero p { max-width: 520px; margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+      .body-hero__actions { display: flex; flex-direction: column; align-items: stretch; gap: 7px; }
+      .fact-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; overflow: hidden; border: 1px solid var(--line); border-radius: 15px; background: var(--line); }
+      .fact-strip__item { min-width: 0; padding: 13px; background: var(--surface); }
+      .fact-strip__item strong { display: block; margin-top: 3px; font-size: 19px; letter-spacing: -.04em; }
+      .fact-strip__item span { color: var(--muted); font-size: 11px; }
+      .empty-state { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+      .empty-state p { max-width: 620px; margin: 5px 0 0; color: var(--muted); font-size: 12px; }
+      .empty-state strong { font-size: 16px; }
+      .sparkline { position: relative; height: 86px; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--surface-muted); }
+      .sparkline svg { width: 100%; height: 100%; }
+      .sparkline__caption { display: flex; justify-content: space-between; margin-top: 7px; color: var(--muted); font-size: 10px; }
+      .disclosure { border-top: 1px solid var(--line); }
+      .disclosure:first-child { border-top: 0; }
+      .disclosure summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; cursor: default; list-style: none; font-size: 12px; font-weight: 800; }
+      .disclosure summary::-webkit-details-marker { display: none; }
+      .disclosure summary::after { content: '+'; color: var(--accent); font-size: 20px; font-weight: 500; }
+      .disclosure[open] summary::after { content: '−'; }
+      .disclosure__content { padding: 0 0 12px; color: var(--muted); font-size: 12px; }
+      .disclosure__content p { margin: 0; }
+      .list-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 10px 0; border-top: 1px solid var(--line); }
+      .list-row:first-child { border-top: 0; }
+      .list-row__main { min-width: 0; }
+      .list-row__title { font-size: 13px; font-weight: 800; }
+      .list-row__meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+      .list-row__value { flex: none; color: var(--muted-strong); font-size: 12px; font-weight: 800; text-align: right; }
+      .confidence { display: flex; align-items: flex-start; gap: 9px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); color: var(--muted); font-size: 11px; }
+      .confidence strong { display: block; margin-bottom: 2px; color: var(--text); font-size: 12px; }
+      .confidence--warn { border-color: color-mix(in srgb, var(--warning) 30%, var(--line)); background: var(--warning-soft); }
+      .pill { display: inline-flex; align-items: center; min-height: 24px; padding: 0 8px; border-radius: 999px; background: var(--surface-muted); color: var(--muted-strong); font-size: 10px; font-weight: 800; white-space: nowrap; }
+      .pill--success { background: var(--success-soft); color: var(--success); }
+      .pill--warning { background: var(--warning-soft); color: var(--warning); }
+      .pill--danger { background: var(--danger-soft); color: var(--danger); }
+      .cardio-row { display: grid; grid-template-columns: minmax(120px, 1.2fr) repeat(3, minmax(70px, .7fr)) auto; align-items: center; gap: 12px; min-height: 69px; padding: 10px 0; border-top: 1px solid var(--line); }
+      .cardio-row:first-child { border-top: 0; }
+      .cardio-row__title { font-size: 13px; font-weight: 850; }
+      .cardio-row__meta { margin-top: 3px; color: var(--muted); font-size: 11px; }
+      .cardio-fact { min-width: 0; }
+      .cardio-fact strong { display: block; font-size: 13px; }
+      .cardio-fact span { color: var(--muted); font-size: 10px; }
+      .cardio-row details > summary { list-style: none; }
+      .cardio-row details > summary::-webkit-details-marker { display: none; }
+      .action-menu { min-height: 38px; padding: 0 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); color: var(--muted-strong); font-size: 11px; font-weight: 800; }
+      .action-menu__body { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 7px; padding: 4px 0 10px; }
+      .step-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+      .step-list li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; align-items: start; }
+      .step-list__number { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--accent-strong); font-size: 12px; font-weight: 900; }
+      .step-list__body { min-height: 44px; padding: 3px 0 9px; border-bottom: 1px solid var(--line); }
+      .step-list li:last-child .step-list__body { border-bottom: 0; }
+      .step-list__body strong { display: block; font-size: 13px; }
+      .step-list__body span { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+      .history-row { display: flex; align-items: center; justify-content: space-between; gap: 15px; min-height: 66px; padding: 10px 0; border-top: 1px solid var(--line); }
+      .history-row:first-child { border-top: 0; }
+      .history-row__date { display: flex; align-items: center; gap: 10px; }
+      .history-row__icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 10px; background: var(--accent-soft); color: var(--accent-strong); }
+      .history-row strong { display: block; font-size: 13px; }
+      .history-row span { color: var(--muted); font-size: 11px; }
+      .history-row__stats { color: var(--muted-strong); font-size: 12px; font-weight: 800; text-align: right; }
+      .before-content { display: grid; gap: 12px; }
+      .before-content .card { border-radius: 14px; }
+      .before-content .card__body { padding: 15px; }
+      .before-content .nested-card { margin-top: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
+      .before-content .low-action { margin-top: 10px; border: 1px dashed var(--line-strong); color: var(--muted); }
+      .mockup-footer { display: flex; justify-content: space-between; gap: 16px; max-width: 1160px; margin: 15px auto 0; color: var(--muted); font-size: 11px; }
+      .mockup-footer strong { color: var(--text); }
+      .matrix { margin-top: 28px; }
+      .matrix h2 { margin: 0 0 10px; font-size: 18px; }
+      .matrix-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; }
+      .matrix a { display: block; min-height: 44px; padding: 10px 11px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--muted-strong); font-size: 11px; font-weight: 750; text-decoration: none; }
+      .matrix a:hover { border-color: var(--accent); color: var(--accent-strong); }
+      .matrix a small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 550; }
+
+      @media (max-width: 760px) {
+        .gallery-header { align-items: flex-start; flex-direction: column; gap: 14px; padding: 20px 16px 14px; }
+        .gallery-header__controls { justify-content: flex-start; }
+        .gallery-main { padding: 0 12px 36px; }
+        .package-note { margin-bottom: 14px; }
+        .stage { border-radius: 18px; }
+        .stage__bar { align-items: flex-start; flex-direction: column; }
+        .screen { min-height: 680px; padding: 16px 12px 32px; }
+        .screen__chrome { margin-bottom: 18px; }
+        .screen__heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+        .period { width: 100%; justify-content: center; }
+        .legacy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 7px; }
+        .legacy-item { min-height: 51px; padding: 7px 8px; font-size: 11px; }
+        .grid--3 { grid-template-columns: 1fr; }
+        .body-hero { flex-direction: column; }
+        .body-hero__actions { width: 100%; flex-direction: row; flex-wrap: wrap; }
+        .body-hero__actions .button { flex: 1 1 150px; }
+        .fact-strip { grid-template-columns: 1fr 1fr; }
+        .fact-strip__item:last-child { grid-column: 1 / -1; }
+        .empty-state { align-items: stretch; flex-direction: column; }
+        .cardio-row { grid-template-columns: 1fr 1fr; gap: 7px 10px; padding: 13px 0; }
+        .cardio-row__main { grid-column: 1 / -1; }
+        .cardio-row .action-menu { justify-self: end; }
+        .matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .mockup-footer { flex-direction: column; gap: 5px; }
+      }
+
+      @media (max-width: 350px) {
+        .screen__chrome-right { gap: 6px; font-size: 10px; }
+        .segment-nav button { padding: 0 11px; }
+        .button { padding: 0 11px; font-size: 11px; }
+        .fact-strip__item { padding: 10px; }
+        .fact-strip__item strong { font-size: 17px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="gallery-header">
+      <div>
+        <p class="gallery-kicker">YFC · Issue #873 · design evidence</p>
+        <h1>Progress: меньше вложенности, больше действия</h1>
+      </div>
+      <div class="gallery-header__controls" aria-label="Параметры макета">
+        <span class="control-label">Режим</span>
+        <select class="control" id="mode-control" aria-label="Режим макета">
+          <option value="proposed">PROPOSED</option>
+          <option value="before">BEFORE</option>
+        </select>
+        <span class="control-label">Тема</span>
+        <select class="control" id="theme-control" aria-label="Тема макета">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+        <select class="control" id="state-control" aria-label="Состояние Progress">
+          <option value="body-many">Тело · несколько замеров</option>
+          <option value="body-empty">Тело · пусто</option>
+          <option value="body-one">Тело · один замер</option>
+          <option value="training">Тренировки</option>
+          <option value="nutrition-empty">Питание · нет данных</option>
+          <option value="nutrition-filled">Питание · заполнено</option>
+          <option value="cardio-one">Кардио · одна сессия</option>
+          <option value="cardio-many">Кардио · несколько сессий</option>
+          <option value="wellbeing">Самочувствие</option>
+          <option value="history">История</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="gallery-main">
+      <div class="package-note">
+        <span class="status-dot" aria-hidden="true"></span>
+        <div><strong>Макетная стадия.</strong> Это синтетическая статическая композиция для owner design approval. После #1021 AI Coach не отображается; #1002 и runtime CSS не затронуты.</div>
+      </div>
+      <section class="stage" aria-labelledby="stage-title">
+        <div class="stage__bar">
+          <div><h2 id="stage-title">Проверяемый экран Progress</h2><p id="stage-description">Состояние, тема и режим меняются через параметры выше.</p></div>
+          <span class="badge" id="stage-badge">PROPOSED</span>
+        </div>
+        <div id="mockup"></div>
+      </section>
+
+      <section class="matrix" aria-labelledby="matrix-title">
+        <h2 id="matrix-title">Быстрый переход по состояниям</h2>
+        <div class="matrix-grid">
+          <a href="?mode=proposed&amp;theme=light&amp;state=body-empty">Тело · пусто<small>CTA и empty state</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=body-one">Тело · один<small>последний факт</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=body-many">Тело · много<small>факты + тренд</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=training">Тренировки<small>snapshot + details</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=nutrition-empty">Питание · нет данных<small>missing ≠ 0</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=nutrition-filled">Питание · заполнено<small>цели и покрытие</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=cardio-one">Кардио · одна<small>compact row</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=cardio-many">Кардио · много<small>safe actions</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=wellbeing">Самочувствие<small>Факты → Уточнения → Решение</small></a>
+          <a href="?mode=proposed&amp;theme=light&amp;state=history">История<small>две тренировки</small></a>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const validModes = ['before', 'proposed'];
+      const validThemes = ['light', 'dark'];
+      const validStates = ['body-empty', 'body-one', 'body-many', 'training', 'nutrition-empty', 'nutrition-filled', 'cardio-one', 'cardio-many', 'wellbeing', 'history'];
+      const mode = validModes.includes(params.get('mode')) ? params.get('mode') : 'proposed';
+      const theme = validThemes.includes(params.get('theme')) ? params.get('theme') : 'light';
+      const state = validStates.includes(params.get('state')) ? params.get('state') : 'body-many';
+      document.documentElement.dataset.theme = theme;
+
+      const icon = (name, size = 16) => {
+        const paths = {
+          plus: '<path d="M8 3v10M3 8h10"/>',
+          scale: '<path d="M3 4h10M4 4l-1 9h10l-1-9M6 4c0 2 4 2 4 0"/>',
+          chart: '<path d="M3 13V7m4 6V3m4 10V8m4 5H2"/>',
+          calendar: '<rect x="3" y="4" width="10" height="9" rx="1"/><path d="M5 2v4M11 2v4M3 7h10"/>',
+          edit: '<path d="m4 11-.7 2.7L6 13l7-7-2-2-7 7ZM9.7 4.3l2 2"/>',
+          more: '<circle cx="3.5" cy="8" r=".8" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r=".8" fill="currentColor" stroke="none"/><circle cx="12.5" cy="8" r=".8" fill="currentColor" stroke="none"/>',
+          chevron: '<path d="m5 6 3 3 3-3"/>',
+          info: '<circle cx="8" cy="8" r="5.5"/><path d="M8 7v3M8 5.2v.2"/>',
+          check: '<path d="m3.5 8 3 3 6-6"/>',
+          run: '<circle cx="8" cy="3.5" r="1.5"/><path d="m7 5 2 3 3 1M7 5 4 8l2 2-1 3M9 8l-1 5"/>',
+          arrow: '<path d="M3 8h10M8 3l5 5-5 5"/>',
+          dot: '<circle cx="8" cy="8" r="3" fill="currentColor" stroke="none"/>'
+        };
+        return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.dot}</svg>`;
+      };
+
+      const stateMeta = {
+        'body-empty': ['Тело', 'Первый шаг — сохранить факт, а не искать его ниже графика.'],
+        'body-one': ['Тело', 'Последний замер рядом с действием и историей.'],
+        'body-many': ['Тело', 'Факты и тренд видны до методики и пояснений.'],
+        training: ['Тренировки', 'Ключевая статистика сохраняется в одном коротком блоке.'],
+        'nutrition-empty': ['Питание', 'Покрытие периода отделено от числового нуля.'],
+        'nutrition-filled': ['Питание', 'Цели и покрытие доступны без перегруза деталями.'],
+        'cardio-one': ['Кардио', 'Одна сессия остаётся компактной и редактируемой.'],
+        'cardio-many': ['Кардио', 'Вторичные действия раскрываются безопасно.'],
+        wellbeing: ['Самочувствие', 'Факты, уточнения и решение остаются читаемыми.'],
+        history: ['История', 'Две тренировки видны как события, детали — по запросу.']
+      };
+      const navItems = [['Обзор', 'overview'], ['Тело', 'body'], ['Тренировки', 'training'], ['Питание', 'nutrition'], ['Кардио', 'cardio'], ['Самочувствие', 'wellbeing'], ['История', 'history']];
+
+      function nav(active, isBefore) {
+        if (isBefore) {
+          return `<div class="legacy-grid" aria-label="Повторяющаяся навигационная сетка">${navItems.map(([label, key]) => `<div class="legacy-item ${key === active ? 'legacy-item--active' : ''}">${label}<small>${key === active ? 'выбранный раздел' : 'детали и обзор'}</small></div>`).join('')}</div><div class="detail-back">${icon('arrow', 14)} Обзор <span>·</span> Детали выбранного периода</div>`;
+        }
+        return `<div class="segment-nav" role="tablist" aria-label="Разделы прогресса">${navItems.map(([label, key]) => `<button type="button" role="tab" aria-selected="${key === active}" ${key === active ? '' : 'tabindex="-1"'}>${label}</button>`).join('')}</div>`;
+      }
+
+      function sparkline() {
+        return `<div class="sparkline" aria-label="Синтетический тренд за период"><svg viewBox="0 0 600 100" preserveAspectRatio="none"><path d="M0 75 C45 68 58 83 100 63 S160 71 210 55 S270 72 315 48 S370 60 420 42 S470 54 520 33 S560 40 600 22" fill="none" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/><path d="M0 76 C45 69 58 84 100 64 S160 72 210 56 S270 73 315 49 S370 61 420 43 S470 55 520 34 S560 41 600 23 L600 100 L0 100Z" fill="var(--accent)" opacity=".1" stroke="none"/></svg></div><div class="sparkline__caption"><span>01 окт.</span><span>сегодня</span></div>`;
+      }
+
+      function bodyContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>Замеры и приоритеты</h4><span class="pill">тело</span></div><div class="nested-card"><strong>Приоритеты на период</strong><p class="metric__note">Сначала откройте пояснение и прокрутите до блоков с данными.</p></div><div class="nested-card"><strong>Качество данных</strong><p class="metric__note">Замеры и история находятся после длинного вводного блока.</p></div></div></div><div class="card"><div class="card__body"><p class="micro-label">Динамика</p>${sparkline()}<div class="nested-card"><strong>Методика</strong><p class="metric__note">Подробное пояснение занимает отдельный уровень.</p></div><div class="button-row low-action"><span>Действие далеко от фактов</span><span class="button button--quiet">Добавить замер</span></div></div></div></div>`;
+        }
+        if (state === 'body-empty') {
+          return `<div class="body-hero"><div><p class="eyebrow">Тело · первый факт</p><h5>Замеры пока не добавлены</h5><p>Сохраните один замер, чтобы увидеть динамику веса и окружностей. Форма и проверка значений остаются прежними.</p></div><div class="body-hero__actions"><span class="button button--primary">${icon('plus')} Добавить замер</span><span class="button button--secondary">История замеров</span></div></div><div class="card card--soft"><div class="card__body empty-state"><div><strong>Нет графика без исходных значений</strong><p>Это состояние не превращается в «0 кг» и не обещает недостаточную историю.</p></div><span class="pill">нет данных</span></div></div>`;
+        }
+        const many = state === 'body-many';
+        return `<div class="body-hero"><div><p class="eyebrow">Тело · последний факт · 15 окт.</p><h5>${many ? 'Вес и окружности' : 'Последний замер'}</h5><p>${many ? 'Факты видны до тренда, методики и дополнительных пояснений.' : 'Один сохранённый факт уже доступен для редактирования и истории.'}</p></div><div class="body-hero__actions"><span class="button button--primary">${icon('plus')} Добавить замер</span><span class="button button--secondary">${icon('calendar')} История замеров</span></div></div><div class="fact-strip"><div class="fact-strip__item"><span>Вес</span><strong>72,4 <small>кг</small></strong><span>15 окт.</span></div><div class="fact-strip__item"><span>Талия</span><strong>81 <small>см</small></strong><span>15 окт.</span></div><div class="fact-strip__item"><span>Бёдра</span><strong>${many ? '98' : '—'} <small>см</small></strong><span>${many ? '15 окт.' : 'нет данных'}</span></div></div><div class="grid grid--2" style="margin-top:12px"><div class="card"><div class="card__body"><div class="section-label"><h4>Динамика</h4><span class="pill pill--success">${many ? 'есть история' : '1 замер'}</span></div>${many ? sparkline() : '<div class="empty-state"><div><strong>Нужен ещё один факт</strong><p>График появится после следующего замера.</p></div></div>'}</div></div><div class="card card--soft"><div class="card__body"><div class="confidence"><span>${icon('info')}</span><div><strong>История и редактирование</strong>Открываются отдельно и используют существующую форму.</div></div><details class="disclosure"><summary>Как читается тренд</summary><div class="disclosure__content"><p>Пояснение доступно по запросу и не отодвигает действие от фактов.</p></div></details></div></div></div>`;
+      }
+
+      function trainingContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>Тренировки</h4><span class="pill">30 дней</span></div><div class="nested-card"><strong>Рабочие подходы</strong><p class="metric__note">27 · раскрывается отдельным большим блоком.</p></div><div class="nested-card"><strong>Нагрузка</strong><p class="metric__note">13 948 кг · повторяется в следующей карточке.</p></div><div class="nested-card"><strong>Повторения и PR</strong><p class="metric__note">286 повторений · действие и детали ниже.</p></div></div></div><div class="card"><div class="card__body"><p class="micro-label">Подробности</p><div class="nested-card"><strong>Упражнения</strong><p class="metric__note">Сессии и подходы раскрыты глубже, чем нужно для первого взгляда.</p></div></div></div></div>`;
+        }
+        return `<div class="card"><div class="card__body"><div class="section-label"><h4>Итоги тренировок</h4><span class="pill pill--success">30 дней</span></div><div class="grid grid--3"><div class="metric"><p class="micro-label">Рабочие подходы</p><div class="metric__value">27</div><p class="metric__note">за период</p></div><div class="metric"><p class="micro-label">Внешняя нагрузка</p><div class="metric__value">13 948 <span class="metric__unit">кг</span></div><p class="metric__note">сумма рабочих подходов</p></div><div class="metric"><p class="micro-label">Повторения</p><div class="metric__value">286</div><p class="metric__note">без изменения расчёта</p></div></div><div class="confidence" style="margin-top:16px"><span>${icon('check')}</span><div><strong>Есть прогресс для сравнения</strong>Последний PR: жим ногами · 140 кг · 12 окт.</div></div></div><div class="card__body card__body--compact"><details class="disclosure" open><summary>Упражнения и сессии</summary><div class="disclosure__content"><div class="list-row"><div class="list-row__main"><div class="list-row__title">Жим ногами</div><div class="list-row__meta">4 сессии · лучший результат 140 кг</div></div><div class="list-row__value">подробности</div></div><div class="list-row"><div class="list-row__main"><div class="list-row__title">Тяга верхнего блока</div><div class="list-row__meta">3 сессии · 48 повторений</div></div><div class="list-row__value">подробности</div></div></div></details><details class="disclosure"><summary>Методика расчёта</summary><div class="disclosure__content"><p>Существующее пояснение остаётся доступно по запросу.</p></div></details></div></div>`;
+      }
+
+      function nutritionContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>Питание</h4><span class="pill pill--warning">требует пояснения</span></div><div class="nested-card"><strong>Средние значения</strong><p class="metric__note">Пустой период визуально похож на нулевые расчёты.</p></div><div class="nested-card"><strong>Дни и цели</strong><p class="metric__note">Нужно открыть несколько вложенных уровней.</p></div></div></div></div>`;
+        }
+        const empty = state === 'nutrition-empty';
+        return `<div class="grid grid--2"><div class="card"><div class="card__body"><div class="section-label"><h4>Покрытие периода</h4><span class="pill ${empty ? 'pill--warning' : 'pill--success'}">${empty ? 'нет данных' : 'частично'}</span></div><div class="metric__value">${empty ? '0' : '18'} <span class="metric__unit">из 30 дней</span></div><p class="metric__note">${empty ? '30 дней без данных · 0 отмечено без приёмов пищи' : '9 дней без данных · 3 дня незавершены'}</p><div class="confidence ${empty ? 'confidence--warn' : ''}" style="margin-top:14px"><span>${icon('info')}</span><div><strong>${empty ? 'Пропуск — не ноль' : 'Факты отделены от пропусков'}</strong>${empty ? 'Невнесённые дни не участвуют в средних и не подменяются нулевыми значениями.' : 'Расчёты используют только завершённые дни по текущей логике.'}</div></div></div></div><div class="card"><div class="card__body"><div class="section-label"><h4>Цели и гидратация</h4><span class="pill">видно</span></div><div class="list-row"><div class="list-row__main"><div class="list-row__title">Энергия</div><div class="list-row__meta">дневная цель</div></div><div class="list-row__value">2 100 ккал</div></div><div class="list-row"><div class="list-row__main"><div class="list-row__title">Гидратация</div><div class="list-row__meta">цель на день</div></div><div class="list-row__value">2,0 л</div></div><details class="disclosure"><summary>${empty ? 'Почему нет средних' : 'Детали дней и целей'}</summary><div class="disclosure__content"><p>Объяснение, CSV и отчёт доступны отдельным раскрытием, без изменения формул.</p></div></details></div></div></div>`;
+      }
+
+      function cardioContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>Кардио</h4><span class="pill">5 сессий</span></div><div class="nested-card"><strong>Бег · 15 окт.</strong><p class="metric__note">32 мин · 4,8 км · 142 уд/мин</p><div class="button-row" style="margin-top:8px"><span class="button button--quiet">Изменить</span><span class="button button--danger">Удалить</span></div></div><div class="nested-card"><strong>Вторичная информация</strong><p class="metric__note">Действия визуально конкурируют с фактами.</p></div></div></div></div>`;
+        }
+        const one = state === 'cardio-one';
+        const rows = one ? [['Бег', '15 окт.', '32 мин', '4,8 км', '142'] ] : [['Бег', '15 окт.', '32 мин', '4,8 км', '142'], ['Велотренажёр', '12 окт.', '28 мин', '8,1 км', '136']];
+        return `<div class="card"><div class="card__body"><div class="section-label"><h4>Сессии кардио</h4><span class="pill">${one ? '1 запись' : '2 из 5 показаны'}</span></div>${rows.map(row => `<div class="cardio-row"><div class="cardio-row__main"><div class="cardio-row__title">${row[0]}</div><div class="cardio-row__meta">${row[1]} · сохранённая запись</div></div><div class="cardio-fact"><strong>${row[2]}</strong><span>длительность</span></div><div class="cardio-fact"><strong>${row[3]}</strong><span>дистанция</span></div><div class="cardio-fact"><strong>${row[4]}</strong><span>средний пульс</span></div><details><summary class="action-menu" aria-label="Действия с записью">${icon('more')} Действия</summary><div class="action-menu__body"><span class="pill pill--danger">подтвердить перед удалением</span><span class="button button--quiet">${icon('edit')} Изменить</span><span class="button button--danger">Удалить</span></div></details></div>`).join('')}<details class="disclosure"><summary>Показать все записи</summary><div class="disclosure__content"><p>Список раскрывается безопасно; удаление требует отдельного подтверждения.</p></div></details></div></div>`;
+      }
+
+      function wellbeingContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>Самочувствие</h4><span class="pill">неделя</span></div><div class="nested-card"><strong>Итоги недели</strong><div class="nested-card"><strong>Факты</strong><p class="metric__note">Показатели и уточнения вложены ещё глубже.</p></div><div class="nested-card"><strong>Уточнения</strong><p class="metric__note">Вопросы и решение скрыты последовательно.</p></div></div></div></div></div>`;
+        }
+        return `<div class="grid grid--2"><div class="card"><div class="card__body"><div class="section-label"><h4>Итоги недели</h4><span class="pill pill--success">сохранено</span></div><ol class="step-list"><li><span class="step-list__number">1</span><div class="step-list__body"><strong>Факты</strong><span>Сон 7 ч 20 мин · энергия 4/5 · восстановление 4/5</span></div></li><li><span class="step-list__number">2</span><div class="step-list__body"><strong>Уточнения</strong><span>Есть один вопрос для контекста этой недели.</span></div></li><li><span class="step-list__number">3</span><div class="step-list__body"><strong>Решение</strong><span>Сохранить текущий объём и проверить самочувствие.</span></div></li></ol></div></div><div class="card card--soft"><div class="card__body"><p class="micro-label">Дополнительный контекст</p><p style="margin:7px 0 0;color:var(--muted);font-size:12px">Каждый блок раскрывается отдельно; события и ответы не теряются в общей вложенности.</p><details class="disclosure" style="margin-top:8px"><summary>Открыть вопросы</summary><div class="disclosure__content"><p>Вопросы доступны с клавиатуры и без hover-only подсказок.</p></div></details></div></div></div>`;
+      }
+
+      function historyContent(isBefore) {
+        if (isBefore) {
+          return `<div class="before-content"><div class="card"><div class="card__body"><div class="section-label"><h4>История тренировок</h4><span class="pill">неделя</span></div><div class="nested-card"><strong>Сводка</strong><p class="metric__note">Показатели и список событий раскрыты разными карточками.</p></div><div class="nested-card"><strong>История</strong><div class="nested-card"><strong>15 окт. · Силовая</strong><p class="metric__note">9 упражнений · 11 подходов</p></div><div class="nested-card"><strong>12 окт. · Силовая</strong><p class="metric__note">8 упражнений · 10 подходов</p></div></div></div></div></div>`;
+        }
+        return `<div class="card"><div class="card__body"><div class="section-label"><h4>История тренировок</h4><span class="pill pill--success">2 события</span></div><div class="grid grid--2"><div class="metric"><p class="micro-label">Тренировки</p><div class="metric__value">2</div><p class="metric__note">за выбранный период</p></div><div class="metric"><p class="micro-label">Рабочие подходы</p><div class="metric__value">21</div><p class="metric__note">сохранённые события</p></div></div><details class="disclosure" open style="margin-top:12px"><summary>События периода</summary><div class="disclosure__content"><div class="history-row"><div class="history-row__date"><span class="history-row__icon">${icon('run')}</span><div><strong>15 окт. · Силовая</strong><span>9 упражнений · 11 подходов</span></div></div><div class="history-row__stats">7 240 кг</div></div><div class="history-row"><div class="history-row__date"><span class="history-row__icon">${icon('run')}</span><div><strong>12 окт. · Силовая</strong><span>8 упражнений · 10 подходов</span></div></div><div class="history-row__stats">6 708 кг</div></div></div></details></div></div>`;
+      }
+
+      function renderContent() {
+        const isBefore = mode === 'before';
+        if (state.startsWith('body-')) return bodyContent(isBefore);
+        if (state === 'training') return trainingContent(isBefore);
+        if (state.startsWith('nutrition-')) return nutritionContent(isBefore);
+        if (state.startsWith('cardio-')) return cardioContent(isBefore);
+        if (state === 'wellbeing') return wellbeingContent(isBefore);
+        return historyContent(isBefore);
+      }
+
+      const [sectionTitle, sectionDescription] = stateMeta[state];
+      const activeSection = state.startsWith('body-') ? 'body' : state.startsWith('nutrition-') ? 'nutrition' : state.startsWith('cardio-') ? 'cardio' : state;
+      const isBefore = mode === 'before';
+      document.getElementById('stage-badge').textContent = mode.toUpperCase();
+      document.getElementById('stage-badge').classList.toggle('badge--before', isBefore);
+      document.getElementById('stage-description').textContent = `${sectionTitle} · ${theme === 'dark' ? 'тёмная' : 'светлая'} тема · ${isBefore ? 'текущая композиция' : 'предложенная композиция'}`;
+      document.getElementById('mode-control').value = mode;
+      document.getElementById('theme-control').value = theme;
+      document.getElementById('state-control').value = state;
+      document.getElementById('mode-control').addEventListener('change', (event) => go({ mode: event.target.value }));
+      document.getElementById('theme-control').addEventListener('change', (event) => go({ theme: event.target.value }));
+      document.getElementById('state-control').addEventListener('change', (event) => go({ state: event.target.value }));
+
+      function go(change) {
+        const next = new URLSearchParams({ mode, theme, state, ...change });
+        window.location.search = next.toString();
+      }
+
+      document.getElementById('mockup').innerHTML = `<div class="screen"><div class="screen__chrome"><div class="brand"><span class="brand-mark">YF</span>Your Fitness Coach</div><div class="screen__chrome-right"><span><span class="status-dot" aria-hidden="true" style="display:inline-block;margin-right:5px"></span>синтетические данные</span><span>10:24</span></div></div><div class="screen__header"><div class="screen__heading"><div><p class="eyebrow">Progress · период</p><h3>Прогресс</h3><p>${sectionDescription}</p></div><span class="period">${icon('calendar', 14)} 01–30 окт. 2026</span></div>${nav(activeSection, isBefore)}</div><div class="screen__content"><div class="section-label"><h4>${sectionTitle}</h4><span class="section-label__line"></span><span class="badge ${isBefore ? 'badge--before' : ''}">${isBefore ? 'BEFORE' : 'PROPOSED'}</span></div>${renderContent()}</div><div class="mockup-footer"><span><strong>Композиция:</strong> ${isBefore ? 'повторяющаяся сетка и глубокая вложенность' : 'одна навигация, факты первыми, детали по запросу'}</span><span>AI Coach: не отображается</span></div></div>`;
+    </script>
+  </body>
+</html>
