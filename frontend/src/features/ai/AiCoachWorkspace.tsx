@@ -572,7 +572,7 @@ function AiCoachWorkspacePortal({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !status?.ui_enabled) return null;
   if (!status) {
     return createPortal(
       <aside className="ai-coach-workspace-layer" data-testid="ai-coach-workspace-layer">
@@ -798,6 +798,7 @@ type AiCoachWorkspacePortalProps = Parameters<typeof AiCoachWorkspacePortal>[0];
 
 function AiCoachWorkspaceStatusQueryBridge(props: Omit<AiCoachWorkspacePortalProps, 'status'>) {
   const statusQuery = useAiCoachStatus();
+  if (!statusQuery.data?.ui_enabled) return null;
   return <AiCoachWorkspacePortal {...props} status={statusQuery.data} />;
 }
 

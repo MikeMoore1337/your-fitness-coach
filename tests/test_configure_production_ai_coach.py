@@ -29,6 +29,7 @@ def test_enables_ai_coach_without_changing_groq_key_or_unrelated_values(
     assert "POSTGRES_PASSWORD=also-keep-this\n" in content
     for key, value in PRODUCTION_AI_COACH_FLAGS.items():
         assert content.count(f"{key}={value}\n") == 1
+    assert "AI_COACH_UI_ENABLED=false\n" in content
 
 
 def test_adds_missing_flags_once_removes_duplicates_and_is_idempotent(tmp_path: Path) -> None:

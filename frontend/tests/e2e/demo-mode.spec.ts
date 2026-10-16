@@ -1166,6 +1166,7 @@ test('demo uses production today composition and persists one workout set throug
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
   await expect(page.getByRole('navigation', { name: 'Основная навигация' })).toBeVisible();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
+  await expect(page.getByText('AI Coach', { exact: true })).toHaveCount(0);
   if (TASK_278_THEME) {
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', TASK_278_THEME);
   }
@@ -1174,6 +1175,7 @@ test('demo uses production today composition and persists one workout set throug
   await page.getByRole('button', { name: 'Продолжить' }).click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=plan');
   await expect(page.getByRole('heading', { name: 'План', level: 1 })).toBeVisible();
+  await expect(page.getByText('AI Coach', { exact: true })).toHaveCount(0);
   await page.getByRole('link', { name: 'Сегодня', exact: true }).first().click();
   await expect(page).toHaveURL('/demo?cabinet=1&scenario=self_training&section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
@@ -1287,6 +1289,7 @@ test('the public trainer entry opens the existing isolated trainer cabinet', asy
     await entry.click();
     await expect(page).toHaveURL('/demo?cabinet=1&scenario=trainer&section=trainer');
     await expect(page.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+    await expect(page.getByText('AI Coach', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Демо-режим · данные не сохраняются')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Пригласить клиента' }).first()).toBeDisabled();
 
@@ -1313,6 +1316,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await installDemoTransport(nutritionPage);
   await nutritionPage.goto('/demo?cabinet=1&scenario=nutrition&section=nutrition');
   await expect(nutritionPage.getByRole('heading', { name: 'Питание', exact: true })).toBeVisible();
+  await expect(nutritionPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
   await expect(nutritionPage.getByRole('button', { name: 'Быстрый ввод' })).toBeVisible();
   await nutritionPage.getByRole('button', { name: 'Быстрый ввод' }).click();
   await expect(nutritionPage.getByRole('dialog')).toBeVisible();
@@ -1336,6 +1340,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await installDemoTransport(planPage);
   await planPage.goto('/demo?cabinet=1&scenario=self_training&section=plan');
   await expect(planPage.getByText(/Управление программой недоступно/)).toBeVisible();
+  await expect(planPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
   await expect(planPage.locator('fieldset.demo-capability-fieldset')).toHaveAttribute(
     'disabled',
     '',
@@ -1353,6 +1358,7 @@ test('nutrition and coach scenarios render shared production surfaces with local
   await installDemoTransport(trainerPage);
   await trainerPage.goto('/demo?cabinet=1&scenario=trainer&section=trainer');
   await expect(trainerPage.getByRole('heading', { name: 'Что требует действия?' })).toBeVisible();
+  await expect(trainerPage.getByText('AI Coach', { exact: true })).toHaveCount(0);
   await assertTrainerCapacityAvailable(trainerPage);
   await expect(
     trainerPage.getByRole('button', { name: 'Пригласить клиента' }).first(),

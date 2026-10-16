@@ -13,12 +13,12 @@ for (const width of [390, 1440])
         }),
       );
       await page.goto('/app?section=profile');
-      for (const selector of [
-        '[data-icon="account-security"]',
-        '[data-icon="ai-coach"]',
+      for (const [selector, expectedCount] of [
+        ['[data-icon="account-security"]', 2],
+        ['[data-icon="ai-coach"]', 1],
       ] as const) {
         const icons = page.locator(selector);
-        await expect(icons).toHaveCount(2);
+        await expect(icons).toHaveCount(expectedCount);
         for (const icon of await icons.all()) {
           await expect(icon).toBeVisible();
           await expect(icon).toHaveAttribute('stroke', 'currentColor');

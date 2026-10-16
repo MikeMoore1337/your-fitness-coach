@@ -1183,7 +1183,7 @@ function AiCoachChat({
     staleTime: 15_000,
     retry: false,
   });
-  const quota = useAiCoachQuota();
+  const quota = useAiCoachQuota(Boolean(status?.ui_enabled));
   const { refetch: refetchQuota } = quota;
   useEffect(() => {
     const refreshQuota = () => {
@@ -1874,7 +1874,7 @@ export function AiCoachSettingsCard({
 }) {
   const statusQuery = useAiCoachStatus(!providedStatus);
   const status = providedStatus ?? statusQuery.data;
-  const quota = useAiCoachQuota();
+  const quota = useAiCoachQuota(Boolean(status?.ui_enabled));
   const workspace = useOptionalAiCoachWorkspace();
   const deepLinkOpenedRef = useRef(false);
   const quotaState = getAiCoachQuotaState(quota.data);
@@ -1960,13 +1960,7 @@ export function AiCoachExperience({
 }) {
   const statusQuery = useAiCoachStatus(!providedStatus);
   const status = providedStatus ?? statusQuery.data;
-  if (!status?.ui_enabled) {
-    return (
-      <section className="ai-coach-unavailable" data-testid="ai-coach-ui-disabled">
-        <p>AI Coach пока не может загрузиться. Основные функции приложения доступны.</p>
-      </section>
-    );
-  }
+  if (!status?.ui_enabled) return null;
   return (
     <section className="ai-coach-experience" data-testid="ai-coach-experience">
       <AiCoachChat

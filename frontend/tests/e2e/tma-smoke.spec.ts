@@ -705,13 +705,9 @@ test('AI adaptation stays bounded across confirm, reject and disabled core state
   await installPlatformApi(desktop, { browserSession: true, programHistory: 'many' });
   await desktop.goto('/app?section=programs&view=manage');
   const desktopAdaptation = desktop.getByTestId('ai-adaptation');
-  await expect(desktopAdaptation).toHaveAttribute('data-state', 'disabled');
-  await expect(
-    desktopAdaptation.getByRole('button', { name: 'AI-адаптация недоступна' }),
-  ).toBeDisabled();
+  await expect(desktopAdaptation).toHaveCount(0);
   await expect(desktop.getByText('Текущий тренировочный блок')).toBeVisible();
   expect(desktopProposalRequests).toEqual([]);
-  await desktopAdaptation.scrollIntoViewIfNeeded();
   await waitForVisualStability(desktop);
   await desktop.screenshot({
     path: '../.artifacts/tasks/509/evidence/screenshots/desktop-light-disabled.png',

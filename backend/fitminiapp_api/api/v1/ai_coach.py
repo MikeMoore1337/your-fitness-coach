@@ -166,7 +166,7 @@ def get_ai_coach_status(
     current_user: User = Depends(require_user),
 ) -> AiCoachStatusResponse:
     del request
-    ui_enabled = True
+    ui_enabled = settings.ai_coach_ui_enabled
     generic_available = _chat_runtime_available()
     personal_available = bool(
         generic_available

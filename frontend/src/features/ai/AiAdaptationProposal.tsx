@@ -409,34 +409,7 @@ export function AiAdaptationProposal({
     }
   };
 
-  const statusUnavailable =
-    status.isError ||
-    (status.isSuccess && (!status.data?.ui_enabled || !status.data?.personal_available));
-  if (status.isLoading || statusUnavailable) {
-    const disabled = status.data?.ui_enabled === false;
-    return (
-      <section
-        className={`ai-adaptation ai-adaptation--${disabled ? 'disabled' : 'unavailable'}`}
-        data-state={disabled ? 'disabled' : 'unavailable'}
-        data-testid="ai-adaptation"
-      >
-        <div className="ai-adaptation__copy">
-          <span className="eyebrow">AI Coach · адаптация</span>
-          <strong>
-            {status.isLoading
-              ? 'Проверяем доступ…'
-              : stateCopy(disabled ? 'disabled' : 'unavailable')}
-          </strong>
-          {!status.isLoading && (
-            <p>Можно продолжать использовать текущую программу и детерминированную прогрессию.</p>
-          )}
-        </div>
-        <Button type="button" variant="secondary" disabled>
-          {status.isLoading ? 'Проверяем доступ…' : 'AI-адаптация недоступна'}
-        </Button>
-      </section>
-    );
-  }
+  if (!status.data?.ui_enabled || !status.data.personal_available) return null;
 
   if (!panelOpen && state === 'idle') {
     return (
