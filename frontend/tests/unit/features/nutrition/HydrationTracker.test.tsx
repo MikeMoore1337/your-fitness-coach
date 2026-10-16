@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HydrationTracker } from '../../../../src/features/nutrition/HydrationTracker';
-import type { HydrationDay } from '../../../../src/shared/api/types';
+import type { HydrationDay, HydrationEntry } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 import {
   PRODUCT_EVENT_NAME,
@@ -144,6 +144,61 @@ describe('HydrationTracker', () => {
       '850 из 2200 миллилитров',
     );
     expect(screen.getByRole('button', { name: /Стакан.*250 мл/ })).toBeVisible();
+    expect(
+      within(screen.getByRole('region', { name: 'Другой объём' })).getByLabelText('Объём, мл'),
+    ).toBeVisible();
+    expect(screen.getByText('История за день')).toBeVisible();
+    expect(screen.getByText('Личный ориентир', { exact: true })).toBeVisible();
+  });
+
+  it.each([
+    { entries: [], label: '0 записей', toggle: false },
+    { entries: [day.entries[0], { ...day.entries[0], id: 11 }], label: '2 записи', toggle: false },
+    {
+      entries: [
+        day.entries[0],
+        { ...day.entries[0], id: 11 },
+        { ...day.entries[0], id: 12 },
+        { ...day.entries[0], id: 13 },
+      ],
+      label: 'Последние 3 · всего 4',
+      toggle: true,
+    },
+  ])('reports history count truthfully for $label', async ({ entries, label, toggle }) => {
+    apiMock.mockImplementation((path: string) => {
+      if (path === '/api/v1/me') return Promise.resolve({ profile: { sex: 'female' } });
+      if (path.startsWith('/api/v1/nutrition/hydration?')) {
+        return Promise.resolve({ ...day, entries: entries as HydrationEntry[] });
+      }
+      return Promise.resolve({});
+    });
+
+    renderTracker();
+
+    expect(await screen.findByText(label, { exact: true })).toBeVisible();
+    if (entries.length > 0) {
+      const history = screen.getByRole('list');
+      expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(
+        Math.min(entries.length, 3),
+      );
+    } else {
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    }
+    if (!toggle) {
+      expect(
+        screen.queryByRole('button', { name: 'Показать всю историю' }),
+      ).not.toBeInTheDocument();
+      return;
+    }
+
+    const history = screen.getByRole('list');
+    const toggleButton = screen.getByRole('button', { name: 'Показать всю историю' });
+    expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggleButton);
+    expect(screen.getByText('Вся история · всего 4', { exact: true })).toBeVisible();
+    expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(4);
+    fireEvent.click(screen.getByRole('button', { name: 'Свернуть историю' }));
+    expect(within(history).getAllByRole('button', { name: 'Изменить' })).toHaveLength(3);
   });
 
   it('quick-adds once and offers explicit undo', async () => {
@@ -170,7 +225,7 @@ describe('HydrationTracker', () => {
 
   it('reveals adult/reference boundaries and history without hiding edit actions', async () => {
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: 'Другой напиток, история и цель' }));
+    fireEvent.click(await screen.findByText('Личный ориентир', { exact: true }));
     expect(screen.getByText(/для здоровых взрослых/i)).toBeVisible();
     expect(screen.getByLabelText('Мне 18 лет или больше')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'История за день' })).toBeVisible();
@@ -199,7 +254,7 @@ describe('HydrationTracker', () => {
     });
 
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: 'Другой напиток, история и цель' }));
+    fireEvent.click(await screen.findByText('Личный ориентир', { exact: true }));
 
     expect(screen.getByRole('radio', { name: 'Вручную' })).toBeChecked();
     expect(screen.getByLabelText('Ориентир, мл в день')).toHaveValue(3000);
@@ -215,15 +270,16 @@ describe('HydrationTracker', () => {
     });
 
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: 'Другой напиток, история и цель' }));
+    fireEvent.click(await screen.findByText('Личный ориентир', { exact: true }));
 
     expect(screen.getByRole('radio', { name: 'По справочному ориентиру' })).toBeChecked();
     expect(screen.getByLabelText('Пол для справочного ориентира')).toHaveValue('male');
     expect(screen.getByLabelText('Мне 18 лет или больше')).toBeChecked();
     expect(screen.getByLabelText('Сохранить выбранный пол в профиле')).toBeVisible();
+    fireEvent.click(await screen.findByText('Мои кружки и бутылки', { exact: true }));
     const presets = screen
-      .getByRole('heading', { name: 'Мои кружки и бутылки' })
-      .closest('section') as HTMLElement;
+      .getByText('Мои кружки и бутылки', { exact: true })
+      .closest('details') as HTMLElement;
     expect(within(presets).getByRole('button', { name: 'Добавить' })).toBeVisible();
   });
 
@@ -237,7 +293,7 @@ describe('HydrationTracker', () => {
     });
 
     renderTracker();
-    fireEvent.click(await screen.findByRole('button', { name: 'Другой напиток, история и цель' }));
+    fireEvent.click(await screen.findByText('Личный ориентир', { exact: true }));
 
     const sex = screen.getByLabelText('Пол для справочного ориентира');
     expect(sex).toHaveValue('');
