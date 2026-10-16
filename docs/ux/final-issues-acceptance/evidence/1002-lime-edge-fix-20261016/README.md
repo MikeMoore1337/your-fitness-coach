@@ -13,8 +13,8 @@ AI Coach в этом worktree не менялся и остаётся скрыт
   `430` и `1440 px`; в каждом проходе проверены computed CSS и `scrollWidth <= innerWidth`.
 - Active Workout: Chromium и WebKit, Light/Dark, ширины `320`, `360`, `393` и `430 px`;
   проверены current-set frame, RIR и рабочий timer.
-- Mock TMA critical regression: Chromium прошёл 13 сценариев; после обновления только A-06
-  golden отдельный Active Workout visual test прошёл. WebKit mobile-regression не смог открыть
+- Mock TMA critical regression: Chromium прошёл 13 сценариев; после обновления platform-specific
+  A-06 goldens отдельный Active Workout visual test прошёл. WebKit mobile-regression не смог открыть
   локальный preview в отведённые 30 секунд и не используется как mobile proof.
 - Physical iPhone/Safari, native Telegram, VoiceOver, production runtime и реальный 200% browser
   zoom этим пакетом не подтверждаются.
@@ -55,8 +55,10 @@ AI Coach в этом worktree не менялся и остаётся скрыт
 ## Регрессии и границы
 
 - Targeted computed assertions находятся в [progress-report.spec.ts](../../../../../frontend/tests/e2e/progress-report.spec.ts), [today-dashboard.spec.ts](../../../../../frontend/tests/e2e/today-dashboard.spec.ts) и [active-workout-experience.spec.ts](../../../../../frontend/tests/e2e/active-workout-experience.spec.ts).
-- Active visual golden обновлён только для изменённого A-06 кадра:
-  `mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/active-workout-390x844-dark.png`.
+- Active visual goldens обновлены только для изменённого A-06 кадра:
+  `mobile-ui-regression.spec.ts-snapshots/mobile-chromium/win32/active-workout-390x844-dark.png`,
+  `mobile-ui-regression.spec.ts-snapshots/mobile-chromium/linux/active-workout-390x844-dark.png`,
+  `mobile-ui-regression.spec.ts-snapshots/mobile-webkit/linux/active-workout-390x844-dark.png`.
 - Прогон mobile-regression сохранил известный baseline mismatch Progress: `741` пиксель в Light
   и `716` в Dark; эти эталоны не относятся к A-01…A-06 и не обновлялись.
 - [AI Coach hidden regression](../../../../../frontend/tests/e2e/ai-coach-hidden.spec.ts) прошёл
