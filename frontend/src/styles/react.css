@@ -5599,6 +5599,9 @@ button.today-text-link {
 .active-workout:has(.active-workout-rest) :is(input, [data-workout-field='done']) {
   scroll-margin-block-start: calc(var(--yfc-layout-safe-top, 0px) + 124px);
 }
+.active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
+  display: none;
+}
 
 @keyframes active-workout-set-confirm {
   50% {
