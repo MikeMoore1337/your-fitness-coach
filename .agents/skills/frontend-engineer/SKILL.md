@@ -129,3 +129,12 @@ Dedicated complex a11y -> `$accessibility-engineer`.
 Используй текущий test stack проекта.
 
 Проверяй поведение, а не implementation details, и не объявляй browser/device verification выполненной, если она не выполнялась.
+
+## Внешние React-рекомендации (только по теме задачи)
+
+Для доказанных React performance/waterfall/bundle и API-компонентов используй
+`../../references/external-quality/vercel/react-best-practices/SKILL.md` или
+`../../references/external-quality/vercel/composition-patterns/SKILL.md`.
+Их большие `AGENTS.md` загружай только после выбора конкретной проблемы.
+Весь маршрут: `../../../docs/development/external-ui-quality-skills.md`.
+Правила для Next.js не заменяют архитектуру React/Vite YFC.

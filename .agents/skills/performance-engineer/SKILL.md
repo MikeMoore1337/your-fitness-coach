@@ -91,3 +91,10 @@ Lab-метрики нужны для диагностики, но не подм�
 - recovery after spike.
 
 После изменения повтори тот же benchmark и зафиксируй разницу.
+
+## Внешние ссылки по узкому performance-scope
+
+После baseline при React/motion проблеме используй
+`../../references/external-quality/vercel/react-best-practices/SKILL.md` и/или
+`../../references/external-quality/ui-skills/fixing-motion-performance.md`.
+Не переносить Next.js-специфичные советы в Vite без технической проверки.
