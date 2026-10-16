@@ -2255,6 +2255,33 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await expect(tmaPage.getByText('1 ч')).toBeVisible();
   await expect(tmaPage.getByText(/максимальный вес 40 кг/)).toBeVisible();
   await expect(tmaPage.getByText(/Следующая тренировка/)).toBeVisible();
+  const completionOrderCorrect = await tmaPage.locator('.workout-completion').evaluate((root) => {
+    const selectors = [
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    const nodes = selectors.map((selector) => root.querySelector(selector));
+    if (nodes.some((node) => !node)) return false;
+    return nodes
+      .slice(1)
+      .every((node, index) =>
+        Boolean(nodes[index]!.compareDocumentPosition(node!) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+  });
+  expect(completionOrderCorrect).toBe(true);
+  if (process.env.YFC_CAPTURE_871 === '1') {
+    for (const theme of ['dark', 'light'] as const) {
+      await tma.setTheme(theme);
+      await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+      await tmaPage.screenshot({
+        path: '../.artifacts/screenshots/issue-871/completion-390-' + theme + '-after.png',
+        fullPage: true,
+      });
+    }
+  }
   expect(api.finishCalls()).toBe(1);
   await expectNoHorizontalOverflow(tmaPage);
   const focusHeader = tmaPage.locator('.today-workout-focus__header');

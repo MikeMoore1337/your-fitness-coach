@@ -23,6 +23,18 @@ for (const theme of themes) {
       await expect(presets.nth(1)).toContainText('350 мл');
       await expect(page.getByText('План питания', { exact: true })).toBeVisible();
       await expect(page.getByText('Список покупок', { exact: true })).toBeVisible();
+      const planningDetails = page.locator(
+        '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+      );
+      await expect(planningDetails).toHaveCount(2);
+      for (const detail of await planningDetails.all()) {
+        const summary = detail.locator(':scope > summary');
+        await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+        await summary.press('Enter');
+        await expect(detail).toHaveAttribute('open', '');
+        await summary.press('Space');
+        await expect(detail).not.toHaveAttribute('open', '');
+      }
       await hydration.scrollIntoViewIfNeeded();
       await hydration.screenshot({
         path: testInfo.outputPath(`${phase}-869-hydration-${theme}-${width}.png`),
@@ -108,15 +120,30 @@ for (const theme of themes) {
       );
       await page.goto('/app?section=profile');
       const nav = page.getByRole('navigation', { name: 'Разделы профиля' });
-      await expect(nav).toBeVisible();
-      await nav.screenshot({ path: testInfo.outputPath(`${phase}-870-nav-${theme}-${width}.png`) });
-      const links = nav.locator('a[href^="#"]');
-      expect(await links.count()).toBeGreaterThanOrEqual(5);
-      for (const href of await links.evaluateAll((elements) =>
-        elements.map((element) => element.getAttribute('href')),
-      )) {
-        expect(href).toBeTruthy();
-        expect(await page.locator(href!).count()).toBe(1);
+      if (phase === 'before') {
+        await expect(nav).toBeVisible();
+        await nav.screenshot({
+          path: testInfo.outputPath(`${phase}-870-nav-${theme}-${width}.png`),
+        });
+        const links = nav.locator('a[href^="#"]');
+        expect(await links.count()).toBeGreaterThanOrEqual(5);
+        for (const href of await links.evaluateAll((elements) =>
+          elements.map((element) => element.getAttribute('href')),
+        )) {
+          expect(href).toBeTruthy();
+          expect(await page.locator(href!).count()).toBe(1);
+        }
+      } else {
+        await expect(nav).toHaveCount(0);
+        for (const target of [
+          '#profile-personal',
+          '#profile-fitness',
+          '#profile-trainer',
+          '#profile-notifications',
+          '#profile-security',
+        ]) {
+          await expect(page.locator(target)).toHaveCount(1);
+        }
       }
       await page.locator('.profile-primary-card > summary').click();
       const goal = page.locator('#profile-goal');

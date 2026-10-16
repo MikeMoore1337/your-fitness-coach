@@ -97,6 +97,18 @@ async function loadedFrontendResources(page: Page) {
   );
 }
 
+// Vite's opaque 8-character hash can coincidentally contain "tma" or "telegram".
+function isDedicatedTmaAsset(file: string) {
+  const logicalName = file.replace(/-[A-Za-z0-9_-]{8}\.(css|js)$/i, '.$1');
+  return /(?:telegram|tma).*\.(?:css|js)$/i.test(logicalName);
+}
+
+test('TMA asset detection ignores opaque Vite hash suffixes', () => {
+  expect(isDedicatedTmaAsset('useQuery-D6X9tmA8.js')).toBe(false);
+  expect(isDedicatedTmaAsset('telegram-web-app-D6X9tmA8.js')).toBe(true);
+  expect(isDedicatedTmaAsset('tma-bridge-D6X9tmA8.css')).toBe(true);
+});
+
 function captureConsoleFailures(page: Page) {
   const failures: string[] = [];
   page.on('console', (message) => {
@@ -238,7 +250,7 @@ test('Mobile Web and mocked TMA share one frontend resource graph', async ({ bro
     await settle(page);
     const resources = await loadedFrontendResources(page);
     expect(resources.some((file) => /publicContent/i.test(file))).toBe(false);
-    expect(resources.some((file) => /(?:telegram|tma).*(?:css|js)$/i.test(file))).toBe(false);
+    expect(resources.some(isDedicatedTmaAsset)).toBe(false);
     expect(
       consoleFailures.filter(
         (message) => !message.includes('server responded with a status of 401'),

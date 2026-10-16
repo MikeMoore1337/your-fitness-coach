@@ -75,6 +75,119 @@ async function installReportApi(page: Page, state: ReportState = 'full') {
   );
 }
 
+async function expectProgressReportEdgeContract(page: Page) {
+  const edges = await page.locator('.progress-report-document').evaluate((root) => {
+    const read = (selector: string) => {
+      const element = root.querySelector<HTMLElement>(selector);
+      if (!element) throw new Error(`Missing progress report edge target: ${selector}`);
+      const style = getComputedStyle(element);
+      return {
+        top: {
+          width: style.borderTopWidth,
+          style: style.borderTopStyle,
+          color: style.borderTopColor,
+        },
+        right: {
+          width: style.borderRightWidth,
+          style: style.borderRightStyle,
+          color: style.borderRightColor,
+        },
+        bottom: {
+          width: style.borderBottomWidth,
+          style: style.borderBottomStyle,
+          color: style.borderBottomColor,
+        },
+        left: {
+          width: style.borderLeftWidth,
+          style: style.borderLeftStyle,
+          color: style.borderLeftColor,
+        },
+      };
+    };
+
+    return {
+      overview: read('.progress-report-overview'),
+      factualSummary: read('.progress-report-factual-summary'),
+      program: read('.progress-report-program'),
+      exerciseCards: Array.from(
+        root.querySelectorAll<HTMLElement>('.progress-report-exercises article'),
+      ).map((element) => {
+        const style = getComputedStyle(element);
+        return {
+          top: style.borderTopWidth,
+          right: style.borderRightWidth,
+          bottom: style.borderBottomWidth,
+          left: style.borderLeftWidth,
+          topColor: style.borderTopColor,
+          leftColor: style.borderLeftColor,
+        };
+      }),
+    };
+  });
+
+  expect(edges.overview.left).toMatchObject({ width: '0px', style: 'none' });
+  expect(edges.program.left).toMatchObject({ width: '0px', style: 'none' });
+  expect(edges.factualSummary.left.width).toBe('1px');
+  expect(edges.factualSummary.left.color).toBe(edges.factualSummary.top.color);
+  expect(edges.factualSummary.left.style).toBe('solid');
+  expect(edges.exerciseCards).toHaveLength(2);
+  for (const card of edges.exerciseCards) {
+    expect(card).toMatchObject({ top: '1px', right: '1px', bottom: '1px', left: '1px' });
+    expect(card.leftColor).toBe(card.topColor);
+  }
+}
+
+test('report uses the available mobile canvas width without horizontal overflow', async ({
+  page,
+}) => {
+  await installPlatformApi(page, { browserSession: true });
+  await installReportApi(page);
+  await page.goto('/app/report?period=days_30');
+  const evidenceDir = resolve(process.cwd(), '../docs/ux/issue-1039-report-width-20261016');
+
+  for (const theme of ['dark', 'light'] as const) {
+    await page.evaluate((selectedTheme) => localStorage.setItem('app-theme', selectedTheme), theme);
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
+    ).toBeVisible();
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expectNoHorizontalOverflow(page);
+      const geometry = await page
+        .locator('.progress-report-document')
+        .evaluate((documentElement) => {
+          const pageElement = documentElement.closest<HTMLElement>('.progress-report-page');
+          if (!pageElement) throw new Error('Missing report page');
+          const pageRect = pageElement.getBoundingClientRect();
+          const documentRect = documentElement.getBoundingClientRect();
+          const styles = getComputedStyle(documentElement);
+          return {
+            pageWidth: pageRect.width,
+            documentWidth: documentRect.width,
+            contentWidth:
+              documentRect.width - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight),
+            viewportWidth: window.innerWidth,
+          };
+        });
+      expect(geometry.pageWidth).toBeGreaterThanOrEqual(width - 18);
+      expect(geometry.documentWidth).toBeGreaterThanOrEqual(width - 34);
+      expect(geometry.contentWidth).toBeGreaterThanOrEqual(width - 50);
+      if (width === 393 && process.env.YFC_CAPTURE_1039 === '1') {
+        // Screenshots show identical, collapsed report options in both themes.
+        await page.locator('.progress-report-options').evaluate((node) => {
+          (node as HTMLDetailsElement).open = false;
+        });
+        await mkdir(evidenceDir, { recursive: true });
+        await page.screenshot({
+          path: resolve(evidenceDir, `after-393-${theme}.png`),
+          fullPage: true,
+        });
+      }
+    }
+  }
+});
+
 test('keeps custom date fields aligned while validation is visible', async ({ page }) => {
   await installPlatformApi(page, { browserSession: true });
   await installReportApi(page);
@@ -389,14 +502,14 @@ test('full report keeps a mobile-first preview and print layout', async ({
   }
 });
 
-test('report stays readable across the requested mobile viewport matrix', async ({
+test('report stays readable across the requested viewport matrix', async ({
   page,
   browserName,
 }, testInfo) => {
   await installPlatformApi(page, { browserSession: true });
   await installReportApi(page);
 
-  for (const width of [320, 360, 393, 430]) {
+  for (const width of [320, 360, 390, 393, 430, 1440]) {
     for (const colorScheme of ['light', 'dark'] as const) {
       await page.setViewportSize({ width, height: 844 });
       await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
@@ -410,6 +523,7 @@ test('report stays readable across the requested mobile viewport matrix', async 
       ).toBeVisible();
       await expect(page.locator('.progress-report-confidence')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Печать / Сохранить как PDF' })).toBeVisible();
+      await expectProgressReportEdgeContract(page);
       await expectNoHorizontalOverflow(page);
       await page.screenshot({
         path: testInfo.outputPath(`mobile-report-${width}-${colorScheme}.png`),

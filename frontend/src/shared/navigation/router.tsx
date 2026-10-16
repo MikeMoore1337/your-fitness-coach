@@ -13,6 +13,7 @@ import { getApiRuntime, useRuntime } from '../runtime/runtime';
 interface NavigationContextValue {
   path: string;
   search: string;
+  hash: string;
   navigate(to: string, replace?: boolean, historyState?: unknown): void;
 }
 
@@ -217,13 +218,22 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const [location, setLocation] = useState(() => ({
     path: window.location.pathname,
     search: window.location.search,
+    hash: window.location.hash,
   }));
 
   useEffect(() => {
-    const onPopState = () =>
-      setLocation({ path: window.location.pathname, search: window.location.search });
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
+    const onLocationChange = () =>
+      setLocation({
+        path: window.location.pathname,
+        search: window.location.search,
+        hash: window.location.hash,
+      });
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener('hashchange', onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener('hashchange', onLocationChange);
+    };
   }, []);
 
   const navigate = useCallback((to: string, replace = false, historyState?: unknown) => {
@@ -231,7 +241,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     const nextHistoryState = historyState === undefined ? {} : historyState;
     if (replace) window.history.replaceState(nextHistoryState, '', destination);
     else window.history.pushState(nextHistoryState, '', destination);
-    setLocation({ path: window.location.pathname, search: window.location.search });
+    setLocation({
+      path: window.location.pathname,
+      search: window.location.search,
+      hash: window.location.hash,
+    });
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, []);
 
@@ -264,8 +278,8 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   }, [navigate, location.path, location.search]);
 
   const value = useMemo(
-    () => ({ path: location.path, search: location.search, navigate }),
-    [location.path, location.search, navigate],
+    () => ({ path: location.path, search: location.search, hash: location.hash, navigate }),
+    [location.path, location.search, location.hash, navigate],
   );
   return <NavigationContext.Provider value={value}>{children}</NavigationContext.Provider>;
 }

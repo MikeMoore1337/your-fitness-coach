@@ -929,6 +929,11 @@ test.describe('#1001 completion navigation', () => {
         await page.goto('/app');
         await page.getByRole('button', { name: 'Клиент', exact: true }).click();
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+        const currentSet = page.locator('.active-workout-set.is-current');
+        await expect(currentSet).toHaveCount(1);
+        await expect(currentSet).toHaveCSS('box-shadow', 'none');
+        await expect(currentSet).toHaveCSS('border-width', '1px');
+        await expect(currentSet).toHaveCSS('border-color', 'rgb(178, 245, 32)');
         for (const [id, nextId] of [
           [201, 202],
           [202, 203],

@@ -6,6 +6,7 @@ import { queryKeys } from '../../shared/queryKeys';
 import { haptic } from '../../shared/telegram/useTelegram';
 import {
   Button,
+  DisclosureIcon,
   EmptyState,
   ErrorState,
   Field,
@@ -47,6 +48,14 @@ function localDateTimeValue(value: string, timeZone: string): string {
   const part = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((item) => item.type === type)?.value ?? '';
   return `${part('year')}-${part('month')}-${part('day')}T${part('hour')}:${part('minute')}`;
+}
+
+function hydrationEntryCountLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'запись';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'записи';
+  return 'записей';
 }
 
 function HydrationEntryRow({ entry, onChanged }: { entry: HydrationEntry; onChanged(): void }) {
@@ -178,7 +187,7 @@ export function HydrationTracker({
 }) {
   const queryClient = useQueryClient();
   const { toast } = useFeedback();
-  const [expanded, setExpanded] = useState(initialExpanded);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const quickAddRef = useRef<HTMLDivElement>(null);
   const addInFlightRef = useRef(false);
   const [customVolume, setCustomVolume] = useState('');
@@ -209,7 +218,6 @@ export function HydrationTracker({
     ) {
       return;
     }
-    setExpanded(true);
     quickAddRef.current.querySelector('button')?.focus({ preventScroll: true });
     quickAddRef.current.scrollIntoView({ block: 'center', behavior: 'instant' });
     url.searchParams.delete('hydration');
@@ -375,6 +383,12 @@ export function HydrationTracker({
   const data = hydration.data;
   const target = data.goal?.enabled ? data.goal.target_ml : null;
   const progress = Math.min(data.progress_percent ?? 0, 100);
+  const hasFullHistory = data.entries.length > 3;
+  const showFullHistory = hasFullHistory && historyExpanded;
+  const historyEntries = showFullHistory ? data.entries : data.entries.slice(0, 3);
+  const historyCount = hasFullHistory
+    ? `${showFullHistory ? 'Вся история' : 'Последние 3'} · всего ${data.entries.length}`
+    : `${data.entries.length} ${hydrationEntryCountLabel(data.entries.length)}`;
   return (
     <section className="hydration-card" aria-label="Гидратация">
       <header className="hydration-card__header">
@@ -452,67 +466,99 @@ export function HydrationTracker({
           </Button>
         </div>
       )}
-      <Button
-        aria-expanded={expanded}
-        className="hydration-expand"
-        variant="secondary"
-        type="button"
-        onClick={() => setExpanded((value) => !value)}
-      >
-        {expanded ? 'Скрыть детали' : 'Другой напиток, история и цель'}
-        <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} />
-      </Button>
-      {expanded && (
-        <div className="hydration-details">
-          <section aria-labelledby="hydration-custom-title">
-            <h3 id="hydration-custom-title">Другой объём</h3>
-            <div className="hydration-form-row">
-              <Field label="Объём, мл" labelFor="hydration-custom-volume">
-                <Input
-                  id="hydration-custom-volume"
-                  inputMode="numeric"
-                  min="1"
-                  max="5000"
-                  type="number"
-                  value={customVolume}
-                  onChange={(event) => setCustomVolume(event.target.value)}
-                />
-              </Field>
-              <Field label="Напиток" labelFor="hydration-custom-kind">
-                <Select
-                  id="hydration-custom-kind"
-                  value={beverageType}
-                  onChange={(event) => setBeverageType(event.target.value)}
-                >
-                  {Object.entries(beverageLabels).map(([value, label]) => (
-                    <option value={value} key={value}>
-                      {label}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Button
-                disabled={add.isPending || !customVolume}
-                type="button"
-                onClick={() =>
-                  submitAdd({
-                    volume: Number(customVolume),
-                    kind: beverageType,
-                    source: 'manual',
-                    key: requestKey('hydration-entry'),
-                  })
-                }
-              >
-                {add.isPending ? 'Добавляем…' : 'Добавить'}
-              </Button>
-            </div>
-            <p className="hydration-note">
-              Запись напитка не изменяет калории и кофеин в дневнике питания.
-            </p>
-          </section>
+      <section className="hydration-card__section" aria-labelledby="hydration-custom-title">
+        <h3 id="hydration-custom-title">Другой объём</h3>
+        <div className="hydration-form-row">
+          <Field label="Объём, мл" labelFor="hydration-custom-volume">
+            <Input
+              id="hydration-custom-volume"
+              inputMode="numeric"
+              min="1"
+              max="5000"
+              type="number"
+              value={customVolume}
+              onChange={(event) => setCustomVolume(event.target.value)}
+            />
+          </Field>
+          <Field label="Напиток" labelFor="hydration-custom-kind">
+            <Select
+              id="hydration-custom-kind"
+              value={beverageType}
+              onChange={(event) => setBeverageType(event.target.value)}
+            >
+              {Object.entries(beverageLabels).map(([value, label]) => (
+                <option value={value} key={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button
+            disabled={add.isPending || !customVolume}
+            type="button"
+            onClick={() =>
+              submitAdd({
+                volume: Number(customVolume),
+                kind: beverageType,
+                source: 'manual',
+                key: requestKey('hydration-entry'),
+              })
+            }
+          >
+            {add.isPending ? 'Добавляем…' : 'Добавить'}
+          </Button>
+        </div>
+        <p className="hydration-note">
+          Запись напитка не изменяет калории и кофеин в дневнике питания.
+        </p>
+      </section>
 
-          <section aria-labelledby="hydration-goal-title">
-            <h3 id="hydration-goal-title">Личный ориентир</h3>
+      <section className="hydration-card__section" aria-labelledby="hydration-history-title">
+        <div className="hydration-section-head">
+          <div>
+            <h3 id="hydration-history-title">История за день</h3>
+            <p>Последние записи сразу после добавления воды</p>
+          </div>
+          <span className="eyebrow hydration-history__count">{historyCount}</span>
+        </div>
+        {data.entries.length === 0 ? (
+          <EmptyState
+            title="Напитков пока нет"
+            text="Быстро добавьте стакан или укажите другой объём."
+          />
+        ) : (
+          <ul id="hydration-history-list" className="hydration-history" aria-live="polite">
+            {historyEntries.map((entry) => (
+              <HydrationEntryRow entry={entry} key={entry.id} onChanged={() => void refresh()} />
+            ))}
+          </ul>
+        )}
+        {hasFullHistory && (
+          <div className="hydration-history__actions">
+            <Button
+              aria-controls="hydration-history-list"
+              aria-expanded={showFullHistory}
+              type="button"
+              onClick={() => setHistoryExpanded((value) => !value)}
+            >
+              {showFullHistory ? 'Свернуть историю' : 'Показать всю историю'}
+              <Icon
+                className={`hydration-history__toggle-icon${showFullHistory ? ' hydration-history__toggle-icon--expanded' : ''}`}
+                name="disclosure-closed"
+                size={16}
+              />
+            </Button>
+          </div>
+        )}
+      </section>
+
+      <div className="hydration-details">
+        <details>
+          <summary className="hydration-details__summary yfc-disclosure-summary">
+            <span id="hydration-goal-title">Личный ориентир</span>
+            <DisclosureIcon />
+          </summary>
+          <section className="hydration-details__body" aria-labelledby="hydration-goal-title">
             <div
               className="hydration-choice"
               role="radiogroup"
@@ -618,9 +664,14 @@ export function HydrationTracker({
               </div>
             )}
           </section>
+        </details>
 
-          <section aria-labelledby="hydration-presets-title">
-            <h3 id="hydration-presets-title">Мои кружки и бутылки</h3>
+        <details>
+          <summary className="hydration-details__summary yfc-disclosure-summary">
+            <span id="hydration-presets-title">Мои кружки и бутылки</span>
+            <DisclosureIcon />
+          </summary>
+          <section className="hydration-details__body" aria-labelledby="hydration-presets-title">
             <div className="hydration-form-row">
               <Field label="Название" labelFor="hydration-preset-name">
                 <Input
@@ -672,28 +723,8 @@ export function HydrationTracker({
               </ul>
             )}
           </section>
-
-          <section aria-labelledby="hydration-history-title">
-            <h3 id="hydration-history-title">История за день</h3>
-            {data.entries.length === 0 ? (
-              <EmptyState
-                title="Напитков пока нет"
-                text="Быстро добавьте стакан или укажите другой объём."
-              />
-            ) : (
-              <ul className="hydration-history">
-                {data.entries.map((entry) => (
-                  <HydrationEntryRow
-                    entry={entry}
-                    key={entry.id}
-                    onChanged={() => void refresh()}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
-        </div>
-      )}
+        </details>
+      </div>
     </section>
   );
 }
