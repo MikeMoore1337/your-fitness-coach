@@ -1014,6 +1014,8 @@ class ExerciseGuideMedia(BaseModel):
     byte_size: int = Field(gt=0)
     sort_order: int = Field(ge=0)
     sources: list[ExerciseGuideMediaSource] = Field(min_length=1)
+    # Optional additive H.264 delivery; old clients continue to use the GIF in `url`.
+    video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
 
 
 class ExerciseGuide(BaseModel):

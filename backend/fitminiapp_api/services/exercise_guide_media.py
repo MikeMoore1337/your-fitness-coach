@@ -121,6 +121,18 @@ def get_guide_media(
                     }
                     for source in sorted(sources, key=lambda value: value["width"])
                 ],
+                "video_sources": [
+                    {
+                        "url": _public_url(source["path"]),
+                        "mime_type": source["mime_type"],
+                        "width": source["width"],
+                        "height": source["height"],
+                        "byte_size": source["byte_size"],
+                    }
+                    for source in sorted(
+                        media.get("video_sources", []), key=lambda value: value["width"]
+                    )
+                ],
             }
         )
     return result

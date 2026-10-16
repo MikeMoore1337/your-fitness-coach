@@ -4,6 +4,7 @@ import { ChevronIcon, CloseIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { usePrefersReducedMotion } from './ExerciseMediaAsset';
+import { ExerciseGuideVideo } from './ExerciseGuideVideo';
 
 type GuideMediaItem = ExerciseGuide['media'][number];
 
@@ -28,6 +29,7 @@ export function ExerciseGuideMedia({
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
   const [posterFallbackUrls, setPosterFallbackUrls] = useState<Set<string>>(() => new Set());
   const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
+  const [failedVideoUrls, setFailedVideoUrls] = useState<Set<string>>(() => new Set());
   const reducedMotion = usePrefersReducedMotion();
   const close = () => {
     setExpandedIndex(null);
@@ -35,6 +37,9 @@ export function ExerciseGuideMedia({
   };
   const lightboxRef = useModalA11y<HTMLDivElement>(expandedIndex !== null, close);
   const activeItem = expandedIndex === null ? null : items[expandedIndex];
+  const activeItemUsesVideo = Boolean(
+    activeItem?.video_sources?.length && !reducedMotion && !failedVideoUrls.has(activeItem.url),
+  );
   const activeItemUsesPoster = Boolean(
     activeItem?.type === 'animation' && (reducedMotion || posterFallbackUrls.has(activeItem.url)),
   );
@@ -88,6 +93,9 @@ export function ExerciseGuideMedia({
           const showPoster =
             item.type === 'animation' && (reducedMotion || posterFallbackUrls.has(item.url));
           const displayUrl = showPoster ? item.poster : item.url;
+          const useVideo = Boolean(
+            item.video_sources?.length && !reducedMotion && !failedVideoUrls.has(item.url),
+          );
           return (
             <figure className="exercise-guide-image" key={item.asset_id ?? item.url}>
               {failed ? (
@@ -110,20 +118,32 @@ export function ExerciseGuideMedia({
                     onExpandedChange?.(true);
                   }}
                 >
-                  <img
-                    src={displayUrl}
-                    srcSet={
-                      showPoster || item.type === 'animation' ? undefined : responsiveSources(item)
-                    }
-                    sizes={cardSizes}
-                    alt={item.alt}
-                    width={item.width}
-                    height={item.height}
-                    loading="lazy"
-                    decoding="async"
-                    data-media-mode={showPoster ? 'static-poster' : item.type}
-                    onError={() => markImageError(item, displayUrl)}
-                  />
+                  {useVideo ? (
+                    <ExerciseGuideVideo
+                      sources={item.video_sources ?? []}
+                      poster={item.poster}
+                      onError={() =>
+                        setFailedVideoUrls((current) => new Set(current).add(item.url))
+                      }
+                    />
+                  ) : (
+                    <img
+                      src={displayUrl}
+                      srcSet={
+                        showPoster || item.type === 'animation'
+                          ? undefined
+                          : responsiveSources(item)
+                      }
+                      sizes={cardSizes}
+                      alt={item.alt}
+                      width={item.width}
+                      height={item.height}
+                      loading="lazy"
+                      decoding="async"
+                      data-media-mode={showPoster ? 'static-poster' : item.type}
+                      onError={() => markImageError(item, displayUrl)}
+                    />
+                  )}
                   <span className="exercise-guide-image__zoom" aria-hidden="true">
                     <Icon name="maximize" size={16} />
                   </span>
@@ -168,21 +188,32 @@ export function ExerciseGuideMedia({
             </button>
           )}
           <figure>
-            <img
-              src={activeItemDisplayUrl ?? ''}
-              srcSet={
-                activeItemUsesPoster || activeItem.type === 'animation'
-                  ? undefined
-                  : responsiveSources(activeItem)
-              }
-              sizes={lightboxSizes}
-              alt={activeItem.alt}
-              width={activeItem.width}
-              height={activeItem.height}
-              decoding="async"
-              data-media-mode={activeItemUsesPoster ? 'static-poster' : activeItem.type}
-              onError={() => markImageError(activeItem, activeItemDisplayUrl ?? '')}
-            />
+            {activeItemUsesVideo ? (
+              <ExerciseGuideVideo
+                sources={activeItem.video_sources ?? []}
+                poster={activeItem.poster}
+                expanded
+                onError={() =>
+                  setFailedVideoUrls((current) => new Set(current).add(activeItem.url))
+                }
+              />
+            ) : (
+              <img
+                src={activeItemDisplayUrl ?? ''}
+                srcSet={
+                  activeItemUsesPoster || activeItem.type === 'animation'
+                    ? undefined
+                    : responsiveSources(activeItem)
+                }
+                sizes={lightboxSizes}
+                alt={activeItem.alt}
+                width={activeItem.width}
+                height={activeItem.height}
+                decoding="async"
+                data-media-mode={activeItemUsesPoster ? 'static-poster' : activeItem.type}
+                onError={() => markImageError(activeItem, activeItemDisplayUrl ?? '')}
+              />
+            )}
             <figcaption>{activeItem.phase}</figcaption>
           </figure>
           {availableItemsCount > 1 && (

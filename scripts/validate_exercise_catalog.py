@@ -256,6 +256,55 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 ],
                 f"Animation source metadata drifted: {slug}",
             )
+            video_sources = media.get("video_sources", [])
+            if video_sources:
+                _require(
+                    slug in {"barbell-curl", "burpee"} and len(video_sources) == 2,
+                    f"Unexpected H.264 pilot scope: {slug}",
+                )
+                _require(
+                    media.get("video_provenance", {}).get("source_revision")
+                    == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                    f"Unpinned H.264 source: {slug}",
+                )
+                for video, (width, height) in zip(
+                    video_sources, [(854, 480), (1280, 720)], strict=True
+                ):
+                    _require(
+                        video.get("mime_type") == "video/mp4"
+                        and video.get("width") == width
+                        and video.get("height") == height,
+                        f"Invalid H.264 source profile: {slug}",
+                    )
+                    relative_video = Path(video.get("path", ""))
+                    _require(
+                        relative_video.as_posix()
+                        == f"exercises-media/videos/{slug}-{height}p-h264.mp4",
+                        f"Unexpected video path: {slug}",
+                    )
+                    video_file = MEDIA_DIR / relative_video
+                    _require(video_file.is_file(), f"Missing video file: {slug}")
+                    data = video_file.read_bytes()
+                    _require(
+                        len(data) == video.get("byte_size")
+                        and hashlib.sha256(data).hexdigest() == video.get("sha256"),
+                        f"Invalid video file checksum/size: {slug}",
+                    )
+    pilot_videos = [
+        media
+        for item in exercises.values()
+        for media in item.get("media", [])
+        if media.get("video_sources")
+    ]
+    _require(
+        len(pilot_videos) == manifest.get("hq_video_count") == 2,
+        "H.264 pilot exercise count drift",
+    )
+    _require(
+        sum(video["byte_size"] for media in pilot_videos for video in media["video_sources"])
+        == manifest.get("hq_video_total_bytes"),
+        "H.264 pilot total size drift",
+    )
     # Some approved canonical variants intentionally point to the same source
     # record. The manifest keeps the source asset identity explicit instead of
     # inventing a derivative to make hashes unique.
