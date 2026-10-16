@@ -46,6 +46,8 @@ test('desktop account entry stays available across primary sections and never op
   expect(Math.abs(themeBox!.width - logoutBox!.width)).toBeLessThanOrEqual(1);
   expect(Math.abs(themeBox!.height - logoutBox!.height)).toBeLessThanOrEqual(1);
 
+  // The profile module is lazy-loaded; ensure all disclosures mounted first.
+  await expect(page.locator('.profile-settings > details.card-disclosure')).toHaveCount(5);
   const cardHeights = await page
     .locator('.profile-settings > details.card-disclosure')
     .evaluateAll((cards) => cards.map((card) => card.getBoundingClientRect().height));
@@ -122,7 +124,8 @@ test('profile stays compact while disclosures, icons and shared provider actions
   await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
 
   const majorCards = page.locator('.profile-settings > details.card-disclosure');
-  expect(await majorCards.count()).toBeGreaterThanOrEqual(5);
+  // Navigation renders before the lazily loaded profile; poll instead of reading zero early.
+  await expect(majorCards).toHaveCount(5);
   for (const card of await majorCards.all()) await expect(card).not.toHaveAttribute('open');
 
   await page.goto('/app?section=profile#profile-fitness');
