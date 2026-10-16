@@ -217,6 +217,33 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 f"Stale poster hash: {media['poster_path']}",
             )
             _require(
+                media.get("poster_byte_size") == poster_path.stat().st_size,
+                f"Stale poster byte count: {slug}",
+            )
+            poster_source = media.get("poster_source")
+            if poster_source is not None:
+                _require(
+                    poster_source.get("name") == "Exercises Media"
+                    and poster_source.get("url")
+                    == "https://github.com/akajdid-mostafa/exercises-media"
+                    and poster_source.get("source_revision")
+                    == "18742da40b0627c85925c5dd4441dc3eac0594d0"
+                    and poster_source.get("rights_basis")
+                    == "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16"
+                    and media["poster_path"].startswith("exercises-media/")
+                    and media.get("poster_dimensions") == {"width": 720, "height": 720},
+                    f"Unauthorized or malformed HQ poster provenance: {slug}",
+                )
+                from PIL import Image
+
+                with Image.open(poster_path) as hq_poster:
+                    _require(
+                        hq_poster.format == "JPEG"
+                        and hq_poster.size == (720, 720)
+                        and not hq_poster.getexif(),
+                        f"HQ poster image metadata mismatch: {slug}",
+                    )
+            _require(
                 media.get("sources")
                 == [
                     {

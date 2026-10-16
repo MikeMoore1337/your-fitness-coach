@@ -23,8 +23,8 @@
     "remote_runtime_assets": 0
   },
   "asset_count": 334,
-  "derivative_count": 0,
-  "total_bytes": 18137868,
+  "derivative_count": 13,
+  "total_bytes": 18352704,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -267,7 +267,7 @@
         {
           "type": "animation",
           "path": "gymvisual/barbell-curl-0031-25GPyDY.gif",
-          "poster_path": "gymvisual/barbell-curl-0031-25GPyDY.jpg",
+          "poster_path": "exercises-media/barbell-curl-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подъем штанги на бицепс: движение",
@@ -277,10 +277,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 106020,
-          "poster_byte_size": 7053,
+          "poster_byte_size": 23637,
           "sort_order": 0,
           "asset_sha256": "3907d2a2561b7afa76a5b8c4af4237b5f424b11bb8a350175ae73aaaf532021a",
-          "poster_sha256": "6bc7f4e746e85969863fcabbf86eb714a8d4cbf0d0e71b055308ff47672922cb",
+          "poster_sha256": "fd218b731a6d51a476345cd80ef600b59aecbf3fc9db773b5ed2251b97fe039e",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -292,7 +292,20 @@
               "height": 180,
               "byte_size": 106020
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/barbell-curl.jpg",
+            "git_blob_sha1": "c5c74f9f689737cfaa352516bab96d66be6ad0f1",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -399,7 +412,7 @@
         {
           "type": "animation",
           "path": "gymvisual/barbell-shrug-0095-dG7tG5y.gif",
-          "poster_path": "gymvisual/barbell-shrug-0095-dG7tG5y.jpg",
+          "poster_path": "exercises-media/barbell-shrug-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Шраги со штангой: движение",
@@ -409,10 +422,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 100499,
-          "poster_byte_size": 6909,
+          "poster_byte_size": 22704,
           "sort_order": 0,
           "asset_sha256": "f1e98f227e445ee94ca2c049dfa87a6f84eb043f95bd9176a291d3a330c88d81",
-          "poster_sha256": "83b660c5acfbec5a4af42e97343e1329af552ff65a1aa36092162b8068c8c966",
+          "poster_sha256": "f4e7bda046b7f88db32cdf2437bfdc54c824d68917aa7dfa7f4c04db3280b539",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -424,7 +437,20 @@
               "height": 180,
               "byte_size": 100499
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/barbell-shrug.jpg",
+            "git_blob_sha1": "06efc9cb5f3b288dabbc1b0a4f6cad5faab97fc2",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -819,7 +845,7 @@
         {
           "type": "animation",
           "path": "gymvisual/burpee-1160-dK9394r.gif",
-          "poster_path": "gymvisual/burpee-1160-dK9394r.jpg",
+          "poster_path": "exercises-media/burpee-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Берпи: движение",
@@ -829,10 +855,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 100254,
-          "poster_byte_size": 3966,
+          "poster_byte_size": 15965,
           "sort_order": 0,
           "asset_sha256": "d2e45138b446c4c7eced4496554736068ef66a61bd553c5fe284e3ed8aa44c53",
-          "poster_sha256": "f632d49879dbd521e80249dd5a68999b295f4717280552c990f1be190c4da25e",
+          "poster_sha256": "aaed620ee0a0d96bee7a0d14873c75efb50a605ef7022c6692564d43a83c2131",
           "frame_count": 30,
           "duration_ms": 5500,
           "animated": true,
@@ -844,7 +870,20 @@
               "height": 180,
               "byte_size": 100254
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/burpee.jpg",
+            "git_blob_sha1": "a8b4efd7ada263b77a649125c7f0ca570ec38abe",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -1083,7 +1122,7 @@
         {
           "type": "animation",
           "path": "gymvisual/cable-lateral-raise-0178-goJ6ezq.gif",
-          "poster_path": "gymvisual/cable-lateral-raise-0178-goJ6ezq.jpg",
+          "poster_path": "exercises-media/cable-lateral-raise-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подъем руки через сторону в кроссовере: движение",
@@ -1093,10 +1132,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 128040,
-          "poster_byte_size": 8564,
+          "poster_byte_size": 29559,
           "sort_order": 0,
           "asset_sha256": "6c957260f7ecd64d52369fb5e0d6e0ef1b5081469ba8518dd8f1f25acaf16cfa",
-          "poster_sha256": "778cbe7a8c68e0419719e0a5a68a410dd9edd2962126fde42b0488a77796bdf1",
+          "poster_sha256": "95087d010f17f2c28ba898220ea1937637ef626e4e063f948eaa0723a709d276",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -1108,7 +1147,20 @@
               "height": 180,
               "byte_size": 128040
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/cable-lateral-raise.jpg",
+            "git_blob_sha1": "682041a9218765b069b201a8039a3e8b8bc1d98c",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -1937,7 +1989,7 @@
         {
           "type": "animation",
           "path": "gymvisual/donkey-calf-raise-1253-C9LuR4A.gif",
-          "poster_path": "gymvisual/donkey-calf-raise-1253-C9LuR4A.jpg",
+          "poster_path": "exercises-media/donkey-calf-raise-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Ослиные подъемы на носки: движение",
@@ -1947,10 +1999,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 151072,
-          "poster_byte_size": 10047,
+          "poster_byte_size": 28879,
           "sort_order": 0,
           "asset_sha256": "818d7c7cb4fe477dbef8b8a8170471dd540463849219f680e1041afe4b82eb5a",
-          "poster_sha256": "0cd434fcb4e904e38a21e73330fbdb41727cd4cbbea3bfb789176901eabde407",
+          "poster_sha256": "5d37f9f58752b1a960d6098394a2c7cd65f3eb15a74730065556b3ddd7be2f26",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -1962,7 +2014,20 @@
               "height": 180,
               "byte_size": 151072
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/donkey-calf-raise.jpg",
+            "git_blob_sha1": "aac593257ee602d2fa8249411cc6a395420cd2c0",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -2113,7 +2178,7 @@
         {
           "type": "animation",
           "path": "gymvisual/dumbbell-fly-0308-yz9nUhF.gif",
-          "poster_path": "gymvisual/dumbbell-fly-0308-yz9nUhF.jpg",
+          "poster_path": "exercises-media/dumbbell-fly-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Разведение гантелей лежа: движение",
@@ -2123,10 +2188,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 111040,
-          "poster_byte_size": 9375,
+          "poster_byte_size": 25639,
           "sort_order": 0,
           "asset_sha256": "bc51f3cfad0bade1395385553d68f77481cf6622947b49e9f6357187898924f3",
-          "poster_sha256": "3feaa65dc1e1d0561a8e9b441f28e4e321ebf51e2da8d486fde184a1a823d938",
+          "poster_sha256": "5c411b1178d937f1337159750caaddeb5a6415d0847b8d851517d2a02b1b80c4",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2138,7 +2203,20 @@
               "height": 180,
               "byte_size": 111040
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/dumbbell-fly.jpg",
+            "git_blob_sha1": "7b47eaf04249d0356be45e98b64e9f1659da48e4",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -2157,7 +2235,7 @@
         {
           "type": "animation",
           "path": "gymvisual/dumbbell-front-raise-0310-3eGE2JC.gif",
-          "poster_path": "gymvisual/dumbbell-front-raise-0310-3eGE2JC.jpg",
+          "poster_path": "exercises-media/dumbbell-front-raise-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подъем гантелей перед собой: движение",
@@ -2167,10 +2245,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 80626,
-          "poster_byte_size": 5893,
+          "poster_byte_size": 20187,
           "sort_order": 0,
           "asset_sha256": "f103cfbe8f9c3249f46cb7b56d2a42189f672d4c36e3c17f31f50cded09ba264",
-          "poster_sha256": "23f45d3327da51242f5b3b92d44b86624f7e1ad12e9794e0b4b8109c9474e1d0",
+          "poster_sha256": "c32076de650b627b40df2a465e4f4dc09802bdc9fa531b054ae204ebecad03b5",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2182,7 +2260,20 @@
               "height": 180,
               "byte_size": 80626
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/dumbbell-front-raise.jpg",
+            "git_blob_sha1": "7b0ce786949abbe8323b245f316b7074521132ad",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -2201,7 +2292,7 @@
         {
           "type": "animation",
           "path": "gymvisual/dumbbell-lateral-raise-0334-DsgkuIt.gif",
-          "poster_path": "gymvisual/dumbbell-lateral-raise-0334-DsgkuIt.jpg",
+          "poster_path": "exercises-media/dumbbell-lateral-raise-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подъем гантелей через стороны: движение",
@@ -2211,10 +2302,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 87645,
-          "poster_byte_size": 5732,
+          "poster_byte_size": 20682,
           "sort_order": 0,
           "asset_sha256": "68de0e7c7727fa08a203f73b0d2935181a5c6489470d44b9028de4a7d10a17f1",
-          "poster_sha256": "360e2168c8e3c2532a84ba658d058eee1b39c53b886494b50663ebb01ccd3c88",
+          "poster_sha256": "406f71b36d7705ff6f852d9a3793404ea48aed7f9edde70076796da699697455",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2226,7 +2317,20 @@
               "height": 180,
               "byte_size": 87645
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/dumbbell-lateral-raise.jpg",
+            "git_blob_sha1": "1fa4221078a2cf70f43c7208c46d511bace3048a",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -2333,7 +2437,7 @@
         {
           "type": "animation",
           "path": "gymvisual/dumbbell-shrug-0406-NJzBsGJ.gif",
-          "poster_path": "gymvisual/dumbbell-shrug-0406-NJzBsGJ.jpg",
+          "poster_path": "exercises-media/dumbbell-shrug-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Шраги с гантелями: движение",
@@ -2343,10 +2447,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 77551,
-          "poster_byte_size": 5740,
+          "poster_byte_size": 20735,
           "sort_order": 0,
           "asset_sha256": "24560aa9a4ba2f3bf7ffda3bd33a6a63127d26cb2f2d77f3a0778d88e1e536a1",
-          "poster_sha256": "ce1f9db25105c104e4bef71cbe3892380e9b3f462ac31006f22a2c02d20ed68f",
+          "poster_sha256": "462e9ddbde00af4f2b1e3c81c50cfa67f6ca35254a71b4f5c94a29ed9fbaf49b",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2358,7 +2462,20 @@
               "height": 180,
               "byte_size": 77551
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/dumbbell-shrug.jpg",
+            "git_blob_sha1": "e1b5c5fa90616f9638a816ff381e6b5deccd7e53",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -3419,7 +3536,7 @@
         {
           "type": "animation",
           "path": "gymvisual/jump-rope-2612-e1e76I2.gif",
-          "poster_path": "gymvisual/jump-rope-2612-e1e76I2.jpg",
+          "poster_path": "exercises-media/jump-rope-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Скакалка: движение",
@@ -3429,10 +3546,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 62427,
-          "poster_byte_size": 5657,
+          "poster_byte_size": 21554,
           "sort_order": 0,
           "asset_sha256": "4590924327d2689fb2d8419e93f8485438031812767a14684dece560ca3f77b1",
-          "poster_sha256": "6bc1a97ebb686793acbbcc4a5435bb55699fb4c315babe048b61a1f74d2a9453",
+          "poster_sha256": "af15d9e4a3171552d3c3cff809723a762f822964af1489c0312b8acb2e1b8a53",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -3444,7 +3561,20 @@
               "height": 180,
               "byte_size": 62427
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/jump-rope.jpg",
+            "git_blob_sha1": "91b4c123ea013ed70e6bfe1c44fee470a0de7223",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -3827,7 +3957,7 @@
         {
           "type": "animation",
           "path": "gymvisual/lever-high-row-0581-nZZZy9m.gif",
-          "poster_path": "gymvisual/lever-high-row-0581-nZZZy9m.jpg",
+          "poster_path": "exercises-media/lever-high-row-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Верхняя рычажная тяга с упором грудью: движение",
@@ -3837,10 +3967,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 126978,
-          "poster_byte_size": 9099,
+          "poster_byte_size": 34777,
           "sort_order": 0,
           "asset_sha256": "c132e833915b249752879c31018474402ac3da7eb1388d1fd98c56669bad9e6c",
-          "poster_sha256": "771dee3d31636df8f601b9127b64f97c41d6bc324fd098d53231a055f8f2cfde",
+          "poster_sha256": "c414e609dc450c4f0b57f4689997925e1c1e05ac237d7bb48ceef5785c7e2020",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -3852,7 +3982,20 @@
               "height": 180,
               "byte_size": 126978
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/lever-high-row.jpg",
+            "git_blob_sha1": "7b514b80d8ff4ce788799e728d24c5c7ebe32e54",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -6657,7 +6800,7 @@
         {
           "type": "animation",
           "path": "gymvisual/squat-0043-qXTaZnJ.gif",
-          "poster_path": "gymvisual/squat-0043-qXTaZnJ.jpg",
+          "poster_path": "exercises-media/squat-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Приседания: движение",
@@ -6667,10 +6810,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 88019,
-          "poster_byte_size": 6834,
+          "poster_byte_size": 20501,
           "sort_order": 0,
           "asset_sha256": "3c1e29f67ffaae89316c94d7af42fcbe2cbf379967c27c1d30fa0205b6f9ed30",
-          "poster_sha256": "7dfb739e4060e402d71201195b34d81a3bfbc26cf3c8243c476be855744aef7d",
+          "poster_sha256": "97ba9ecbf4f1f1ce2dbf116d0e8c77ae87db1738ad34c53cad9644fbbcf575bb",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -6682,7 +6825,20 @@
               "height": 180,
               "byte_size": 88019
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/squat.jpg",
+            "git_blob_sha1": "ee1bba8a97d5aaefc1f06659341d71e4e07529b0",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -6795,7 +6951,7 @@
         {
           "type": "animation",
           "path": "gymvisual/stationary-bike-2138-H1PESYI.gif",
-          "poster_path": "gymvisual/stationary-bike-2138-H1PESYI.jpg",
+          "poster_path": "exercises-media/stationary-bike-hq720.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Велотренажёр: движение",
@@ -6805,10 +6961,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 99975,
-          "poster_byte_size": 9054,
+          "poster_byte_size": 23940,
           "sort_order": 0,
           "asset_sha256": "9ddd3ef3fd2cb138df8f427435baacc73d838ff47c2363ea2c4ffa81e0d13a5f",
-          "poster_sha256": "d19074b9ac809ce5ef10c5a88e1c526ffe4fc324e9c34648d5a79a9d3a26f70f",
+          "poster_sha256": "68a6751c4e283fc20d8e7f8ad274239dbcb964ab1538d5eacadb4b23abf11df8",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -6820,7 +6976,20 @@
               "height": 180,
               "byte_size": 99975
             }
-          ]
+          ],
+          "poster_dimensions": {
+            "width": 720,
+            "height": 720
+          },
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/stationary-bike.jpg",
+            "git_blob_sha1": "0830201e28f31683a95ef3cc27d886be2773cd8d",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-lanczos-pad-720-jpeg-q88-no-metadata"
+          }
         }
       ]
     },
@@ -7608,5 +7777,6 @@
         }
       ]
     }
-  }
+  },
+  "hq_poster_count": 13
 }
