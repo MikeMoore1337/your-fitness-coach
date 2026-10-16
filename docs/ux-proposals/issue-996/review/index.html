@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark light" />
+    <title>YFC · #996 · Проверенная замена</title>
+    <link rel="stylesheet" href="./prototype.css" />
+  </head>
+  <body data-theme="dark">
+    <div class="review-shell">
+      <header class="review-bar">
+        <div>
+          <p class="eyebrow">YFC / Issue #996</p>
+          <h1>Быстрый выбор проверенной замены</h1>
+        </div>
+        <div class="review-controls" aria-label="Управление обзором прототипа">
+          <label>
+            <span>Вариант</span>
+            <select id="direction-select">
+              <option value="quick">01 · Быстрый список</option>
+              <option value="sheet">02 · Нижний лист</option>
+              <option value="compare">03 · Сравнение</option>
+            </select>
+          </label>
+          <label>
+            <span>Состояние</span>
+            <select id="state-select">
+              <option value="ready">Готово</option>
+              <option value="expanded">Все подходящие</option>
+              <option value="loading">Загрузка</option>
+              <option value="empty">Нет вариантов</option>
+              <option value="error">Ошибка сети</option>
+              <option value="offline">Офлайн</option>
+              <option value="conflict">Данные изменились</option>
+              <option value="pain">Боль или травма</option>
+              <option value="started">Уже есть выполненные факты</option>
+              <option value="preview">Предпросмотр готов</option>
+              <option value="apply-disabled">Применение недоступно</option>
+            </select>
+          </label>
+          <button id="theme-toggle" class="quiet-button" type="button" aria-pressed="true">Светлая тема</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="review-intro" aria-labelledby="intro-title">
+          <div>
+            <p class="eyebrow">PROPOSAL · НЕ PRODUCTION</p>
+            <h2 id="intro-title">Три компоновки одного безопасного контракта</h2>
+            <p>
+              Варианты сокращают визуальный поиск, но не меняют серверную проверку. В каждом варианте
+              сначала выбирается кандидат из ответа <code>GET alternatives</code>, затем отдельным шагом
+              строится <code>preview</code>, и только после него доступен <code>apply</code>.
+            </p>
+          </div>
+          <aside class="review-callout">
+            <strong>Данные прототипа</strong>
+            <span>Обезличенная синтетическая фикстура, повторяющая форму существующего ответа API.</span>
+            <span>Поиск и фильтры действуют только внутри уже возвращенного множества.</span>
+          </aside>
+        </section>
+
+        <section id="prototype-gallery" class="prototype-gallery" aria-label="Варианты дизайна">
+          <article class="direction-card" data-direction-card="quick">
+            <header class="direction-header">
+              <div><span class="direction-number">01</span><h2>Быстрый список</h2></div>
+              <p>Три лучших результата сразу, полный ответ — по запросу.</p>
+            </header>
+            <div class="mockup" data-prototype="quick"></div>
+            <footer class="direction-footer"><strong>Сильная сторона:</strong> самый короткий путь к частой замене. <span>Риск: длинный полный список требует аккуратного фокуса.</span></footer>
+          </article>
+
+          <article class="direction-card" data-direction-card="sheet">
+            <header class="direction-header">
+              <div><span class="direction-number">02</span><h2>Нижний лист</h2></div>
+              <p>Короткий выбор наверху, поиск раскрывается в отдельном слое.</p>
+            </header>
+            <div class="mockup" data-prototype="sheet"></div>
+            <footer class="direction-footer"><strong>Сильная сторона:</strong> спокойная иерархия на 360–430 px. <span>Риск: дополнительный слой и возврат фокуса.</span></footer>
+          </article>
+
+          <article class="direction-card" data-direction-card="compare">
+            <header class="direction-header">
+              <div><span class="direction-number">03</span><h2>Сравнение</h2></div>
+              <p>Исходное упражнение и выбранная замена видны рядом до preview.</p>
+            </header>
+            <div class="mockup" data-prototype="compare"></div>
+            <footer class="direction-footer"><strong>Сильная сторона:</strong> меньше сомнений перед preview. <span>Риск: больше вертикали и текста.</span></footer>
+          </article>
+        </section>
+
+        <section class="review-notes" aria-labelledby="notes-title">
+          <div>
+            <p class="eyebrow">OWNER GATE</p>
+            <h2 id="notes-title">Что нужно утвердить</h2>
+          </div>
+          <ol>
+            <li>Один из трех визуальных вариантов или точечные правки к нему.</li>
+            <li>Показываем ли человекочитаемую причину из allowlist <code>reason_keys</code>; неизвестный ключ не должен превращаться в выдуманное обещание.</li>
+            <li>Разрешается ли локальный поиск по полному ответу без нового API; при пагинации/лимите этот прототип блокируется до отдельного API-решения.</li>
+          </ol>
+          <p class="gate-status">FINAL STATUS: <strong>STOP_OWNER_UI_APPROVAL</strong> · MERGE=false · DEPLOY=false</p>
+        </section>
+      </main>
+    </div>
+    <script src="./prototype.js"></script>
+  </body>
+</html>

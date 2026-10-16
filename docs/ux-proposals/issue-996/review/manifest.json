@@ -1,0 +1,33 @@
+{
+  "issue": 996,
+  "status": "PROPOSAL_NEEDS_OWNER_DESIGN_APPROVAL",
+  "base_sha": "4c92832415d4eb994cf6b849a67074742f07ea50",
+  "browser": "Chromium",
+  "primary_capture": {
+    "viewport_mobile": "393x844",
+    "viewport_desktop": "1440x1000",
+    "state": "expanded",
+    "files": [
+      "proposal/chromium-393-dark-quick.png",
+      "proposal/chromium-1440-dark-quick.png",
+      "proposal/chromium-393-light-quick.png",
+      "proposal/chromium-1440-light-quick.png",
+      "proposal/chromium-393-dark-sheet.png",
+      "proposal/chromium-1440-dark-sheet.png",
+      "proposal/chromium-393-light-sheet.png",
+      "proposal/chromium-1440-light-sheet.png",
+      "proposal/chromium-393-dark-compare.png",
+      "proposal/chromium-1440-dark-compare.png",
+      "proposal/chromium-393-light-compare.png",
+      "proposal/chromium-1440-light-compare.png"
+    ]
+  },
+  "state_capture": {
+    "viewport": "393x844",
+    "directions": ["quick"],
+    "themes": ["dark", "light"],
+    "states": ["loading", "empty", "error", "offline", "conflict", "pain", "started", "preview", "apply-disabled"],
+    "directory": "states/"
+  },
+  "capture_note": "Screenshots are element captures of the selected direction card from a static prototype, not production AFTER evidence and not physical-device proof."
+}

@@ -1,0 +1,23 @@
+{
+  "status": "passed",
+  "browser": "Chromium headless",
+  "viewport": "393x844",
+  "synthetic_static_file": "docs/ux-proposals/issue-996/review/index.html",
+  "checks": 8,
+  "assertions": [
+    "expanded response renders four candidate fixture rows",
+    "search narrows only the returned fixture and preserves input value",
+    "equipment filter preserves input value and does not add candidates",
+    "preview transition renders a separate preview and enabled apply",
+    "all-suitable is disabled in the network-error state",
+    "network error exposes one active retry alert",
+    "apply-disabled renders preview with disabled apply"
+  ],
+  "not_verified": [
+    "production React component",
+    "live API",
+    "physical device",
+    "native TMA",
+    "VoiceOver"
+  ]
+}

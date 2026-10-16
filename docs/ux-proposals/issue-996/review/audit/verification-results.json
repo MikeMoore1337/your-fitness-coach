@@ -1,0 +1,45 @@
+{
+  "base_sha": "4c92832415d4eb994cf6b849a67074742f07ea50",
+  "production_changes": false,
+  "checks": [
+    {
+      "name": "frontend build",
+      "command": "npm run build",
+      "result": "passed"
+    },
+    {
+      "name": "WorkoutAdaptation unit regression",
+      "command": "npm test -- --run tests/unit/features/workouts/WorkoutAdaptation.test.tsx --reporter=dot",
+      "result": "passed",
+      "test_files": 1,
+      "tests": 8
+    },
+    {
+      "name": "existing V9-01 and #860 browser regression",
+      "command": "npx playwright test tests/e2e/active-workout-experience.spec.ts --config=playwright.config.ts --grep \"V9-01 replaces only an untouched active exercise and survives refresh|#860 replacement feedback\" --reporter=line",
+      "result": "passed",
+      "tests": 13
+    },
+    {
+      "name": "isolated proposal smoke",
+      "command": "temporary Playwright Chromium harness against docs/ux-proposals/issue-996/review/index.html",
+      "result": "passed",
+      "viewport": "393x844",
+      "checks": 8
+    },
+    {
+      "name": "current-flow baseline geometry",
+      "result": "passed",
+      "cases": 3,
+      "viewports": [360, 393, 430]
+    }
+  ],
+  "not_run": [
+    "full repository CI",
+    "physical iPhone/Safari",
+    "native Telegram Mini App",
+    "OS keyboard",
+    "VoiceOver",
+    "live production mutation"
+  ]
+}

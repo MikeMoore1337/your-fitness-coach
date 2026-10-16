@@ -1,0 +1,78 @@
+{
+  "issue": 996,
+  "kind": "before-dom-measurement",
+  "status": "PROPOSAL_EVIDENCE",
+  "base_sha": "4c92832415d4eb994cf6b849a67074742f07ea50",
+  "browser": "Chromium",
+  "viewport_height": 844,
+  "theme": "light",
+  "prefers_reduced_motion": true,
+  "fixture": "frontend/tests/e2e/active-workout-experience.spec.ts::mockActiveWorkout",
+  "measurement_harness": "temporary worktree-only Playwright spec, removed after measurement; production tests unchanged",
+  "command": "npx playwright test tests/e2e/issue-996-baseline-measure.spec.ts --config=playwright.config.ts --grep \"Issue #996\" --reporter=line",
+  "cases": [
+    {
+      "viewport_width": 360,
+      "entry_to_preview_clicks": 5,
+      "clicks_within_dialog": 4,
+      "before_preview": { "scroll_top": 877, "scroll_height": 1418, "client_height": 541 },
+      "after_preview": {
+        "scroll_top": 1244,
+        "scroll_height": 1858,
+        "client_height": 489,
+        "body_top": 215.78125,
+        "body_bottom": 705,
+        "preview_top": 390.171875,
+        "preview_bottom": 801.46875,
+        "scroll_events": 3,
+        "max_scroll_top": 1244
+      }
+    },
+    {
+      "viewport_width": 393,
+      "entry_to_preview_clicks": 5,
+      "clicks_within_dialog": 4,
+      "before_preview": { "scroll_top": 821, "scroll_height": 1382, "client_height": 561 },
+      "after_preview": {
+        "scroll_top": 1198,
+        "scroll_height": 1821,
+        "client_height": 509,
+        "body_top": 195.78125,
+        "body_bottom": 705,
+        "preview_top": 379.375,
+        "preview_bottom": 790.671875,
+        "scroll_events": 3,
+        "max_scroll_top": 1198
+      }
+    },
+    {
+      "viewport_width": 430,
+      "entry_to_preview_clicks": 5,
+      "clicks_within_dialog": 4,
+      "before_preview": { "scroll_top": 777, "scroll_height": 1365, "client_height": 588 },
+      "after_preview": {
+        "scroll_top": 1168,
+        "scroll_height": 1784,
+        "client_height": 536,
+        "body_top": 169.390625,
+        "body_bottom": 705,
+        "preview_top": 366.1875,
+        "preview_bottom": 757.484375,
+        "scroll_events": 3,
+        "max_scroll_top": 1168
+      }
+    }
+  ],
+  "interpretation": [
+    "The current per-exercise replacement path used 5 clicks to reach a visible preview in this synthetic browser fixture; 4 clicks were inside the dialog.",
+    "The measured scroll events are DOM scroll activity caused by the current flow and focus/React updates, not a claim about manual finger gestures.",
+    "At all three widths preview_bottom exceeded body_bottom after preview, so the preview card was partially below the body viewport in this baseline state."
+  ],
+  "not_verified": [
+    "physical iPhone/Safari",
+    "native Telegram Mini App",
+    "OS keyboard",
+    "VoiceOver",
+    "live production data"
+  ]
+}
