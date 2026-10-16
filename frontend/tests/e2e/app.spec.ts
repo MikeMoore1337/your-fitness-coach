@@ -1863,7 +1863,9 @@ test('notification nutrition deep links open the intended quick entry context', 
   await page.getByRole('button', { name: 'Закрыть добавление' }).click();
 
   await page.goto('/app?section=nutrition&date=2030-01-10&hydration=quick');
-  await expect(page.getByRole('button', { name: 'Скрыть детали' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Другой объём' }).getByLabel('Объём, мл'),
+  ).toBeVisible();
 });
 
 test('notification empty and error states keep compact profile rhythm', async ({ page }) => {

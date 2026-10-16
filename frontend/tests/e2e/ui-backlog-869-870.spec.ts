@@ -23,6 +23,18 @@ for (const theme of themes) {
       await expect(presets.nth(1)).toContainText('350 мл');
       await expect(page.getByText('План питания', { exact: true })).toBeVisible();
       await expect(page.getByText('Список покупок', { exact: true })).toBeVisible();
+      const planningDetails = page.locator(
+        '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+      );
+      await expect(planningDetails).toHaveCount(2);
+      for (const detail of await planningDetails.all()) {
+        const summary = detail.locator(':scope > summary');
+        await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+        await summary.press('Enter');
+        await expect(detail).toHaveAttribute('open', '');
+        await summary.press('Space');
+        await expect(detail).not.toHaveAttribute('open', '');
+      }
       await hydration.scrollIntoViewIfNeeded();
       await hydration.screenshot({
         path: testInfo.outputPath(`${phase}-869-hydration-${theme}-${width}.png`),
