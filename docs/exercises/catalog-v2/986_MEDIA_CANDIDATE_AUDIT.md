@@ -1,7 +1,8 @@
 # Issue #986 — аудит candidate media для упражнений
 
 Статус: `RESEARCH_ONLY`. Production UI, runtime media contract, manifest и локальные
-медиа-файлы YFC не изменялись. Merge, deploy и release не выполнялись.
+медиа-файлы YFC не изменялись. Документационный PR #1019 был слит; media implementation,
+deploy и release не выполнялись.
 
 ## Зафиксированные ревизии и границы прав
 
@@ -181,6 +182,55 @@ dimensions, duration, FPS, quality target и SHA-256.
   traffic — `NOT_VERIFIED`;
 - full 593-file SHA-256/codec/duration inventory — `NOT_MEASURED`, так как это
   потребовало бы скачать весь source package и не было необходимо для bounded pilot.
+
+### Bounded pilot 16.10.2026
+
+Pilot повторён на актуальном `origin/master` `8a5c955400de87eed8c92974bd196a8343c6cd35`.
+Выбраны 8 строк со статусом `VERIFIED` (`barbell-curl`, `burpee`,
+`cable-lateral-raise`, `dumbbell-fly`, `jump-rope`, `lever-high-row`, `squat`,
+`stationary-bike`) в вариантах `male` и `female`: 16 MP4, 16 JPG и 8 текущих GIF
+(один текущий asset может использоваться обеими gender-строками). Исходные бинарники
+скачаны только во временный ignored-каталог `.artifacts/tasks/986/pilot/raw/` и в Git
+не добавлялись. Метаданные и file-level SHA-256 сохранены в
+[`986_PILOT_RESULTS.csv`](./986_PILOT_RESULTS.csv).
+
+| Измерение | Текущий GIF baseline | Candidate pilot |
+|---|---:|---:|
+| Сумма строк выборки | 1,645,506 B | 13,684,249 B MP4 |
+| Размер encoded frame | 180×180 | 1920×1080 |
+| Codec/container | GIF | H.264/`avc1` in MP4 |
+| Frames / duration | 12–30 / 3.0–5.5 s | 148–593 / 4.933–19.767 s |
+| FPS | n/a | 29.97003–30 |
+| Candidate posters | n/a | 1,234,406 B total, 1920×1080 encoded |
+| MP4 vs repeated GIF rows | baseline | 8.3161× |
+| MP4 vs 8 unique current GIFs | baseline | 16.6323× |
+
+Суммы — это сумма строк pilot, а не прогноз сетевого бюджета: браузерный cache может
+повторно использовать один текущий GIF. Статический poster дешевле полного MP4 на первом
+экране, но 1920×1080 — только размер encoded canvas; natural detail, anatomy, motion
+quality и provenance каждого файла этим не доказаны. `candidate_poster` не считается
+заменой semantic/domain review.
+
+#### Черновик безопасного media contract — не активировать
+
+- same-origin versioned asset и poster с file-level SHA-256; remote runtime URL и
+  внешний CDN не допускаются;
+- poster-first, `preload="none"`, загрузка MP4 только по явному открытию/намерению;
+  без autoplay со звуком;
+- `prefers-reduced-motion` показывает poster, а decode/network error возвращает текущий
+  approved GIF или текстовую fallback-сцену;
+- формат, допустимые derivative files, redistribution scope и quality budget должны быть
+  отдельно подтверждены до любого production implementation;
+- raw source и произвольные производные не публикуются как открытый asset pack.
+
+Deterministic re-encoding в pilot не выполнялся: текущего owner permission для
+исследования недостаточно, чтобы самостоятельно считать public redistribution derivative
+files разрешённой. AI-upscale/interpolation не использовались.
+
+Latency, browser decode, memory, Chromium/WebKit playback, TMA и physical iPhone/Safari
+остаются `NOT_MEASURED`/`NOT_VERIFIED`: на этой ветке нет установленного Playwright
+browser runtime и реального устройства. Pilot не является visual acceptance и не подтверждает
+production readiness.
 
 ## Рекомендуемый план миграции
 
