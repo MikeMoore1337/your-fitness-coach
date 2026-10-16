@@ -407,7 +407,6 @@ body:has(.app-shell--design-v2) {
   gap: 28px;
   align-items: end;
   padding: 18px 0 28px 18px;
-  border-left: 3px solid var(--v2-lime);
 }
 
 .progress-report-overview__identity,
@@ -458,7 +457,6 @@ body:has(.app-shell--design-v2) {
   margin-block: 28px;
   padding: 18px;
   border: 1px solid var(--v2-border);
-  border-left: 3px solid var(--v2-lime);
   background: var(--v2-surface-secondary);
 }
 
@@ -568,7 +566,6 @@ body:has(.app-shell--design-v2) {
 
 .progress-report-program {
   padding: 18px;
-  border-left: 3px solid var(--v2-lime);
   background: var(--v2-surface-secondary);
 }
 
@@ -587,7 +584,6 @@ body:has(.app-shell--design-v2) {
   margin-top: 12px;
   padding: 18px;
   border: 1px solid var(--v2-border);
-  border-left: 3px solid var(--v2-lime);
   background: var(--v2-surface-secondary);
 }
 
@@ -2530,7 +2526,6 @@ body:has(.app-shell--design-v2) {
   border: 1px solid var(--v2-lime);
   border-radius: var(--v2-panel-radius);
   background: var(--v2-surface-secondary);
-  box-shadow: inset 3px 0 0 var(--v2-lime);
   scroll-margin-block: var(--v2-space-4) var(--yfc-mobile-dock-clearance);
 }
 
@@ -8827,7 +8822,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .cardio-log {
   padding: var(--v2-space-5);
   border: 1px solid var(--v2-border);
-  border-top: 3px solid var(--v2-lime);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
 }
