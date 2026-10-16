@@ -115,6 +115,14 @@ const sections: ReadonlyArray<AppSection> = [
   'profile',
 ];
 
+const PROFILE_HASH_TARGETS = new Set([
+  'profile-personal',
+  'profile-fitness',
+  'profile-trainer',
+  'profile-notifications',
+  'profile-security',
+]);
+
 function requestedSection(search: string): AppSection | null {
   const params = new URLSearchParams(search);
   const section = params.get('section');
@@ -224,6 +232,12 @@ function launchInviteToken(): string | null {
   return startParam?.startsWith('trainer_') ? startParam.slice('trainer_'.length) : null;
 }
 
+function revealDetails(details: HTMLDetailsElement | null) {
+  if (!details || details.open) return;
+  const summary = details.querySelector('summary');
+  if (summary instanceof HTMLElement) summary.click();
+}
+
 export default function MiniAppPage({
   demo,
   renderShell = true,
@@ -236,7 +250,7 @@ export default function MiniAppPage({
   const { user, reloadUser } = useAuth();
   const runtime = useRuntime();
   const capabilities = useRuntimeCapabilities();
-  const { navigate, search } = useNavigation();
+  const { hash, navigate, search } = useNavigation();
   const { toast } = useFeedback();
   const [initialInviteToken] = useState(launchInviteToken);
   const [fallbackSection] = useState<AppSection>(() => {
@@ -278,10 +292,6 @@ export default function MiniAppPage({
     target: WorkoutNavigationTarget;
   } | null>(null);
   const [inviteToken, setInviteToken] = useState<string | null>(initialInviteToken);
-  const [activeProfileNavTarget, setActiveProfileNavTarget] = useState<string | null>(() => {
-    const targetId = window.location.hash.slice(1);
-    return targetId.startsWith('profile-') ? targetId : null;
-  });
   const scheduleFocusId =
     requestedFeedback?.workoutId ??
     (focusedWorkout?.target === 'schedule' ? focusedWorkout.id : null);
@@ -361,47 +371,14 @@ export default function MiniAppPage({
     user?.profile?.cardio_trainings_per_week,
     user?.profile?.timezone,
   ]);
-  const revealDetails = (details: HTMLDetailsElement | null) => {
-    if (!details || details.open) return;
-    const summary = details.querySelector('summary');
-    if (summary instanceof HTMLElement) summary.click();
-  };
-  const openProfileSection = (detailsId: string, targetId = detailsId) => {
-    setActiveProfileNavTarget(targetId);
-    const details = document.getElementById(detailsId);
-    revealDetails(details instanceof HTMLDetailsElement ? details : null);
-    window.requestAnimationFrame(() =>
-      document.getElementById(targetId)?.scrollIntoView({ block: 'start' }),
-    );
-  };
-
   useEffect(() => {
     if (section !== 'profile') return;
-
-    const syncProfileNavTarget = () => {
-      const targetId = window.location.hash.slice(1);
-      setActiveProfileNavTarget(targetId.startsWith('profile-') ? targetId : null);
-    };
-    syncProfileNavTarget();
-    window.addEventListener('hashchange', syncProfileNavTarget);
-    return () => window.removeEventListener('hashchange', syncProfileNavTarget);
-  }, [section]);
-
-  useEffect(() => {
-    if (
-      section !== 'profile' ||
-      window.location.hash !== '#profile-ai-coach' ||
-      aiCoachStatus.data?.ui_enabled
-    ) {
+    const targetId = hash.slice(1);
+    if (targetId === 'profile-ai-coach') {
+      navigate('/app?section=profile', true);
       return;
     }
-    navigate('/app?section=profile', true);
-  }, [aiCoachStatus.data?.ui_enabled, navigate, section]);
-
-  useEffect(() => {
-    if (section !== 'profile') return;
-    const targetId = window.location.hash.slice(1);
-    if (!targetId.startsWith('profile-')) return;
+    if (!PROFILE_HASH_TARGETS.has(targetId)) return;
     const revealHashTarget = () => {
       const target = document.getElementById(targetId);
       if (!target) return false;
@@ -419,7 +396,7 @@ export default function MiniAppPage({
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => observer.disconnect();
-  }, [section, search]);
+  }, [hash, navigate, search, section]);
 
   const content = (
     <div
@@ -623,112 +600,6 @@ export default function MiniAppPage({
                     </div>
                   </section>
                 )}
-
-                <nav
-                  className="profile-settings-nav section-navigation"
-                  aria-label="Разделы профиля"
-                >
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-personal' ? ' is-active' : ''
-                    }`}
-                    href="#profile-personal"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-personal' ? 'location' : undefined
-                    }
-                    aria-label="Личные данные"
-                    aria-describedby="profile-nav-personal-description"
-                    onClick={() => openProfileSection('profile-personal')}
-                  >
-                    <Icon
-                      className="section-navigation__leading-icon"
-                      name="nav-profile"
-                      size={16}
-                    />
-                    <span>Личные данные</span>
-                    <small id="profile-nav-personal-description">
-                      Имя, параметры, часовой пояс
-                    </small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-fitness' ? ' is-active' : ''
-                    }`}
-                    href="#profile-fitness"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-fitness' ? 'location' : undefined
-                    }
-                    aria-label="Цели"
-                    aria-describedby="profile-nav-fitness-description"
-                    onClick={() => openProfileSection('profile-personal', 'profile-fitness')}
-                  >
-                    <Icon className="section-navigation__leading-icon" name="nav-plan" size={16} />
-                    <span>Цели</span>
-                    <small id="profile-nav-fitness-description">Цель, уровень и частота</small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-trainer' ? ' is-active' : ''
-                    }`}
-                    href="#profile-trainer"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-trainer' ? 'location' : undefined
-                    }
-                    aria-label="Тренер"
-                    aria-describedby="profile-nav-trainer-description"
-                    onClick={() => openProfileSection('profile-trainer')}
-                  >
-                    <Icon className="section-navigation__leading-icon" name="nav-coach" size={16} />
-                    <span>Тренер</span>
-                    <small id="profile-nav-trainer-description">Приглашения и режим тренера</small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-notifications' ? ' is-active' : ''
-                    }`}
-                    href="#profile-notifications"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-notifications' ? 'location' : undefined
-                    }
-                    aria-label="Уведомления"
-                    aria-describedby="profile-nav-notifications-description"
-                    onClick={() => openProfileSection('profile-notifications')}
-                  >
-                    <Icon className="section-navigation__leading-icon" name="nav-today" size={16} />
-                    <span>Уведомления</span>
-                    <small id="profile-nav-notifications-description">Напоминания и время</small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
-                  <a
-                    data-yfc-choice="compact"
-                    className={`profile-settings-nav__item${
-                      activeProfileNavTarget === 'profile-security' ? ' is-active' : ''
-                    }`}
-                    href="#profile-security"
-                    aria-current={
-                      activeProfileNavTarget === 'profile-security' ? 'location' : undefined
-                    }
-                    aria-label="Безопасность"
-                    aria-describedby="profile-nav-security-description"
-                    onClick={() => openProfileSection('profile-security')}
-                  >
-                    <Icon
-                      className="section-navigation__leading-icon"
-                      name="account-security"
-                      size={16}
-                    />
-                    <span>Безопасность</span>
-                    <small id="profile-nav-security-description">Вход, копия данных, аккаунт</small>
-                    <Icon className="section-navigation__chevron" name="chevron-right" size={16} />
-                  </a>
-                </nav>
 
                 <ProfileForm key={profileFormKey} />
                 <Card

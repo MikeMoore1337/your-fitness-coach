@@ -418,9 +418,7 @@ test('Task 295 lets populated Progress cards use their content height on mobile 
   }
 });
 
-test('Task 295 keeps Profile shortcuts title-first and untruncated at narrow widths', async ({
-  page,
-}) => {
+test('Task 295 keeps Profile disclosures readable at narrow widths', async ({ page }) => {
   await installPlatformApi(page, { browserSession: true, fixedDate: FIXED_DATE });
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
 
@@ -432,18 +430,25 @@ test('Task 295 keeps Profile shortcuts title-first and untruncated at narrow wid
   ]) {
     await page.setViewportSize({ width: surface.width, height: surface.height });
     await openApp(page, 'profile');
-    const navigation = page.getByRole('navigation', { name: 'Разделы профиля' });
-    const shortcuts = navigation.locator('.profile-settings-nav__item');
-    await expect(shortcuts).toHaveCount(5);
-    const expectedLabels = ['Личные данные', 'Цели', 'Тренер', 'Уведомления', 'Безопасность'];
-    for (const [index, shortcut] of (await shortcuts.all()).entries()) {
-      await expect(shortcut.locator(':scope > span')).toHaveText(expectedLabels[index]!);
-      const box = await shortcut.boundingBox();
+    await expect(page.locator('.profile-settings-nav')).toHaveCount(0);
+    const profile = page.locator('.profile-settings');
+    const sections = profile.locator(':scope > details.card-disclosure');
+    await expect(sections).toHaveCount(5);
+    const expectedLabels = [
+      'Личные данные и фитнес-профиль',
+      'Тренировочные предпочтения',
+      'Тренер и приглашения',
+      'Уведомления',
+      'Доступ и безопасность',
+    ];
+    for (const [index, section] of (await sections.all()).entries()) {
+      const summary = section.locator(':scope > summary');
+      await expect(summary).toContainText(expectedLabels[index]!);
+      const box = await summary.boundingBox();
       expect(box).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(44);
       if (surface.width <= 430) {
-        await expect(shortcut.locator('small')).toBeHidden();
-        const titleStyle = await shortcut.locator(':scope > span').evaluate((element) => {
+        const titleStyle = await summary.evaluate((element) => {
           const style = getComputedStyle(element);
           return {
             overflow: style.overflow,
@@ -451,33 +456,11 @@ test('Task 295 keeps Profile shortcuts title-first and untruncated at narrow wid
             whiteSpace: style.whiteSpace,
           };
         });
-        expect(titleStyle).toEqual({
-          overflow: 'visible',
-          textOverflow: 'clip',
-          whiteSpace: 'nowrap',
-        });
-        const [iconBox, titleBox, chevronBox] = await Promise.all([
-          shortcut.locator(':scope > .section-navigation__leading-icon').boundingBox(),
-          shortcut.locator(':scope > span').boundingBox(),
-          shortcut.locator(':scope > .section-navigation__chevron').boundingBox(),
-        ]);
-        expect(iconBox).not.toBeNull();
-        expect(titleBox).not.toBeNull();
-        expect(chevronBox).not.toBeNull();
-        expect(titleBox!.height).toBeLessThan(24);
-        const titleCenter = titleBox!.y + titleBox!.height / 2;
-        expect(Math.abs(titleCenter - (iconBox!.y + iconBox!.height / 2))).toBeLessThan(3);
-        expect(Math.abs(titleCenter - (chevronBox!.y + chevronBox!.height / 2))).toBeLessThan(3);
+        expect(titleStyle.overflow).not.toBe('hidden');
+        expect(titleStyle.textOverflow).not.toBe('ellipsis');
       }
     }
-    const profile = page.locator('.profile-settings');
-    for (const sectionTitle of [
-      'Личные данные и фитнес-профиль',
-      'Тренировочные предпочтения',
-      'Тренер и приглашения',
-      'Уведомления',
-      'Доступ и безопасность',
-    ]) {
+    for (const sectionTitle of expectedLabels) {
       await expect(profile).toContainText(sectionTitle);
     }
     await expectNoHorizontalOverflow(page);
