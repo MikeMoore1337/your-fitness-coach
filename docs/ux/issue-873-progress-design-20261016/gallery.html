@@ -1,10 +1,44 @@
 <!doctype html>
-<html lang="ru" data-theme="light">
+<html lang="ru" data-theme="light" data-mode="proposed">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Issue #873 — Progress design package</title>
     <style>
+      /* Use the checked-in product fonts for PROPOSED without changing BEFORE rendering. */
+      @font-face {
+        font-family: 'YFC Inter';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+      @font-face {
+        font-family: 'YFC Inter';
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/inter-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: 'YFC Oswald';
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/oswald-cyrillic.woff2') format('woff2');
+        unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+      }
+      @font-face {
+        font-family: 'YFC Oswald';
+        font-style: normal;
+        font-weight: 400 700;
+        font-display: swap;
+        src: url('../../../frontend/public/assets/fonts/oswald-latin.woff2') format('woff2');
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+
       :root {
         color-scheme: light;
         --page: #eef1f7;
@@ -59,12 +93,133 @@
         --shadow-soft: 0 6px 18px rgb(0 0 0 / 25%);
       }
 
+      /* PROPOSED only: local aliases mirror the current production V2.1 tokens on origin/master. */
+      html[data-mode='proposed'][data-theme='light'] {
+        --v2-canvas: #ffffff;
+        --v2-surface: #ffffff;
+        --v2-surface-secondary: #f0f0f0;
+        --v2-surface-strong: #dedede;
+        --v2-text-primary: #151515;
+        --v2-text-secondary: #606060;
+        --v2-border: #d0d0d0;
+        --v2-border-strong: #808080;
+        --v2-lime: #b2f520;
+        --v2-lime-hover: #8dce20;
+        --v2-accent-text: #486414;
+        --v2-on-lime: #090b0b;
+        --v2-success: #486414;
+        --v2-success-surface: #f0f0f0;
+        --v2-success-border: #9aac7b;
+        --v2-success-text: #486414;
+        --v2-warning: #98600f;
+        --v2-warning-surface: #f5ead5;
+        --v2-danger: #b93838;
+        --v2-danger-surface: #f9e7e7;
+        --v2-selected-surface: linear-gradient(180deg, #f7ffe8, #dbeeb7);
+        --v2-selected-outline: #758b50;
+        --v2-selected-ink: #334612;
+        --v2-selected-relief: inset 0 0 0 1px var(--v2-selected-outline), inset 0 1px 0 rgb(255 255 255 / 90%), inset 0 -1px 0 rgb(52 72 20 / 12%), 0 2px 5px rgb(25 40 15 / 10%);
+        --segment-bg: #e8ede4;
+        --secondary-bg: #f0f0f0;
+        --secondary-hover: #dedede;
+        --metric-bg: #f0f0f0;
+        --button-text: var(--v2-on-lime);
+        --page: var(--v2-canvas);
+        --page-strong: var(--v2-surface-secondary);
+        --surface: var(--v2-surface);
+        --surface-muted: var(--v2-surface-secondary);
+        --surface-soft: var(--v2-surface-strong);
+        --line: var(--v2-border);
+        --line-strong: var(--v2-border-strong);
+        --text: var(--v2-text-primary);
+        --muted: var(--v2-text-secondary);
+        --muted-strong: var(--v2-text-primary);
+        --accent: var(--v2-lime);
+        --accent-strong: var(--v2-accent-text);
+        --accent-soft: var(--v2-surface-secondary);
+        --accent-hover: var(--v2-lime-hover);
+        --accent-on: var(--v2-on-lime);
+        --success: var(--v2-success-text);
+        --success-soft: var(--v2-success-surface);
+        --success-line: var(--v2-success-border);
+        --warning: var(--v2-warning);
+        --warning-soft: var(--v2-warning-surface);
+        --danger: var(--v2-danger);
+        --danger-soft: var(--v2-danger-surface);
+        --shadow: none;
+        --shadow-soft: none;
+        --selected-surface: var(--v2-selected-surface);
+        --selected-outline: var(--v2-selected-outline);
+        --selected-ink: var(--v2-selected-ink);
+        --selected-relief: var(--v2-selected-relief);
+      }
+
+      html[data-mode='proposed'][data-theme='dark'] {
+        --v2-canvas: #090b0b;
+        --v2-surface: #141717;
+        --v2-surface-secondary: #1b1f1f;
+        --v2-surface-strong: #303030;
+        --v2-text-primary: #f5f5f5;
+        --v2-text-secondary: #b8b8b8;
+        --v2-border: #404040;
+        --v2-border-strong: #787878;
+        --v2-lime: #b2f520;
+        --v2-lime-hover: #98d62f;
+        --v2-accent-text: #b9ea72;
+        --v2-on-lime: #090b0b;
+        --v2-success: #a8e83a;
+        --v2-success-surface: #222222;
+        --v2-success-border: #596f38;
+        --v2-success-text: #b9ea72;
+        --v2-warning: #e5b963;
+        --v2-warning-surface: #2b2314;
+        --v2-danger: #ef7474;
+        --v2-danger-surface: #2c1717;
+        --v2-selected-surface: linear-gradient(180deg, #3b4436, #2a3028);
+        --v2-selected-outline: #778e55;
+        --v2-selected-ink: #d9f9b5;
+        --v2-selected-relief: inset 0 0 0 1px var(--v2-selected-outline), inset 0 1px 0 rgb(255 255 255 / 30%), inset 0 -1px 0 rgb(0 0 0 / 28%), 0 2px 5px rgb(0 0 0 / 18%);
+        --segment-bg: #161916;
+        --secondary-bg: #1b1f1f;
+        --secondary-hover: #303030;
+        --metric-bg: #1b1f1f;
+        --button-text: var(--v2-on-lime);
+        --page: var(--v2-canvas);
+        --page-strong: var(--v2-surface-secondary);
+        --surface: var(--v2-surface);
+        --surface-muted: var(--v2-surface-secondary);
+        --surface-soft: var(--v2-surface-strong);
+        --line: var(--v2-border);
+        --line-strong: var(--v2-border-strong);
+        --text: var(--v2-text-primary);
+        --muted: var(--v2-text-secondary);
+        --muted-strong: var(--v2-text-primary);
+        --accent: var(--v2-lime);
+        --accent-strong: var(--v2-accent-text);
+        --accent-soft: var(--v2-surface-secondary);
+        --accent-hover: var(--v2-lime-hover);
+        --accent-on: var(--v2-on-lime);
+        --success: var(--v2-success-text);
+        --success-soft: var(--v2-success-surface);
+        --success-line: var(--v2-success-border);
+        --warning: var(--v2-warning);
+        --warning-soft: var(--v2-warning-surface);
+        --danger: var(--v2-danger);
+        --danger-soft: var(--v2-danger-surface);
+        --shadow: none;
+        --shadow-soft: none;
+        --selected-surface: var(--v2-selected-surface);
+        --selected-outline: var(--v2-selected-outline);
+        --selected-ink: var(--v2-selected-ink);
+        --selected-relief: var(--v2-selected-relief);
+      }
+
       * { box-sizing: border-box; }
       body {
         margin: 0;
         background: var(--page);
         color: var(--text);
-        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family: var(--font-body, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
         line-height: 1.4;
       }
       button, select { font: inherit; }
@@ -412,6 +567,189 @@
       .matrix a:hover { border-color: var(--accent); color: var(--accent-strong); }
       .matrix a small { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; font-weight: 550; }
 
+      html[data-mode='proposed'] {
+        --font-sans: 'YFC Inter', Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        --font-display: 'YFC Oswald', Oswald, 'Arial Narrow', var(--font-sans);
+        --font-body: var(--font-sans);
+        --font-size-caption: 0.75rem;
+        --font-size-body: 0.9375rem;
+        --font-size-body-lg: 1rem;
+        --font-size-section: clamp(1.125rem, 1.05rem + 0.35vw, 1.375rem);
+        --font-size-page: clamp(1.5rem, 1.3rem + 1vw, 2.125rem);
+        --font-weight-medium: 600;
+        --font-weight-strong: 700;
+        --line-height-tight: 1.15;
+        --line-height-body: 1.5;
+        --touch-target: 44px;
+        --radius-action: 14px;
+        --radius-region: 20px;
+        --radius-panel: 24px;
+      }
+      html[data-mode='proposed'] body {
+        font-size: var(--font-size-body);
+        line-height: var(--line-height-body);
+      }
+      html[data-mode='proposed'] h1,
+      html[data-mode='proposed'] h2,
+      html[data-mode='proposed'] h3 {
+        font-family: var(--font-display);
+        font-weight: var(--font-weight-strong);
+      }
+      html[data-mode='proposed'] .gallery-header h1,
+      html[data-mode='proposed'] .screen__heading h3 {
+        font-size: var(--font-size-page);
+        line-height: var(--line-height-tight);
+      }
+      html[data-mode='proposed'] .control {
+        appearance: none;
+        min-height: var(--touch-target);
+        padding: 0.625rem 42px 0.625rem 0.75rem;
+        border-radius: var(--radius-action);
+        background: var(--surface);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6' fill='none' stroke='%23767676' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.8'/%3E%3C/svg%3E");
+        background-position: right 14px center;
+        background-repeat: no-repeat;
+        background-size: 20px 20px;
+        color: var(--text);
+        font-size: var(--font-size-body);
+        line-height: var(--line-height-body);
+      }
+      html[data-mode='proposed'] .package-note,
+      html[data-mode='proposed'] .stage {
+        box-shadow: none;
+      }
+      html[data-mode='proposed'] .stage { border-radius: var(--radius-panel); }
+      html[data-mode='proposed'] .card {
+        border-radius: var(--radius-region);
+        box-shadow: none;
+      }
+      html[data-mode='proposed'] .card--soft {
+        background: var(--surface-muted);
+      }
+      html[data-mode='proposed'] .badge,
+      html[data-mode='proposed'] .pill {
+        border: 1px solid var(--line);
+        border-radius: 9999px;
+        background: var(--surface-muted);
+        color: var(--muted);
+        font-size: var(--font-size-caption);
+        line-height: 1.2;
+      }
+      html[data-mode='proposed'] .pill--success {
+        border-color: var(--success-line);
+        background: var(--success-soft);
+        color: var(--success);
+      }
+      html[data-mode='proposed'] .pill--warning {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+      html[data-mode='proposed'] .pill--danger {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+      html[data-mode='proposed'] .button {
+        min-height: var(--touch-target);
+        border-radius: var(--radius-action);
+        box-shadow: none;
+        font-family: var(--font-body);
+        font-size: var(--font-size-body);
+        font-weight: var(--font-weight-strong);
+        line-height: var(--line-height-body);
+      }
+      html[data-mode='proposed'] .button--primary {
+        border-color: transparent;
+        background: var(--accent);
+        color: var(--accent-on);
+        box-shadow: none;
+      }
+      html[data-mode='proposed'] .button--secondary {
+        border-color: var(--line);
+        background: var(--secondary-bg);
+        color: var(--text);
+      }
+      html[data-mode='proposed'] .button--quiet {
+        min-height: var(--touch-target);
+        border-color: var(--line);
+        background: var(--secondary-bg);
+        color: var(--text);
+      }
+      html[data-mode='proposed'] .brand-mark {
+        background: var(--accent);
+        color: var(--accent-on);
+      }
+      html[data-mode='proposed'] .period {
+        min-height: var(--touch-target);
+        border-radius: var(--radius-action);
+        background: var(--surface);
+        color: var(--text);
+      }
+      html[data-mode='proposed'] .section-label h4,
+      html[data-mode='proposed'] .body-hero h5 {
+        font-family: var(--font-display);
+        font-weight: var(--font-weight-strong);
+      }
+      html[data-mode='proposed'] .section-label h4 {
+        font-size: var(--font-size-section);
+        line-height: var(--line-height-tight);
+      }
+      html[data-mode='proposed'] .body-hero h5 {
+        line-height: var(--line-height-tight);
+      }
+      html[data-mode='proposed'] .body-hero {
+        border-color: var(--line);
+        border-radius: var(--radius-region);
+        background: var(--surface);
+      }
+      html[data-mode='proposed'] .segment-nav {
+        border: 0;
+        border-radius: var(--radius-action);
+        background: var(--segment-bg);
+        box-shadow: none;
+      }
+      html[data-mode='proposed'] .segment-nav button {
+        border-radius: 18px;
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: var(--font-size-body);
+        font-weight: var(--font-weight-medium);
+        line-height: var(--line-height-body);
+      }
+      html[data-mode='proposed'] .segment-nav button[aria-selected='true'] {
+        background: var(--selected-surface);
+        box-shadow: var(--selected-relief);
+        color: var(--selected-ink);
+      }
+      html[data-mode='proposed'] .sparkline {
+        border-color: var(--line);
+        background: var(--surface-muted);
+      }
+      html[data-mode='proposed'] .disclosure summary::after {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        margin-inline-start: auto;
+        place-items: center;
+        border-radius: 50%;
+        background: var(--surface-muted);
+        color: var(--muted);
+      }
+      html[data-mode='proposed'] .step-list__number,
+      html[data-mode='proposed'] .history-row__icon {
+        color: var(--accent-strong);
+      }
+      html[data-mode='proposed'] .history-row__icon {
+        background: var(--surface-muted);
+      }
+      html[data-mode='proposed'] .metric__value,
+      html[data-mode='proposed'] .fact-strip__item strong,
+      html[data-mode='proposed'] .cardio-fact strong,
+      html[data-mode='proposed'] .history-row__stats {
+        font-size: 1.375rem;
+        line-height: var(--line-height-tight);
+        font-variant-numeric: tabular-nums;
+      }
+
       @media (max-width: 760px) {
         .gallery-header { align-items: flex-start; flex-direction: column; gap: 14px; padding: 20px 16px 14px; }
         .gallery-header__controls { justify-content: flex-start; }
@@ -518,6 +856,7 @@
       const mode = validModes.includes(params.get('mode')) ? params.get('mode') : 'proposed';
       const theme = validThemes.includes(params.get('theme')) ? params.get('theme') : 'light';
       const state = validStates.includes(params.get('state')) ? params.get('state') : 'body-many';
+      document.documentElement.dataset.mode = mode;
       document.documentElement.dataset.theme = theme;
 
       const icon = (name, size = 16) => {
@@ -553,7 +892,7 @@
       const navItems = [['Обзор', 'overview'], ['Тело', 'body'], ['Тренировки', 'training'], ['Питание', 'nutrition'], ['Кардио', 'cardio'], ['Самочувствие', 'wellbeing'], ['История', 'history']];
 
       function nav(active, isBefore) {
-        const segment = `<div class="segment-nav" role="tablist" aria-label="Разделы прогресса">${navItems.map(([label, key]) => `<button type="button" role="tab" aria-selected="${key === active}" ${key === active ? '' : 'tabindex="-1"'}>${label}</button>`).join('')}</div>`;
+        const segment = `<div class="segment-nav" role="tablist" aria-label="Разделы прогресса">${navItems.map(([label, key]) => `<button type="button" role="tab" aria-selected="${key === active}" data-yfc-choice="capsule" ${key === active ? '' : 'tabindex="-1"'}>${label}</button>`).join('')}</div>`;
         if (!isBefore) return segment;
         return `${segment}<div class="current-base-note">${icon('check', 13)} Текущая база: общий SegmentedControl уже заменил историческую повторяющуюся grid; раскрытия в Issue могли быть открыты владельцем вручную.</div><div class="detail-back">${icon('arrow', 14)} Обзор <span>·</span> Детали выбранного периода</div>`;
       }

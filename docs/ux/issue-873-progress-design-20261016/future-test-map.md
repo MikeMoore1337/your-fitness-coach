@@ -3,6 +3,15 @@
 Это план тестов после owner design approval. До approval он не добавляет обязательные CI
 checks и не меняет текущие тесты.
 
+## Проверка текущего статического пакета
+
+16.10.2026 в headless Chromium повторно сняты `28/28` PROPOSED-комбинаций: две темы,
+ширины `320`, `360`, `393`, `430`, `1440` и десять состояний. Browser self-check подтвердил
+отсутствие горизонтального overflow, canonical lime CTA/график, различие `missing` и `0`,
+подтверждение перед удалением и отсутствие AI Coach UI. Это доказательство статического
+mockup, а не runtime, Mobile WebKit, физического устройства, Telegram Mini App или owner
+approval.
+
 ## Vitest / component-level
 
 | Область | Проверка | Риск, который закрывает |
