@@ -137,6 +137,57 @@ async function expectProgressReportEdgeContract(page: Page) {
   }
 }
 
+test('report uses the available mobile canvas width without horizontal overflow', async ({
+  page,
+}) => {
+  await installPlatformApi(page, { browserSession: true });
+  await installReportApi(page);
+  await page.goto('/app/report?period=days_30');
+  const evidenceDir = resolve(process.cwd(), '../docs/ux/issue-1039-report-width-20261016');
+
+  for (const theme of ['dark', 'light'] as const) {
+    await page.evaluate((selectedTheme) => localStorage.setItem('app-theme', selectedTheme), theme);
+    await page.reload();
+    await expect(
+      page.getByRole('heading', { name: 'Отчёт о прогрессе', exact: true }),
+    ).toBeVisible();
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      await expectNoHorizontalOverflow(page);
+      const geometry = await page
+        .locator('.progress-report-document')
+        .evaluate((documentElement) => {
+          const pageElement = documentElement.closest<HTMLElement>('.progress-report-page');
+          if (!pageElement) throw new Error('Missing report page');
+          const pageRect = pageElement.getBoundingClientRect();
+          const documentRect = documentElement.getBoundingClientRect();
+          const styles = getComputedStyle(documentElement);
+          return {
+            pageWidth: pageRect.width,
+            documentWidth: documentRect.width,
+            contentWidth:
+              documentRect.width - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight),
+            viewportWidth: window.innerWidth,
+          };
+        });
+      expect(geometry.pageWidth).toBeGreaterThanOrEqual(width - 18);
+      expect(geometry.documentWidth).toBeGreaterThanOrEqual(width - 34);
+      expect(geometry.contentWidth).toBeGreaterThanOrEqual(width - 50);
+      if (width === 393 && process.env.YFC_CAPTURE_1039 === '1') {
+        // Screenshots show identical, collapsed report options in both themes.
+        await page.locator('.progress-report-options').evaluate((node) => {
+          (node as HTMLDetailsElement).open = false;
+        });
+        await mkdir(evidenceDir, { recursive: true });
+        await page.screenshot({
+          path: resolve(evidenceDir, `after-393-${theme}.png`),
+          fullPage: true,
+        });
+      }
+    }
+  }
+});
+
 test('keeps custom date fields aligned while validation is visible', async ({ page }) => {
   await installPlatformApi(page, { browserSession: true });
   await installReportApi(page);
