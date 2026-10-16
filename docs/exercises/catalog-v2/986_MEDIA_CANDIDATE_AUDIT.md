@@ -162,11 +162,11 @@ frontend media type, browser codec matrix, mobile decode/CPU, poster/fallback и
 
 ### B — deterministic re-encode
 
-Не выполнялся. Это допустимо только после отдельного решения о разрешённом способе
-обработки и о том, какие derivative files можно bundling/redistribute. AI и
-генеративная переработка не использовались. При принятии решения сравнить минимум
-H.264 MP4 и WebM/animated derivative на одной и той же короткой выборке с locked
-dimensions, duration, FPS, quality target и SHA-256.
+В этой сессии не выполнен: локальные `ffmpeg` и `ffprobe` отсутствуют, поэтому
+encoded bytes, quality metrics и playback не выдумывались. Причина blocker, фактическая
+baseline выборка, права на derivative и воспроизводимые offline-команды записаны в
+[`986_REENCODE_BENCHMARK.md`](./986_REENCODE_BENCHMARK.md). AI и генеративная
+переработка не использовались.
 
 ### Что реально проверено
 
@@ -228,9 +228,10 @@ quality и provenance каждого файла этим не доказаны. 
   отдельно подтверждены до любого production implementation;
 - raw source и произвольные производные не публикуются как открытый asset pack.
 
-Deterministic re-encoding в pilot не выполнялся: текущего owner permission для
-исследования недостаточно, чтобы самостоятельно считать public redistribution derivative
-files разрешённой. AI-upscale/interpolation не использовались.
+Deterministic re-encoding в pilot не выполнялся из-за отсутствующего локального
+FFmpeg. Даже после устранения blocker отдельное owner permission на создание
+derivative не будет считаться разрешением на public redistribution/bundling;
+AI-upscale/interpolation не использовались.
 
 Latency, browser decode, memory, Chromium/WebKit playback, TMA и physical iPhone/Safari
 остаются `NOT_MEASURED`/`NOT_VERIFIED`: на этой ветке нет установленного Playwright
