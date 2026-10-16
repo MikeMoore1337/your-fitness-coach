@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { PublicWebLink } from '../navigation/PublicWebLink';
 import { Icon } from './Icon';
 import { DisclosureIcon } from './common';
@@ -12,9 +12,18 @@ export function ContextualHelp({
   articlePath: string;
   summary?: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <details className="contextual-help">
-      <summary className="yfc-disclosure-summary">
+    <details
+      className="contextual-help"
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
+      <summary
+        aria-expanded={expanded}
+        className="yfc-disclosure-summary"
+        onClick={() => setExpanded((value) => !value)}
+      >
         {summary}
         <DisclosureIcon />
       </summary>
