@@ -388,7 +388,8 @@ def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
     manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 3
     assert manifest["asset_count"] == 334
-    assert manifest["derivative_count"] == 0
+    assert manifest["derivative_count"] == 13
+    assert manifest["hq_poster_count"] == 13
     assert len(manifest["exercises"]) == 206
     assert manifest["counts"] == {
         "canonical_exercises": 206,
