@@ -93,11 +93,13 @@ test('AI Coach is hidden across user surfaces, roles, themes and Web/TMA/PWA run
 
   // The fixture installs the Telegram bridge as an init script; create its first document before mutating it.
   await tmaPage.goto('about:blank');
-  await tma.setTheme('dark');
   const tmaRequests = trackAiCoachRequests(tmaPage);
   await installPlatformApi(tmaPage);
   await tmaPage.goto('/app?section=profile&tgWebAppPlatform=android#profile-ai-coach');
   await expect(tmaPage).toHaveURL(/\/app\?section=profile(?:&[^#]+)?$/);
+  await expect(tmaPage.getByRole('heading', { name: 'Профиль и настройки' })).toBeVisible();
+  await tma.setTheme('dark');
+  await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expectAiCoachHidden(tmaPage, tmaRequests);
   await tmaPage.screenshot({
     path: `${AFTER_SCREENSHOTS}/tma-390x844-dark-profile.png`,
