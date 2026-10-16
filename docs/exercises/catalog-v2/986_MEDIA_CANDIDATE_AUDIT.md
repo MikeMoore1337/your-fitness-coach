@@ -186,13 +186,18 @@ dimensions, duration, FPS, quality target и SHA-256.
 ### Bounded pilot 16.10.2026
 
 Pilot повторён на актуальном `origin/master` `8a5c955400de87eed8c92974bd196a8343c6cd35`.
-Выбраны 8 строк со статусом `VERIFIED` (`barbell-curl`, `burpee`,
+Выбраны 8 строк со статусом `VERIFIED_SEMANTIC` (`barbell-curl`, `burpee`,
 `cable-lateral-raise`, `dumbbell-fly`, `jump-rope`, `lever-high-row`, `squat`,
 `stationary-bike`) в вариантах `male` и `female`: 16 MP4, 16 JPG и 8 текущих GIF
 (один текущий asset может использоваться обеими gender-строками). Исходные бинарники
 скачаны только во временный ignored-каталог `.artifacts/tasks/986/pilot/raw/` и в Git
 не добавлялись. Метаданные и file-level SHA-256 сохранены в
 [`986_PILOT_RESULTS.csv`](./986_PILOT_RESULTS.csv).
+
+В полной матрице, унаследованной от #1019, исторические `VERIFIED=13`, `REVIEW=94`,
+`NO_MATCH=99` читаются в текущей таксономии как `VERIFIED_SEMANTIC`, `NEEDS_REVIEW`,
+`NO_MATCH`. `EXACT` намеренно не заявлен: exact slug и poster correspondence не
+доказывают отдельно технику, оборудование, диапазон и сторону движения.
 
 | Измерение | Текущий GIF baseline | Candidate pilot |
 |---|---:|---:|
