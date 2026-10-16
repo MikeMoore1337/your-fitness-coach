@@ -1,0 +1,218 @@
+[
+  {
+    "theme": "dark",
+    "viewport": {
+      "width": 320,
+      "height": 800
+    },
+    "documentWidth": 320,
+    "bodyWidth": 320,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "dark",
+    "viewport": {
+      "width": 360,
+      "height": 800
+    },
+    "documentWidth": 360,
+    "bodyWidth": 360,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "dark",
+    "viewport": {
+      "width": 393,
+      "height": 844
+    },
+    "documentWidth": 393,
+    "bodyWidth": 393,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "dark",
+    "viewport": {
+      "width": 430,
+      "height": 932
+    },
+    "documentWidth": 430,
+    "bodyWidth": 430,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "dark",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "documentWidth": 1280,
+    "bodyWidth": 1280,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "light",
+    "viewport": {
+      "width": 320,
+      "height": 800
+    },
+    "documentWidth": 320,
+    "bodyWidth": 320,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "light",
+    "viewport": {
+      "width": 360,
+      "height": 800
+    },
+    "documentWidth": 360,
+    "bodyWidth": 360,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "light",
+    "viewport": {
+      "width": 393,
+      "height": 844
+    },
+    "documentWidth": 393,
+    "bodyWidth": 393,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "light",
+    "viewport": {
+      "width": 430,
+      "height": 932
+    },
+    "documentWidth": 430,
+    "bodyWidth": 430,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "theme": "light",
+    "viewport": {
+      "width": 1280,
+      "height": 720
+    },
+    "documentWidth": 1280,
+    "bodyWidth": 1280,
+    "dom": [
+      "workout-completion__hero",
+      "workout-completion__facts",
+      "workout-completion__results",
+      "workout-completion__records",
+      "workout-completion__feedback",
+      "workout-completion__next"
+    ],
+    "resultsDirectlyAfterFacts": true,
+    "resultsSummary": "Записанные результаты\n              4 упражнений · 10 подходов\n            \n            Показать детали",
+    "resultsAriaExpanded": "false",
+    "feedbackNoteVisible": true
+  },
+  {
+    "interaction": "feedback-persists-through-results-toggle-and-save",
+    "noteAfterToggle": "Рабочий темп",
+    "savedMessage": "Обратная связь сохранена",
+    "pressed": "true"
+  }
+]
