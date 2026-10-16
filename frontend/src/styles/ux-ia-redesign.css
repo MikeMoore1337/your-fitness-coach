@@ -74,7 +74,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   align-items: flex-end;
   justify-content: center;
   padding: max(12px, var(--yfc-layout-safe-top, 0px)) max(12px, var(--yfc-layout-safe-right, 0px))
-    calc(12px + var(--yfc-layout-safe-bottom, 0px) + var(--yfc-viewport-bottom, 0px))
+    calc(12px + var(--yfc-layout-safe-bottom, 0px) + var(--yfc-viewport-bottom-effective, 0px))
     max(12px, var(--yfc-layout-safe-left, 0px));
   background: rgba(10, 16, 12, 0.54);
 }
@@ -1386,7 +1386,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 @media (max-width: 899px) {
   .app-shell--design-v2:has(.app-quick-add-trigger--floating) .app-bottom-nav {
     inset: auto calc(max(12px, var(--yfc-layout-safe-right)) + 60px + var(--space-4))
-      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
+      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px))
       max(12px, var(--yfc-layout-safe-left));
     min-height: 60px;
     gap: 0;
@@ -1419,7 +1419,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   }
   .app-shell--design-v2 .app-quick-add-trigger--floating {
     right: max(12px, var(--yfc-layout-safe-right));
-    bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+    bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px));
     width: 60px;
     height: 60px;
     min-height: 60px;
@@ -1440,7 +1440,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     padding-bottom: var(--yfc-mobile-dock-clearance);
   }
   .app-quick-add-layer {
-    padding-bottom: calc(88px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+    padding-bottom: calc(
+      88px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
   }
   .app-quick-add-panel {
     max-height: calc(
@@ -1449,7 +1451,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     );
   }
   html[data-yfc-keyboard='visible'] .app-quick-add-layer {
-    padding-bottom: calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px));
+    padding-bottom: calc(
+      12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px)
+    );
   }
   html[data-yfc-keyboard='visible'] .app-quick-add-panel {
     max-height: calc(
@@ -1476,7 +1480,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   .app-shell--design-v2:has(.app-bottom-nav__quick-add) .app-bottom-nav {
     grid-template-columns: repeat(5, minmax(0, 1fr));
     inset: auto max(10px, var(--yfc-layout-safe-right))
-      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom, 0px))
+      calc(12px + var(--yfc-layout-safe-bottom) + var(--yfc-viewport-bottom-effective, 0px))
       max(10px, var(--yfc-layout-safe-left));
     gap: 2px;
     padding: 6px;
@@ -1640,7 +1644,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   display: flex;
   align-items: flex-end;
   padding: 12px max(12px, var(--yfc-layout-safe-right))
-    calc(12px + var(--yfc-viewport-bottom, 0px) + var(--yfc-layout-safe-bottom))
+    calc(12px + var(--yfc-viewport-bottom-effective, 0px) + var(--yfc-layout-safe-bottom))
     max(12px, var(--yfc-layout-safe-left));
   background: #0009;
 }
@@ -1744,7 +1748,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
         var(--yfc-layout-safe-bottom)
     );
     padding: 16px;
-    bottom: var(--yfc-viewport-bottom, 0px);
+    bottom: var(--yfc-viewport-bottom-effective, 0px);
   }
   .program-editor-modal > .section-head {
     display: grid;
