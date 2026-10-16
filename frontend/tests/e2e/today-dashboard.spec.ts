@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
-import { emptyHydrationDay } from './fixtures/platform-api';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
+import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 
 const captureLandingProductProofs =
   (
@@ -319,6 +320,71 @@ async function openDashboard(page: Page) {
   await page.getByRole('button', { name: 'Клиент' }).click();
   await expect(page.getByRole('heading', { name: /^Сегодня ·/ })).toBeVisible();
 }
+
+test('Today Cardio keeps a uniform frame and validation guard after the top rail removal', async ({
+  page,
+}, testInfo) => {
+  await installPlatformApi(page, { browserSession: true, cardioState: 'completed' });
+
+  for (const width of [320, 360, 390, 393, 430, 1440]) {
+    for (const theme of ['dark', 'light'] as const) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.goto('/app?section=today&cardio=1');
+      await page.evaluate(
+        (selectedTheme) => localStorage.setItem('app-theme', selectedTheme),
+        theme,
+      );
+      await page.reload();
+
+      const cardio = page.locator('.cardio-log');
+      await expect(cardio).toBeVisible();
+      const edges = await cardio.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          top: {
+            width: style.borderTopWidth,
+            style: style.borderTopStyle,
+            color: style.borderTopColor,
+          },
+          right: {
+            width: style.borderRightWidth,
+            style: style.borderRightStyle,
+            color: style.borderRightColor,
+          },
+          bottom: {
+            width: style.borderBottomWidth,
+            style: style.borderBottomStyle,
+            color: style.borderBottomColor,
+          },
+          left: {
+            width: style.borderLeftWidth,
+            style: style.borderLeftStyle,
+            color: style.borderLeftColor,
+          },
+        };
+      });
+      for (const side of Object.values(edges)) {
+        expect(side).toMatchObject({ width: '1px', style: 'solid' });
+      }
+      expect(edges.top.color).toBe(edges.right.color);
+      expect(edges.top.color).toBe(edges.bottom.color);
+      expect(edges.top.color).toBe(edges.left.color);
+
+      const duration = cardio.getByLabel('Длительность, мин');
+      await duration.focus();
+      await expect(duration).toBeFocused();
+      await expect(cardio.getByRole('button', { name: 'Сохранить кардио' })).toBeDisabled();
+      await expectNoHorizontalOverflow(page);
+      if (width === 390 || width === 1440) {
+        await page.screenshot({
+          path: testInfo.outputPath(`cardio-${width}-${theme}-after.png`),
+          fullPage: true,
+        });
+      }
+    }
+  }
+});
 
 test('shows the non-modal install option only after value on the authenticated Today surface', async ({
   page,
