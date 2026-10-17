@@ -361,16 +361,20 @@ def evaluate_energy_calibration(
             proposed_target = _round_to_fifty(target.calories + delta)
             proposed_macros = calculate_macros(target.weight_kg, proposed_target, target.goal)
             if proposed_macros["macro_warning"]:
-                macro_floor = proposed_macros["protein_g"] * 4 + proposed_macros["fat_g"] * 9
-                proposed_target = math.ceil(macro_floor / 50) * 50
-            if proposed_target != target.calories:
-                proposed_macros = calculate_macros(target.weight_kg, proposed_target, target.goal)
+                # Never override a calibrated energy budget to satisfy
+                # weight-based macro heuristics. No proposal is safer than
+                # a silently larger-than-intended target.
+                proposed_target = None
+                proposed_macros = None
+                status = "limited"
+                rationale_keys.append("macro_allocation_infeasible")
+            elif proposed_target != target.calories:
                 status = "pending"
                 rationale_keys.append("gradual_target_change_proposed")
             else:
                 proposed_target = None
                 proposed_macros = None
-        if proposed_target is None:
+        if proposed_target is None and status != "limited":
             rationale_keys.append("current_target_within_range")
 
     return CalibrationEvaluation(
@@ -760,6 +764,13 @@ def decide_energy_calibration(
             "Для текущей цели больше нет данных калькулятора; выполните новую проверку"
         )
     macros = calculate_macros(target.weight_kg, record.proposed_target_calories, target.goal)
+    if macros["macro_warning"]:
+        record.status = "superseded"
+        record.decided_at = decided_at
+        db.commit()
+        raise EnergyCalibrationConflictError(
+            "Нельзя принять цель: белки и жиры превышают калорийность; обновите расчёт"
+        )
     context = nutrition_target_context(target)
     context.update(
         tdee=record.estimated_expenditure_kcal,
