@@ -1014,6 +1014,13 @@ class ExerciseGuideMedia(BaseModel):
     byte_size: int = Field(gt=0)
     sort_order: int = Field(ge=0)
     sources: list[ExerciseGuideMediaSource] = Field(min_length=1)
+    # Responsive HD poster variants; old clients can continue using `poster`.
+    poster_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+    poster_width: int | None = Field(default=None, gt=0)
+    poster_height: int | None = Field(default=None, gt=0)
+    poster_preferred: bool | None = None
+    # Optional additive H.264 delivery; old clients continue to use the GIF in `url`.
+    video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
 
 
 class ExerciseGuide(BaseModel):
@@ -1056,8 +1063,10 @@ class ExerciseCatalogItem(BaseModel):
     created_by_user_id: int | None = None
     source_exercise_id: int | None = None
     has_guide: bool = False
-    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_state: Literal["approved_animated", "approved_static", "blocked"] | None = None
     media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+    media_preferred_mode: Literal["static", "animation"] | None = None
     media_animation_url: str | None = None
     guide: ExerciseGuide | None = None
 

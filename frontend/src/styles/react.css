@@ -1181,8 +1181,37 @@ details:not([open]) > :not(summary) {
   color: var(--muted);
   font-size: 0.62rem;
   line-height: 1.15;
-  object-fit: cover;
+  object-fit: contain;
   text-align: center;
+}
+.exercise-media-picture {
+  display: block;
+  min-width: 0;
+}
+.exercise-media-picture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.exercise-picker__option > .exercise-media-picture {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-picker__option > .exercise-media-picture > img,
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture > img {
+  width: 100%;
+  height: 100%;
 }
 .exercise-catalog-item__thumb {
   width: 58px;
@@ -1939,6 +1968,13 @@ details:not([open]) > :not(summary) {
   object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
 }
+.exercise-guide-image__frame .exercise-guide-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .exercise-guide-image__frame img {
     transition: none;
@@ -2257,6 +2293,16 @@ details:not([open]) > :not(summary) {
   display: block;
   max-width: 100%;
   max-height: calc(100dvh - 125px);
+  margin: auto;
+  border-radius: var(--radius-control);
+  object-fit: contain;
+}
+.exercise-lightbox .exercise-guide-video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 125px);
+  width: 100%;
+  aspect-ratio: 16 / 9;
   margin: auto;
   border-radius: var(--radius-control);
   object-fit: contain;
@@ -3240,6 +3286,10 @@ details:not([open]) > :not(summary) {
     padding: 7px 8px;
   }
   .exercise-picker__option-thumb {
+    width: 46px;
+    height: 46px;
+  }
+  .exercise-picker__option > .exercise-media-picture {
     width: 46px;
     height: 46px;
   }

@@ -310,7 +310,19 @@ def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
         width = _positive_dimension(item.get("width"), field=f"media[{index}].width")
         height = _positive_dimension(item.get("height"), field=f"media[{index}].height")
         raw_sources = item.get("sources")
+        poster_preferred = item.get("poster_preferred") is True
+        poster_sources = item.get("poster_sources") if poster_preferred else None
+        if isinstance(poster_sources, list) and poster_sources:
+            raw_sources = poster_sources
+            width = _positive_dimension(
+                item.get("poster_width"), field=f"media[{index}].poster_width"
+            )
+            height = _positive_dimension(
+                item.get("poster_height"), field=f"media[{index}].poster_height"
+            )
+            url = _public_asset_url(item.get("poster"), field=f"media[{index}].poster")
         srcset: list[str] = []
+        webp_srcset: list[str] = []
         if isinstance(raw_sources, list):
             for source_index, raw_source in enumerate(raw_sources):
                 if not isinstance(raw_source, dict):
@@ -325,6 +337,8 @@ def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
                     source.get("width"), field=f"media[{index}].sources[{source_index}].width"
                 )
                 srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
+                if source.get("mime_type") == "image/webp":
+                    webp_srcset.append(f"{html.escape(source_url, quote=True)} {source_width}w")
         srcset_attribute = f' srcset="{", ".join(srcset)}"' if srcset else ""
         media_markup = (
             f'<img src="{html.escape(url, quote=True)}"{srcset_attribute} '
@@ -332,6 +346,12 @@ def _public_exercise_media_markup(exercise: dict[str, object]) -> str:
             f'(max-width: 1040px) 44vw, 470px" alt="{html.escape(alt, quote=True)}" '
             f'width="{width}" height="{height}" loading="lazy" decoding="async" />'
         )
+        if poster_preferred and webp_srcset:
+            media_markup = (
+                f'<picture><source type="image/webp" srcset="{", ".join(webp_srcset)}" '
+                'sizes="(max-width: 620px) calc(100vw - 48px), (max-width: 1040px) 44vw, 470px" />'
+                f"{media_markup}</picture>"
+            )
         figures.append(
             f'<figure class="exercise-guide-image">{media_markup}'
             f"<figcaption>{html.escape(phase)}</figcaption></figure>"
