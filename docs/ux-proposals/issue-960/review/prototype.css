@@ -137,6 +137,7 @@ a:focus-visible {
 .active-workout-demo {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .active-workout-rest {
@@ -146,10 +147,12 @@ a:focus-visible {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px 12px;
+  gap: 8px 12px;
   width: 100%;
-  min-height: 222px;
-  padding: 10px;
+  min-width: 0;
+  min-height: 110px;
+  margin: 0;
+  padding: 9px 10px;
   border: 1px solid var(--edge);
   border-radius: var(--radius);
   background: var(--panel);
@@ -158,16 +161,19 @@ a:focus-visible {
   -webkit-backdrop-filter: blur(20px) saturate(1.05);
 }
 
+.active-workout-rest [hidden] {
+  display: none;
+}
+
 .rest-time {
   display: grid;
   align-content: center;
-  gap: 2px;
-  min-width: 78px;
+  gap: 1px;
 }
 
 .rest-time > span {
   color: var(--text);
-  font-size: 0.66rem;
+  font-size: 0.65rem;
   font-weight: 800;
   text-transform: uppercase;
 }
@@ -179,29 +185,32 @@ a:focus-visible {
   font-variant-numeric: tabular-nums;
 }
 
-.fact {
-  color: var(--muted);
-  font-size: 0.76rem;
-  font-variant-numeric: tabular-nums;
-}
-
 .rest-next {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   min-width: 0;
-  gap: 2px;
+  gap: 6px;
   color: var(--text);
   font-size: 0.76rem;
   line-height: 1.25;
 }
 
-.rest-next strong {
+.rest-next-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  line-height: 1.05;
+}
+
+.rest-next-copy strong {
   overflow: hidden;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.rest-next span {
+.rest-next-copy span {
   color: var(--muted);
 }
 
@@ -211,7 +220,36 @@ a:focus-visible {
   font-weight: 800;
 }
 
-.rest-finish,
+.rest-actual {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.rest-actual-copy {
+  display: grid;
+  justify-items: end;
+  min-width: 32px;
+  gap: 1px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.rest-actual-copy strong {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.rest-stop,
+.rest-hide,
 .rest-actions button {
   min-width: 44px;
   min-height: 44px;
@@ -223,11 +261,23 @@ a:focus-visible {
   font-weight: 750;
 }
 
-.rest-finish {
-  grid-column: 1 / -1;
-  border-color: var(--lime);
-  background: var(--lime-soft);
-  color: var(--lime);
+.rest-stop {
+  padding: 5px 6px;
+  color: var(--text);
+  font-size: 0.7rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.rest-hide {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  color: var(--text);
+  font-size: 0.7rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  touch-action: manipulation;
 }
 
 .rest-actions {
@@ -240,6 +290,51 @@ a:focus-visible {
 .rest-actions button {
   padding: 6px 4px;
   white-space: nowrap;
+}
+
+.rest-complete {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.rest-complete-copy {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-workout-rest.is-complete {
+  display: flex;
+  min-height: 62px;
+  padding-block: 8px;
+}
+
+:root[data-mode='baseline'] .rest-next {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+:root[data-mode='proposed'] .active-workout-rest {
+  padding-block: 8px;
+  row-gap: 4px;
+}
+
+:root[data-state='overtime'] .rest-status,
+:root[data-state='overtime'] .rest-stop {
+  color: var(--lime);
+}
+
+:root[data-state='overtime'] .rest-stop {
+  border-color: var(--lime);
+  background: var(--lime-soft);
 }
 
 .exercise-card {
@@ -320,18 +415,13 @@ a:focus-visible {
 
   .active-workout-rest {
     grid-template-columns: auto minmax(0, 1fr) auto;
-    min-height: 174px;
-  }
-
-  .rest-finish {
-    grid-column: 3;
-    grid-row: 1;
-    min-width: 138px;
+    min-height: 64px;
+    padding-block: 9px;
+    row-gap: 8px;
   }
 
   .rest-actions {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: auto;
     grid-template-columns: repeat(3, minmax(88px, 1fr));
   }
 
@@ -364,7 +454,8 @@ a:focus-visible {
   .exercise-card,
   .bottom-nav,
   .toolbar-button,
-  .rest-finish,
+  .rest-stop,
+  .rest-hide,
   .rest-actions button {
     border: 1px solid CanvasText;
   }

@@ -5,8 +5,9 @@
 
 **Issue:** [#960](https://github.com/MikeMoore1337/your-fitness-coach/issues/960)
 
-**Исходный SHA:** `4c92832415d4eb994cf6b849a67074742f07ea50` (`origin/master`,
-2026-10-16, merge #1042).
+**Текущий проверенный SHA:** `10d3010968bde58554ffeb0925d94fc5d555a48f` (`origin/master`,
+2026-10-17, #1061; затронуты только exercise media). Исторический SHA исходного discovery-среза:
+`4c92832415d4eb994cf6b849a67074742f07ea50`.
 
 **Ветка:** `codex/issue-960-rest-discovery`
 
@@ -15,14 +16,18 @@
 Это решение разрешает доработать discovery-контракт и макеты, но не является разрешением на
 production-реализацию.
 
+**Latest owner-review 2026-10-17:** сохранять текущую композицию RestTimer; factual counter
+поставить справа после `Далее` в существующей верхней строке; lower row оставить без изменений;
+не добавлять `Факт` под countdown или постоянную отдельную строку; Policy A/B не выбирать.
+
 **Owner gates:** `OWNER_DIRECTION=RECORDED_IN_TASK_AND_ISSUE_BODY`,
 `OWNER_DESIGN_APPROVAL=MINIMAL_BASELINE_PACKAGE_PENDING`,
 `OWNER_IMPLEMENTATION_APPROVAL=PENDING`, `OWNER_VISUAL_ACCEPTANCE=NOT_APPLICABLE_YET`,
 `MERGE=FORBIDDEN`, `DEPLOY=FORBIDDEN`.
 
 Этот пакет фиксирует выбранную функциональную логику Variant A в пределах существующего
-RestTimer. SVG и static prototype — обезличенные макеты для review, не production UI и не AFTER
-evidence.
+RestTimer. SVG и browser-rendered static prototype — обезличенные макеты для review, не production
+UI и не AFTER evidence.
 
 ## Решение в одном абзаце
 
@@ -31,11 +36,12 @@ evidence.
 завершения рабочего подхода. Она хранит снимок планового отдыха, отдельную скорректированную цель
 и, только после явной отметки пользователя, фактический интервал. Визуально сохраняется
 существующий верхний RestTimer: его «Отдых», контекст «Далее», матовый Liquid Glass, размеры,
-скругления и ряд `+30 сек / +60 сек / Пропустить`. Минимальные добавления — строка «Факт» и
-кнопка «Завершить отдых» в той же системе управляющих элементов. `+30 сек` и `+60 сек` меняют
+скругления и ряд `+30 сек / +60 сек / Пропустить`. Минимальные добавления — компактный блок
+«Факт» справа после `Далее` в той же верхней строке и inline-действие остановки с доступным
+именем «Завершить отдых». `+30 сек` и `+60 сек` меняют
 только цель таймера. После достижения цели обратный счётчик остаётся на нуле, прямой счётчик
 продолжает показывать время от принятого завершения предыдущего подхода до нажатия
-«Завершить отдых». Это не измерение физиологической готовности и не доказательство фактического
+inline-действия остановки. Это не измерение физиологической готовности и не доказательство фактического
 начала следующего подхода.
 
 ## Что проверено на исходном SHA
@@ -352,23 +358,34 @@ raw timestamps, mutation keys или данные другого аккаунт�
 - фирменные цвета, типографика, скругления, размеры и системные touch tokens;
 - существующий ряд `+30 сек / +60 сек / Пропустить` без `-30 сек`, pointer pass-through или
   повторного уведомления;
-- только две минимальные добавки: `Факт 00:42` рядом с текущим countdown и явная кнопка
-  `Завершить отдых` в той же системе `ui-button`;
-- на 320–430 px кнопка завершения получает отдельную строку, на desktop — ту же строку
-  контекста/управления без изменения порядка вторичных действий;
+- только две минимальные добавки: `Факт 00:42` справа после текста `Далее` в существующей
+  верхней строке и компактное inline-действие `Стоп` с доступным именем `Завершить отдых`;
+- на 320–430 px длинный `Далее` сокращается ellipsis внутри центрального места, не вытесняя
+  factual cluster; отдельная постоянная строка завершения не добавляется;
+- на desktop сохраняется текущая правая строка управляющих элементов и та же высота панели;
 - оба счётчика показывают один и тот же интервал: `Осталось` не ниже нуля, `Факт` продолжает
   расти до explicit terminal action. `Далее` — контекст, не начало следующего подхода.
 
-Пакет [baseline-preserving review](review/README.md) содержит static prototype и 20 SVG-снимков:
-countdown/overtime × Light/Dark × 320/360/393/430/desktop. Все данные синтетические; старые
-standalone A/B SVG оставлены как исторический discovery-материал и не являются текущим
-кандидатом на implementation.
+Пакет [baseline-preserving review](review/README.md) содержит static prototype, 30 SVG-снимков
+и 50 browser-rendered PNG: current baseline, proposed countdown/overtime/completion × Light/Dark
+× 320/360/393/430/desktop. Все данные синтетические; старые standalone A/B SVG
+оставлены как исторический discovery-материал и не являются текущим кандидатом на implementation.
 
 - [Review package и матрица размеров](review/README.md)
 - [Variant A · Dark — исторический discovery](rest-time-panel-variant-a-dark.svg)
 - [Variant A · Light — исторический discovery](rest-time-panel-variant-a-light.svg)
 - [Variant B · Dark — исторический alternate](rest-time-panel-variant-b-dark.svg)
 - [Variant B · Light — исторический alternate](rest-time-panel-variant-b-light.svg)
+
+### Discovery browser evidence
+
+Browser capture выполнен на synthetic static prototype в Brave Chromium через Playwright: 50 PNG
+для current baseline и proposed countdown/overtime/completion, Dark/Light, 320/360/393/430/1280 px.
+Geometry assertions
+проверили клик `Стоп` → completion, горизонтальный overflow, ellipsis длинного `Далее`, 44×44
+actions, сохранённую высоту active proposed панели и отсутствие перекрытия нижней навигации. Это
+доказательство макета, а не runtime AFTER:
+WebKit, physical iPhone/Safari, real TMA, VoiceOver и production остаются `NOT_VERIFIED`.
 
 ### Accessibility and platform intent
 
@@ -382,12 +399,13 @@ Implementation must preserve, and the owner-approved mockup must be checked agai
 - 44×44 targets at 320/360/393/430px, 768px tablet and 1280/1440px desktop;
 - Chromium and WebKit, mocked TMA Light/Dark, `prefers-reduced-motion`, forced colors and reduced
   transparency; no Telegram-only palette or component tree;
-- long exercise labels wrap/ellipsis without hiding finish or plan actions;
+- long exercise labels wrap/ellipsis without hiding the inline stop or plan actions;
 - notification is non-blocking and never the only confirmation.
 
 ## Verification plan after owner approval
 
-This is a plan, not evidence already produced by this discovery branch.
+Это план проверки production/runtime после отдельного implementation approval. Browser evidence
+статического prototype уже создана, но не заменяет проверки runtime-контрактов.
 
 ### Domain/backend
 
@@ -468,12 +486,13 @@ Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible
 
 | Проверено/создано | Статус |
 | --- | --- |
-| Live Issue #960, comments, related #914/#927/#1011/#1012, duplicate search | `VERIFIED` live on 2026-10-16; #960 has no comments and no implementation PR found |
-| `origin/master` and source SHA | `VERIFIED`: `4c92832415d4eb994cf6b849a67074742f07ea50` |
+| Live Issue #960, comments, related #914/#927/#1011/#1012, duplicate search | `VERIFIED` live on 2026-10-17; PR #1044 is the current Draft visual-review path |
+| Latest owner-review direction on PR #1044 | `VERIFIED` live; right-side factual cluster after `Далее`, inline stop, no extra row, no Policy A/B choice |
+| `origin/master` and source SHA | `VERIFIED`: `10d3010968bde58554ffeb0925d94fc5d555a48f`; media-only #1061 does not touch RestTimer |
 | Current timer, accepted completion, queue and backend set contract | `VERIFIED` read-only; exact paths above |
 | AI Coach hidden boundary | `VERIFIED` against merged PR #1021; no new AI surface proposed |
 | Baseline-preserving Variant A contract and static Dark/Light mockups | `UPDATED` in this directory, synthetic data |
-| Exact viewport package 320/360/393/430/desktop | `CREATED` under `review/`, SVG renderables |
+| Exact viewport package 320/360/393/430/desktop | `CREATED` under `review/`, 30 SVG + 50 Chromium PNG renderables |
 | Production runtime/DB/API/PDF/CSS | `NOT_MODIFIED` |
 | Runtime tests, browser AFTER, physical device, real TMA, VoiceOver | `NOT_RUN` / `NOT_VERIFIED` by design |
 
@@ -486,6 +505,7 @@ Phase 3 must not reactivate AI Coach. Each phase has its own backward-compatible
 - [Variant B · Light](rest-time-panel-variant-b-light.svg)
 - [Baseline-preserving review package](review/README.md)
 
-**Next gate:** owner confirms the complete baseline-preserving package and one threshold policy in
-Issue #960, followed separately by explicit implementation approval. Until then the production
-timer and all runtime contracts remain unchanged.
+**Next gate:** owner повторно принимает именно этот baseline-preserving visual package в PR #1044
+и отдельно выбирает threshold policy A/B (этот discovery-пакет не выбирает её), после чего нужно
+отдельное `OWNER_IMPLEMENTATION_APPROVAL`. До этих решений production timer и все runtime
+контракты остаются без изменений.
