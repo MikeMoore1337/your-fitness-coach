@@ -1,74 +1,87 @@
 # Issue #998 — реализация Variant A
 
-Статус: production-реализация подготовлена, ожидает owner visual acceptance. Merge и deploy не
-разрешены.
+Статус: технически готовый Draft PR, ожидает owner visual acceptance. Merge и deploy не
+выполнялись.
 
 ## Контракт и границы
 
 - Issue: [#998](https://github.com/MikeMoore1337/your-fitness-coach/issues/998).
-- Утверждённое направление: Variant A — компактная подсказка рядом с соответствующим понятием.
-- Discovery-пакет: `codex/issue-998-rir-guidance-discovery-local` на `24e77a1a9f3e72420a570bb988c5bcaaf6ed7455`.
-- Исходный baseline-аудит: `origin/master` на `4c92832415d4eb994cf6b849a67074742f07ea50`.
-- Актуальный base перед финальной проверкой: `origin/master` на `b6acadfd808fca41ab8a0c10558fad6a08f3cc0b`.
-- Основная реализация и screenshots: `923442725d68f319bdb9f2815f17000a7a6fc2a8`; rest/dock regression fix и
-  обновлённые visual baselines: `f9fe37d77c41b7ad462f8b4adea3885747cea0d0`.
-- Изоляция: ветка `codex/issue-998-rir-guidance-implementation` в отдельном worktree.
+- PR: [#1046](https://github.com/MikeMoore1337/your-fitness-coach/pull/1046).
+- Ветка: `codex/issue-998-rir-guidance-implementation`.
+- Утверждённое направление: Variant A — короткая подсказка рядом с соответствующим понятием.
+- Финальный application/evidence SHA: `096a4ededf95558f6996058e56826f50a1bd5f81`.
+- Актуальный base при финальной синхронизации: `origin/master`
+  `dc1daeb57bc7eded67a089b206e8f84375fea8d1`.
+- Последняя синхронизация с этим base: merge `82da4ddec628e8c781b5c4c36ce8e9528da78787`.
+- Изоляция: отдельный worktree существующей ветки реализации.
 
-Изменения не трогают выполнение подхода, расчёт прогрессии, назначение программ, редактор, API,
-данные пользователя или скрытый AI Coach. `frontend/src/styles/design-v2.css` не изменён.
+После снятия evidence в master вошёл CI-only commit #1090. Он не меняет application-код,
+компоненты Issue #998 или визуальные поверхности; branch sync зафиксирован merge-коммитом
+`82da4dde`.
 
-## Матрица контекста и источников
+Изменение сохраняет компактный current-set-first интерфейс из #826. В `ActiveSessionSummary`
+подробности остаются свёрнутыми до действия пользователя; после раскрытия доступны
+детерминированная прогрессия и её объяснение. RIR вынесен рядом с текущим подходом и не
+мешает полям веса, повторов и завершения подхода. Алгоритм прогрессии, назначение программ,
+backend/API/DB, offline queue, версии и обработка 409 не изменялись.
 
-| Термин     | Экран/компонент                            | Проверенный источник                                                                                                 | Реализованное объяснение                                                                                                                          | Состояние источника |
-| ---------- | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| RIR        | TodayWorkout, текущий подход               | `knowledge-rir-v1`, `/knowledge/training/repetitions-in-reserve`, опубликовано/проверено `2026-08-22`                | «Повторы в запасе» — субъективная оценка качественных повторов, которые ещё можно выполнить; поле необязательное, отсутствие оценки не равно нулю | ссылка есть         |
-| Прогрессия | TodayWorkout / ProgressionGuidance         | `knowledge-progressive-overload-v1`, `/knowledge/training/progressive-overload`, опубликовано/проверено `2026-08-22` | Действующая детерминированная рекомендация остаётся источником решения; раскрытие объясняет факты и даёт ссылку на материал                       | ссылка есть         |
-| Цикл       | ProgramBuilder, последовательная программа | подтверждённого публичного редакционного материала нет                                                               | Короткое описание восьмидневного последовательного цикла; в раскрытии явно показано `Источник: нет ссылки.`                                       | нет ссылки          |
+## Контекст и источники
 
-Тексты сверены с `frontend/src/content/publicContent.json`, `docs/workout-rir.md` и
-`docs/progression-guidance.md`. Нового источника или рекомендации без источника не добавлено.
+| Термин     | Экран/компонент                      | Проверенный источник                                   | Реализованное объяснение                                                                                                                         |
+| ---------- | ------------------------------------ | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| RIR        | TodayWorkout, текущий подход         | `/knowledge/training/repetitions-in-reserve`           | «Повторы в запасе» — субъективная оценка качественных повторов, которые ещё можно выполнить; поле необязательно, отсутствие оценки не равно нулю |
+| Прогрессия | TodayWorkout / ProgressionGuidance   | `/knowledge/training/progressive-overload`             | Действующая детерминированная рекомендация остаётся источником решения; раскрытие показывает факты и ссылку на материал                          |
+| Цикл       | ProgramBuilder, 8 тренировочных дней | подтверждённого публичного редакционного материала нет | Короткое описание последовательного восьмидневного цикла; в раскрытии явно показано `Источник: нет ссылки.`                                      |
+
+Новые источники и непроверенные рекомендации не добавлялись.
 
 ## Текстовый и интеракционный контракт
 
-- RIR: свернутое состояние `Что такое RIR?`; раскрытие находится после полей веса/повторов и
-  кнопки завершения, поэтому не занимает первый экран ввода. Внутри — короткое определение и
-  `Подробнее на сайте`.
-- Прогрессия: существующее native `<details>` получает точный summary `Почему такой вес?` и
-  ссылку `Подробнее о прогрессии`; действия «Применить» и «Оставить текущую нагрузку» не менялись.
-- Цикл: существующая строка в редакторе стала свернутой `Как устроен цикл?`; fallback без
-  выдуманной ссылки — `Источник: нет ссылки.`.
-- Клавиатура: порядок для текущего подхода `Вес → Повторы → Завершить подход → Что такое RIR?`;
-  Enter/Space раскрывают native disclosure, Escape закрывает RIR и возвращает фокус на summary.
-- Доступность: сохранены native details/summary, `aria-expanded` существующего ContextualHelp,
-  44px touch targets и reduced-motion контракт проекта.
+- RIR: свёрнутое состояние `Что такое RIR?` находится после полей веса/повторов и кнопки
+  завершения; внутри — краткое определение и `Подробнее на сайте`.
+- Прогрессия: пользователь раскрывает `Что делать сейчас?`, затем native disclosure
+  `Почему такой вес?`; действия применения рекомендации не менялись.
+- Цикл: при восьми днях редактор показывает `Как устроен цикл?`; раскрытие не выдумывает
+  ссылку и содержит `Источник: нет ссылки.`.
+- Клавиатура: `Вес → Повторы → Завершить подход → Что такое RIR?`; Enter/Space раскрывают
+  native disclosure, Escape закрывает RIR и возвращает фокус на summary.
+- Доступность: сохранены native details/summary, ARIA-атрибуты, touch target от 44 px и
+  reduced-motion контракт проекта.
 
 ## Evidence
 
-Полный пакет из 30 synthetic browser screenshots (BEFORE 10 + AFTER 20) находится в
-[`evidence/README.md`](evidence/README.md). AFTER снят Chromium на финальном исходнике, BEFORE —
-на baseline `4c92832415d4eb994cf6b849a67074742f07ea50`; ширины: 320, 360, 393, 430 и desktop
-1440 CSS px, обе темы. Open-capture содержит раскрытые RIR и progression disclosures.
+Полный индекс финальных captures находится в [`evidence/README.md`](evidence/README.md).
+В нём 48 AFTER-снимков: active workout (40: 320, 360, 393, 430 и 1440 px; Dark/Light;
+compact, раскрытый summary, раскрытые подсказки и rest panel) и цикл редактора (8: 393 и
+1440 px; Dark/Light; закрытая и открытая подсказка). Исторические BEFORE-снимки сохранены
+отдельно и не выдаются за текущий baseline.
 
-Evidence использует только synthetic fixture data. Физический iPhone/Safari, реальный Telegram
-Mini App и VoiceOver не выдаются за проверенные.
+Все captures сняты Chromium Playwright на synthetic fixture data. WebKit прошёл тот же
+Issue #998 matrix, но screenshots намеренно сняты только Chromium для сопоставимости.
+Приватные пользовательские данные не использовались.
+
+Физические iPhone/Safari, реальный Telegram Mini App, VoiceOver и production runtime остаются
+`NOT_VERIFIED`.
 
 ## Проверки
 
-- Vitest: `150` test files, `886` tests passed.
-- Targeted Chromium: Issue #998 responsive matrix `10/10`, keyboard/TMA `2/2`, существующие
-  TMA progression/contextual-help regression `2/2`.
-- Targeted WebKit: Issue #998 responsive matrix `10/10`.
-- Typecheck, ESLint и русский UI-copy guard: passed.
+- Vitest: 154 test files, 915 tests passed.
+- Issue #998: Chromium 16/16 и WebKit 16/16.
+- #826/V9-05: Chromium+WebKit 10/10.
+- Mobile dock/safe-area regression: Chromium 13/13.
+- Active workout completion/conflict/offline/rest regression: Chromium 18/18.
+- TypeScript typecheck: passed.
+- ESLint, русский UI-copy guard и thick-lime-edge guard: passed.
 - Production build: passed.
-- Mobile rest/dock regression: 8/8 Chromium (320/360/393/430, Dark/Light) после скрытия
-  вторичной подсказки на время полноразмерного rest-panel.
-- Pre-commit: passed при запуске через проектный `.venv`; первый запуск был заблокирован отсутствующим
-  Windows `python` alias, затем тот же hook прошёл с явным `.venv` в PATH.
-- Изменённые файлы проходят Prettier. Repo-wide `prettier --check .` выявляет 512 исторически
-  неформатированных файлов вне этого изменения и не исправлялся в рамках Issue #998.
+- Prettier для изменённого Issue #998 E2E-файла: passed after formatting.
+- Pre-commit для evidence-коммита: passed с проектным `.venv`; первый запуск штатно остановился
+  на отсутствующем Windows `python` alias.
+
+Repo-wide `prettier --check .` не запускался; форматирование посторонних исторических файлов
+вне этой задачи не выполнялось.
 
 ## Следующий owner gate
 
-Показать owner полный batch-пакет Dark/Light, 320/360/393/430/desktop и получить отдельное
-подтверждение visual acceptance. После него всё ещё потребуется отдельное прямое разрешение на
-merge и затем отдельное разрешение на deploy.
+Показать owner единый batch-пакет Dark/Light, 320/360/393/430/desktop и получить отдельное
+подтверждение visual acceptance. После него всё ещё потребуются отдельные разрешения на merge
+и production deploy.
