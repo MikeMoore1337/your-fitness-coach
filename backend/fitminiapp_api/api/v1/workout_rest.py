@@ -185,7 +185,11 @@ def mutate_rest_session(
     if row.version != payload.expected_version or row.status != "running":
         raise HTTPException(status_code=409, detail="Состояние отдыха изменилось")
     if payload.action in ("add30", "add60"):
-        if payload.ended_at is not None or payload.corrected or payload.corrected_seconds is not None:
+        if (
+            payload.ended_at is not None
+            or payload.corrected
+            or payload.corrected_seconds is not None
+        ):
             raise HTTPException(status_code=422, detail="Время окончания здесь не требуется")
         applied_at = _utc_naive(payload.occurred_at) if payload.occurred_at else _now()
         if applied_at < row.started_at or applied_at > _now() + timedelta(minutes=1):
@@ -197,7 +201,9 @@ def mutate_rest_session(
     else:
         if payload.action == "complete":
             if payload.corrected != (payload.corrected_seconds is not None):
-                raise HTTPException(status_code=422, detail="Для исправления укажите фактическую длительность")
+                raise HTTPException(
+                    status_code=422, detail="Для исправления укажите фактическую длительность"
+                )
             if payload.ended_at is None:
                 raise HTTPException(status_code=422, detail="Укажите время остановки")
             ended = _utc_naive(payload.ended_at)
@@ -216,7 +222,11 @@ def mutate_rest_session(
             row.source = "USER_CORRECTED" if payload.corrected else "USER_CONFIRMED"
             row.quality = "normal"
         else:
-            if payload.ended_at is not None or payload.corrected or payload.corrected_seconds is not None:
+            if (
+            payload.ended_at is not None
+            or payload.corrected
+            or payload.corrected_seconds is not None
+        ):
                 raise HTTPException(status_code=422, detail="Конечное время не требуется")
             row.ended_at = _now()
             row.status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
