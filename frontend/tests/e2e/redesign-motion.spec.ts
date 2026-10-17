@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { expectNoHorizontalOverflow } from './fixtures/mobile-tma';
 
-test.use({ video: 'on' });
+test.use({ video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on' });
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
