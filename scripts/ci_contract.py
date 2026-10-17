@@ -644,9 +644,11 @@ def _is_frontend_path(path: str) -> bool:
 
 
 def _is_backend_path(path: str) -> bool:
-    return path in _PYTHON_CI_SCRIPT_PATHS or path in {
-        "backend", "bot", "pyproject.toml", "uv.lock"
-    } or path.startswith(("backend/", "bot/", "tests/integration/"))
+    return (
+        path in _PYTHON_CI_SCRIPT_PATHS
+        or path in {"backend", "bot", "pyproject.toml", "uv.lock"}
+        or path.startswith(("backend/", "bot/", "tests/integration/"))
+    )
 
 
 def _is_api_path(path: str) -> bool:
