@@ -53,7 +53,10 @@ def test_verified_static_media_plays_hd_video_and_keeps_responsive_poster() -> N
     media = ExerciseGuideMedia.model_validate(source)
     assert media.type == "image"
     assert media.url.endswith("/poster-1280.jpg")
-    assert [(variant.width, variant.height) for variant in media.video_sources] == [(854, 480), (1280, 720)]
+    assert [(variant.width, variant.height) for variant in media.video_sources] == [
+        (854, 480),
+        (1280, 720),
+    ]
     assert get_guide_media_preview("machine-glute-kickback")["video_sources"]
     assert [(variant.width, variant.mime_type) for variant in media.sources] == [
         (640, "image/jpeg"),
