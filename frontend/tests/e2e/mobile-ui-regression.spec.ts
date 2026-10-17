@@ -260,6 +260,19 @@ test('@critical active workout keeps the current set primary across mobile width
     await expect(currentSet).toContainText(/Отдых \d+ с/);
     await expect(currentSetDone).toBeVisible();
     await expect(page.locator('.app-bottom-nav__quick-add')).toBeVisible();
+
+    // A previous viewport/click can leave a long active-session page at an
+    // intermediate scroll position, where a fixed dock temporarily covers
+    // ordinary content. Audit the canonical top viewport first; below we
+    // still scroll the *actual current set action* into view and explicitly
+    // assert it is not covered by the dock.
+    await page.evaluate(async () => {
+      window.scrollTo(0, 0);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
     await assertMobileShellGeometry(page);
 
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
