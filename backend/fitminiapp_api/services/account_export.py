@@ -74,6 +74,7 @@ from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.models.user import (
     BodyMeasurement,
     BodyMeasurementCustomValue,
@@ -144,6 +145,7 @@ ACCOUNT_EXPORT_DATA_INVENTORY: dict[str, str] = {
     "workout_adaptations": "programs",
     "user_workout_exercises": "programs",
     "user_workout_sets": "programs",
+    "workout_rest_sessions": "programs",
     "exercise_setup_memories": "exercise_setup_memories",
     "exercises": "custom_exercises",
     "exercise_muscles": "custom_exercises",
@@ -187,6 +189,7 @@ ACCOUNT_EXPORT_EXCLUDED_DATA_INVENTORY: dict[str, str] = {
     "payments": "retired operational billing/provider records",
     "subscriptions": "retired operational billing records",
     "workout_set_mutations": "idempotency fingerprints used only for sync correctness",
+    "workout_rest_actions": "idempotency fingerprints and mutation ids used only for sync correctness",
     "program_imports": (
         "short-lived owner-scoped import drafts; source is never persisted and normalized content "
         "is cleared on terminal state"
@@ -651,7 +654,9 @@ def _serialize_program_template(template: ProgramTemplate) -> dict[str, object]:
     }
 
 
-def _serialize_program(program: UserProgram) -> dict[str, object]:
+def _serialize_program(
+    program: UserProgram, rest_by_workout: dict[int, list[dict[str, object]]]
+) -> dict[str, object]:
     return {
         "id": program.id,
         "title": program.template.title if program.template else "Архивная программа",
@@ -723,6 +728,7 @@ def _serialize_program(program: UserProgram) -> dict[str, object]:
                         "completion_feedback_updated_at",
                     ),
                 ),
+                "rest_sessions": rest_by_workout.get(workout.id, []),
                 "adaptations": [
                     _fields(
                         adaptation,
@@ -826,6 +832,23 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         .order_by(UserProgram.assigned_at.asc(), UserProgram.id.asc())
         .all()
     )
+    rest_by_workout: dict[int, list[dict[str, object]]] = {}
+    for row in (
+        db.query(WorkoutRestSession)
+        .filter(WorkoutRestSession.user_id == user.id)
+        .order_by(WorkoutRestSession.workout_id, WorkoutRestSession.started_at)
+        .all()
+    ):
+        rest_by_workout.setdefault(row.workout_id, []).append(
+            _fields(
+                row,
+                (
+                    "id", "source_set_id", "started_at", "ended_at",
+                    "planned_seconds", "adjusted_seconds", "measured_seconds",
+                    "status", "source", "quality",
+                ),
+            )
+        )
     measurements = (
         db.query(BodyMeasurement)
         .options(
@@ -1570,7 +1593,7 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
         "hidden_program_templates": [
             _fields(row, ("id", "template_id", "hidden_at")) for row in hidden_templates
         ],
-        "programs": [_serialize_program(program) for program in programs],
+        "programs": [_serialize_program(program, rest_by_workout) for program in programs],
         "exercise_setup_memories": [
             _fields(
                 row,
