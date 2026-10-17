@@ -54,8 +54,7 @@ function fromInitial(
       ...defaults,
       target_telegram_user_id: targetTelegramId,
       goal: profileGoal,
-      sex:
-        profile?.sex === 'female' ? 'female' : profile?.sex === 'male' ? 'male' : defaults.sex,
+      sex: profile?.sex === 'female' ? 'female' : profile?.sex === 'male' ? 'male' : defaults.sex,
       height_cm: profile?.height_cm ?? defaults.height_cm,
       weight_kg: profile?.weight_kg ?? defaults.weight_kg,
       age: validProfileAge ? profileAge : defaults.age,
@@ -81,11 +80,9 @@ function fromInitial(
       defaults.strength_training_type) as NutritionCalculatorInput['strength_training_type'],
     strength_rest: initial.strength_rest as NutritionCalculatorInput['strength_rest'],
     cardio_trainings: initial.cardio_trainings ?? [],
-    goal: (
-      profile?.goal && Object.hasOwn(goalOptions, profile.goal)
-        ? profile.goal
-        : initial.goal || defaults.goal
-    ) as NutritionCalculatorInput['goal'],
+    goal: (profile?.goal && Object.hasOwn(goalOptions, profile.goal)
+      ? profile.goal
+      : initial.goal || defaults.goal) as NutritionCalculatorInput['goal'],
   };
 }
 
@@ -636,8 +633,8 @@ export function NutritionForm({
 
               {!clientId && (
                 <p className="muted">
-                  При сохранении данные калькулятора обновят профиль. Если вы изменили
-                  вес, он также появится в дневнике замеров.
+                  При сохранении данные калькулятора обновят профиль. Если вы изменили вес, он также
+                  появится в дневнике замеров.
                 </p>
               )}
               <button disabled={mutation.isPending || !calculation.valid}>

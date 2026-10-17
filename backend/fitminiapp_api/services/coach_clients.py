@@ -125,14 +125,11 @@ def _client_entry_from_user(
     include_preferences_context: bool,
     operational_status: str | None = "active",
     labels: list[str] | None = None,
+    latest_weight_kg: float | None = None,
 ) -> dict:
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
     profile = user.profile
-    # Use the same effective weight as the user's own profile screen.
-    from fitminiapp_api.services.measurements import latest_current_weight_measurement
-
-    latest_weight = latest_current_weight_measurement(db, user)
     return {
         "id": user.id,
         "invite_id": None,
@@ -144,8 +141,8 @@ def _client_entry_from_user(
         "level": profile.level if profile else None,
         "height_cm": profile.height_cm if profile else None,
         "weight_kg": (
-            latest_weight.weight_kg
-            if latest_weight is not None
+            latest_weight_kg
+            if latest_weight_kg is not None
             else profile.weight_kg
             if profile
             else None

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from uuid import uuid4
 
-from sqlalchemy import or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, aliased, contains_eager, joinedload, selectinload
 
 from fitminiapp_api.core.timezone import (
@@ -25,7 +25,13 @@ from fitminiapp_api.models.program import (
     UserWorkoutExercise,
     UserWorkoutSet,
 )
-from fitminiapp_api.models.user import CoachClient, CoachClientInvite, User, UserProfile
+from fitminiapp_api.models.user import (
+    BodyMeasurement,
+    CoachClient,
+    CoachClientInvite,
+    User,
+    UserProfile,
+)
 from fitminiapp_api.schemas.program import (
     ProgramTemplateCreate,
     ProgramTemplateDayCreate,
@@ -1486,6 +1492,39 @@ def list_clients(
 
     client_users = [user for user, _private_name, _operational_status, _labels in clients]
     users_by_id = {user.id: user for user in client_users}
+    # One extra query for all clients, never one query per client.
+    # Filter by each user's own local day before ranking historical weights.
+    latest_weight_by_user: dict[int, float] = {}
+    if client_users:
+        ranked = (
+            db.query(
+                BodyMeasurement.user_id.label("user_id"),
+                BodyMeasurement.weight_kg.label("weight_kg"),
+                func.row_number()
+                .over(
+                    partition_by=BodyMeasurement.user_id,
+                    order_by=(BodyMeasurement.measured_on.desc(), BodyMeasurement.id.desc()),
+                )
+                .label("rank"),
+            )
+            .filter(
+                BodyMeasurement.user_id.in_(users_by_id),
+                BodyMeasurement.weight_kg.is_not(None),
+                or_(
+                    *[
+                        and_(
+                            BodyMeasurement.user_id == user.id,
+                            BodyMeasurement.measured_on <= today_for_user(user),
+                        )
+                        for user in client_users
+                    ]
+                ),
+            )
+            .subquery()
+        )
+        latest_weight_by_user = dict(
+            db.query(ranked.c.user_id, ranked.c.weight_kg).filter(ranked.c.rank == 1).all()
+        )
     assigner_user = aliased(User)
     assigner_profile = aliased(UserProfile)
     nutrition_rows = (
@@ -1523,6 +1562,7 @@ def list_clients(
             include_preferences_context=include_preferences_context,
             operational_status=operational_status,
             labels=labels,
+            latest_weight_kg=latest_weight_by_user.get(user.id),
         )
         for user, private_name, operational_status, labels in clients
     ] + [_client_entry_from_invite(invite) for invite in invites]
