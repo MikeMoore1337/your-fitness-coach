@@ -96,4 +96,23 @@ describe('ContextualHelp', () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
+
+  it('closes with Escape and keeps a truthful fallback when no source exists', () => {
+    render(
+      <ContextualHelp summary="Как устроен цикл?">
+        <p>Восьмидневный цикл повторяется после восьмой тренировки.</p>
+      </ContextualHelp>,
+    );
+
+    const summary = screen.getByText('Как устроен цикл?');
+    const details = summary.closest('details') as HTMLDetailsElement;
+    fireEvent.click(summary);
+    expect(screen.getByText('Источник: нет ссылки.')).toBeVisible();
+    expect(details.querySelector('a')).not.toBeInTheDocument();
+
+    summary.focus();
+    fireEvent.keyDown(summary, { key: 'Escape' });
+    expect(details).not.toHaveAttribute('open');
+    expect(summary).toHaveFocus();
+  });
 });

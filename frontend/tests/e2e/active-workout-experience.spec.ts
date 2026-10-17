@@ -2757,6 +2757,7 @@ for (const width of [320, 360, 393, 430]) {
         await currentSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
         await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
         await expect(page.locator('.active-workout-rest')).toBeVisible();
+        await expect(currentSet.locator('.active-workout-set__contextual-help')).toBeHidden();
         await page.evaluate(
           () =>
             new Promise<void>((resolve) =>

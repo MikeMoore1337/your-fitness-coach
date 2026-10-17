@@ -2055,7 +2055,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   expect(await tmaGuidance.textContent()).toBe(await mobileGuidance.textContent());
   await expect(tmaGuidance.locator('.ui-button--primary')).not.toBeAttached();
 
-  await tmaGuidance.getByText('Почему?', { exact: true }).click();
+  await tmaGuidance.getByText('Почему такой вес?', { exact: true }).click();
   await expect(tmaGuidance.getByText('Цель: 1 × 8–10')).toBeVisible();
   await expect(tmaGuidance.getByText(/запас записан: 1/)).toBeVisible();
   const disclosureGeometry = await tmaGuidance.locator('.disclosure-icon').evaluate((element) => {
@@ -2206,7 +2206,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
     const exercise = namedArticle(page, exerciseTitle);
     await expect(exercise).toHaveCount(1);
     const guidance = exercise.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
-    await guidance.getByText('Почему?', { exact: true }).click();
+    await guidance.getByText('Почему такой вес?', { exact: true }).click();
     await expect(guidance).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', current.theme);
     await expectNoHorizontalOverflow(page);
@@ -2799,13 +2799,11 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   const currentSet = tmaPage.locator('[aria-current="step"]');
   await expect(currentSet).toHaveCount(1);
-  await currentSet.getByText('Дополнительно', { exact: true }).click();
-  const rirDetails = tmaPage.locator('.active-workout-rir .contextual-help');
-  const rirHelp = rirDetails.getByText('Что это?', { exact: true });
+  const rirDetails = currentSet.locator('.active-workout-set__contextual-help .contextual-help');
+  const rirHelp = rirDetails.getByText('Что такое RIR?', { exact: true });
+  await expect(rirHelp).toBeVisible();
   await rirHelp.click();
-  const rirArticleLink = tmaPage
-    .locator('.active-workout-rir')
-    .getByRole('link', { name: /Подробнее на сайте/ });
+  const rirArticleLink = rirDetails.getByRole('link', { name: /Подробнее на сайте/ });
   await expect(rirArticleLink).toHaveAttribute(
     'href',
     '/knowledge/training/repetitions-in-reserve',
