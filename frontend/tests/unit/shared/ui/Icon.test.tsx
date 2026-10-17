@@ -2,7 +2,8 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { Icon, type IconName } from '../../../../src/shared/ui/Icon';
 import { iconGlyphs } from '../../../../src/shared/ui/iconGlyphs';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 describe('Icon', () => {
   it('renders every semantic glyph without images or opaque glass patches', () => {
@@ -62,6 +63,35 @@ describe('Icon', () => {
       expect(css).toContain(`d='${path.getAttribute('d')}'`);
     }
     expect(css).toContain("input[type='search']::-webkit-search-cancel-button");
+  });
+  it('requires canonical glyph renderer for functional SVG across the frontend', () => {
+    const allowed = new Set([
+      'src/shared/ui/Icon.tsx',
+      'src/shared/ui/iconGlyphs.tsx',
+      'src/shared/ui/DataViz.tsx',
+      'src/features/auth/OAuthButtons.tsx',
+    ]);
+    const visit = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const filename = join(directory, entry.name);
+        if (entry.isDirectory()) return visit(filename);
+        return entry.name.endsWith('.tsx') ? [filename] : [];
+      });
+
+    for (const filename of visit('src')) {
+      const normalized = filename.replaceAll('\\', '/');
+      if (allowed.has(normalized)) continue;
+      const source = readFileSync(filename, 'utf8');
+      expect(source, `Non-canonical functional SVG in ${normalized}`).not.toMatch(
+        /<(?:svg|path|circle|rect|line|polyline|polygon)\b/,
+      );
+    }
+  });
+  it('uses the shared Lucide chevron in the workout summary', () => {
+    const source = readFileSync('src/features/workouts/ActiveSessionSummary.tsx', 'utf8');
+    expect(source).toContain("name={open ? 'chevron-up' : 'chevron-down'}");
+    expect(iconGlyphs['chevron-down']).toBeTruthy();
+    expect(iconGlyphs['chevron-up']).toBeTruthy();
   });
   it('fills only the explicit selected star state', () => {
     const { container, rerender } = render(<Icon name="star" />);
