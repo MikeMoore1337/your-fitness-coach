@@ -1,6 +1,6 @@
 import { api, ApiError } from '../../shared/api/client';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
-import { readStorage, writeStorage } from '../../shared/storage';
+import { readStorage, removeStorage, writeStorage } from '../../shared/storage';
 import { activeWorkoutRestKey } from './activeWorkoutQueue';
 
 type RestAction = 'add30' | 'add60' | 'complete' | 'skip' | 'interrupt' | 'unknown';
@@ -79,10 +79,54 @@ function validSession(row: LocalRestSession): boolean {
   );
 }
 
+function actionStorageKey(userId: number, workoutId: number, mutationId: string): string {
+  return `${restJournalStorageKey(userId, workoutId)}:op:${mutationId}`;
+}
+
 export function loadRestJournal(userId: number, workoutId: number): LocalRestSession[] {
-  const records = readStorage<LocalRestSession[]>(restJournalStorageKey(userId, workoutId), []);
+  const journalKey = restJournalStorageKey(userId, workoutId);
+  const records = readStorage<LocalRestSession[]>(journalKey, []);
   if (!Array.isArray(records)) return [];
-  return records.filter(validSession);
+  const valid = records.filter(validSession);
+  // A separate immutable localStorage key per mutation prevents another tab's
+  // stale journal snapshot from erasing an action that has not reached the API.
+  try {
+    const prefix = `${journalKey}:op:`;
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
+      .filter((key): key is string => Boolean(key?.startsWith(prefix)));
+    for (const key of keys) {
+      const value = readStorage<{ source_set_id: number; operation: QueuedRestAction } | null>(
+        key, null,
+      );
+      const row = valid.find((session) => session.source_set_id === value?.source_set_id);
+      if (!row || !value?.operation?.mutation_id) continue;
+      if (!row.pending.some((operation) => operation.mutation_id === value.operation.mutation_id)) {
+        row.pending.push(value.operation);
+      }
+    }
+    for (const row of valid) {
+      row.pending.sort((a, b) => a.occurred_at.localeCompare(b.occurred_at));
+      // Rehydrate terminal state when a stale tab overwrote the primary snapshot.
+      const lastTerminal = [...row.pending]
+        .reverse()
+        .find((operation) => ['complete', 'skip', 'interrupt', 'unknown'].includes(operation.action));
+      if (row.status === 'running' && lastTerminal) {
+        row.status = {
+          complete: 'completed',
+          skip: 'skipped',
+          interrupt: 'interrupted',
+          unknown: 'unknown',
+        }[lastTerminal.action] as RestStatus;
+        row.ended_at = lastTerminal.ended_at ?? lastTerminal.occurred_at;
+        if (lastTerminal.action === 'complete') {
+          row.source = lastTerminal.corrected ? 'USER_CORRECTED' : 'USER_CONFIRMED';
+        }
+      }
+    }
+  } catch {
+    // Restricted browsers without accessible localStorage retain in-memory flow.
+  }
+  return valid;
 }
 
 function saveRestJournal(userId: number, workoutId: number, records: LocalRestSession[]): void {
@@ -202,6 +246,10 @@ export function updateMeasuredRest(
     }
   }
   row.pending.push(entry);
+  writeStorage(actionStorageKey(userId, workoutId, entry.mutation_id), {
+    source_set_id: sourceSetId,
+    operation: entry,
+  });
   saveRestJournal(userId, workoutId, records);
   return row;
 }
@@ -263,6 +311,7 @@ function acknowledgeRemote(
   row.server_version = Math.max(row.server_version ?? 0, remote.version);
   if (mutationId) {
     row.pending = row.pending.filter((operation) => operation.mutation_id !== mutationId);
+    removeStorage(actionStorageKey(userId, workoutId, mutationId));
   }
   saveRestJournal(userId, workoutId, records);
 }
