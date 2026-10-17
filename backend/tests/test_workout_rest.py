@@ -255,3 +255,34 @@ def test_rest_history_and_progress_exclude_unknown_intervals(client):
     )
     assert report.status_code == 200, report.text
     assert report.json()["training"]["rest"]["observation_count"] >= 1
+
+def test_delayed_offline_rest_can_sync_after_workout_finish(client):
+    """Finishing a workout must not silently discard an earlier accepted offline rest."""
+    headers = _auth(client, 996006)
+    workout = _new_workout(client, headers)
+    workout_id = workout["id"]
+    set_id = workout["exercises"][0]["sets"][0]["id"]
+    started_at = datetime.now(UTC).isoformat()
+    marked = client.patch(
+        f"/api/v1/workouts/sets/{set_id}",
+        headers=headers,
+        json={"actual_reps": 8, "actual_weight": 45, "is_completed": True},
+    )
+    assert marked.status_code == 200, marked.text
+    finished = client.post(
+        f"/api/v1/workouts/{workout_id}/finish",
+        headers=headers,
+        json={"confirm_incomplete": True},
+    )
+    assert finished.status_code == 200, finished.text
+    queued = client.post(
+        f"/api/v1/workouts/{workout_id}/rest-sessions",
+        headers=headers,
+        json={
+            "source_set_id": set_id,
+            "started_at": started_at,
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert queued.status_code == 200, queued.text
+    assert queued.json()["status"] == "running"
