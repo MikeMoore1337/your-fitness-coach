@@ -72,14 +72,20 @@ function fromInitial(
     steps_range: (initial.steps_range ||
       defaults.steps_range) as NutritionCalculatorInput['steps_range'],
     strength_trainings_per_week:
-      initial.strength_trainings_per_week ?? defaults.strength_trainings_per_week,
+      profile?.workouts_per_week ??
+      initial.strength_trainings_per_week ??
+      defaults.strength_trainings_per_week,
     strength_training_duration_minutes:
       initial.strength_training_duration_minutes ?? defaults.strength_training_duration_minutes,
     strength_training_type: (initial.strength_training_type ||
       defaults.strength_training_type) as NutritionCalculatorInput['strength_training_type'],
     strength_rest: initial.strength_rest as NutritionCalculatorInput['strength_rest'],
     cardio_trainings: initial.cardio_trainings ?? [],
-    goal: (initial.goal || defaults.goal) as NutritionCalculatorInput['goal'],
+    goal: (
+      profile?.goal && Object.hasOwn(goalOptions, profile.goal)
+        ? profile.goal
+        : initial.goal || defaults.goal
+    ) as NutritionCalculatorInput['goal'],
   };
 }
 
