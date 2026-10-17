@@ -139,7 +139,6 @@ export type NutritionCalculationResult =
 
 const roundNumber = (value: number) => Math.max(0, Math.floor(value + 0.5));
 const roundToTen = (value: number) => Math.max(0, Math.floor(value / 10 + 0.5) * 10);
-const roundUpToTen = (value: number) => Math.max(0, Math.ceil(value / 10) * 10);
 
 const netExerciseCalories = (met: number, weightKg: number, durationMinutes: number) =>
   Math.max(0, (met - 1) * 3.5 * weightKg * durationMinutes) / 200;
@@ -246,7 +245,7 @@ export function calculateNutritionEstimate(
     }, 0) / 7;
   const maintenanceExact = baseTdeeExact + strengthDailyExact + cardioDailyExact;
   const goalMultiplier = goalMultipliers[input.goal];
-  let calories = roundToTen(maintenanceExact * goalMultiplier);
+  const calories = roundToTen(maintenanceExact * goalMultiplier);
 
   const proteinPerKg = {
     fat_loss: 2.2,
@@ -257,11 +256,15 @@ export function calculateNutritionEstimate(
   const fatPerKg = input.goal === 'maintenance' || input.goal === 'muscle_gain' ? 0.9 : 0.8;
   const protein = roundNumber(input.weight_kg * proteinPerKg);
   const fat = roundNumber(input.weight_kg * fatPerKg);
-  let remainingCalories = calories - protein * 4 - fat * 9;
-  const macroWarning = remainingCalories < 0;
-  if (macroWarning) {
-    calories = roundUpToTen(protein * 4 + fat * 9);
-    remainingCalories = calories - protein * 4 - fat * 9;
+  const remainingCalories = calories - protein * 4 - fat * 9;
+  if (remainingCalories < 0) {
+    return {
+      valid: false,
+      estimate: null,
+      errors: [
+        'Расчёт не сформирован: белки и жиры превышают целевую калорийность. Стандартные нормы на текущий вес здесь неприменимы; нужна индивидуальная настройка питания.',
+      ],
+    };
   }
 
   return {
@@ -279,7 +282,7 @@ export function calculateNutritionEstimate(
       protein,
       fat,
       carbs: roundNumber(remainingCalories / 4),
-      macroWarning,
+      macroWarning: false,
       accuracy: calculationAccuracy(input),
     },
   };
