@@ -4525,6 +4525,11 @@ button.today-text-link {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.active-workout-exercise__head-actions > .workout-adaptation-entry--workout {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
 .active-workout-exercise__toggle {
   min-height: 44px;
 }
