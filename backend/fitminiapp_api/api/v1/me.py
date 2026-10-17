@@ -250,7 +250,9 @@ def _build_user_response(db: Session, user) -> UserResponse:
             weight_kg=(
                 latest_weight.weight_kg
                 if latest_weight is not None
-                else user.profile.weight_kg if user.profile else None
+                else user.profile.weight_kg
+                if user.profile
+                else None
             ),
             workouts_per_week=user.profile.workouts_per_week if user.profile else None,
             cardio_trainings_per_week=(
