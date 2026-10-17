@@ -113,6 +113,7 @@ export function NutritionForm({
     () => fromInitial(initial, targetTelegramId, targetTelegramId ? null : user?.profile),
   );
 
+  const [weightEdited, setWeightEdited] = useState(false);
   const calculation = useMemo(() => calculateNutritionEstimate(form), [form]);
   const estimate = calculation.estimate;
 
@@ -122,6 +123,7 @@ export function NutritionForm({
         method: 'POST',
         body: {
           ...form,
+          record_weight_measurement: weightEdited && !targetTelegramId,
           strength_training_duration_minutes:
             form.strength_trainings_per_week > 0
               ? form.strength_training_duration_minutes
@@ -131,6 +133,7 @@ export function NutritionForm({
       }),
     onSuccess: async () => {
       clearDraft();
+      setWeightEdited(false);
       await Promise.all([
         invalidateNutritionSummaries(queryClient, clientId),
         queryClient.invalidateQueries({
@@ -257,7 +260,10 @@ export function NutritionForm({
                     step="0.1"
                     required
                     value={form.weight_kg || ''}
-                    onChange={(event) => setNumber('weight_kg', event.target.value)}
+                    onChange={(event) => {
+                      setNumber('weight_kg', event.target.value);
+                      setWeightEdited(true);
+                    }}
                   />
                 </label>
                 <label className="field">
@@ -624,8 +630,8 @@ export function NutritionForm({
 
               {!clientId && (
                 <p className="muted">
-                  При сохранении данные калькулятора обновят профиль, а текущий вес
-                  появится в дневнике замеров.
+                  При сохранении данные калькулятора обновят профиль. Если вы изменили
+                  вес, он также появится в дневнике замеров.
                 </p>
               )}
               <button disabled={mutation.isPending || !calculation.valid}>
