@@ -1876,10 +1876,19 @@ for (const width of [360, 393, 430]) {
         await page.goto(platform === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
         if (platform === 'browser') await page.getByRole('button', { name: 'Клиент' }).click();
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
-        await page
+        const replacementButton = page
           .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
-          .first()
-          .click();
+          .first();
+        const replacementGeometry = await replacementButton.evaluate((button) => {
+          const row = button.closest('.active-workout-exercise__head-actions');
+          const buttonRect = button.getBoundingClientRect();
+          const rowRect = row?.getBoundingClientRect();
+          return { buttonWidth: buttonRect.width, rowWidth: rowRect?.width ?? 0, pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth };
+        });
+        expect(replacementGeometry.rowWidth).toBeGreaterThan(0);
+        expect(replacementGeometry.buttonWidth).toBeGreaterThanOrEqual(replacementGeometry.rowWidth - 1);
+        expect(replacementGeometry.pageWidth).toBeLessThanOrEqual(replacementGeometry.viewportWidth + 1);
+        await replacementButton.click();
         const dialog = page.getByRole('dialog', {
           name: 'Заменить только в этой тренировке',
           exact: true,
