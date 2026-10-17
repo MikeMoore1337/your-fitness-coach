@@ -1,7 +1,7 @@
 {
   "issue": 873,
   "fixture": "progress-experience.spec.ts::mockProgress",
-  "revision": "66e5f050cba410c605c0cbb804c7d153e9e8aee7",
+  "revision": "936456db7e93bfbd72ffb52c1f3c735429897073",
   "browser": "Chromium",
   "themes": [
     "light",

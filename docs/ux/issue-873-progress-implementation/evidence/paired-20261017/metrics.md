@@ -1,7 +1,7 @@
 # Issue #873 paired evidence metrics
 
 - BEFORE: exact owner-requested base 4c92832415d4eb994cf6b849a67074742f07ea50.
-- AFTER: exact PR continuation capture revision 66e5f050cba410c605c0cbb804c7d153e9e8aee7.
+- AFTER: exact PR continuation capture revision 936456db7e93bfbd72ffb52c1f3c735429897073.
 - Fixture: progress-experience.spec.ts::mockProgress in both runs.
 - Browser: Chromium; themes: light/dark; viewport heights: 844px for mobile and 1000px for desktop; region: .progress-details.
 - Scroll: window.scrollY=0; region screenshot after two animation frames and document.fonts.ready.
