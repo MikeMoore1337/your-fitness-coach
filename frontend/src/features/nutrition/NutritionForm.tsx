@@ -54,7 +54,8 @@ function fromInitial(
       ...defaults,
       target_telegram_user_id: targetTelegramId,
       goal: profileGoal,
-      sex: profile?.sex ?? defaults.sex,
+      sex:
+        profile?.sex === 'female' ? 'female' : profile?.sex === 'male' ? 'male' : defaults.sex,
       height_cm: profile?.height_cm ?? defaults.height_cm,
       weight_kg: profile?.weight_kg ?? defaults.weight_kg,
       age: validProfileAge ? profileAge : defaults.age,
