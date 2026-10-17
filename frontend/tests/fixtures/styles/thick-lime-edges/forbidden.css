@@ -2,6 +2,10 @@
   border-left: 3px solid var(--v2-lime);
 }
 
+.semantic-warning {
+  border-left: 4px solid var(--v2-lime);
+}
+
 .forbidden-bottom {
   border-bottom: 4px solid var(--accent);
 }

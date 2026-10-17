@@ -22,7 +22,7 @@ const SOURCE_EXTENSIONS = new Set([
 const LIME_VALUE_RE =
   /(?:var\(\s*--[^)]*(?:lime|accent|brand-lime|weekly-review-lime)[^)]*\)|--(?:[^,\s)]*lime|[^,\s)]*accent|brand-lime|weekly-review-lime)\b|#(?:b2f520|b6f238|98d62f|a7e52d|99d522|6b8f20|79a71c)\b)/i;
 const ALLOWED_CONTEXT_RE =
-  /(?:\b(?:active|selected|selection|current|focus|focused|focus-visible|pressed|checked|cta|call-to-action|primary-action|status|warning|danger|error|success|notice|alert|permission|offline|stale|validation|fallback|handoff|data-confidence)\b|:(?:focus|focus-visible|active|checked)|\[\s*aria-(?:current|selected|pressed|checked)|\[\s*role\s*=\s*["']?(?:status|alert))/i;
+  /(?:\b(?:active|selected|selection|current|focus|focused|focus-visible|pressed|checked|cta|call-to-action|primary-action)\b|:(?:focus|focus-visible|active|checked)|\[\s*aria-(?:current|selected|pressed|checked))/i;
 
 const SIDE_PROPERTIES = new Map([
   ['border-left', 'left'],

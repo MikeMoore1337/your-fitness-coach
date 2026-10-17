@@ -71,7 +71,10 @@ describe('thick lime edge safeguard', () => {
       /\.progress-report-confidence\s*\{[^}]*border-left\s*:\s*3px\s+solid\s+var\(--v2-lime\)/s,
     );
     expect(systemStyles).toMatch(
-      /\.data-confidence\s*\{[^}]*border-inline-start-width\s*:\s*3px[^}]*border-inline-start-color\s*:\s*var\(--v2-lime\)/s,
+      /\.data-confidence\s*\{[^}]*border\s*:\s*1px solid var\(--v2-border\)/s,
+    );
+    expect(systemStyles).not.toMatch(
+      /\.data-confidence\s*\{[^}]*border-inline-start-width\s*:\s*3px/s,
     );
   });
 });

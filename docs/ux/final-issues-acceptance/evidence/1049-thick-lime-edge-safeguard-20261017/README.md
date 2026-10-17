@@ -21,15 +21,17 @@ master. BEFORE deliberately injects only the original 3px lime decoration into t
 fixture; AFTER uses the corrected production CSS. These are **synthetic test captures**, not
 production screenshots or personal user data.
 
-- Dark: [BEFORE](before/progress-good-card-mobile-393-dark.png) · [AFTER](after/progress-good-card-mobile-393-dark.png)
-- Light: [BEFORE](before/progress-good-card-mobile-393-light.png) · [AFTER](after/progress-good-card-mobile-393-light.png)
+- «Что идёт хорошо», Dark: [BEFORE](before/progress-good-card-mobile-393-dark.png) · [AFTER](after/progress-good-card-mobile-393-dark.png)
+- «Что идёт хорошо», Light: [BEFORE](before/progress-good-card-mobile-393-light.png) · [AFTER](after/progress-good-card-mobile-393-light.png)
+- «Данных достаточно для оценки» (`DataConfidence`), Dark: [BEFORE](before/progress-confidence-mobile-393-dark.png) · [AFTER](after/progress-confidence-mobile-393-dark.png)
+- «Данных достаточно для оценки» (`DataConfidence`), Light: [BEFORE](before/progress-confidence-mobile-393-light.png) · [AFTER](after/progress-confidence-mobile-393-light.png)
 
 ## Audited and changed sources
 
 - Removed the decorative 3px lime `border-left` from the Progress “Что идёт хорошо” column in `ux-ia-redesign.css`.
 - Removed the decorative `inset 3px 0` lime rail from `.app-section--progress .program-history-workout`.
 - Removed the decorative 3px lime left edge from the report confidence container while retaining its thin uniform frame.
-- Preserved `DataConfidence`, active/current/selected states, keyboard focus, CTA treatments and semantic status/warning styling.
+- Preserved `DataConfidence` message, status icons and actions while replacing its 3px one-sided lime rail with the same neutral 1px border as the other sides (throughout YFC). Active/current/selected states, keyboard focus and CTA treatments remain.
 
 ## Permanent safeguard
 
@@ -40,7 +42,8 @@ shadow, edge-sized lime gradient or positioned pseudo-element at 3px or more, wh
 explicit allowed state and semantic-status contexts.
 
 The isolated negative fixtures intentionally fail with exit code 1; allowed thin-frame,
-active-tab, focus and semantic-warning fixtures pass with exit code 0. The computed-style E2E
+active-tab, focus and thin-framed semantic-warning fixtures pass with exit code 0.
+Thick one-sided lime rails on semantic warnings are forbidden too. The computed-style E2E
 also checks Progress at 320/360/393/430/1440 px in light and dark Chromium runs. Cross-browser
 verification is reported separately; this evidence is not a claim of physical iPhone,
 Telegram-native or production verification.

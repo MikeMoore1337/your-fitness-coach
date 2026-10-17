@@ -1139,7 +1139,7 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
         const allowed = (element: HTMLElement) =>
           Boolean(
             element.closest(
-              '.data-confidence, .data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, [role="status"], [role="alert"], .cta',
+              '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta',
             ),
           );
         const violations: string[] = [];
@@ -1180,13 +1180,15 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
           confidenceBorderLeftColor: confidence
             ? getComputedStyle(confidence).borderLeftColor
             : null,
+          confidenceBorderTopColor: confidence ? getComputedStyle(confidence).borderTopColor : null,
           lime,
         };
       });
       expect(contract.violations).toEqual([]);
       expect(contract.goodBorderLeftWidth).not.toBe('3px');
-      expect(contract.confidenceBorderLeftWidth).toBe('3px');
-      expect(contract.confidenceBorderLeftColor).toBe(contract.lime);
+      expect(contract.confidenceBorderLeftWidth).toBe('1px');
+      expect(contract.confidenceBorderLeftColor).toBe(contract.confidenceBorderTopColor);
+      expect(contract.confidenceBorderLeftColor).not.toBe(contract.lime);
 
       if (CAPTURE_1049_BEFORE_EVIDENCE && viewport.width >= 1440) {
         const baselineStyle = await page.addStyleTag({
@@ -1216,6 +1218,21 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
         await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
         await goodCard.screenshot({
           path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-good.png'),
+        });
+
+        const confidenceCard = page.locator('.data-confidence--sufficient').first();
+        const historicalConfidenceRail = await page.addStyleTag({
+          content:
+            '.app-section--progress .data-confidence { border-inline-start-width: 3px !important; border-inline-start-color: var(--v2-lime) !important; }',
+        });
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-confidence.png'),
+        });
+        await historicalConfidenceRail.evaluate((element) =>
+          element.parentNode?.removeChild(element),
+        );
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-confidence.png'),
         });
       }
 

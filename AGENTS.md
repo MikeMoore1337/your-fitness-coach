@@ -71,8 +71,9 @@ visual redesigns.
 Do not add a disproportionate one-sided lime edge to a user-facing component. A style is
 forbidden when a single physical or logical side, inset shadow rail, hard-stop gradient or
 positioned pseudo-element uses a YFC lime/accent color at 3px or more. A uniform 1px frame,
-ordinary thin outline, focus outline, active/current/selected state, CTA treatment and a
-semantic status or warning are allowed; this is not a global ban on borders, shadows,
+ordinary thin outline, focus outline, active/current/selected state and CTA treatment
+are allowed. Semantic status and warning messages must keep their icons and text but
+must not use a thick one-sided lime strip; this is not a global ban on borders, shadows,
 outlines or lime.
 
 `npm run lint` includes `lint:lime-edges`, which checks changed CSS, CSS Modules, JSX/TSX

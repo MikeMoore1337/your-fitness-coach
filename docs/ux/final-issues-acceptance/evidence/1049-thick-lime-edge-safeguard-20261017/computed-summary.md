@@ -11,8 +11,8 @@ Observed in the deterministic fixture:
 
 - Progress “Что идёт хорошо”: `border-left-width` is 3px in the reconstructed BEFORE and is
   absent after the fix.
-- `DataConfidence`: the semantic `border-left-width: 3px` and lime color remain present and are
-  explicitly accepted by the contract test.
+- `DataConfidence`: its status text, icons and actions remain, while the former 3px
+  one-sided lime border becomes a uniform neutral 1px border, asserted by the contract test.
 - Progress history workout: the decorative `inset 3px 0` lime shadow is removed; the ordinary
   1px contour remains.
 - No unapproved one-sided computed lime border or inset rail was found at 320, 360, 393, 430 or
