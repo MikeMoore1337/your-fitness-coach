@@ -2424,6 +2424,10 @@ test('trainer nutrition report stays scoped to the active client and remains rea
   const report = nutrition.locator('#nutrition-period-report');
   await expect(report.getByRole('heading', { name: 'Отчёт по питанию' })).toBeVisible();
   await expect(report.getByText('Заполнено 1 из 30 дней')).toBeVisible();
+  const days = report.locator('.nutrition-report-days');
+  await expect(days).not.toHaveAttribute('open', '');
+  await days.locator(':scope > summary').click();
+  await expect(days).toHaveAttribute('open', '');
   await expect(
     report.getByRole('table', {
       name: 'Дневные КБЖУ, статус заполнения и действовавшая цель',
