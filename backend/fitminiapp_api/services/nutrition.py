@@ -193,10 +193,6 @@ def _round_to_ten(value: float) -> int:
     return max(0, math.floor(value / 10 + 0.5) * 10)
 
 
-def _round_up_to_ten(value: float) -> int:
-    return max(0, math.ceil(value / 10) * 10)
-
-
 def _target_calories(maintenance_calories: float, goal: str) -> int:
     return _round_to_ten(maintenance_calories * GOAL_MULTIPLIERS[goal])
 
@@ -298,12 +294,15 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
     calories = _target_calories(maintenance_calories, goal)
     macros = calculate_macros(payload.weight_kg, calories, goal)
     if macros["macro_warning"]:
-        # A calorie target below its own protein/fat allocation is internally
-        # inconsistent and could previously become zero for accepted edge
-        # inputs. Raise it only as far as needed to make every macro nonnegative.
-        calories = _round_up_to_ten(macros["protein_g"] * 4 + macros["fat_g"] * 9)
-        macros = calculate_macros(payload.weight_kg, calories, goal)
-        macros["macro_warning"] = True
+        # Fail closed: increasing calories to fit weight-based macros can
+        # silently reverse a deficit or create an unapproved surplus.
+        # A different reference mass / macro allocation needs its own
+        # explicitly reviewed nutrition policy.
+        raise NutritionError(
+            "Расчёт не сформирован: белки и жиры превышают целевую калорийность. "
+            "Стандартные нормы на текущий вес здесь неприменимы; "
+            "нужна индивидуальная настройка питания."
+        )
 
     return {
         "bmr": _round_number(bmr),
