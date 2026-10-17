@@ -129,6 +129,10 @@ def _client_entry_from_user(
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
     profile = user.profile
+    # Use the same effective weight as the user's own profile screen.
+    from fitminiapp_api.services.measurements import latest_current_weight_measurement
+
+    latest_weight = latest_current_weight_measurement(db, user)
     return {
         "id": user.id,
         "invite_id": None,
@@ -139,7 +143,11 @@ def _client_entry_from_user(
         "goal": profile.goal if profile else None,
         "level": profile.level if profile else None,
         "height_cm": profile.height_cm if profile else None,
-        "weight_kg": profile.weight_kg if profile else None,
+        "weight_kg": (
+            latest_weight.weight_kg
+            if latest_weight is not None
+            else profile.weight_kg if profile else None
+        ),
         "workouts_per_week": profile.workouts_per_week if profile else None,
         "cardio_trainings_per_week": (profile.cardio_trainings_per_week if profile else None),
         "resting_heart_rate": profile.resting_heart_rate if profile else None,
