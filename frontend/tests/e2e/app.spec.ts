@@ -2470,12 +2470,28 @@ test('поля профиля и питания выровнены на деск
   await openAppDestination(page, 'Питание');
   const nutritionSettings = page.locator('details.nutrition-target-settings');
   await expect(nutritionSettings).toHaveCount(1);
+  await expect(nutritionSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
+  const nutritionSectionOrder = await page
+    .locator('.nutrition-experience > *')
+    .evaluateAll((nodes) => nodes.map((node) => String(node.className)));
+  const settingsIndex = nutritionSectionOrder.findIndex((name) =>
+    name.includes('nutrition-target-settings'),
+  );
+  const mealPlannerIndex = nutritionSectionOrder.findIndex((name) => name.includes('meal-planner'));
+  const groceryListIndex = nutritionSectionOrder.findIndex((name) => name.includes('grocery-list'));
+  expect(settingsIndex).toBeGreaterThanOrEqual(0);
+  expect(settingsIndex).toBeLessThan(mealPlannerIndex);
+  expect(settingsIndex).toBeLessThan(groceryListIndex);
   await nutritionSettings.locator(':scope > summary').click();
   await expect(nutritionSettings).toHaveAttribute('open', '');
-  const nutritionTargetCard = nutritionSettings.locator('details.card-disclosure');
-  await expect(nutritionTargetCard).toHaveCount(1);
-  await nutritionTargetCard.locator(':scope > summary').click();
-  await expect(nutritionTargetCard).toHaveAttribute('open', '');
+  await expect(nutritionSettings.locator(':scope > summary')).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(nutritionSettings.locator('details.card-disclosure')).toHaveCount(0);
+  await expect(
+    nutritionSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+  ).toBeVisible();
   const nutritionControlTops = await page
     .locator('.nutrition-form-grid')
     .first()

@@ -62,24 +62,23 @@ export function NutritionPage({
         readOnlyEntries={readOnlyEntries}
         timeZone={timeZone}
       />
-      {!demoSafeMode && (
-        <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-      )}
-      {!demoSafeMode && (
-        <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
-      )}
       <details
         id="nutrition-target-settings"
         className="nutrition-target-settings"
         open={settingsOpen}
         onToggle={(event) => setSettingsOpen(event.currentTarget.open)}
       >
-        <summary className="yfc-disclosure-summary">
-          Настройки питания
+        <summary
+          className="yfc-disclosure-summary"
+          aria-controls="nutrition-target-settings-body"
+          aria-expanded={settingsOpen}
+        >
+          Настройки КБЖУ
           <DisclosureIcon />
         </summary>
-        <div className="nutrition-target-settings__body">
+        <div id="nutrition-target-settings-body" className="nutrition-target-settings__body">
           <NutritionForm
+            embedded
             initial={initial}
             readOnly={readOnlyTargets}
             timeZone={timeZone}
@@ -87,6 +86,12 @@ export function NutritionPage({
           />
         </div>
       </details>
+      {!demoSafeMode && (
+        <MealPlanner initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      )}
+      {!demoSafeMode && (
+        <GroceryList initialDate={initialDate} readOnly={readOnlyEntries} timeZone={timeZone} />
+      )}
       <AiCoachContextualEntry
         context={{ surface: 'nutrition', periodDays: 7 }}
         entryPoint="nutrition"
