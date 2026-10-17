@@ -185,7 +185,7 @@ def mutate_rest_session(
     if row.version != payload.expected_version or row.status != "running":
         raise HTTPException(status_code=409, detail="Состояние отдыха изменилось")
     if payload.action in ("add30", "add60"):
-        if payload.ended_at is not None or payload.corrected:
+        if payload.ended_at is not None or payload.corrected or payload.corrected_seconds is not None:
             raise HTTPException(status_code=422, detail="Время окончания здесь не требуется")
         applied_at = _utc_naive(payload.occurred_at) if payload.occurred_at else _now()
         if applied_at < row.started_at or applied_at > _now() + timedelta(minutes=1):
@@ -196,26 +196,27 @@ def mutate_rest_session(
         )
     else:
         if payload.action == "complete":
+            if payload.corrected != (payload.corrected_seconds is not None):
+                raise HTTPException(status_code=422, detail="Для исправления укажите фактическую длительность")
             if payload.ended_at is None:
                 raise HTTPException(status_code=422, detail="Укажите время остановки")
             ended = _utc_naive(payload.ended_at)
-            if ended < row.started_at or ended > _now() + timedelta(minutes=1):
+            if ended > _now() + timedelta(minutes=1):
                 raise HTTPException(status_code=422, detail="Недопустимое время окончания")
-            if not payload.corrected and ended - row.started_at > timedelta(
-                seconds=min(max(12 * row.adjusted_seconds, 12 * 3600), 24 * 3600)
-            ):
-                raise HTTPException(status_code=409, detail="Интервал требует ручного уточнения")
+            if payload.corrected:
+                # The owner explicitly reports the duration after returning from background.
+                # Do not derive a fictitious interval from wall clock time while absent.
+                row.measured_seconds = payload.corrected_seconds
+            else:
+                if ended < row.started_at:
+                    raise HTTPException(status_code=422, detail="Недопустимое время окончания")
+                row.measured_seconds = max(0, int((ended - row.started_at).total_seconds()))
             row.ended_at = ended
-            row.measured_seconds = max(0, int((ended - row.started_at).total_seconds()))
             row.status = "completed"
             row.source = "USER_CORRECTED" if payload.corrected else "USER_CONFIRMED"
-            row.quality = (
-                "long"
-                if row.measured_seconds > max(row.adjusted_seconds * 4, 30 * 60)
-                else "normal"
-            )
+            row.quality = "normal"
         else:
-            if payload.ended_at is not None or payload.corrected:
+            if payload.ended_at is not None or payload.corrected or payload.corrected_seconds is not None:
                 raise HTTPException(status_code=422, detail="Конечное время не требуется")
             row.ended_at = _now()
             row.status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
