@@ -1,0 +1,31 @@
+.forbidden-left {
+  border-left: 3px solid var(--v2-lime);
+}
+
+.forbidden-bottom {
+  border-bottom: 4px solid var(--accent);
+}
+
+.forbidden-logical {
+  border-inline-start: 3px solid var(--brand-lime);
+}
+
+.forbidden-inset {
+  box-shadow: inset 3px 0 0 var(--v2-lime);
+}
+
+.forbidden-pseudo {
+  position: relative;
+}
+
+.forbidden-pseudo::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--v2-lime);
+}
+
+.forbidden-gradient {
+  background: linear-gradient(to right, var(--v2-lime) 0 4px, transparent 4px);
+}

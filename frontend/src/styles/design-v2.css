@@ -8070,7 +8070,6 @@ button.notification-row__main:focus-visible {
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
-  box-shadow: inset 3px 0 var(--v2-lime);
 }
 
 .app-section--progress .program-history-workout__header {
@@ -11701,7 +11700,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   margin-block: 28px;
   padding: 16px;
   border: 1px solid var(--v2-border);
-  border-left: 3px solid var(--v2-lime);
   background: var(--v2-surface-secondary);
 }
 
