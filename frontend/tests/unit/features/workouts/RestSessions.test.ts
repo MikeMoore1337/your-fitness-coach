@@ -6,6 +6,7 @@ import {
   loadRestJournal,
   markRestBackground,
   recoverRestAfterAbsence,
+  restJournalStorageKey,
   REST_ABSENCE_REVIEW_MS,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
@@ -47,6 +48,24 @@ describe('measured rest journal #960', () => {
     expect(activeRestJournalSession(11, 56)).toBeNull();
     expect(updateMeasuredRest(11, 56, 1002, 'complete', base + 200_000)).toBeNull();
     expect(loadRestJournal(11, 56)[0]?.pending).toHaveLength(1);
+  });
+
+  it('recovers terminal events after a second tab overwrites the shared journal', () => {
+    const startedAt = 2_250_000;
+    beginMeasuredRest(11, 56, 1008, 90, startedAt);
+    const key = restJournalStorageKey(11, 56);
+    const staleSnapshot = localStorage.getItem(key);
+    const stopped = updateMeasuredRest(11, 56, 1008, 'complete', startedAt + 120_000);
+    expect(stopped?.status).toBe('completed');
+    expect(stopped?.pending).toHaveLength(1);
+    // Emulate another tab saving an older copy after the stop was journaled.
+    expect(staleSnapshot).not.toBeNull();
+    localStorage.setItem(key, staleSnapshot!);
+    const recovered = loadRestJournal(11, 56)[0];
+    expect(recovered?.pending[0]?.action).toBe('complete');
+    expect(recovered?.status).toBe('completed');
+    expect(recovered?.source).toBe('USER_CONFIRMED');
+    expect(activeRestJournalSession(11, 56)).toBeNull();
   });
 
   it('does not prompt while actively using the workout, even if rest is long', () => {
