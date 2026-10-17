@@ -4102,7 +4102,9 @@ test('rest timer reaches its final state from the deadline without user events',
   await expect(panel).toHaveCount(0);
 });
 
-test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({ page }) => {
+test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({
+  page,
+}) => {
   const start = new Date('2026-09-09T12:00:00Z');
   await page.clock.setFixedTime(start);
   await mockActiveWorkout(page);
@@ -4113,23 +4115,32 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
   await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
-  await expect(page.locator('.active-workout-rest').getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(
+    page.locator('.active-workout-rest').getByRole('button', { name: 'Завершить отдых' }),
+  ).toBeVisible();
   await page.evaluate(() => {
     Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
     document.dispatchEvent(new Event('visibilitychange'));
   });
   await page.clock.setFixedTime(new Date(start.getTime() + 17 * 60_000));
   await page.evaluate(() => {
-    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' });
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
     document.dispatchEvent(new Event('visibilitychange'));
   });
   const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
   await expect(review).toBeVisible();
   await expect(review).toContainText('Вы забыли завершить отдых?');
   await expect(page.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
-  await review.getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' }).fill('2,5');
+  await review
+    .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
+    .fill('2,5');
   await review.getByRole('button', { name: 'Сохранить время' }).click();
-  await expect(page.locator('.active-workout-rest')).toContainText('Отдых сохранён по вашей отметке');
+  await expect(page.locator('.active-workout-rest')).toContainText(
+    'Отдых сохранён по вашей отметке',
+  );
   const journal = await page.evaluate(() =>
     Object.keys(localStorage)
       .filter((key) => key.includes(':measured:v1'))

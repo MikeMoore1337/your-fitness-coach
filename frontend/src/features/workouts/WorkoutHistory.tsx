@@ -45,7 +45,9 @@ function restHistoryLabel(row: RestHistoryEntry): string {
 
 function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
   if (!sessions?.length) return <p className="muted">Отдых: нет достоверных замеров.</p>;
-  const confirmed = sessions.filter((row) => row.status === 'completed' && row.measured_seconds !== null).length;
+  const confirmed = sessions.filter(
+    (row) => row.status === 'completed' && row.measured_seconds !== null,
+  ).length;
   return (
     <details className="workout-history__rest">
       <summary className="yfc-disclosure-summary">

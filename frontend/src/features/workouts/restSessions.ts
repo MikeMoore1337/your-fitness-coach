@@ -153,10 +153,22 @@ export function updateMeasuredRest(
   const row = records.find((item) => item.source_set_id === sourceSetId);
   if (!row || row.status !== 'running') return null;
   // Variant C: unresolved background returns must be explicitly corrected or skipped.
-  if (row.needs_review && action !== 'skip' && !(action === 'complete' && correctedSeconds !== undefined)) return null;
-  if (correctedSeconds !== undefined &&
-      (action !== 'complete' || !Number.isInteger(correctedSeconds) || correctedSeconds < 0 || correctedSeconds > 86400)) return null;
-  if (action === 'complete' && correctedSeconds === undefined && at < Date.parse(row.started_at)) return null;
+  if (
+    row.needs_review &&
+    action !== 'skip' &&
+    !(action === 'complete' && correctedSeconds !== undefined)
+  )
+    return null;
+  if (
+    correctedSeconds !== undefined &&
+    (action !== 'complete' ||
+      !Number.isInteger(correctedSeconds) ||
+      correctedSeconds < 0 ||
+      correctedSeconds > 86400)
+  )
+    return null;
+  if (action === 'complete' && correctedSeconds === undefined && at < Date.parse(row.started_at))
+    return null;
   const effectiveAction = action;
   const occurredAt = new Date(at).toISOString();
   const entry: QueuedRestAction = {
@@ -212,12 +224,19 @@ export function markRestBackground(userId: number, workoutId: number, at = Date.
 }
 
 /** Variant C: prompt only if the user was away AND the plan is overdue by 15 min. */
-export function recoverRestAfterAbsence(userId: number, workoutId: number, at = Date.now()): LocalRestSession | null {
+export function recoverRestAfterAbsence(
+  userId: number,
+  workoutId: number,
+  at = Date.now(),
+): LocalRestSession | null {
   const records = loadRestJournal(userId, workoutId);
   const row = records.find((item) => item.status === 'running');
   if (!row) return null;
   if (row.background_since !== undefined) {
-    if (at - row.background_since >= REST_ABSENCE_REVIEW_MS && at - row.deadline >= REST_ABSENCE_REVIEW_MS) {
+    if (
+      at - row.background_since >= REST_ABSENCE_REVIEW_MS &&
+      at - row.deadline >= REST_ABSENCE_REVIEW_MS
+    ) {
       row.needs_review = true;
     }
     row.background_since = undefined;

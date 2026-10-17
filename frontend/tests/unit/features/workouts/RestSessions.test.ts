@@ -54,7 +54,13 @@ describe('measured rest journal #960', () => {
     beginMeasuredRest(11, 56, 1005, 90, startedAt);
     const returned = recoverRestAfterAbsence(11, 56, startedAt + REST_ABSENCE_REVIEW_MS * 5);
     expect(returned?.needs_review).toBeUndefined();
-    const confirmed = updateMeasuredRest(11, 56, 1005, 'complete', startedAt + REST_ABSENCE_REVIEW_MS * 5);
+    const confirmed = updateMeasuredRest(
+      11,
+      56,
+      1005,
+      'complete',
+      startedAt + REST_ABSENCE_REVIEW_MS * 5,
+    );
     expect(confirmed?.status).toBe('completed');
     expect(confirmed?.source).toBe('USER_CONFIRMED');
   });
@@ -85,7 +91,9 @@ describe('measured rest journal #960', () => {
     const start = 4_000_000;
     beginMeasuredRest(11, 56, 1007, 60, start);
     markRestBackground(11, 56, start + 60_000);
-    expect(recoverRestAfterAbsence(11, 56, start + 60_000 + REST_ABSENCE_REVIEW_MS + 1)?.needs_review).toBe(true);
+    expect(
+      recoverRestAfterAbsence(11, 56, start + 60_000 + REST_ABSENCE_REVIEW_MS + 1)?.needs_review,
+    ).toBe(true);
     const skipped = updateMeasuredRest(11, 56, 1007, 'skip');
     expect(skipped?.status).toBe('skipped');
     expect(skipped?.source).toBeUndefined();
