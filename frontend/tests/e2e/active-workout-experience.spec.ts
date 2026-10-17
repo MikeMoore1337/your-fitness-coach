@@ -1904,11 +1904,20 @@ for (const width of [360, 393, 430]) {
           const row = button.closest('.active-workout-exercise__head-actions');
           const buttonRect = button.getBoundingClientRect();
           const rowRect = row?.getBoundingClientRect();
-          return { buttonWidth: buttonRect.width, rowWidth: rowRect?.width ?? 0, pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth };
+          return {
+            buttonWidth: buttonRect.width,
+            rowWidth: rowRect?.width ?? 0,
+            pageWidth: document.documentElement.scrollWidth,
+            viewportWidth: innerWidth,
+          };
         });
         expect(replacementGeometry.rowWidth).toBeGreaterThan(0);
-        expect(replacementGeometry.buttonWidth).toBeGreaterThanOrEqual(replacementGeometry.rowWidth - 1);
-        expect(replacementGeometry.pageWidth).toBeLessThanOrEqual(replacementGeometry.viewportWidth + 1);
+        expect(replacementGeometry.buttonWidth).toBeGreaterThanOrEqual(
+          replacementGeometry.rowWidth - 1,
+        );
+        expect(replacementGeometry.pageWidth).toBeLessThanOrEqual(
+          replacementGeometry.viewportWidth + 1,
+        );
         await replacementButton.click();
         const dialog = page.getByRole('dialog', {
           name: 'Заменить только в этой тренировке',
