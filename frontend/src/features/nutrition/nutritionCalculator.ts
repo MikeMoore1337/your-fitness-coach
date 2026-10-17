@@ -109,7 +109,7 @@ const legacyCardioIntensities = {
 
 export const goalMultipliers = {
   fat_loss: 0.85,
-  recomposition: 1,
+  recomposition: 0.95,
   maintenance: 1,
   muscle_gain: 1.05,
 } as const;
