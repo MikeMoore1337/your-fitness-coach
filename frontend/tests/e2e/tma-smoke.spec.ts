@@ -64,6 +64,19 @@ async function expectLimeStartBoundary(locator: Locator) {
   expect(colors.boundary).toBe(colors.lime);
 }
 
+async function expectNeutralStartBoundary(locator: Locator) {
+  const boundary = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      width: style.borderInlineStartWidth,
+      start: style.borderInlineStartColor,
+      top: style.borderTopColor,
+    };
+  });
+  expect(boundary.width).toBe('1px');
+  expect(boundary.start).toBe(boundary.top);
+}
+
 test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on one platform contract', async ({
   browserName,
   mobilePage,
@@ -1318,7 +1331,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     await expect(insufficient).toBeVisible();
     await expect(insufficient).toContainText('0 рабочих подходов');
     await expect(page.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-    await expectLimeStartBoundary(insufficient);
+    await expectNeutralStartBoundary(insufficient);
     await expectNoHorizontalOverflow(page);
     await expectTouchTargets(
       page.locator('#progress-training .data-confidence__details > summary:visible'),
@@ -1401,7 +1414,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(limited).toBeVisible();
   await expect(limited).toContainText('1 рабочий подход в 1 тренировке');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-  await expectLimeStartBoundary(limited);
+  await expectNeutralStartBoundary(limited);
   await expectNoHorizontalOverflow(tmaPage);
   await expectTouchTargets(limited.locator('.data-confidence__details > summary'));
   await limited.screenshot({
@@ -1414,7 +1427,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(stale).toBeVisible();
   await expect(stale).toContainText('Новые данные загружаются');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
-  await expectLimeStartBoundary(stale);
+  await expectNeutralStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);
   // Period changes move the card through the floating dock; verify its reachable reading position.
   await stale.evaluate((element) =>
@@ -2968,7 +2981,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
           .getByRole('region', { name: /^Достаточно ли данных:/ });
         for (const confidence of await confidences.all()) {
           await confidence.scrollIntoViewIfNeeded();
-          await expectLimeStartBoundary(confidence);
+          await expectNeutralStartBoundary(confidence);
         }
       }
       if (scenario.label === 'nutrition-search') {
