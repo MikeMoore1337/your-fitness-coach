@@ -10178,6 +10178,8 @@ export interface components {
             media_preferred_mode?: ("static" | "animation") | null;
             /** Media Animation Url */
             media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             guide?: components["schemas"]["ExerciseGuide"] | null;
         };
         /** ExerciseEstimated1RM */
@@ -17606,6 +17608,8 @@ export interface components {
             media_preferred_mode?: ("static" | "animation") | null;
             /** Media Animation Url */
             media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             progression_guidance?: components["schemas"]["ProgressionGuidance"] | null;
             /** Sets */
             sets: components["schemas"]["LoggedSetItem"][];

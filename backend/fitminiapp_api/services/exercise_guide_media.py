@@ -90,6 +90,7 @@ def get_guide_media_preview(slug: str) -> dict[str, object]:
             "thumbnail_sources": [],
             "preferred_mode": None,
             "animation_url": None,
+            "video_sources": [],
         }
     posters = _poster_sources(media)
     return {
@@ -98,6 +99,7 @@ def get_guide_media_preview(slug: str) -> dict[str, object]:
         "thumbnail_sources": [_source_payload(source) for source in posters],
         "preferred_mode": "static" if media.get("poster_preferred") else "animation",
         "animation_url": _public_url(str(media["path"])) if media["type"] == "animation" else None,
+        "video_sources": [_source_payload(source) for source in media.get("video_sources", [])],
     }
 
 
