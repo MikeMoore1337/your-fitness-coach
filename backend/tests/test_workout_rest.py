@@ -322,14 +322,22 @@ def test_owner_corrects_forgotten_rest_duration(client):
         "corrected_seconds": 150,
     }
     assert client.post(url, headers=stranger, json=corrected).status_code == 404
-    assert client.post(url, headers=owner, json={
-        **corrected,
-        "corrected_seconds": None,
-    }).status_code == 422
-    assert client.post(url, headers=owner, json={
-        **corrected,
-        "corrected": False,
-    }).status_code == 422
+    assert (
+        client.post(
+            url,
+            headers=owner,
+            json={**corrected, "corrected_seconds": None},
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            url,
+            headers=owner,
+            json={**corrected, "corrected": False},
+        ).status_code
+        == 422
+    )
     saved = client.post(url, headers=owner, json=corrected)
     assert saved.status_code == 200, saved.text
     assert saved.json()["measured_seconds"] == 150
@@ -337,6 +345,11 @@ def test_owner_corrects_forgotten_rest_duration(client):
     retried = client.post(url, headers=owner, json=corrected)
     assert retried.status_code == 200
     assert retried.json()["version"] == saved.json()["version"]
-    assert client.post(url, headers=owner, json={
-        **corrected, "mutation_id": str(uuid4()),
-    }).status_code == 409
+    assert (
+        client.post(
+            url,
+            headers=owner,
+            json={**corrected, "mutation_id": str(uuid4())},
+        ).status_code
+        == 409
+    )
