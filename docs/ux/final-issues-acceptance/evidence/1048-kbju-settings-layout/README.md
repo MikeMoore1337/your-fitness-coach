@@ -22,8 +22,15 @@
 - Desktop Web: [1280 Dark](after/desktop-web-1280x900-dark.png), [1440 Light](after/desktop-web-1440x900-light.png)
 - Mock TMA: [320 Dark](after/tma-mock-320x760-dark.png), [360 Dark](after/tma-mock-360x800-dark.png), [393 Light](after/tma-mock-393x852-light.png), [430 Dark](after/tma-mock-430x932-dark.png)
 
+Дополнительная проверка компоновки после интеграции с принятой #1047 (Chromium, закрытые секции):
+
+- [Mobile overview 393×844 Dark](after/mobile-overview-393x844-dark.png)
+- [Mobile overview 393×844 Light](after/mobile-overview-393x844-light.png)
+
 На AFTER секция называется «Настройки КБЖУ», находится перед планом питания и списком покупок,
-а режимы и форма видны сразу после одного раскрытия. Внешний dock остаётся частью viewport;
+а режимы и форма видны сразу после одного раскрытия. Во всех трёх закрытых секциях
+сохранены одинаковые рамки, фон и интервал 16px из #1047.
+Внешний dock остаётся частью viewport;
 достижимость кнопки сохранения отдельно проверяется после прокрутки к ней.
 
 ## Проверки
