@@ -2366,6 +2366,7 @@ export function TodayWorkout({
 
                 {isCurrentExercise &&
                   (exercise.media_state === 'approved_animated' ||
+                    exercise.media_state === 'approved_static' ||
                     exercise.media_state === 'blocked') && (
                     <div
                       className={`active-workout-exercise__media ${exercise.media_state === 'blocked' ? 'active-workout-exercise__media--blocked' : ''}`}
@@ -2382,6 +2383,7 @@ export function TodayWorkout({
                       ) : (
                         <ExerciseMediaAsset
                           animationUrl={exercise.media_animation_url}
+                          videoSources={exercise.media_video_sources}
                           alt={`${exercise.exercise_title}: техника движения`}
                           thumbnailUrl={exercise.media_thumbnail_url}
                           thumbnailSources={exercise.media_thumbnail_sources}
