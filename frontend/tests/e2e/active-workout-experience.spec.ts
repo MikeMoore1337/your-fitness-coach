@@ -4143,7 +4143,8 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
   );
   const journal = await page.evaluate(() =>
     Object.keys(localStorage)
-      .filter((key) => key.includes(':measured:v1'))
+      // Per-action ':op:<id>' records are objects, not session arrays.
+      .filter((key) => key.endsWith(':measured:v1'))
       .flatMap((key) => JSON.parse(localStorage.getItem(key) || '[]')),
   );
   expect(journal[0]?.source).toBe('USER_CORRECTED');
