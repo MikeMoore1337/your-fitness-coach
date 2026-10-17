@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ru" data-theme="dark" data-state="countdown">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Issue #960 — RestTimer baseline-preserving review</title>
+    <link rel="stylesheet" href="prototype.css" />
+  </head>
+  <body>
+    <div class="review-shell">
+      <header class="review-header">
+        <div>
+          <p class="eyebrow">Текущая тренировка</p>
+          <h1>Отдых между подходами</h1>
+        </div>
+        <p class="fixture-label">Обезличенный макет</p>
+      </header>
+
+      <div class="review-toolbar" aria-label="Управление макетом">
+        <span class="toolbar-label">Состояние макета</span>
+        <button class="toolbar-button" type="button" data-mode-button="baseline">Действующий UI</button>
+        <button class="toolbar-button" type="button" data-mode-button="proposed">Новая композиция</button>
+        <button class="toolbar-button" type="button" data-state-button="countdown">До нуля</button>
+        <button class="toolbar-button" type="button" data-state-button="overtime">После нуля</button>
+        <button class="toolbar-button" type="button" data-theme-button="dark">Dark</button>
+        <button class="toolbar-button" type="button" data-theme-button="light">Light</button>
+      </div>
+
+      <main class="active-workout-demo">
+        <aside class="active-workout-rest" aria-label="Отдых между подходами">
+          <div class="rest-time">
+            <span>Отдых</span>
+            <strong class="countdown" role="timer" aria-live="off">0:48</strong>
+          </div>
+          <div class="rest-next">
+            <div class="rest-next-copy">
+              <small class="rest-status" hidden>План завершён</small>
+              <strong>Далее: Тяга верхнего блока — повторный тяжёлый подход</strong>
+              <span>2-й подход</span>
+            </div>
+            <div class="rest-actual" aria-label="Фактически измеренный интервал по отметке пользователя">
+              <div class="rest-actual-copy">
+                <span>Факт</span>
+                <strong class="fact">0:42</strong>
+              </div>
+              <button class="rest-stop" type="button" aria-label="Завершить отдых">Стоп</button>
+            </div>
+          </div>
+          <div class="rest-actions" aria-label="Настройка планового отдыха">
+            <button type="button">+30 сек</button>
+            <button type="button">+60 сек</button>
+            <button type="button">Пропустить</button>
+          </div>
+          <div class="rest-complete" hidden>
+            <span class="rest-complete-copy"></span>
+            <button class="rest-hide" type="button" aria-label="Скрыть панель отдыха">Скрыть</button>
+          </div>
+        </aside>
+
+        <section class="exercise-card" aria-label="Следующий подход">
+          <div>
+            <p class="eyebrow">Следующий подход</p>
+            <h2>Тяга верхнего блока</h2>
+            <p class="muted">3 × 10 · 42 кг · RIR 2</p>
+          </div>
+          <div class="field-row">
+            <span>Вес</span><strong>42 кг</strong>
+            <span>Повторы</span><strong>10</strong>
+          </div>
+          <p class="muted note">Следующий подход начинается отдельным действием пользователя.</p>
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Основная навигация">
+        <a href="#workout">Тренировка</a>
+        <a href="#progress">Прогресс</a>
+        <a href="#nutrition">Питание</a>
+        <a href="#library">Библиотека</a>
+        <a href="#profile">Профиль</a>
+      </nav>
+    </div>
+
+    <script>
+      const root = document.documentElement;
+      const panel = document.querySelector('.active-workout-rest');
+      const restTime = document.querySelector('.rest-time');
+      const restNext = document.querySelector('.rest-next');
+      const restActions = document.querySelector('.rest-actions');
+      const restStatus = document.querySelector('.rest-status');
+      const countdown = document.querySelector('.countdown');
+      const fact = document.querySelector('.fact');
+      const actual = document.querySelector('.rest-actual');
+      const stop = document.querySelector('.rest-stop');
+      const completion = document.querySelector('.rest-complete');
+      const completionCopy = document.querySelector('.rest-complete-copy');
+      const hide = document.querySelector('.rest-hide');
+      const params = new URLSearchParams(window.location.search);
+
+      const sync = () => {
+        const state = root.dataset.state;
+        const mode = root.dataset.mode;
+        const overtime = state === 'overtime';
+        const completed = state === 'completed';
+        const proposed = mode === 'proposed';
+        panel.hidden = false;
+        panel.classList.toggle('is-complete', completed);
+        restTime.hidden = completed;
+        restNext.hidden = completed;
+        restActions.hidden = completed;
+        restStatus.hidden = !overtime || completed;
+        actual.hidden = !proposed || completed;
+        stop.hidden = !proposed || completed;
+        completion.hidden = !completed;
+        countdown.textContent = overtime ? '0:00' : '0:48';
+        fact.textContent = overtime ? '2:14' : '0:42';
+        completionCopy.textContent = proposed
+          ? 'Отдых завершён · факт 0:42'
+          : 'Отдых завершён · дальше: Тяга верхнего блока';
+        stop.textContent = 'Стоп';
+        stop.setAttribute('aria-label', 'Завершить отдых');
+      };
+
+      root.dataset.mode = params.get('mode') === 'baseline' ? 'baseline' : 'proposed';
+      const initialState = params.get('state');
+      root.dataset.state = ['overtime', 'completed'].includes(initialState) ? initialState : 'countdown';
+      root.dataset.theme = params.get('theme') === 'light' ? 'light' : 'dark';
+      sync();
+
+      for (const button of document.querySelectorAll('[data-mode-button]')) {
+        button.addEventListener('click', () => {
+          root.dataset.mode = button.dataset.modeButton;
+          sync();
+        });
+      }
+
+      for (const button of document.querySelectorAll('[data-state-button]')) {
+        button.addEventListener('click', () => {
+          root.dataset.state = button.dataset.stateButton;
+          sync();
+        });
+      }
+      stop.addEventListener('click', () => {
+        root.dataset.state = 'completed';
+        sync();
+      });
+      hide.addEventListener('click', () => {
+        panel.hidden = true;
+      });
+      for (const button of document.querySelectorAll('[data-theme-button]')) {
+        button.addEventListener('click', () => {
+          root.dataset.theme = button.dataset.themeButton;
+        });
+      }
+    </script>
+  </body>
+</html>
