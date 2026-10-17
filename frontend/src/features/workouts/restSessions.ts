@@ -226,14 +226,41 @@ export function recoverRestAfterAbsence(userId: number, workoutId: number, at = 
   return row;
 }
 
-/** Complete only after the source-set mutation reaches the server. Deferred 409 is not data loss. */
+/**
+ * Merge a network acknowledgement into the newest durable journal. Never overwrite
+ * an event appended by a concurrent set completion or a second browser tab.
+ */
+function acknowledgeRemote(
+  userId: number,
+  workoutId: number,
+  sourceSetId: number,
+  remote: RemoteRestSession,
+  mutationId?: string,
+): void {
+  const records = loadRestJournal(userId, workoutId);
+  const row = records.find((item) => item.source_set_id === sourceSetId);
+  if (!row) return;
+  row.server_id = remote.id;
+  row.server_version = Math.max(row.server_version ?? 0, remote.version);
+  if (mutationId) {
+    row.pending = row.pending.filter((operation) => operation.mutation_id !== mutationId);
+  }
+  saveRestJournal(userId, workoutId, records);
+}
+
+/** Sync accepted set journal before any rest actions; retain 409s for recovery. */
 export async function syncRestJournal(userId: number, workoutId: number): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const key = restJournalStorageKey(userId, workoutId);
   await crossContextCoordinator.run(`rest-sync:${key}`, async () => {
-    const records = loadRestJournal(userId, workoutId);
-    let changed = false;
-    for (const row of records) {
+    const sourceSetIds = loadRestJournal(userId, workoutId)
+      .filter((row) => !row.server_id || row.pending.length)
+      .map((row) => row.source_set_id);
+    for (const sourceSetId of sourceSetIds) {
+      const latest = () =>
+        loadRestJournal(userId, workoutId).find((row) => row.source_set_id === sourceSetId);
+      let row = latest();
+      if (!row) continue;
       if (!row.server_id) {
         try {
           const remote = await api<RemoteRestSession>(
@@ -247,40 +274,36 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
               },
             },
           );
-          row.server_id = remote.id;
-          row.server_version = remote.version;
-          changed = true;
+          acknowledgeRemote(userId, workoutId, sourceSetId, remote);
         } catch (error) {
-          // An offline-completed set is still waiting for its own durable sync.
+          // Completion of the source set can still be in its separate offline queue.
           if (error instanceof ApiError && [409, 503].includes(error.status)) continue;
           throw error;
         }
       }
-      for (const operation of [...row.pending]) {
-        if (!row.server_id) break;
+      row = latest();
+      if (!row?.server_id) continue;
+      for (const pendingId of row.pending.map((operation) => operation.mutation_id)) {
+        // Refresh on every iteration: a foreground click can append while a POST awaits.
+        row = latest();
+        const operation = row?.pending.find((entry) => entry.mutation_id === pendingId);
+        if (!row?.server_id || !operation) continue;
         try {
           const remote = await api<RemoteRestSession>(
             `/api/v1/workouts/rest-sessions/${row.server_id}/actions`,
             {
               method: 'POST',
-              body: {
-                ...operation,
-                expected_version: row.server_version,
-              },
+              body: { ...operation, expected_version: row.server_version },
             },
           );
-          row.server_version = remote.version;
-          row.pending.shift();
-          changed = true;
+          acknowledgeRemote(userId, workoutId, sourceSetId, remote, operation.mutation_id);
         } catch (error) {
-          // Never discard pending operations or fabricate a successful measurement.
+          // Conflicts require explicit reconciliation, not data loss or silent retries.
           if (error instanceof ApiError && [409, 503].includes(error.status)) break;
           throw error;
         }
       }
-      if (changed) saveRestJournal(userId, workoutId, records);
     }
-    if (changed) saveRestJournal(userId, workoutId, records);
   });
 }
 
