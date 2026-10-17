@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type { ExerciseHistory, Workout } from '../../shared/api/types';
 import { Button } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import type { ActiveWorkoutMutation } from './activeWorkoutQueue';
 
@@ -27,6 +28,8 @@ function currentRir(set: WorkoutSet, pending?: ActiveWorkoutMutation): string | 
   return pending ? (pending.values.rir ?? null) : (set.rir ?? null);
 }
 
+const rirMetric = 'RIR';
+
 function targetLabel(exercise: WorkoutExercise): string {
   if (exercise.metric_type === 'cardio') {
     return exercise.prescribed_duration_minutes
@@ -45,6 +48,7 @@ export function ActiveSessionSummary({
   guidance,
   setupMemory,
   adaptation,
+  safetyAction,
 }: {
   exercise: WorkoutExercise;
   currentSet: WorkoutSet;
@@ -54,7 +58,9 @@ export function ActiveSessionSummary({
   guidance?: ReactNode;
   setupMemory?: ReactNode;
   adaptation?: ReactNode;
+  safetyAction?: ReactNode;
 }) {
+  const [open, setOpen] = useState(false);
   const online = useOnlineStatus();
   const history = useQuery({
     queryKey: ['workout', 'exercise-history', exercise.exercise_id],
@@ -73,6 +79,7 @@ export function ActiveSessionSummary({
     : null;
   const rir = currentRir(currentSet, pending);
   const isCardio = exercise.metric_type === 'cardio';
+  const detailsId = `active-session-summary-${exercise.id}-details`;
 
   let previousCopy = 'История появится после старта';
   let previousDetail = 'Сопоставимый результат';
@@ -98,78 +105,92 @@ export function ActiveSessionSummary({
       aria-labelledby={`active-session-summary-${exercise.id}-title`}
     >
       <header className="active-session-summary__header">
-        <div>
-          <span className="active-session-summary__eyebrow">Следующее действие</span>
-          <h4 id={`active-session-summary-${exercise.id}-title`}>Что делать сейчас</h4>
-        </div>
+        <h4 id={`active-session-summary-${exercise.id}-title`}>
+          <button
+            type="button"
+            className="active-session-summary__toggle"
+            aria-controls={detailsId}
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <span>Что делать сейчас?</span>
+            <Icon aria-hidden="true" name={open ? 'chevron-up' : 'chevron-down'} size={16} />
+          </button>
+        </h4>
+      </header>
+
+      <div className="active-session-summary__details" id={detailsId} hidden={!open}>
         <span className={`active-session-summary__state${online ? '' : ' is-offline'}`}>
           {online ? 'Актуальные данные' : 'Офлайн-снимок'}
         </span>
-      </header>
 
-      <div className="active-session-summary__primary">
-        <div>
-          <span>{isCardio ? 'Следующий этап' : 'Следующий подход'}</span>
-          <strong>
-            {exercise.exercise_title}
-            {!isCardio && ` · подход ${currentSet.set_number}`}
-          </strong>
-          <small>
-            {started
-              ? isCardio
-                ? 'Запишите длительность и дистанцию, затем завершите этап.'
-                : 'Запишите вес и повторы, затем отметьте подход.'
-              : 'После старта этот этап станет доступен для записи.'}
-          </small>
+        <div className="active-session-summary__primary">
+          <div>
+            <span>{isCardio ? 'Следующий этап' : 'Следующий подход'}</span>
+            <strong>
+              {exercise.exercise_title}
+              {!isCardio && ` · подход ${currentSet.set_number}`}
+            </strong>
+            <small>
+              {started
+                ? isCardio
+                  ? 'Запишите длительность и дистанцию, затем завершите этап.'
+                  : 'Запишите вес и повторы, затем отметьте подход.'
+                : 'После старта этот этап станет доступен для записи.'}
+            </small>
+          </div>
+          {started && (
+            <Button type="button" variant="secondary" onClick={onFocusCurrentSet}>
+              К текущему подходу
+            </Button>
+          )}
         </div>
-        {started && (
-          <Button type="button" variant="secondary" onClick={onFocusCurrentSet}>
-            К текущему подходу
-          </Button>
-        )}
+
+        <div className="active-session-summary__facts">
+          <div>
+            <span>План</span>
+            <strong>{targetLabel(exercise)}</strong>
+            <small>Серверное назначение</small>
+          </div>
+          <div>
+            <span>Предыдущий результат</span>
+            <strong>{previousCopy}</strong>
+            <small>{previousDetail}</small>
+          </div>
+          <div>
+            <span>{rirMetric}</span>
+            <strong>{isCardio ? 'Не применяется' : (rir ?? 'Не записан')}</strong>
+            <small>{isCardio ? 'Для кардио не используется' : 'Введите после подхода'}</small>
+          </div>
+          <div>
+            <span>Отдых</span>
+            <strong>
+              {exercise.rest_seconds > 0 ? `${exercise.rest_seconds} сек` : 'Без отдыха'}
+            </strong>
+            <small>Таймер запускается после сохранения</small>
+          </div>
+        </div>
+
+        <div className="active-session-summary__guidance">
+          <div className="active-session-summary__section-label">
+            <span>Прогрессия</span>
+            <small>
+              {guidance ? 'Детерминированная подсказка' : 'Без автоматического решения'}
+            </small>
+          </div>
+          {guidance ?? (
+            <p className="active-session-summary__unavailable" role="status">
+              {online
+                ? 'Для этого этапа отдельная подсказка не сформирована.'
+                : 'Подсказка прогрессии недоступна в офлайн-снимке.'}
+            </p>
+          )}
+        </div>
+
+        {setupMemory}
+        {adaptation && <div className="active-session-summary__adaptation">{adaptation}</div>}
+        {safetyAction && <div className="active-session-summary__safety">{safetyAction}</div>}
       </div>
-
-      <div className="active-session-summary__facts">
-        <div>
-          <span>План</span>
-          <strong>{targetLabel(exercise)}</strong>
-          <small>Серверное назначение</small>
-        </div>
-        <div>
-          <span>Предыдущий результат</span>
-          <strong>{previousCopy}</strong>
-          <small>{previousDetail}</small>
-        </div>
-        <div>
-          <span>RIR</span>
-          <strong>{isCardio ? 'Не применяется' : (rir ?? 'Не записан')}</strong>
-          <small>{isCardio ? 'Для кардио не используется' : 'Введите после подхода'}</small>
-        </div>
-        <div>
-          <span>Отдых</span>
-          <strong>
-            {exercise.rest_seconds > 0 ? `${exercise.rest_seconds} сек` : 'Без отдыха'}
-          </strong>
-          <small>Таймер запускается после сохранения</small>
-        </div>
-      </div>
-
-      <div className="active-session-summary__guidance">
-        <div className="active-session-summary__section-label">
-          <span>Прогрессия</span>
-          <small>{guidance ? 'Детерминированная подсказка' : 'Без автоматического решения'}</small>
-        </div>
-        {guidance ?? (
-          <p className="active-session-summary__unavailable" role="status">
-            {online
-              ? 'Для этого этапа отдельная подсказка не сформирована.'
-              : 'Подсказка прогрессии недоступна в офлайн-снимке.'}
-          </p>
-        )}
-      </div>
-
-      {setupMemory}
-      {adaptation && <div className="active-session-summary__adaptation">{adaptation}</div>}
     </section>
   );
 }
