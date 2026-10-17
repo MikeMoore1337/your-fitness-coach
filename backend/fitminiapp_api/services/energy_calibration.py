@@ -46,7 +46,7 @@ HISTORY_LIMIT = 20
 
 GOAL_MULTIPLIERS = {
     "fat_loss": 0.85,
-    "recomposition": 1.0,
+    "recomposition": 0.95,
     "maintenance": 1.0,
     "muscle_gain": 1.05,
 }

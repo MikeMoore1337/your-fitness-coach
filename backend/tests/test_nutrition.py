@@ -42,11 +42,11 @@ def test_calculates_new_activity_inputs_and_net_training_calories() -> None:
         "strength_daily_calories": 187,
         "cardio_daily_calories": 123,
         "tdee": 2450,
-        "goal_multiplier": 1.0,
-        "calories": 2450,
+        "goal_multiplier": 0.95,
+        "calories": 2330,
         "protein_g": 156,
         "fat_g": 62,
-        "carbs_g": 317,
+        "carbs_g": 287,
         "macro_warning": False,
     }
 
@@ -103,7 +103,7 @@ def test_routine_and_steps_select_one_activity_coefficient(
     ("goal", "multiplier", "protein_per_kg", "fat_per_kg"),
     [
         ("fat_loss", 0.85, 2.2, 0.8),
-        ("recomposition", 1.0, 2.0, 0.8),
+        ("recomposition", 0.95, 2.0, 0.8),
         ("maintenance", 1.0, 1.8, 0.9),
         ("muscle_gain", 1.05, 1.8, 0.9),
     ],

@@ -277,6 +277,16 @@ def reconcile_current_measurement_state(
         weight_kg = owner.profile.weight_kg
     if weight_kg is None:
         return False
+    # A single weigh-in can fluctuate because of water and meal timing.
+    # Keep the current physical weight visible, but do not create a new
+    # nutrition-target version for changes below the drift threshold.
+    from fitminiapp_api.services.nutrition import get_current_nutrition_target
+
+    target = get_current_nutrition_target(db, owner.id)
+    if target is not None and target.source == "calculated" and target.weight_kg is not None:
+        minimum_change = max(0.5, target.weight_kg * 0.01)
+        if abs(weight_kg - target.weight_kg) < minimum_change:
+            return False
     return recalculate_nutrition_target(
         db,
         owner,
@@ -407,6 +417,21 @@ def _upsert_measurement(
         .where(BodyMeasurement.id == measurement_id)
         .execution_options(populate_existing=True)
     ).scalar_one()
+
+
+def sync_current_weight_to_diary(db: Session, owner: User, weight_kg: float) -> None:
+    """Mirror an explicitly saved current weight without a second KBJU recalculation.
+
+    The outer profile/nutrition transaction owns the commit and target version.
+    The measurement ledger retains the effective fact and its original date.
+    """
+    _lock_owner_measurements(db, owner.id)
+    _upsert_measurement(
+        db,
+        owner_user_id=owner.id,
+        measured_on=today_for_user(owner),
+        changes={"weight_kg": weight_kg},
+    )
 
 
 def save_measurement(

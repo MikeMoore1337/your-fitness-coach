@@ -567,10 +567,6 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   background: var(--v2-surface-secondary);
 }
 
-.app-section--progress .progress-insights__column--good {
-  border-left: 3px solid var(--v2-lime);
-}
-
 .app-section--progress .progress-insights__column--attention {
   border-left: 3px solid var(--v2-border-strong);
 }

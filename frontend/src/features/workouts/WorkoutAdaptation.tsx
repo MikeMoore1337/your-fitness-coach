@@ -315,7 +315,7 @@ export function WorkoutAdaptation({
       data-testid="workout-adaptation-entry"
     >
       <Button
-        fullWidth={entryContext === 'today'}
+        fullWidth={entryContext === 'today' || entryContext === 'workout'}
         type="button"
         variant={entryContext === 'today' ? 'ghost' : 'secondary'}
         disabled={!online && !safetyOnly}
