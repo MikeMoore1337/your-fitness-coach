@@ -115,12 +115,22 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
           ['complete', 'skip', 'interrupt', 'unknown'].includes(operation.action),
         );
       if (row.status === 'running' && lastTerminal) {
-        row.status = {
-          complete: 'completed',
-          skip: 'skipped',
-          interrupt: 'interrupted',
-          unknown: 'unknown',
-        }[lastTerminal.action] as RestStatus;
+        switch (lastTerminal.action) {
+          case 'complete':
+            row.status = 'completed';
+            break;
+          case 'skip':
+            row.status = 'skipped';
+            break;
+          case 'interrupt':
+            row.status = 'interrupted';
+            break;
+          case 'unknown':
+            row.status = 'unknown';
+            break;
+          default:
+            break;
+        }
         row.ended_at = lastTerminal.ended_at ?? lastTerminal.occurred_at;
         if (lastTerminal.action === 'complete') {
           row.source = lastTerminal.corrected ? 'USER_CORRECTED' : 'USER_CONFIRMED';
