@@ -45,7 +45,7 @@ function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
               : ''}
             {' · '}
             {row.status === 'completed' && row.measured_seconds !== null
-              ? `по отметке ${restDuration(row.measured_seconds)} (разница ${row.measured_seconds - row.adjusted_seconds > 0 ? '+' : ''}${row.measured_seconds - row.adjusted_seconds} с)`
+              ? `по отметке ${restDuration(row.measured_seconds)} (разница ${row.measured_seconds - row.planned_seconds > 0 ? '+' : ''}${row.measured_seconds - row.planned_seconds} с)`
               : 'нет достоверного замера'}
           </li>
         ))}
