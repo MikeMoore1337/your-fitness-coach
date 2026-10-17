@@ -245,12 +245,12 @@ export function updateMeasuredRest(
       Math.round((row.deadline - Date.parse(row.started_at)) / 1000),
     );
   } else {
-    const terminalStatus: Record<'complete' | 'skip' | 'interrupt' | 'unknown', RestStatus> = {
+    const terminalStatus = {
       complete: 'completed',
       skip: 'skipped',
       interrupt: 'interrupted',
       unknown: 'unknown',
-    };
+    } as const;
     row.status = terminalStatus[effectiveAction];
     row.ended_at = occurredAt;
     row.needs_review = false;
