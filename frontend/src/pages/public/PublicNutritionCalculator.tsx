@@ -90,12 +90,6 @@ function ResultSummary({ estimate }: { estimate: NutritionEstimate }) {
         Для поддержания: {formatNumber(estimate.maintenanceCalories)} ккал. Точность стартовой
         оценки: {accuracyLabels[estimate.accuracy]}.
       </p>
-      {estimate.macroWarning && (
-        <small>
-          Расчёт поднят до минимального сочетания белка и жиров; углеводы в этом сценарии показаны
-          как 0 г.
-        </small>
-      )}
       <small>Проверьте ориентир по средней динамике за 14–21 день, а не по одному измерению.</small>
     </div>
   );
