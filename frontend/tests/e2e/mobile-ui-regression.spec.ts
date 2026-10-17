@@ -201,7 +201,10 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await assertSharedSummaryFrame();
-  await expect(summary.locator('.active-session-summary__details')).toHaveCSS('border-top-width', '0px');
+  await expect(summary.locator('.active-session-summary__details')).toHaveCSS(
+    'border-top-width',
+    '0px',
+  );
 
   await expect(page.locator('.active-workout')).toBeVisible();
   await assertMobileShellGeometry(page);
