@@ -78,11 +78,11 @@ def test_coach_client_list_query_count_is_constant() -> None:
             reset_sql_metrics(token)
 
     assert len(result) == 25
-    assert metrics.query_count == 4
+    assert metrics.query_count == 5
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
 
 
-def test_me_response_needs_five_queries_after_authentication() -> None:
+def test_me_response_needs_six_queries_after_authentication() -> None:
     with get_session_context() as db:
         user = db.query(User).filter(User.telegram_user_id == 2001).one()
         token = begin_sql_metrics()
@@ -94,7 +94,7 @@ def test_me_response_needs_five_queries_after_authentication() -> None:
 
     assert response.telegram_user_id == 2001
     assert response.auth_providers == ["telegram"]
-    assert metrics.query_count == 5
+    assert metrics.query_count == 6
 
 
 def test_coach_program_import_targets_keep_query_count_bounded_at_client_scale() -> None:

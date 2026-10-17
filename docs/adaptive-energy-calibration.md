@@ -61,7 +61,8 @@ estimated_expenditure = mean_logged_intake - (weight_delta_kg * 7700 / 21)
 Расчёт сначала переводит диапазон расхода в диапазон для текущей цели:
 
 - `fat_loss` — `85%` оценки расхода;
-- `maintenance` и `recomposition` — `100%`;
+- `maintenance` — `100%`;
+- `recomposition` — `95%` (небольшой дефицит);
 - `muscle_gain` — `105%`.
 
 Если текущая цель выходит за расчётный диапазон больше чем на `100 ккал`, preview может предложить

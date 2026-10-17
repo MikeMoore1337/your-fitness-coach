@@ -34,17 +34,18 @@ function fromInitial(
   targetTelegramId: number | null | undefined,
   profile: UserProfile | null | undefined,
 ): NutritionCalculatorInput {
+  const birthDate = profile?.birth_date ? new Date(`${profile.birth_date}T12:00:00`) : null;
+  const now = new Date();
+  const profileAge = birthDate
+    ? now.getFullYear() -
+      birthDate.getFullYear() -
+      (now.getMonth() < birthDate.getMonth() ||
+      (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
+        ? 1
+        : 0)
+    : null;
+  const validProfileAge = profileAge != null && profileAge >= 18 && profileAge <= 100;
   if (!initial) {
-    const birthDate = profile?.birth_date ? new Date(`${profile.birth_date}T12:00:00`) : null;
-    const now = new Date();
-    const age = birthDate
-      ? now.getFullYear() -
-        birthDate.getFullYear() -
-        (now.getMonth() < birthDate.getMonth() ||
-        (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
-          ? 1
-          : 0)
-      : null;
     const profileGoal =
       profile?.goal && Object.hasOwn(goalOptions, profile.goal)
         ? (profile.goal as NutritionCalculatorInput['goal'])
@@ -53,30 +54,35 @@ function fromInitial(
       ...defaults,
       target_telegram_user_id: targetTelegramId,
       goal: profileGoal,
+      sex: profile?.sex === 'female' ? 'female' : profile?.sex === 'male' ? 'male' : defaults.sex,
       height_cm: profile?.height_cm ?? defaults.height_cm,
       weight_kg: profile?.weight_kg ?? defaults.weight_kg,
-      age: age && age >= 18 && age <= 100 ? age : defaults.age,
+      age: validProfileAge ? profileAge : defaults.age,
     };
   }
   return {
     target_telegram_user_id: targetTelegramId,
-    sex: (initial.sex || defaults.sex) as NutritionCalculatorInput['sex'],
-    weight_kg: initial.weight_kg ?? profile?.weight_kg ?? defaults.weight_kg,
-    height_cm: initial.height_cm ?? profile?.height_cm ?? defaults.height_cm,
-    age: initial.age ?? defaults.age,
+    sex: (profile?.sex || initial.sex || defaults.sex) as NutritionCalculatorInput['sex'],
+    weight_kg: profile?.weight_kg ?? initial.weight_kg ?? defaults.weight_kg,
+    height_cm: profile?.height_cm ?? initial.height_cm ?? defaults.height_cm,
+    age: validProfileAge ? profileAge : (initial.age ?? defaults.age),
     daily_routine: (initial.daily_routine ||
       defaults.daily_routine) as NutritionCalculatorInput['daily_routine'],
     steps_range: (initial.steps_range ||
       defaults.steps_range) as NutritionCalculatorInput['steps_range'],
     strength_trainings_per_week:
-      initial.strength_trainings_per_week ?? defaults.strength_trainings_per_week,
+      profile?.workouts_per_week ??
+      initial.strength_trainings_per_week ??
+      defaults.strength_trainings_per_week,
     strength_training_duration_minutes:
       initial.strength_training_duration_minutes ?? defaults.strength_training_duration_minutes,
     strength_training_type: (initial.strength_training_type ||
       defaults.strength_training_type) as NutritionCalculatorInput['strength_training_type'],
     strength_rest: initial.strength_rest as NutritionCalculatorInput['strength_rest'],
     cardio_trainings: initial.cardio_trainings ?? [],
-    goal: (initial.goal || defaults.goal) as NutritionCalculatorInput['goal'],
+    goal: (profile?.goal && Object.hasOwn(goalOptions, profile.goal)
+      ? profile.goal
+      : initial.goal || defaults.goal) as NutritionCalculatorInput['goal'],
   };
 }
 
@@ -110,6 +116,7 @@ export function NutritionForm({
     () => fromInitial(initial, targetTelegramId, targetTelegramId ? null : user?.profile),
   );
 
+  const [weightEdited, setWeightEdited] = useState(false);
   const calculation = useMemo(() => calculateNutritionEstimate(form), [form]);
   const estimate = calculation.estimate;
 
@@ -119,6 +126,7 @@ export function NutritionForm({
         method: 'POST',
         body: {
           ...form,
+          record_weight_measurement: weightEdited && !targetTelegramId,
           strength_training_duration_minutes:
             form.strength_trainings_per_week > 0
               ? form.strength_training_duration_minutes
@@ -128,12 +136,14 @@ export function NutritionForm({
       }),
     onSuccess: async () => {
       clearDraft();
+      setWeightEdited(false);
       await Promise.all([
         invalidateNutritionSummaries(queryClient, clientId),
         queryClient.invalidateQueries({
           queryKey: queryKeys.nutrition.targetHistory(targetTelegramId),
         }),
         queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.currentTarget }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.measurements.subject(clientId) }),
         ...(!clientId
           ? [queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })]
           : []),
@@ -253,7 +263,10 @@ export function NutritionForm({
                     step="0.1"
                     required
                     value={form.weight_kg || ''}
-                    onChange={(event) => setNumber('weight_kg', event.target.value)}
+                    onChange={(event) => {
+                      setNumber('weight_kg', event.target.value);
+                      setWeightEdited(true);
+                    }}
                   />
                 </label>
                 <label className="field">
@@ -618,6 +631,12 @@ export function NutritionForm({
                 </p>
               </aside>
 
+              {!clientId && (
+                <p className="muted">
+                  При сохранении данные калькулятора обновят профиль. Если вы изменили вес, он также
+                  появится в дневнике замеров.
+                </p>
+              )}
               <button disabled={mutation.isPending || !calculation.valid}>
                 {mutation.isPending ? 'Сохраняем…' : 'Сохранить КБЖУ'}
               </button>
