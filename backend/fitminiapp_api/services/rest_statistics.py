@@ -10,7 +10,7 @@ from fitminiapp_api.models.workout_rest import WorkoutRestSession
 
 def rest_statistics(db: Session, user_id: int, start_date, end_date) -> dict:
     values = (
-        db.query(WorkoutRestSession.measured_seconds, WorkoutRestSession.adjusted_seconds)
+        db.query(WorkoutRestSession.measured_seconds, WorkoutRestSession.planned_seconds)
         .join(UserWorkout, UserWorkout.id == WorkoutRestSession.workout_id)
         .join(UserProgram, UserProgram.id == UserWorkout.user_program_id)
         .filter(
