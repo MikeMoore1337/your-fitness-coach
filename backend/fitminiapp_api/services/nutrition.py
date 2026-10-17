@@ -639,6 +639,26 @@ def recalculate_nutrition_target(
         return False
 
     context = nutrition_target_context(target)
+
+    # The profile stores total cardio sessions, while the calculator stores
+    # per-activity details. A single activity can be updated without guessing.
+    # With multiple activities, keep their explicit split intact.
+    requested_cardio = updates.get("cardio_trainings_per_week")
+    if isinstance(requested_cardio, int):
+        existing_cardio = context.get("cardio_trainings") or []
+        if isinstance(existing_cardio, list) and (
+            len(existing_cardio) == 1 or requested_cardio == 0
+        ):
+            if requested_cardio == 0:
+                updates = {**updates, "cardio_trainings": []}
+            elif len(existing_cardio) == 1:
+                updates = {
+                    **updates,
+                    "cardio_trainings": [
+                        {**existing_cardio[0], "trainings_per_week": requested_cardio}
+                    ],
+                }
+
     changed = False
     for field in NUTRITION_INPUT_FIELDS:
         value = updates.get(field)
