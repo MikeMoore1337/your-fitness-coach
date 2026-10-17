@@ -1755,7 +1755,7 @@ export function RestTimer({
             aria-label="Завершить отдых"
             onClick={() => {
               const stoppedAt = Date.now();
-              updateMeasuredRest(
+              const result = updateMeasuredRest(
                 userId,
                 workoutId,
                 measuredRest.source_set_id,
@@ -1766,7 +1766,11 @@ export function RestTimer({
               removeStorage(storageKey);
               setDeadline(0);
               setNow(stoppedAt);
-              setCompletedNotice('Отдых завершён по отметке');
+              setCompletedNotice(
+                result?.status === 'completed'
+                  ? 'Отдых завершён по отметке'
+                  : 'Нет достоверного замера отдыха',
+              );
               compactNotice();
             }}
           >
