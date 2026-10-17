@@ -1,437 +1,1077 @@
 {
-  "browser": "Microsoft Edge 141.0.3537.57 via Playwright Chromium",
-  "engine": "chromium",
+  "browser": "Playwright Chromium 155.0.8059.12",
+  "engine": "Chromium",
   "viewportMatrix": [
     {
+      "theme": "dark",
       "width": 320,
-      "height": 900,
-      "themes": [
-        "dark",
-        "light"
-      ]
+      "height": 900
     },
     {
+      "theme": "light",
+      "width": 320,
+      "height": 900
+    },
+    {
+      "theme": "dark",
       "width": 360,
-      "height": 900,
-      "themes": [
-        "dark",
-        "light"
-      ]
+      "height": 900
     },
     {
+      "theme": "light",
+      "width": 360,
+      "height": 900
+    },
+    {
+      "theme": "dark",
       "width": 393,
-      "height": 900,
-      "themes": [
-        "dark",
-        "light"
-      ]
+      "height": 900
     },
     {
+      "theme": "light",
+      "width": 393,
+      "height": 900
+    },
+    {
+      "theme": "dark",
       "width": 430,
-      "height": 900,
-      "themes": [
-        "dark",
-        "light"
-      ]
+      "height": 900
     },
     {
+      "theme": "light",
+      "width": 430,
+      "height": 900
+    },
+    {
+      "theme": "dark",
       "width": 1440,
-      "height": 900,
-      "themes": [
-        "dark",
-        "light"
-      ]
+      "height": 900
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 900
     }
   ],
   "results": [
     {
       "theme": "dark",
       "width": 320,
-      "fixture": "ready",
-      "screenshot": "dark-320.png",
-      "audit": {
-        "viewport": 320,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 181.65625,
-            "right": 289.1875
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 320,
-        "documentClientWidth": 320,
-        "bodyScrollWidth": 320,
-        "chipInsideCard": true
-      }
-    },
-    {
-      "theme": "dark",
-      "width": 360,
-      "fixture": "ready",
-      "screenshot": "dark-360.png",
-      "audit": {
-        "viewport": 360,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 16,
-            "right": 123.53125
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 360,
-        "documentClientWidth": 360,
-        "bodyScrollWidth": 360,
-        "chipInsideCard": true
-      }
-    },
-    {
-      "theme": "dark",
-      "width": 393,
-      "fixture": "ready",
-      "screenshot": "dark-393.png",
-      "audit": {
-        "viewport": 393,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 16,
-            "right": 123.53125
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 393,
-        "documentClientWidth": 393,
-        "bodyScrollWidth": 393,
-        "chipInsideCard": true
-      }
-    },
-    {
-      "theme": "dark",
-      "width": 430,
-      "fixture": "ready",
-      "screenshot": "dark-430.png",
-      "audit": {
-        "viewport": 430,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 243.375,
-            "right": 350.90625
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 430,
-        "documentClientWidth": 430,
-        "bodyScrollWidth": 430,
-        "chipInsideCard": true
-      }
-    },
-    {
-      "theme": "dark",
-      "width": 1440,
-      "fixture": "ready",
-      "screenshot": "dark-1440.png",
-      "audit": {
-        "viewport": 1440,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 266.453125,
-            "right": 373.984375
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 464.53125,
-            "right": 573.734375
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "bodyScrollWidth": 1440,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 285,
+        "top": 831.34375,
+        "bottom": 875.34375,
+        "width": 250,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 274,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 250,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 140.5,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 140.5,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 140.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 304,
+        "top": 466.84375,
+        "bottom": 894.34375,
+        "width": 288,
+        "height": 427.5
       }
     },
     {
       "theme": "light",
       "width": 320,
-      "fixture": "ready",
-      "screenshot": "light-320.png",
-      "audit": {
-        "viewport": 320,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 181.65625,
-            "right": 289.1875
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 320,
-        "documentClientWidth": 320,
-        "bodyScrollWidth": 320,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 285,
+        "top": 831.34375,
+        "bottom": 875.34375,
+        "width": 250,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 274,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 250,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 286,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 140.5,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 140.5,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 140.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 304,
+        "top": 466.84375,
+        "bottom": 894.34375,
+        "width": 288,
+        "height": 427.5
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "state": "preview-open",
+      "viewport": {
+        "width": 360,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 325,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 290,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 314,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 290,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 160.5,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 160.5,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 160.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 344,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 328,
+        "height": 368.359375
       }
     },
     {
       "theme": "light",
       "width": 360,
-      "fixture": "ready",
-      "screenshot": "light-360.png",
-      "audit": {
-        "viewport": 360,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 16,
-            "right": 123.53125
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 360,
-        "documentClientWidth": 360,
-        "bodyScrollWidth": 360,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 360,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 325,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 290,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 314,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 290,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 326,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 160.5,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 160.5,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 160.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 344,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 328,
+        "height": 368.359375
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 393,
+      "state": "preview-open",
+      "viewport": {
+        "width": 393,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 323,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 177,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 361,
+        "height": 368.359375
       }
     },
     {
       "theme": "light",
       "width": 393,
-      "fixture": "ready",
-      "screenshot": "light-393.png",
-      "audit": {
-        "viewport": 393,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 16,
-            "right": 123.53125
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 393,
-        "documentClientWidth": 393,
-        "bodyScrollWidth": 393,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 393,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 323,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 177,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 361,
+        "height": 368.359375
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "state": "preview-open",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 395,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 360,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 384,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 360,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 195.5,
+          "height": 48
+        },
+        {
+          "id": "assignAction",
+          "width": 195.5,
+          "height": 48
+        },
+        {
+          "id": "copyAction",
+          "width": 195.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 414,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 398,
+        "height": 368.359375
       }
     },
     {
       "theme": "light",
       "width": 430,
-      "fixture": "ready",
-      "screenshot": "light-430.png",
-      "audit": {
-        "viewport": 430,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 243.375,
-            "right": 350.90625
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 430,
-        "documentClientWidth": 430,
-        "bodyScrollWidth": 430,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 430,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 395,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 360,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 384,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 360,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 396,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 195.5,
+          "height": 48
+        },
+        {
+          "id": "assignAction",
+          "width": 195.5,
+          "height": 48
+        },
+        {
+          "id": "copyAction",
+          "width": 195.5,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 414,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 398,
+        "height": 368.359375
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "state": "preview-open",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "1px solid rgb(59, 68, 62)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 448.984375,
+        "right": 573.734375,
+        "top": 612.21875,
+        "bottom": 656.21875,
+        "width": 124.75,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 129.984375,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 124.75,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 282.5,
+          "height": 44
+        },
+        {
+          "id": "assignAction",
+          "width": 282.5,
+          "height": 44
+        },
+        {
+          "id": "copyAction",
+          "width": 282.5,
+          "height": 44
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "72px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 100.796875,
+        "right": 596.734375,
+        "top": 372.1875,
+        "bottom": 679.21875,
+        "width": 495.9375,
+        "height": 307.03125
       }
     },
     {
       "theme": "light",
       "width": 1440,
-      "fixture": "ready",
-      "screenshot": "light-1440.png",
-      "audit": {
-        "viewport": 1440,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 266.453125,
-            "right": 373.984375
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 464.53125,
-            "right": 573.734375
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 1440,
-        "documentClientWidth": 1440,
-        "bodyScrollWidth": 1440,
-        "chipInsideCard": true
+      "state": "preview-open",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "1px solid rgb(211, 217, 210)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 448.984375,
+        "right": 573.734375,
+        "top": 612.21875,
+        "bottom": 656.21875,
+        "width": 124.75,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 124.046875,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 124.75,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 571,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 282.5,
+          "height": 44
+        },
+        {
+          "id": "assignAction",
+          "width": 282.5,
+          "height": 44
+        },
+        {
+          "id": "copyAction",
+          "width": 282.5,
+          "height": 44
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "72px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 100.796875,
+        "right": 596.734375,
+        "top": 372.1875,
+        "bottom": 679.21875,
+        "width": 495.9375,
+        "height": 307.03125
       }
     }
   ],
@@ -439,291 +1079,511 @@
     {
       "theme": "dark",
       "width": 320,
-      "screenshot": "card-dark-320.png",
-      "audit": {
-        "viewport": 320,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 181.65625,
-            "right": 289.1875
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 320,
-        "documentClientWidth": 320,
-        "bodyScrollWidth": 320,
-        "chipInsideCard": true
+      "state": "card-closed",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 3px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 285,
+        "top": 831.34375,
+        "bottom": 875.34375,
+        "width": 250,
+        "height": 44
+      },
+      "cardCtaHit": true,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 274,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 250,
+          "height": 44
+        }
+      ],
+      "focusables": [],
+      "activeElement": "reopenFromCard",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 304,
+        "top": 466.84375,
+        "bottom": 894.34375,
+        "width": 288,
+        "height": 427.5
       }
     },
     {
       "theme": "light",
       "width": 320,
-      "screenshot": "card-light-320.png",
-      "audit": {
-        "viewport": 320,
-        "phraseNodes": [
-          {
-            "tag": "span",
-            "className": "pre-assignment-label",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 107.53125,
-            "height": 19,
-            "lineHeight": 21.75,
-            "left": 181.65625,
-            "right": 289.1875
-          },
-          {
-            "tag": "span",
-            "className": "status-chip",
-            "text": "до назначения",
-            "whiteSpace": "nowrap",
-            "width": 109.203125,
-            "height": 29.390625,
-            "lineHeight": 17.4,
-            "left": 35,
-            "right": 144.203125
-          }
-        ],
-        "outOfBounds": [],
-        "overflowNodes": [],
-        "documentScrollWidth": 320,
-        "documentClientWidth": 320,
-        "bodyScrollWidth": 320,
-        "chipInsideCard": true
+      "state": "card-closed",
+      "viewport": {
+        "width": 320,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 3px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 285,
+        "top": 831.34375,
+        "bottom": 875.34375,
+        "width": 250,
+        "height": 44
+      },
+      "cardCtaHit": true,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 274,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 250,
+          "height": 44
+        }
+      ],
+      "focusables": [],
+      "activeElement": "reopenFromCard",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 304,
+        "top": 466.84375,
+        "bottom": 894.34375,
+        "width": 288,
+        "height": 427.5
       }
     }
   ],
-  "states": {
-    "longTitle": {
-      "screenshot": "long-title-light-393.png"
+  "additional": [
+    {
+      "state": "long-title",
+      "viewport": {
+        "width": 393,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 782.515625,
+        "bottom": 826.515625,
+        "width": 323,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 44
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 177,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 429.15625,
+        "bottom": 845.515625,
+        "width": 361,
+        "height": 416.359375
+      }
     },
-    "textSize125": {
-      "screenshot": "text-size-125-light-393.png"
+    {
+      "state": "text-size-125-diagnostic",
+      "viewport": {
+        "width": 393,
+        "height": 900
+      },
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(23, 26, 24)",
+      "previewDialogOutline": "rgb(23, 26, 24) none 0px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 833.140625,
+        "bottom": 882.328125,
+        "width": 323,
+        "height": 49.1875
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 49.1875
+        },
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 49.1875
+        },
+        {
+          "id": "closePreview",
+          "width": 103.0625,
+          "height": 45.1875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 177,
+          "height": 76.375
+        },
+        {
+          "id": "assignAction",
+          "width": 177,
+          "height": 76.375
+        },
+        {
+          "id": "copyAction",
+          "width": 177,
+          "height": 49.1875
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "light",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 484.28125,
+        "bottom": 901.328125,
+        "width": 361,
+        "height": 417.046875
+      }
     },
-    "fixtureChecks": {
-      "ready": {
-        "variant": "ready",
-        "facts": [
-          "4 в составе шаблона",
-          "4 в неделю",
-          "Средний",
-          "Собственный вес · гантели · скамья",
-          "≈45 мин",
-          "1 неделя"
-        ],
-        "buttons": {
-          "selectAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Выбрать"
-          },
-          "copyAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Создать копию"
-          },
-          "editAction": {
-            "hidden": true,
-            "disabled": false,
-            "text": "Редактировать"
-          },
-          "assignAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Назначить программу"
-          }
-        },
-        "title": "Силовая база · 4 дня"
+    {
+      "state": "confirmation",
+      "viewport": {
+        "width": 393,
+        "height": 900
       },
-      "multi": {
-        "variant": "multi",
-        "facts": [
-          "4 в составе шаблона",
-          "4 в неделю",
-          "Средний",
-          "Штанга · стойка · скамья",
-          "Нет данных",
-          "12 недель в исходных предписаниях"
-        ],
-        "buttons": {
-          "selectAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Выбрать"
-          },
-          "copyAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Создать копию"
-          },
-          "editAction": {
-            "hidden": true,
-            "disabled": false,
-            "text": "Редактировать"
-          },
-          "assignAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Назначить программу"
-          }
-        },
-        "title": "PHUL · 12 недель в источнике"
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "rgb(242, 244, 239) none 3px",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 734.515625,
+        "bottom": 778.515625,
+        "width": 323,
+        "height": 44
       },
-      "own": {
-        "variant": "own",
-        "facts": [
-          "3 в составе шаблона",
-          "Нет данных",
-          "Начальный",
-          "Нет данных",
-          "Нет данных",
-          "Нет данных"
-        ],
-        "buttons": {
-          "selectAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Выбрать"
-          },
-          "copyAction": {
-            "hidden": true,
-            "disabled": false,
-            "text": "Создать копию"
-          },
-          "editAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Редактировать"
-          },
-          "assignAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Назначить программу"
-          }
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 44
         },
-        "title": "Домашняя база · моя программа"
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "backToPreview",
+          "width": 361,
+          "height": 44
+        },
+        {
+          "id": "confirmAssignment",
+          "width": 361,
+          "height": 44
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "backToPreview",
+        "confirmAssignment"
+      ],
+      "activeElement": "confirmPanel",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
       },
-      "coach": {
-        "variant": "coach",
-        "facts": [
-          "3 в составе шаблона",
-          "3 в неделю",
-          "Продвинутый",
-          "Тренажёр · штанга",
-          "Нет данных",
-          "4 недели"
-        ],
-        "buttons": {
-          "selectAction": {
-            "hidden": true,
-            "disabled": true,
-            "text": "Выбрать"
-          },
-          "copyAction": {
-            "hidden": true,
-            "disabled": true,
-            "text": "Создать копию"
-          },
-          "editAction": {
-            "hidden": true,
-            "disabled": true,
-            "text": "Редактировать"
-          },
-          "assignAction": {
-            "hidden": true,
-            "disabled": true,
-            "text": "Назначить программу"
-          }
-        },
-        "title": "Тренировочный блок клиента"
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 429.15625,
+        "bottom": 797.515625,
+        "width": 361,
+        "height": 368.359375
+      }
+    }
+  ],
+  "keyboard": {
+    "closeFocused": true,
+    "afterCloseTab": "day-toggle",
+    "wrappedToFirst": true,
+    "escapeClosed": true,
+    "reopenedFromCard": true
+  },
+  "webkit": {
+    "status": "PASS",
+    "metrics": {
+      "state": "webkit-preview-open",
+      "viewport": {
+        "width": 393,
+        "height": 900
       },
-      "legacy": {
-        "variant": "legacy",
-        "facts": [
-          "2 в составе шаблона",
-          "Нет данных",
-          "Нет данных",
-          "Нет данных",
-          "Нет данных",
-          "Нет данных"
-        ],
-        "buttons": {
-          "selectAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Выбрать"
-          },
-          "copyAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Создать копию"
-          },
-          "editAction": {
-            "hidden": true,
-            "disabled": false,
-            "text": "Редактировать"
-          },
-          "assignAction": {
-            "hidden": false,
-            "disabled": false,
-            "text": "Назначить программу"
-          }
+      "horizontalOverflow": false,
+      "outOfBoundsCount": 0,
+      "outOfBounds": [],
+      "visibleTechnicalIdentifiers": [],
+      "sideSheetBorder": "0px none rgb(242, 244, 239)",
+      "previewDialogOutline": "0px none rgb(242, 244, 239)",
+      "fixedDuplicateReviewControl": false,
+      "cardCta": {
+        "left": 35,
+        "right": 358,
+        "top": 739.515625,
+        "bottom": 783.515625,
+        "width": 323,
+        "height": 44
+      },
+      "cardCtaHit": false,
+      "cardSourceCtaOverlapArea": 0,
+      "buttonTargets": [
+        {
+          "id": "themeToggle",
+          "width": 347,
+          "height": 44
         },
-        "title": "Старая базовая программа"
+        {
+          "id": "reopenFromCard",
+          "width": 323,
+          "height": 44
+        },
+        {
+          "id": "closePreview",
+          "width": 87.65625,
+          "height": 40
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "",
+          "width": 359,
+          "height": 63.6875
+        },
+        {
+          "id": "selectAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "assignAction",
+          "width": 177,
+          "height": 65.5
+        },
+        {
+          "id": "copyAction",
+          "width": 177,
+          "height": 48
+        }
+      ],
+      "focusables": [
+        "closePreview",
+        "",
+        "",
+        "",
+        "",
+        "selectAction",
+        "assignAction",
+        "copyAction"
+      ],
+      "activeElement": "previewDialog",
+      "safeAreaPaddingBottom": "80px",
+      "bodyDataset": {
+        "theme": "dark",
+        "variant": "ready"
+      },
+      "cardRect": {
+        "left": 16,
+        "right": 377,
+        "top": 434.15625,
+        "bottom": 802.515625,
+        "width": 361,
+        "height": 368.359375
       }
     }
   },
-  "actions": {
-    "selectStatus": "Выбор сохранён только в текущем flow макета. Активная программа не изменена.",
-    "copyStatus": "Макет: сценарий копирования выбран. Владение становится личным только после серверной операции.",
-    "editStatus": "Макет: редактор доступен только владельцу программы."
-  },
-  "keyboard": {
-    "before": {
-      "variant": "ready",
-      "dialogHidden": false,
-      "active": "previewDialog"
-    },
-    "afterClose": {
-      "dialogHidden": true,
-      "active": "reopenButton",
-      "status": "Предпросмотр закрыт. Активная программа не изменена."
-    },
-    "confirmation": {
-      "previewHidden": true,
-      "confirmHidden": false,
-      "status": "Макет: запрос на назначение не отправляется.",
-      "active": "confirmPanel"
-    }
-  },
   "source": {
-    "statusChipOccurrences": 4,
-    "nowrapStatus": "nowrap",
-    "nowrapToken": "nowrap"
+    "visibleTechnicalIdentifiers": [],
+    "sideSheetBorders": [
+      "0px none rgb(242, 244, 239)",
+      "0px none rgb(23, 26, 24)",
+      "1px solid rgb(59, 68, 62)",
+      "1px solid rgb(211, 217, 210)"
+    ],
+    "previewDialogOutlines": [
+      "rgb(242, 244, 239) none 0px",
+      "rgb(23, 26, 24) none 0px"
+    ],
+    "duplicateReviewControl": false
   },
-  "generatedAt": "2026-10-16T20:46:32.537Z",
   "limitations": [
-    "Physical iPhone/Safari, native Telegram Mini App and VoiceOver are NOT_VERIFIED.",
-    "Increased text check uses a browser root text-size diagnostic of 125%; OS accessibility settings are NOT_VERIFIED."
-  ]
+    "Физический iPhone/Safari, native Telegram Mini App и VoiceOver не проверялись.",
+    "125% — диагностическое увеличение текста через CSS, не системная настройка доступности ОС.",
+    "Все значения фикстур синтетические; API-запросы не отправляются."
+  ],
+  "generatedAt": "2026-10-17T22:57:57.477Z"
 }
+

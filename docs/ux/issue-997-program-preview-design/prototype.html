@@ -114,10 +114,12 @@
         opacity: 0.48;
       }
       button:focus-visible,
-      select:focus-visible,
-      [tabindex='-1']:focus-visible {
+      select:focus-visible {
         outline: 3px solid var(--accent);
         outline-offset: 3px;
+      }
+      .preview-dialog:focus-visible {
+        outline: 0;
       }
       select {
         min-height: 42px;
@@ -335,15 +337,14 @@
         width: min(650px, 100vw);
         height: 100dvh;
         flex-direction: column;
-        border-left: 1px solid var(--border-strong);
+        border-left: 1px solid var(--border);
         background: var(--surface);
         box-shadow: var(--shadow);
       }
       .preview-dialog[hidden],
       .backdrop[hidden],
       .confirm-panel[hidden],
-      .preview-content[hidden],
-      .reopen-button[hidden] {
+      .preview-content[hidden] {
         display: none;
       }
       .dialog-header {
@@ -595,12 +596,6 @@
       .confirm-actions button {
         flex: 1;
       }
-      .reopen-button {
-        position: fixed;
-        z-index: 4;
-        right: 24px;
-        bottom: 24px;
-      }
       @media (max-width: 780px) {
         .prototype-header {
           align-items: flex-start;
@@ -624,7 +619,7 @@
         }
         .app-view {
           display: block;
-          padding: 24px 16px 80px;
+          padding: 24px 16px calc(80px + env(safe-area-inset-bottom));
         }
         .library-column {
           max-width: none;
@@ -674,6 +669,14 @@
         }
         .section-heading p {
           text-align: left;
+        }
+        .library-card__bottom {
+          align-items: stretch;
+          flex-direction: column;
+          gap: 12px;
+        }
+        .library-card__bottom .button-primary {
+          width: 100%;
         }
         .action-grid {
           gap: 7px;
@@ -860,26 +863,22 @@
       </section>
     </article>
 
-    <button class="reopen-button button-primary" id="reopenButton" type="button" hidden>
-      Посмотреть предпросмотр
-    </button>
-
     <script>
       const UNKNOWN = 'Нет данных';
       const fixtures = {
         ready: {
           kind: 'Готовый шаблон',
           title: 'Силовая база · 4 дня',
-          description: 'Полные seed-метаданные и короткий путь к выбору основы.',
+          description: 'Полные подтверждённые сведения и короткий путь к выбору основы.',
           ownership: 'Источник: публичный готовый шаблон. Личный владелец не назначен.',
           version: 'Версия назначения: нет — программа ещё не назначена.',
           facts: [
-            ['Дни', '4 в составе шаблона', 'ProgramTemplateResponse.days'],
-            ['Частота', '4 в неделю', 'program_metadata.days_per_week'],
-            ['Уровень', 'Средний', 'template.level'],
-            ['Оборудование', 'Собственный вес · гантели · скамья', 'program_metadata.equipment'],
-            ['Оценка времени', '≈45 мин', 'макетная оценка; не фактическое время'],
-            ['Срок источника', '1 неделя', 'явное значение фикстуры'],
+            ['Дни', '4 в составе шаблона', 'В составе программы'],
+            ['Частота', '4 в неделю', 'Настройки программы'],
+            ['Уровень', 'Средний', 'Уровень программы'],
+            ['Оборудование', 'Собственный вес · гантели · скамья', 'Список оборудования'],
+            ['Оценка времени', '≈45 мин', 'Синтетическая оценка, не фактическое время'],
+            ['Срок источника', '1 неделя', 'Срок указан в источнике'],
           ],
           days: [
             { title: 'День 1 · всё тело', count: '3 упражнения', exercises: [['Приседания с гантелью', '3 × 8 · отдых 90 с'], ['Жим гантелей лёжа', '3 × 10 · отдых 90 с'], ['Планка', '3 подхода · без минут']] },
@@ -898,12 +897,12 @@
           ownership: 'Источник: готовый шаблон. Периодизация не вычисляется предпросмотром.',
           version: 'Версия назначения: нет — программа ещё не назначена.',
           facts: [
-            ['Дни', '4 в составе шаблона', 'ProgramTemplateResponse.days'],
-            ['Частота', '4 в неделю', 'program_metadata.days_per_week'],
-            ['Уровень', 'Средний', 'template.level'],
-            ['Оборудование', 'Штанга · стойка · скамья', 'program_metadata.equipment'],
-            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
-            ['Срок источника', '12 недель в исходных предписаниях', 'default_duration_weeks + weekly_prescriptions'],
+            ['Дни', '4 в составе шаблона', 'В составе программы'],
+            ['Частота', '4 в неделю', 'Настройки программы'],
+            ['Уровень', 'Средний', 'Уровень программы'],
+            ['Оборудование', 'Штанга · стойка · скамья', 'Список оборудования'],
+            ['Оценка времени', UNKNOWN, 'Источник оценки не указан'],
+            ['Срок источника', '12 недель в исходных предписаниях', 'Срок указан в исходных предписаниях'],
           ],
           days: [
             { title: 'Верх тела · сила', count: '4 упражнения', exercises: [['Жим лёжа', '5 × 5 · предписания недель'], ['Тяга штанги', '4 × 6 · предписания недель'], ['Жим стоя', '3 × 8 · предписания недель'], ['Подтягивания', '3 подхода · предписания недель']] },
@@ -912,7 +911,7 @@
             { title: 'Низ тела · гипертрофия', count: '4 упражнения', exercises: [['Жим ногами', '4 × 10'], ['Сгибание ног', '3 × 12'], ['Выпады', '3 × 10'], ['Икры', '4 × 15']] },
           ],
           weekSummary: '4 дня · в источнике есть предписания на 12 недель',
-          sourceNote: '<strong>Только явные данные источника</strong><span>«12 недель» не означает новый режим повторения или периодизацию назначения. Типы недель и правила повторов не рисуются без отдельного согласованного контракта #916/#919/#920.</span>',
+          sourceNote: '<strong>Только явные данные источника</strong><span>«12 недель» не означает новый режим повторения или периодизацию назначения. Типы недель и правила повторов не рисуются без отдельного согласованного контракта.</span>',
           actions: { select: true, assign: true, copy: true, edit: false, readonly: false },
         },
         own: {
@@ -922,12 +921,12 @@
           ownership: 'Владелец: текущий пользователь. Редактирование доступно владельцу.',
           version: 'Версия назначения: нет — программа ещё не назначена.',
           facts: [
-            ['Дни', '3 в составе шаблона', 'ProgramTemplateResponse.days'],
-            ['Частота', UNKNOWN, 'program_metadata.days_per_week отсутствует'],
-            ['Уровень', 'Начальный', 'template.level'],
-            ['Оборудование', UNKNOWN, 'нет полного списка метаданных'],
-            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
-            ['Срок источника', UNKNOWN, 'default_duration_weeks не задан'],
+            ['Дни', '3 в составе шаблона', 'В составе программы'],
+            ['Частота', UNKNOWN, 'Источник не содержит частоту'],
+            ['Уровень', 'Начальный', 'Уровень программы'],
+            ['Оборудование', UNKNOWN, 'Полный список не указан'],
+            ['Оценка времени', UNKNOWN, 'Источник оценки не указан'],
+            ['Срок источника', UNKNOWN, 'Срок не указан в источнике'],
           ],
           days: [
             { title: 'Тренировка A', count: '2 упражнения', exercises: [['Приседания', '3 × 8'], ['Отжимания', '3 подхода']] },
@@ -945,12 +944,12 @@
           ownership: 'Назначил тренер: Анна Смирнова. Это не личная программа пользователя.',
           version: 'Срок назначения: 4 недели · ревизия назначения: 3.',
           facts: [
-            ['Дни', '3 в составе шаблона', 'ProgramTemplateResponse.days'],
-            ['Частота', '3 в неделю', 'assigned_program_schedule_weekdays'],
-            ['Уровень', 'Продвинутый', 'template.level'],
-            ['Оборудование', 'Тренажёр · штанга', 'program_metadata.equipment'],
-            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
-            ['Срок назначения', '4 недели', 'assigned_program_duration_weeks'],
+            ['Дни', '3 в составе шаблона', 'В составе программы'],
+            ['Частота', '3 в неделю', 'Расписание назначения'],
+            ['Уровень', 'Продвинутый', 'Уровень программы'],
+            ['Оборудование', 'Тренажёр · штанга', 'Список оборудования'],
+            ['Оценка времени', UNKNOWN, 'Источник оценки не указан'],
+            ['Срок назначения', '4 недели', 'Срок текущего назначения'],
           ],
           days: [
             { title: 'Понедельник · сила', count: '4 упражнения', exercises: [['Приседания', '5 × 5'], ['Жим лёжа', '5 × 5'], ['Тяга', '3 × 5'], ['Пресс', '3 подхода']] },
@@ -968,12 +967,12 @@
           ownership: 'Источник доступен для просмотра. Владелец и дополнительные права не определены.',
           version: 'Версия назначения: нет данных.',
           facts: [
-            ['Дни', '2 в составе шаблона', 'ProgramTemplateResponse.days'],
-            ['Частота', UNKNOWN, 'program_metadata отсутствует'],
-            ['Уровень', UNKNOWN, 'level отсутствует'],
-            ['Оборудование', UNKNOWN, 'нет полного источника'],
-            ['Оценка времени', UNKNOWN, 'нет отдельного источника оценки'],
-            ['Срок источника', UNKNOWN, 'default_duration_weeks отсутствует'],
+            ['Дни', '2 в составе шаблона', 'В составе программы'],
+            ['Частота', UNKNOWN, 'Источник не содержит частоту'],
+            ['Уровень', UNKNOWN, 'Источник не содержит уровень'],
+            ['Оборудование', UNKNOWN, 'Полный список не указан'],
+            ['Оценка времени', UNKNOWN, 'Источник оценки не указан'],
+            ['Срок источника', UNKNOWN, 'Срок не указан в источнике'],
           ],
           days: [
             { title: 'Тренировка A', count: 'состав доступен', exercises: [['Упражнение 1', 'назначение не задано'], ['Упражнение 2', 'назначение не задано']] },
@@ -1012,6 +1011,20 @@
 
       function isUnknown(value) {
         return value === UNKNOWN;
+      }
+
+      function getDialogFocusables() {
+        return [...previewDialog.querySelectorAll('button, select, [href], input, textarea, [tabindex]')].filter((element) => {
+          const styles = window.getComputedStyle(element);
+          return (
+            !element.hidden &&
+            !element.closest('[hidden]') &&
+            !element.disabled &&
+            element.getAttribute('tabindex') !== '-1' &&
+            styles.display !== 'none' &&
+            styles.visibility !== 'hidden'
+          );
+        });
       }
 
       function renderFacts(fixture) {
@@ -1094,16 +1107,14 @@
       function openPreview() {
         previewDialog.hidden = false;
         backdrop.hidden = false;
-        document.querySelector('#reopenButton').hidden = true;
         previewDialog.focus({ preventScroll: true });
       }
 
       function closePreview() {
         previewDialog.hidden = true;
         backdrop.hidden = true;
-        document.querySelector('#reopenButton').hidden = false;
         libraryStatus.textContent = 'Предпросмотр закрыт. Активная программа не изменена.';
-        document.querySelector('#reopenButton').focus();
+        document.querySelector('#reopenFromCard').focus();
       }
 
       function showConfirmation() {
@@ -1119,10 +1130,27 @@
       }
 
       document.querySelector('#closePreview').addEventListener('click', closePreview);
-      document.querySelector('#reopenButton').addEventListener('click', openPreview);
       document.querySelector('#reopenFromCard').addEventListener('click', openPreview);
       backdrop.addEventListener('click', closePreview);
       document.addEventListener('keydown', (event) => {
+        if (event.key === 'Tab' && !previewDialog.hidden) {
+          const focusables = getDialogFocusables();
+          if (!focusables.length) {
+            event.preventDefault();
+            previewDialog.focus({ preventScroll: true });
+            return;
+          }
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === previewDialog)) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+          }
+          return;
+        }
         if (event.key !== 'Escape' || previewDialog.hidden) return;
         if (!confirmPanel.hidden) {
           restorePreview();
@@ -1165,9 +1193,22 @@
         const assert = (condition, message) => {
           if (!condition) throw new Error(message);
         };
+        const technicalIdentifiers = [
+          'ProgramTemplateResponse.days',
+          'program_metadata.days_per_week',
+          'template.level',
+          'program_metadata.equipment',
+        ];
+        const visibleFactSources = [...document.querySelectorAll('.fact-source')].map((node) => node.textContent);
         assert(Object.keys(fixtures).length === 5, 'all review fixtures must exist');
         assert(fixtures.legacy.facts.every(([, value]) => value !== '1 неделя'), 'legacy must not infer one week');
         assert(fixtures.legacy.facts.some(([, value]) => value === UNKNOWN), 'legacy must expose unknown data');
+        assert(!document.querySelector('#reopenButton'), 'duplicate fixed review control must not exist');
+        assert(document.querySelector('#reopenFromCard'), 'card preview control must remain available');
+        assert(
+          visibleFactSources.every((source) => !technicalIdentifiers.some((identifier) => source.includes(identifier))),
+          'technical provenance identifiers must not be visible in fact cards',
+        );
         assert(document.querySelector('#previewDialog').getAttribute('role') === 'dialog', 'dialog semantics missing');
         assert(document.querySelector('#closePreview').type === 'button', 'close must not submit a form');
         assert(document.querySelector('#confirmPanel').hidden, 'confirmation must be opt-in');
@@ -1182,3 +1223,4 @@
     </script>
   </body>
 </html>
+
