@@ -1497,6 +1497,188 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
   }
 });
 
+test('all Progress views keep decorative lime edges out of informational surfaces', async ({
+  page,
+}) => {
+  const views = ['overview', 'body', 'training', 'nutrition', 'cardio', 'wellbeing', 'history'];
+  const viewLabels: Record<string, string> = {
+    overview: 'Обзор',
+    body: 'Тело',
+    training: 'Тренировки',
+    nutrition: 'Питание',
+    cardio: 'Кардио',
+    wellbeing: 'Самочувствие',
+    history: 'История',
+  };
+  const viewports = [
+    { width: 320, height: 844 },
+    { width: 393, height: 844 },
+    { width: 1440, height: 1000 },
+  ];
+
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockProgress(page);
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await page.goto('/app?section=progress&progress_view=overview');
+      await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+      await expect(page.locator('.progress-experience')).toBeVisible();
+
+      for (const view of views) {
+        const tab = page
+          .getByRole('navigation', { name: 'Разделы прогресса' })
+          .getByRole('tab', { name: new RegExp(`^${viewLabels[view]}`) });
+        if (view !== 'overview') {
+          await tab.click();
+        }
+        await expect(tab).toHaveAttribute('aria-selected', 'true');
+        await expect(page.locator('[role="status"][aria-busy="true"]')).toHaveCount(0);
+
+        const audit = await page.locator('.progress-experience').evaluate((root) => {
+          const probe = document.createElement('span');
+          probe.style.color = 'var(--v2-lime)';
+          document.body.append(probe);
+          const lime = getComputedStyle(probe).color;
+          probe.remove();
+          const limeChannels = lime.match(/\d+(?:,\s*\d+){2}/)?.[0] ?? '';
+          const hasLimeColor = (value: string) =>
+            value === lime || (limeChannels !== '' && value.includes(limeChannels));
+          const allowed = (element: HTMLElement) =>
+            Boolean(
+              element.closest(
+                '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta, .weekly-review__target, .weekly-review__complete, .weekly-review__notice, .weekly-review__decision-note, .weekly-review__diff > div:last-child',
+              ),
+            );
+          const violations: string[] = [];
+          const describe = (element: HTMLElement) =>
+            `${element.tagName.toLowerCase()}.${String(element.className).replace(/\s+/g, '.')}`;
+          const physicalEdgeSides = [
+            ['left', 'borderLeftWidth', 'borderLeftColor'],
+            ['right', 'borderRightWidth', 'borderRightColor'],
+            ['top', 'borderTopWidth', 'borderTopColor'],
+            ['bottom', 'borderBottomWidth', 'borderBottomColor'],
+          ] as const;
+          const logicalEdgeSides = [
+            ['inline-start', 'borderInlineStartWidth', 'borderInlineStartColor'],
+            ['inline-end', 'borderInlineEndWidth', 'borderInlineEndColor'],
+          ] as const;
+          const frameCandidates = Array.from(
+            root.querySelectorAll<HTMLElement>(
+              '.progress-insights__column, .progress-overview__adherence',
+            ),
+          );
+          const unevenInfoFrames = frameCandidates.flatMap((element) => {
+            if (
+              element.classList.contains('progress-overview__adherence') &&
+              window.innerWidth < 641
+            ) {
+              return [];
+            }
+            const style = getComputedStyle(element);
+            const widths = [
+              style.borderLeftWidth,
+              style.borderRightWidth,
+              style.borderTopWidth,
+              style.borderBottomWidth,
+            ];
+            const colors = [
+              style.borderLeftColor,
+              style.borderRightColor,
+              style.borderTopColor,
+              style.borderBottomColor,
+            ];
+            return widths.every((width) => width === '1px') &&
+              colors.every((color) => color === colors[0])
+              ? []
+              : [describe(element)];
+          });
+
+          for (const element of Array.from(root.querySelectorAll<HTMLElement>('*'))) {
+            const style = getComputedStyle(element);
+            const physicalLimeBorders = physicalEdgeSides.filter(
+              ([, widthProperty, colorProperty]) => {
+                const width = Number.parseFloat(style[widthProperty]);
+                return width >= 3 && hasLimeColor(style[colorProperty]);
+              },
+            );
+            const logicalLimeBorders = logicalEdgeSides.filter(
+              ([, widthProperty, colorProperty]) => {
+                const width = Number.parseFloat(style[widthProperty]);
+                return width >= 3 && hasLimeColor(style[colorProperty]);
+              },
+            );
+            if (
+              (physicalLimeBorders.length === 1 ||
+                (physicalLimeBorders.length === 0 && logicalLimeBorders.length === 1)) &&
+              !allowed(element)
+            ) {
+              const side = physicalLimeBorders[0]?.[0] ?? logicalLimeBorders[0]?.[0];
+              violations.push(`${describe(element)}: border-${side}`);
+            }
+
+            if (
+              style.boxShadow.includes('inset') &&
+              hasLimeColor(style.boxShadow) &&
+              !allowed(element)
+            ) {
+              violations.push(`${describe(element)}: inset lime shadow`);
+            }
+
+            for (const pseudo of ['::before', '::after'] as const) {
+              const pseudoStyle = getComputedStyle(element, pseudo);
+              const hasContent = pseudoStyle.content !== 'none' && pseudoStyle.content !== '""';
+              const physicalLimePseudoBorders = physicalEdgeSides.filter(
+                ([, widthProperty, colorProperty]) => {
+                  const width = Number.parseFloat(pseudoStyle[widthProperty]);
+                  return width >= 3 && hasLimeColor(pseudoStyle[colorProperty]);
+                },
+              );
+              const logicalLimePseudoBorders = logicalEdgeSides.filter(
+                ([, widthProperty, colorProperty]) => {
+                  const width = Number.parseFloat(pseudoStyle[widthProperty]);
+                  return width >= 3 && hasLimeColor(pseudoStyle[colorProperty]);
+                },
+              );
+              const hasLimeEdge =
+                physicalLimePseudoBorders.length === 1 ||
+                (physicalLimePseudoBorders.length === 0 && logicalLimePseudoBorders.length === 1);
+              const hasLimeBackground =
+                hasLimeColor(pseudoStyle.backgroundColor) ||
+                hasLimeColor(pseudoStyle.backgroundImage);
+              if (hasContent && (hasLimeEdge || hasLimeBackground) && !allowed(element)) {
+                violations.push(`${describe(element)}${pseudo}: lime pseudo-element edge`);
+              }
+            }
+
+            if (
+              style.backgroundImage !== 'none' &&
+              hasLimeColor(style.backgroundImage) &&
+              !allowed(element)
+            ) {
+              violations.push(`${describe(element)}: lime background image`);
+            }
+          }
+
+          return { lime, unevenInfoFrames, violations };
+        });
+
+        expect(audit.violations, `${colorScheme}/${viewport.width}/${view}`).toEqual([]);
+        expect(audit.unevenInfoFrames, `${colorScheme}/${viewport.width}/${view}`).toEqual([]);
+      }
+    }
+  }
+});
+
 test('shared data confidence keeps analytics factual, responsive and explicit while refreshing', async ({
   page,
 }) => {

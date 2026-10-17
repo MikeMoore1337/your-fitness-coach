@@ -734,12 +734,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-section--progress .progress-insights__column {
   min-width: 0;
   padding: 14px 16px;
+  border: 1px solid var(--v2-border);
   border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
-}
-
-.app-section--progress .progress-insights__column--attention {
-  border-left: 3px solid var(--v2-border-strong);
 }
 
 .app-section--progress .progress-insights ul {
@@ -1362,7 +1359,6 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     align-self: start;
     padding-inline: 14px;
     border: 1px solid var(--v2-border);
-    border-left: 3px solid var(--v2-border-strong);
     border-radius: var(--v2-control-radius);
     background: var(--v2-surface-secondary);
   }
@@ -2348,6 +2344,14 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-section--progress .progress-experience--approved .data-confidence {
   border: 1px solid var(--v2-border);
   border-left-width: 1px;
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .progress-experience--approved .progress-priority,
+.app-section--progress .progress-experience--approved .progress-coverage,
+.app-section--progress .progress-experience--approved .progress-nutrition-summary > div {
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
 }
 
