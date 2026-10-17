@@ -27,6 +27,7 @@ interface QueuedRestAction {
   occurred_at: string;
   ended_at?: string;
   corrected?: boolean;
+  corrected_seconds?: number;
 }
 
 export interface LocalRestSession {
@@ -39,6 +40,10 @@ export interface LocalRestSession {
   ended_at?: string;
   source?: string;
   notified?: boolean;
+  /** Timestamp of entering the background; survives WebView suspend/reload. */
+  background_since?: number;
+  /** Variant C: owner must recover or discard this measurement. */
+  needs_review?: boolean;
   server_id?: number;
   server_version?: number;
   start_mutation_id: string;
@@ -48,6 +53,8 @@ export interface LocalRestSession {
 const REST_JOURNAL_VERSION = 1;
 const CHANGE_EVENT = 'fit:rest-journal';
 const MAX_JOURNAL = 256;
+/** A return from background prompts for recovery only after 15 minutes past the plan. */
+export const REST_ABSENCE_REVIEW_MS = 15 * 60 * 1000;
 
 function makeId(): string {
   return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
@@ -140,24 +147,27 @@ export function updateMeasuredRest(
   sourceSetId: number,
   action: RestAction,
   at = Date.now(),
+  correctedSeconds?: number,
 ): LocalRestSession | null {
   const records = loadRestJournal(userId, workoutId);
   const row = records.find((item) => item.source_set_id === sourceSetId);
   if (!row || row.status !== 'running') return null;
-  // A restored tab can receive a click before its first cutoff tick.
-  // Never label such a window as measured, even when Stop was explicitly clicked.
-  const elapsedMs = at - Date.parse(row.started_at);
-  const effectiveAction: RestAction =
-    action === 'complete' &&
-    (elapsedMs < 0 || elapsedMs >= restHardCutoffMs(row.adjusted_seconds))
-      ? 'unknown'
-      : action;
+  // Variant C: unresolved background returns must be explicitly corrected or skipped.
+  if (row.needs_review && action !== 'skip' && !(action === 'complete' && correctedSeconds !== undefined)) return null;
+  if (correctedSeconds !== undefined &&
+      (action !== 'complete' || !Number.isInteger(correctedSeconds) || correctedSeconds < 0 || correctedSeconds > 86400)) return null;
+  if (action === 'complete' && correctedSeconds === undefined && at < Date.parse(row.started_at)) return null;
+  const effectiveAction = action;
   const occurredAt = new Date(at).toISOString();
   const entry: QueuedRestAction = {
     action: effectiveAction,
     occurred_at: occurredAt,
     mutation_id: makeId(),
   };
+  if (correctedSeconds !== undefined) {
+    entry.corrected = true;
+    entry.corrected_seconds = correctedSeconds;
+  }
   if (effectiveAction === 'add30' || effectiveAction === 'add60') {
     row.deadline = Math.max(row.deadline, at) + (action === 'add30' ? 30 : 60) * 1000;
     row.adjusted_seconds = Math.max(
@@ -172,9 +182,11 @@ export function updateMeasuredRest(
       unknown: 'unknown',
     }[effectiveAction] as RestStatus;
     row.ended_at = occurredAt;
+    row.needs_review = false;
+    row.background_since = undefined;
     if (effectiveAction === 'complete') {
       entry.ended_at = occurredAt;
-      row.source = 'USER_CONFIRMED';
+      row.source = correctedSeconds === undefined ? 'USER_CONFIRMED' : 'USER_CORRECTED';
     }
   }
   row.pending.push(entry);
@@ -190,8 +202,28 @@ export function acknowledgeRestPlan(userId: number, workoutId: number, sourceSet
   saveRestJournal(userId, workoutId, records);
 }
 
-export function restHardCutoffMs(adjustedSeconds: number): number {
-  return Math.min(Math.max(12 * adjustedSeconds, 12 * 3600), 24 * 3600) * 1000;
+/** Record departure; do not convert time away into a fictitious measured interval. */
+export function markRestBackground(userId: number, workoutId: number, at = Date.now()): void {
+  const records = loadRestJournal(userId, workoutId);
+  const row = records.find((item) => item.status === 'running');
+  if (!row || row.needs_review || row.background_since !== undefined) return;
+  row.background_since = at;
+  saveRestJournal(userId, workoutId, records);
+}
+
+/** Variant C: prompt only if the user was away AND the plan is overdue by 15 min. */
+export function recoverRestAfterAbsence(userId: number, workoutId: number, at = Date.now()): LocalRestSession | null {
+  const records = loadRestJournal(userId, workoutId);
+  const row = records.find((item) => item.status === 'running');
+  if (!row) return null;
+  if (row.background_since !== undefined) {
+    if (at - row.background_since >= REST_ABSENCE_REVIEW_MS && at - row.deadline >= REST_ABSENCE_REVIEW_MS) {
+      row.needs_review = true;
+    }
+    row.background_since = undefined;
+    saveRestJournal(userId, workoutId, records);
+  }
+  return row;
 }
 
 /** Complete only after the source-set mutation reaches the server. Deferred 409 is not data loss. */
