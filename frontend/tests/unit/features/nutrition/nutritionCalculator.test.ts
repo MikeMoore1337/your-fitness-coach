@@ -188,7 +188,7 @@ describe('nutrition calculator', () => {
     expect(result.estimate).toBeNull();
   });
 
-  it('clamps negative carbohydrates and reports the macro warning', () => {
+  it('rejects an infeasible macro allocation instead of silently reversing the deficit', () => {
     const result = calculateNutritionEstimate(
       payload({
         weight_kg: 350,
@@ -202,11 +202,10 @@ describe('nutrition calculator', () => {
       }),
     );
 
-    expect(result.valid && result.estimate.carbs).toBe(0);
-    expect(result.valid && result.estimate.macroWarning).toBe(true);
-    expect(
-      result.valid &&
-        result.estimate.calories === result.estimate.protein * 4 + result.estimate.fat * 9,
-    ).toBe(true);
+    expect(result.valid).toBe(false);
+    expect(result.estimate).toBeNull();
+    expect(result.errors).toEqual(
+      expect.arrayContaining([expect.stringContaining('превышают целевую калорийность')]),
+    );
   });
 });
