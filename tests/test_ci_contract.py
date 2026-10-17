@@ -505,6 +505,13 @@ def test_migrated_stack_browser_spec_routes_to_migration_profile() -> None:
     assert decision["outputs"]["run_migrated_stack"] is True
 
 
+def test_python_sharding_script_requires_python_and_policy_gates() -> None:
+    decision = ci_contract.classify_scope(["scripts/pytest_shard.py"])
+
+    assert decision["profile"] == "cross-stack"
+    assert {"python-tests", "policy"} <= set(decision["required_groups"])
+
+
 def test_scope_router_preserves_dot_prefixed_workflow_paths() -> None:
     decision = ci_contract.classify_scope(["./.github/workflows/ci.yml"])
 
