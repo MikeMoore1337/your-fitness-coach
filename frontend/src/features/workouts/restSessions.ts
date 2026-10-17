@@ -245,7 +245,7 @@ export function updateMeasuredRest(
       Math.round((row.deadline - Date.parse(row.started_at)) / 1000),
     );
   } else {
-    const terminalStatus: Record<Exclude<RestAction, 'add30' | 'add60'>, RestStatus> = {
+    const terminalStatus: Record<string, RestStatus> = {
       complete: 'completed',
       skip: 'skipped',
       interrupt: 'interrupted',
