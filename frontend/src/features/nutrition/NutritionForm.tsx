@@ -53,6 +53,7 @@ function fromInitial(
       ...defaults,
       target_telegram_user_id: targetTelegramId,
       goal: profileGoal,
+      sex: profile?.sex ?? defaults.sex,
       height_cm: profile?.height_cm ?? defaults.height_cm,
       weight_kg: profile?.weight_kg ?? defaults.weight_kg,
       age: age && age >= 18 && age <= 100 ? age : defaults.age,
@@ -60,9 +61,9 @@ function fromInitial(
   }
   return {
     target_telegram_user_id: targetTelegramId,
-    sex: (initial.sex || defaults.sex) as NutritionCalculatorInput['sex'],
-    weight_kg: initial.weight_kg ?? profile?.weight_kg ?? defaults.weight_kg,
-    height_cm: initial.height_cm ?? profile?.height_cm ?? defaults.height_cm,
+    sex: (profile?.sex || initial.sex || defaults.sex) as NutritionCalculatorInput['sex'],
+    weight_kg: profile?.weight_kg ?? initial.weight_kg ?? defaults.weight_kg,
+    height_cm: profile?.height_cm ?? initial.height_cm ?? defaults.height_cm,
     age: initial.age ?? defaults.age,
     daily_routine: (initial.daily_routine ||
       defaults.daily_routine) as NutritionCalculatorInput['daily_routine'],
@@ -134,6 +135,7 @@ export function NutritionForm({
           queryKey: queryKeys.nutrition.targetHistory(targetTelegramId),
         }),
         queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.currentTarget }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.measurements.subject(clientId) }),
         ...(!clientId
           ? [queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all })]
           : []),
@@ -618,6 +620,12 @@ export function NutritionForm({
                 </p>
               </aside>
 
+              {!clientId && (
+                <p className="muted">
+                  При сохранении данные калькулятора обновят профиль, а текущий вес
+                  появится в дневнике замеров.
+                </p>
+              )}
               <button disabled={mutation.isPending || !calculation.valid}>
                 {mutation.isPending ? 'Сохраняем…' : 'Сохранить КБЖУ'}
               </button>
