@@ -119,8 +119,18 @@ def ai_frames(
     for i, frame in enumerate(original_frames):
         frame.save(source / f"{i:04d}.png")
     model_path = engine / "models"
-    exe = engine / "realesrgan-ncnn-vulkan.exe"
-    if not exe.is_file() or not model_path.is_dir():
+    exe = next(
+        (
+            candidate
+            for candidate in (
+                engine / "realesrgan-ncnn-vulkan.exe",
+                engine / "realesrgan-ncnn-vulkan",
+            )
+            if candidate.is_file()
+        ),
+        None,
+    )
+    if exe is None or not model_path.is_dir():
         raise FileNotFoundError("Real-ESRGAN executable/models missing; provide --engine")
     cmd = [
         str(exe),
