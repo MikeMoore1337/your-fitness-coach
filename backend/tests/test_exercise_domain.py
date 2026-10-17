@@ -789,6 +789,7 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
     assert spec is not None and spec.loader is not None
     validator = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(validator)
+    manifest = json.loads(validator.MANIFEST_PATH.read_text(encoding="utf-8"))
     report = validator.validate_catalog()
     assert report == {
         "catalog_records": 207,
