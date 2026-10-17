@@ -3,7 +3,7 @@
 Финальный пакет AFTER для Draft PR [#1046](https://github.com/MikeMoore1337/your-fitness-coach/pull/1046).
 
 - Evidence/source SHA: [`096a4ed`](https://github.com/MikeMoore1337/your-fitness-coach/tree/096a4ededf95558f6996058e56826f50a1bd5f81/docs/ux/issue-998-rir-guidance-implementation/evidence).
-- Mobile snapshot reconciliation: [`6e60efd`](https://github.com/MikeMoore1337/your-fitness-coach/commit/6e60efd6).
+- Merged-result mobile snapshots: [`1981b294`](https://github.com/MikeMoore1337/your-fitness-coach/commit/1981b294).
 - Актуальный base после синхронизации: [`dc1daeb`](https://github.com/MikeMoore1337/your-fitness-coach/commit/dc1daeb57bc7eded67a089b206e8f84375fea8d1).
 - Последующий sync merge после evidence: [`82da4dd`](https://github.com/MikeMoore1337/your-fitness-coach/commit/82da4ddec628e8c781b5c4c36ce8e9528da78787). Он содержит только CI-изменения и не меняет эти captures.
 
