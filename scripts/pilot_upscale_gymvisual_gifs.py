@@ -9,11 +9,11 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
 
-from imageio_ffmpeg import get_ffmpeg_exe
 from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,6 +55,19 @@ def load_gif(slug: str) -> tuple[Path, list[Image.Image], list[int], int]:
     return path, frames, durations, loop
 
 
+def ffmpeg_executable() -> str:
+    """Use the system FFmpeg in CI, or the optional local imageio bundle."""
+    if executable := shutil.which("ffmpeg"):
+        return executable
+    try:
+        from imageio_ffmpeg import get_ffmpeg_exe
+    except ImportError as exc:
+        raise RuntimeError(
+            "FFmpeg is required: install a system ffmpeg binary or imageio-ffmpeg"
+        ) from exc
+    return get_ffmpeg_exe()
+
+
 def ffconcat_video(frames: list[Path], durations: list[int], output: Path) -> None:
     """Encode H.264, preserving original GIF per-frame timing via VFR concat."""
     concat = output.with_suffix(".ffconcat")
@@ -65,7 +78,7 @@ def ffconcat_video(frames: list[Path], durations: list[int], output: Path) -> No
     rows.append("file '" + frames[-1].as_posix() + "'")
     concat.write_text("\n".join(rows) + "\n", encoding="utf-8")
     command = [
-        get_ffmpeg_exe(),
+        ffmpeg_executable(),
         "-hide_banner",
         "-loglevel",
         "error",
