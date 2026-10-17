@@ -122,4 +122,5 @@ describe('ExerciseMediaAsset', () => {
       'src',
       '/static/exercise-guides/gymvisual/deadlift-0032-ila4NZS.gif',
     );
-  })});
+  });
+});
