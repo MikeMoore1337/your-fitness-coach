@@ -101,14 +101,14 @@ export async function invalidateMeasurementMutation(
       queryClient.invalidateQueries({ queryKey: queryKeys.progress.summaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
       queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.currentTarget }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.targetHistory() }),
+      queryClient.invalidateQueries({ queryKey: ['nutrition', 'targets', 'history'] }),
       queryClient.invalidateQueries({ queryKey: ['weekly-check-ins'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
     );
   } else {
     invalidations.push(
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientAnalytics(clientId) }),
-      queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.targetHistory() }),
+      queryClient.invalidateQueries({ queryKey: ['nutrition', 'targets', 'history'] }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientSummary(clientId) }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clientSummaries }),
       queryClient.invalidateQueries({ queryKey: queryKeys.trainer.clients }),
