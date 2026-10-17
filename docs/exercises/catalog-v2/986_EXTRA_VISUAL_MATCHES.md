@@ -1,18 +1,17 @@
-# #986: additional semantically checked HD posters (2026-10-17)
+# #986: four additional visually checked HD posters (2026-10-17)
 
-This follow-up is based on the corrected 73/206 master after PR #1066.
-Source revision: `18742da40b0627c85925c5dd4441dc3eac0594d0`.
-All original GymVisual GIF animations remain; this import upgrades only still-poster variants.
+Follow-up to the corrected 73/206 master from PR #1066.
+All inputs are pinned to source revision `18742da40b0627c85925c5dd4441dc3eac0594d0`.
 
-| YFC canonical slug | Pinned candidate | Equipment / movement | Evidence | Decision |
-| --- | --- | --- | --- | --- |
-| `t-bar-row` | `male/lever-t-bar-row` | T-bar lever machine, standing bent-over supported-stance row; same figure, exercise, equipment and position as original 180px GymVisual poster | [Before/after](evidence/986-t-bar-row-before-after.jpg) | VERIFIED_SEMANTIC, replace static poster |
-| `lying-dumbbell-triceps-extension` | `male/dumbbell-lying-triceps-extension` | Lying flat on a bench, two dumbbells, elbow extension; same pose, movement and equipment as original GymVisual poster | [Before/after](evidence/986-lying-dumbbell-triceps-extension-before-after.jpg) | VERIFIED_SEMANTIC, replace static poster |
+| YFC canonical slug | Pinned candidate | Exercise fidelity evidence | Before/after comparison |
+| --- | --- | --- | --- |
+| `t-bar-row` | `male/lever-t-bar-row` | Identical T-bar lever rowing machine, body inclination and rowing movement in old GymVisual illustration | [JPG](evidence/986-t-bar-row-before-after.jpg) |
+| `lying-dumbbell-triceps-extension` | `male/dumbbell-lying-triceps-extension` | Same flat bench, paired dumbbells, elbow extension and lying pose in old GymVisual | [JPG](evidence/986-lying-dumbbell-triceps-extension-before-after.jpg) |
+| `chin-up` | `male/reverse-grip-pull-up` | Supinated/reverse grip pull-up; exact original GymVisual pose, bodyweight movement and apparatus. More specific independently verified alternative to rejected ambiguous `chin-ups-pull-ups` | [JPG](evidence/986-chin-up-before-after.jpg) |
+| `pull-up` | `male/pull-up-wide-front-grip` | Pronated wide/front grip vertical pull-up; original GymVisual shows the same overhead widened grip, apparatus and vertical motion | [JPG](evidence/986-pull-up-before-after.jpg) |
 
-Contact sheet: the **left** tile is the pre-import 180x180 GymVisual poster enlarged for comparison only. The **right** tile is the authorized 1920x1080 candidate reduced to 640x360 for convenient review. Do not mistake the enlarged 180px comparison for native HD. These proof images are not production assets.
+Each sheet places the **original 180x180 GymVisual** image (left; enlarged solely for visual comparison) against a **640x360 preview of the 1920x1080 authorized candidate** (right). Enlarging the old image in the *evidence sheet* does not change or misrepresent delivered image resolution. New production files are derived directly from the pinned original JPEG at 640/1280/1920 in WebP and JPEG, SHA-gated; original GIF animations, videos and fallback semantics stay untouched.
 
-The importer verifies the exact pinned Git revision and Git blob SHA-1/byte size of the 1920x1080 source image and creates responsive 640/1280/1920 JPEG/WebP derivatives with SHA-256 integrity metadata. Source rights and published derivatives are authorized by the project owner.
+Target after import: **77/206 (37.38%)** HD posters; **73** existing-poster upgrades and **4** previously empty static-only guides; **35 REVIEW**, **94 NO_MATCH**, **35 blocked**. `russian-twist` remains REVIEW with its old GIF/poster, since the available candidate uses incompatible equipment. This change does **not** clear any other REVIEW/NO_MATCH exercises without proof.
 
-Post-release owner visual validation and physical iPhone/Telegram Mini App checks remain open under Issue #986. No attempt is made to upgrade either exercise's GIF to video. Other REVIEW/NO_MATCH records are retained until semantic evidence supports them.
-
-Target after this patch: **75/206 HD posters**, **71** replacements, **4** newly populated static-only exercises, **37 REVIEW**, **94 NO_MATCH**. The two disputed entries from PR #1066 (`chin-up`, `russian-twist`) stay unverified and display their original GIF/poster.
+The project owner already authorized all use/distribution of the source and derivatives; actual technique acceptance on physical iPhone/Telegram Mini App is a **post-release** activity. Keep Issue #986 OPEN for remaining unmatched exercises.

@@ -21,10 +21,10 @@ def test_full_hd_matrix_records_final_import_statuses() -> None:
 
     assert len(rows) == 206
     assert Counter(row["import_status"] for row in rows) == Counter(
-        {"imported_replaced": 71, "imported_added": 4, "skipped": 131}
+        {"imported_replaced": 73, "imported_added": 4, "skipped": 129}
     )
     assert Counter(row["semantic_status"] for row in rows) == Counter(
-        {"VERIFIED_SEMANTIC": 75, "REVIEW": 37, "NO_MATCH": 94}
+        {"VERIFIED_SEMANTIC": 77, "REVIEW": 35, "NO_MATCH": 94}
     )
     assert Counter(row["previous_status"] for row in rows) == Counter(
         {"approved": 167, "blocked": 39}
@@ -32,7 +32,7 @@ def test_full_hd_matrix_records_final_import_statuses() -> None:
     assert Counter(row["current_status"] for row in rows) == Counter(
         {"approved": 171, "blocked": 35}
     )
-    for slug in ("chin-up", "russian-twist"):
+    for slug in ("russian-twist",):
         row = next(item for item in rows if item["canonical_slug"] == slug)
         assert row["semantic_status"] == "REVIEW"
         assert row["import_status"] == "skipped"

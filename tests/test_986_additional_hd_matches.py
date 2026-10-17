@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 ASSETS = ROOT / "backend/assets/exercise-guides"
 MATCHES = {
     "t-bar-row": "lever-t-bar-row",
+    "chin-up": "reverse-grip-pull-up",
+    "pull-up": "pull-up-wide-front-grip",
     "lying-dumbbell-triceps-extension": "dumbbell-lying-triceps-extension",
 }
 

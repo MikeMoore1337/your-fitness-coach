@@ -14,7 +14,7 @@ cable-fly,male,cable-standing-fly-crossover-fly,VERIFIED_SEMANTIC,high,replace_h
 cable-lateral-raise,male,cable-lateral-raise,VERIFIED_SEMANTIC,high,replace_hd,"exact slug, кроссовер, отведение руки","ранее подтверждённый кандидат"
 cable-pushdown,male,cable-triceps-pushdown,VERIFIED_SEMANTIC,high,replace_hd,"кроссовер, разгибание рук вниз","точная техника"
 calf-press,male,sled-45-degree-calf-press,VERIFIED_SEMANTIC,high,replace_hd,"платформа 45°, жим носками","совпадают тренажёр и движение голеностопа"
-chin-up,male,chin-ups-pull-ups,REVIEW,medium,review_only,"подтягивание обратным хватом","источник обозначает chin-up/pull-up; канонический хват chin-up не подтверждён"
+chin-up,male,reverse-grip-pull-up,VERIFIED_SEMANTIC,high,replace_hd,supinated reverse-grip pullup with bodyweight,visual match to original GymVisual chin-up pose
 close-grip-bench-press,male,barbell-close-grip-bench-press,VERIFIED_SEMANTIC,high,replace_hd,"штанга, узкий хват, жим лёжа","точное движение и хват"
 close-grip-lat-pulldown,male,cable-close-grip-front-lat-pulldown,VERIFIED_SEMANTIC,high,replace_hd,"кроссовер, узкий хват, вертикальная тяга","точное движение и хват"
 concentration-curl,male,dumbbell-concentration-curl,VERIFIED_SEMANTIC,high,replace_hd,"гантель, локоть опирается на бедро","точная техника"
@@ -76,3 +76,4 @@ battle-rope,male,battling-ropes,VERIFIED_SEMANTIC,high,add_static,"канаты,
 woodchopper,male,cable-twist-up-down,VERIFIED_SEMANTIC,high,add_static,"кроссовер, вращение/диагональная тяга","раньше blocked; визуально соответствует cable woodchop"
 t-bar-row,male,lever-t-bar-row,VERIFIED_SEMANTIC,high,replace_hd,t-bar lever machine exact movement and equipment,visual match to original GymVisual pose
 lying-dumbbell-triceps-extension,male,dumbbell-lying-triceps-extension,VERIFIED_SEMANTIC,high,replace_hd,flat bench and dumbbells extension,visual match to original GymVisual pose
+pull-up,male,pull-up-wide-front-grip,VERIFIED_SEMANTIC,high,replace_hd,pronated wide-grip vertical pullup with bodyweight,visual match to original GymVisual pull-up stance
