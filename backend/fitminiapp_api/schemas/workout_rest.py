@@ -22,6 +22,7 @@ class RestActionRequest(BaseModel):
     ended_at: datetime | None = None
     occurred_at: datetime | None = None
     corrected: bool = False
+    corrected_seconds: int | None = Field(default=None, ge=0, le=86400)
 
 
 class RestSessionResponse(BaseModel):
