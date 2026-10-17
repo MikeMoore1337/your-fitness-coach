@@ -7214,20 +7214,51 @@ button.notification-row__main:focus-visible {
   color: inherit !important;
 }
 
-.nutrition-report-days {
-  border-block: 1px solid var(--v2-border);
+.nutrition-period-report .nutrition-report-target-history,
+.nutrition-period-report .nutrition-report-days {
+  overflow: hidden;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+  background-clip: padding-box;
 }
 
-.nutrition-report-days > summary {
+.nutrition-period-report .nutrition-report-target-history > summary,
+.nutrition-period-report .nutrition-report-days > summary {
   display: flex;
   min-height: 52px;
   align-items: center;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-2) var(--v2-space-3);
+  color: var(--v2-text-primary);
   font-weight: 700;
   cursor: pointer;
 }
 
-.nutrition-report-days__table-wrap {
+.nutrition-period-report .nutrition-report-target-history > summary > span:first-child,
+.nutrition-period-report .nutrition-report-days > summary > span:first-child {
   min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nutrition-period-report .nutrition-report-target-history[open] > summary,
+.nutrition-period-report .nutrition-report-days[open] > summary {
+  border-bottom: 1px solid var(--v2-border);
+}
+
+.nutrition-period-report .nutrition-report-target-history__body,
+.nutrition-period-report .nutrition-report-days__table-wrap {
+  min-width: 0;
+  padding: 0 var(--v2-space-3) var(--v2-space-3);
+}
+
+.nutrition-period-report .nutrition-report-target-history__empty {
+  margin: 0;
+  padding-top: var(--v2-space-3);
+}
+
+.nutrition-period-report .nutrition-report-target-history .nutrition-report-targets ol {
+  margin-top: 0;
 }
 
 .nutrition-report-days table {
@@ -7248,6 +7279,10 @@ button.notification-row__main:focus-visible {
   color: var(--v2-text-secondary);
   font-size: 0.68rem;
   font-weight: 600;
+}
+
+.nutrition-period-report .nutrition-report-days thead tr:first-child > th {
+  border-top: 0;
 }
 
 .nutrition-report-days td:first-child {
@@ -7416,6 +7451,10 @@ button.notification-row__main:focus-visible {
     border-top: 1px solid var(--v2-border);
   }
 
+  .nutrition-period-report .nutrition-report-days tbody tr:first-child {
+    border-top: 0;
+  }
+
   .nutrition-report-days td {
     display: grid;
     gap: var(--v2-space-1);
@@ -7447,6 +7486,21 @@ button.notification-row__main:focus-visible {
   .nutrition-report-targets ol {
     row-gap: var(--v2-space-3);
     border-top: 0;
+  }
+
+  .nutrition-period-report .nutrition-report-target-history .nutrition-report-targets ol {
+    row-gap: 0;
+    border-top: 0;
+  }
+
+  .nutrition-period-report .nutrition-report-target-history .nutrition-report-targets li {
+    padding-inline: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .nutrition-period-report .nutrition-report-target-history .nutrition-report-targets li + li {
+    border-top: 1px solid var(--v2-border);
   }
 }
 
