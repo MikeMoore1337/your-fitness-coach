@@ -99,22 +99,23 @@ describe('ExerciseMediaAsset', () => {
         variant="animation"
         animationUrl="/static/exercise-guides/gymvisual/deadlift.gif"
         thumbnailUrl="/static/exercise-guides/gymvisual/deadlift.jpg"
-        videoSources={[{
-          url: '/static/exercise-guides/gymvisual/ai-reviewed/deadlift-x4plus-720.mp4',
-          mime_type: 'video/mp4',
-          width: 720,
-        }]}
+        videoSources={[
+          {
+            url: '/static/exercise-guides/gymvisual/ai-reviewed/deadlift-x4plus-720.mp4',
+            mime_type: 'video/mp4',
+            width: 720,
+          },
+        ]}
       />,
     );
     const video = screen.getByLabelText('Становая тяга');
     expect(video).toHaveAttribute('data-media-mode', 'video');
     expect(video).toHaveAttribute('autoplay');
-    expect(video).toHaveAttribute('muted');
+    expect(video).toHaveProperty('muted', true);
     expect(video).toHaveAttribute('playsinline');
     fireEvent.error(video);
     const fallback = screen.getByAltText('Становая тяга');
     expect(fallback).toHaveAttribute('src', '/static/exercise-guides/gymvisual/deadlift.gif');
     expect(fallback).toHaveAttribute('data-media-mode', 'animated');
   });
-
 });

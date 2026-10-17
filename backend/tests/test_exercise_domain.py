@@ -387,7 +387,7 @@ def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
     assets = Path(__file__).resolve().parents[1] / "assets" / "exercise-guides"
     manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 3
-    assert manifest["asset_count"] == 877
+    assert manifest["asset_count"] == 881
     assert manifest["derivative_count"] == 77
     assert manifest["hq_poster_count"] == 77
     assert len(manifest["exercises"]) == 206
@@ -795,7 +795,7 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "canonical_records": 206,
         "titles": 207,
         "cardio_records": 14,
-        "assets": 877,
+        "assets": 881,
         "derivatives": 77,
         "coverage_decisions": 36,
         "guide_item_content_records": 49,
