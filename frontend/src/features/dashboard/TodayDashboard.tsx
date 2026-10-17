@@ -1217,20 +1217,49 @@ export function TodayDashboard({
     if (!detailsOpen) return;
     const details = detailsRef.current;
     details?.scrollIntoView?.({ behavior: 'instant', block: 'start' });
-    const action = details?.querySelector<HTMLElement>(
-      '.active-workout-set.is-current [data-workout-field="done"]',
-    );
-    const dock = document.getElementById('appBottomNav');
-    if (!action || !dock) return;
-    const viewport = window.visualViewport;
-    const viewportTop = viewport?.offsetTop ?? 0;
-    const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
-    const dockRect = dock.getBoundingClientRect();
-    if (dockRect.top <= viewportTop || dockRect.height >= viewportBottom) return;
-    const actionRect = action.getBoundingClientRect();
-    const safeBottom = Math.min(viewportBottom, dockRect.top) - 8;
-    if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom)
-      window.scrollBy({ top: Math.ceil(actionRect.bottom - safeBottom), behavior: 'instant' });
+    if (!details) return;
+
+    // The current set can arrive after the panel opens. Correct dock clearance
+    // once when it mounts, without scrolling again on query refresh.
+    let frame: number | null = null;
+    let corrected = false;
+    const correctOnce = () => {
+      if (corrected || frame !== null) return;
+      const action = details.querySelector<HTMLElement>(
+        '.active-workout-set.is-current [data-workout-field="done"]',
+      );
+      const dock = document.getElementById('appBottomNav');
+      if (!action || !dock) return;
+
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!details.isConnected || corrected) return;
+        const viewport = window.visualViewport;
+        const viewportTop = viewport?.offsetTop ?? 0;
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+        const dockRect = dock.getBoundingClientRect();
+        if (dockRect.top > viewportTop && dockRect.height < viewportBottom) {
+          const actionRect = action.getBoundingClientRect();
+          const safeBottom = Math.min(viewportBottom, dockRect.top) - 24;
+          if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom) {
+            window.scrollBy({
+              top: Math.ceil(actionRect.bottom - safeBottom),
+              behavior: 'instant',
+            });
+          }
+        }
+        corrected = true;
+        observer.disconnect();
+      });
+    };
+    const observer = new MutationObserver(correctOnce);
+    observer.observe(details, { childList: true, subtree: true });
+    correctOnce();
+
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [detailsOpen]);
 
   const requestedRecoveryWorkoutId = Number(new URLSearchParams(search).get('recovery_workout_id'));
