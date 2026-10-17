@@ -39,7 +39,10 @@ function profileFormFromUser(user: User | null | undefined): UserProfileUpdate {
         ...emptyProfile,
         full_name: user.profile.full_name,
         birth_date: user.profile.birth_date,
-        sex: user.profile.sex,
+        sex:
+          user.profile.sex === 'male' || user.profile.sex === 'female'
+            ? user.profile.sex
+            : null,
         goal: (user.profile.goal as UserProfileUpdate['goal']) ?? null,
         level: (user.profile.level as UserProfileUpdate['level']) ?? null,
         height_cm: user.profile.height_cm,
