@@ -149,10 +149,11 @@ def update_profile(
 
     # The user's explicitly saved profile weight is a current measurement too.
     # Mirror it into today's dated ledger without triggering another target version.
-    if "weight_kg" in nutrition_updates:
+    changed_weight = nutrition_updates.get("weight_kg")
+    if isinstance(changed_weight, (float, int)):
         from fitminiapp_api.services.measurements import sync_current_weight_to_diary
 
-        sync_current_weight_to_diary(db, user, float(nutrition_updates["weight_kg"]))
+        sync_current_weight_to_diary(db, user, float(changed_weight))
 
     # Birth date, not a previously entered calculator age, is the durable fact.
     if "birth_date" in changes and profile.birth_date is not None:
