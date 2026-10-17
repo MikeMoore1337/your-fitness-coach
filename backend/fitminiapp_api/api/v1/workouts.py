@@ -420,10 +420,16 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     progression_guidance = build_progression_guidance(db, current_user, workout)
     metric_types = {item.id: workout_exercise_metric_type(item) for item in workout.exercises}
 
-    def media_preview(item: UserWorkoutExercise) -> dict[str, str | None]:
+    def media_preview(item: UserWorkoutExercise) -> dict[str, object]:
         exercise = visible_map.get(item.exercise_id) or item.exercise
         if exercise is None:
-            return {"state": "blocked", "thumbnail_url": None, "animation_url": None}
+            return {
+                "state": "blocked",
+                "thumbnail_url": None,
+                "thumbnail_sources": [],
+                "preferred_mode": None,
+                "animation_url": None,
+            }
         source_slug = _source_exercise_slug(exercise)
         return get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
 
@@ -473,7 +479,10 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 ),
                 "media_state": media_previews[item.id]["state"],
                 "media_thumbnail_url": media_previews[item.id]["thumbnail_url"],
+                "media_thumbnail_sources": media_previews[item.id]["thumbnail_sources"],
+                "media_preferred_mode": media_previews[item.id]["preferred_mode"],
                 "media_animation_url": media_previews[item.id]["animation_url"],
+                "media_video_sources": media_previews[item.id]["video_sources"],
                 "progression_guidance": (
                     progression_guidance[item.id] if metric_types[item.id] == "strength" else None
                 ),

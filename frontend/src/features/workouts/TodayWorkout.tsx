@@ -2334,7 +2334,8 @@ export function TodayWorkout({
 
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
-                    adaptation={adaptationEntry}
+                    key={`active-session-summary-${exercise.id}-${exercise.exercise_id}`}
+                    adaptation={started ? undefined : adaptationEntry}
                     currentSet={currentSet.set}
                     exercise={exercise}
                     guidance={guidanceElement}
@@ -2351,6 +2352,7 @@ export function TodayWorkout({
                         ?.focus({ preventScroll: true });
                     }}
                     pending={activeSync.pendingBySet.get(currentSet.set.id)}
+                    safetyAction={started ? adaptationEntry : undefined}
                     setupMemory={
                       <ExerciseSetupMemory
                         key={`setup-memory-${exercise.exercise_id}-${exercise.setup_memory?.version ?? 'none'}`}
@@ -2366,6 +2368,7 @@ export function TodayWorkout({
 
                 {isCurrentExercise &&
                   (exercise.media_state === 'approved_animated' ||
+                    exercise.media_state === 'approved_static' ||
                     exercise.media_state === 'blocked') && (
                     <div
                       className={`active-workout-exercise__media ${exercise.media_state === 'blocked' ? 'active-workout-exercise__media--blocked' : ''}`}
@@ -2382,8 +2385,11 @@ export function TodayWorkout({
                       ) : (
                         <ExerciseMediaAsset
                           animationUrl={exercise.media_animation_url}
+                          videoSources={exercise.media_video_sources}
                           alt={`${exercise.exercise_title}: техника движения`}
                           thumbnailUrl={exercise.media_thumbnail_url}
+                          thumbnailSources={exercise.media_thumbnail_sources}
+                          preferredMode={exercise.media_preferred_mode}
                           variant="animation"
                         />
                       )}

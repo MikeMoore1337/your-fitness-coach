@@ -14,6 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import get_args
 
+from PIL import Image
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 BACKEND_DIR = ROOT_DIR / "backend"
 MEDIA_DIR = BACKEND_DIR / "assets" / "exercise-guides"
@@ -165,50 +167,95 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
     canonical_slugs = {canonical_slug(slug) for slug in catalog_slugs}
     _require(manifest.get("schema_version") == 3, "Stage 4 media manifest is not active")
     _require(manifest_slugs == canonical_slugs, "Stage 4 manifest/catalog canonical mismatch")
-    _require(manifest.get("counts", {}).get("canonical_exercises") == 206, "Canonical count drift")
-    _require(manifest.get("counts", {}).get("approved_animated") == 167, "Approved count drift")
-    _require(manifest.get("counts", {}).get("blocked") == 39, "Blocked count drift")
-    _require(manifest.get("counts", {}).get("static_only") == 0, "Static-only count drift")
+    counts = manifest.get("counts", {})
+    _require(counts.get("canonical_exercises") == len(canonical_slugs), "Canonical count drift")
     _require(
-        manifest.get("counts", {}).get("remote_runtime_assets") == 0,
+        counts.get("remote_runtime_assets") == 0,
         "Remote runtime asset count drift",
     )
+    actual_animated = 0
+    actual_static = 0
+    actual_blocked = 0
+    referenced_paths: set[str] = set()
+
+    def asset_path(relative: str, slug: str, field: str) -> Path:
+        path = Path(relative)
+        _require(
+            not path.is_absolute() and ".." not in path.parts, f"Invalid media path: {slug}/{field}"
+        )
+        resolved = MEDIA_DIR / path
+        _require(resolved.is_file(), f"Referenced media is missing: {relative}")
+        referenced_paths.add(relative)
+        return resolved
+
+    def check_source(source: dict, slug: str, field: str, *, require_image: bool = False) -> None:
+        path = asset_path(str(source["path"]), slug, field)
+        data = path.read_bytes()
+        _require(source.get("byte_size") == len(data), f"Stale media byte count: {source['path']}")
+        if source.get("sha256") is not None:
+            _require(
+                source["sha256"] == hashlib.sha256(data).hexdigest(),
+                f"Stale media hash: {source['path']}",
+            )
+        if require_image:
+            with Image.open(path) as image:
+                _require(
+                    image.size == (source["width"], source["height"]),
+                    f"Image dimensions drifted: {source['path']}",
+                )
+                _require(
+                    image.format in {"JPEG", "WEBP"}, f"Unsupported image format: {source['path']}"
+                )
+                _require(not image.getexif(), f"Image metadata was not stripped: {source['path']}")
+
     for slug, item in exercises.items():
         source = item.get("source", {})
         status = item.get("status")
         if status == "blocked":
             _require(not source and not item.get("media"), f"Blocked media is not empty: {slug}")
+            actual_blocked += 1
             continue
         _require(status == "approved", f"Invalid Stage 4 media status: {slug}")
         _require(
-            source.get("name") == "Gym visual"
-            and source.get("url") == "https://github.com/hasaneyldrm/exercises-dataset"
-            and source.get("license") == "Owner-purchased GymVisual license",
-            f"Invalid provenance: {slug}",
+            len(item.get("media", [])) == 1, f"Approved media must have one media item: {slug}"
         )
-        _require(len(item.get("media", [])) == 1, f"Approved media must have one animation: {slug}")
         for media in item["media"]:
-            _require(media.get("type") == "animation", f"Approved media is not animated: {slug}")
-            for field in ("path", "poster_path"):
-                relative = Path(media[field])
+            media_type = media.get("type")
+            _require(media_type in {"animation", "image"}, f"Invalid media type: {slug}")
+            if media_type == "animation":
+                actual_animated += 1
                 _require(
-                    not relative.is_absolute() and ".." not in relative.parts,
-                    f"Invalid media path: {slug}/{field}",
+                    source.get("name") == "Gym visual"
+                    and source.get("url") == "https://github.com/hasaneyldrm/exercises-dataset"
+                    and source.get("license") == "Owner-purchased GymVisual license",
+                    f"Invalid animation provenance: {slug}",
                 )
+            else:
+                actual_static += 1
                 _require(
-                    (MEDIA_DIR / relative).is_file(),
-                    f"Referenced media is missing: {media[field]}",
+                    source.get("name") == "Exercises Media"
+                    and source.get("url") == "https://github.com/akajdid-mostafa/exercises-media"
+                    and source.get("source_revision") == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                    f"Invalid static provenance: {slug}",
                 )
+            path = asset_path(str(media["path"]), slug, "path")
+            poster_path = asset_path(str(media["poster_path"]), slug, "poster_path")
             path = MEDIA_DIR / media["path"]
             poster_path = MEDIA_DIR / media["poster_path"]
             _require(
                 media.get("width", 0) > 0 and media.get("height", 0) > 0,
                 f"Invalid dimensions: {slug}",
             )
-            _require(
-                media.get("animated") is True and media.get("frame_count", 0) > 1,
-                f"Animation metadata is invalid: {slug}",
-            )
+            if media_type == "animation":
+                _require(
+                    media.get("animated") is True and media.get("frame_count", 0) > 1,
+                    f"Animation metadata is invalid: {slug}",
+                )
+            else:
+                _require(
+                    media.get("animated") is False and media.get("frame_count") == 1,
+                    f"Static metadata is invalid: {slug}",
+                )
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             _require(media.get("asset_sha256") == digest, f"Stale media hash: {media['path']}")
             poster_digest = hashlib.sha256(poster_path.read_bytes()).hexdigest()
@@ -231,42 +278,60 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                     and poster_source.get("rights_basis")
                     == "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16"
                     and media["poster_path"].startswith("exercises-media/")
-                    and media.get("poster_dimensions") == {"width": 720, "height": 720},
+                    and media.get("poster_dimensions") == {"width": 1280, "height": 720}
+                    and media.get("poster_preferred") is True,
                     f"Unauthorized or malformed HQ poster provenance: {slug}",
                 )
-                from PIL import Image
-
                 with Image.open(poster_path) as hq_poster:
                     _require(
                         hq_poster.format == "JPEG"
-                        and hq_poster.size == (720, 720)
+                        and hq_poster.size == (1280, 720)
                         and not hq_poster.getexif(),
                         f"HQ poster image metadata mismatch: {slug}",
                     )
-            _require(
-                media.get("sources")
-                == [
-                    {
-                        "path": media["path"],
-                        "mime_type": "image/gif",
-                        "width": media["width"],
-                        "height": media["height"],
-                        "byte_size": media["byte_size"],
-                    }
-                ],
-                f"Animation source metadata drifted: {slug}",
-            )
+            if media_type == "animation":
+                _require(
+                    media.get("sources")
+                    == [
+                        {
+                            "path": media["path"],
+                            "mime_type": "image/gif",
+                            "width": media["width"],
+                            "height": media["height"],
+                            "byte_size": media["byte_size"],
+                        }
+                    ],
+                    f"Animation source metadata drifted: {slug}",
+                )
+            else:
+                _require(
+                    len(media.get("sources", [])) == 6,
+                    f"Static responsive source count drift: {slug}",
+                )
+            for descriptor in media.get("sources", []):
+                check_source(descriptor, slug, "source", require_image=media_type == "image")
+            for descriptor in media.get("poster_sources", []):
+                check_source(descriptor, slug, "poster_source", require_image=True)
             video_sources = media.get("video_sources", [])
             if video_sources:
+                _require(len(video_sources) == 2, f"Unexpected HD video profile count: {slug}")
+                provenance = media.get("video_provenance") or {}
                 _require(
-                    slug in {"barbell-curl", "burpee"} and len(video_sources) == 2,
-                    f"Unexpected H.264 pilot scope: {slug}",
-                )
-                _require(
-                    media.get("video_provenance", {}).get("source_revision")
-                    == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                    provenance.get("source_revision") == "18742da40b0627c85925c5dd4441dc3eac0594d0",
                     f"Unpinned H.264 source: {slug}",
                 )
+                if slug not in {"barbell-curl", "burpee"}:
+                    poster_provenance = media.get("poster_source") or {}
+                    _require(
+                        bool(poster_provenance)
+                        and provenance.get("source_path")
+                        == "public/videos/"
+                        + poster_provenance["source_gender"]
+                        + "/"
+                        + poster_provenance["source_slug"]
+                        + ".mp4",
+                        f"Video does not match verified poster: {slug}",
+                    )
                 for video, (width, height) in zip(
                     video_sources, [(854, 480), (1280, 720)], strict=True
                 ):
@@ -284,37 +349,50 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                     )
                     video_file = MEDIA_DIR / relative_video
                     _require(video_file.is_file(), f"Missing video file: {slug}")
+                    referenced_paths.add(str(relative_video))
                     data = video_file.read_bytes()
                     _require(
                         len(data) == video.get("byte_size")
                         and hashlib.sha256(data).hexdigest() == video.get("sha256"),
                         f"Invalid video file checksum/size: {slug}",
                     )
-    pilot_videos = [
+    approved_videos = [
         media
         for item in exercises.values()
         for media in item.get("media", [])
         if media.get("video_sources")
     ]
     _require(
-        len(pilot_videos) == manifest.get("hq_video_count") == 2,
-        "H.264 pilot exercise count drift",
+        len(approved_videos) == manifest.get("hq_video_count"),
+        "Verified H.264 exercise count drift",
     )
     _require(
-        sum(video["byte_size"] for media in pilot_videos for video in media["video_sources"])
+        sum(video["byte_size"] for media in approved_videos for video in media["video_sources"])
         == manifest.get("hq_video_total_bytes"),
-        "H.264 pilot total size drift",
+        "Verified H.264 total size drift",
     )
     # Some approved canonical variants intentionally point to the same source
     # record. The manifest keeps the source asset identity explicit instead of
     # inventing a derivative to make hashes unique.
+    _require(counts.get("approved_animated") == actual_animated, "Approved animation count drift")
+    _require(counts.get("approved_static") == actual_static, "Approved static count drift")
+    _require(counts.get("static_only") == actual_static, "Static-only count drift")
+    _require(counts.get("blocked") == actual_blocked, "Blocked media total drift")
+    _require(manifest.get("asset_count") == len(referenced_paths), "Manifest asset count drift")
     _require(
-        len([item for item in exercises.values() if item["status"] == "approved"]) == 167,
-        "Approved media total drift",
+        manifest.get("total_bytes")
+        == sum((MEDIA_DIR / relative).stat().st_size for relative in referenced_paths),
+        "Manifest total byte count drift",
     )
     _require(
-        len([item for item in exercises.values() if item["status"] == "blocked"]) == 39,
-        "Blocked media total drift",
+        manifest.get("derivative_count")
+        == sum(
+            1
+            for item in exercises.values()
+            for media in item.get("media", [])
+            if media.get("poster_source")
+        ),
+        "HD derivative count drift",
     )
     return (
         manifest["asset_count"],

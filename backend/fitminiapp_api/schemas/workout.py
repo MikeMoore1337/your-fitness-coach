@@ -7,6 +7,7 @@ from fitminiapp_api.schemas.data_quality import TrainingDataSufficiency
 from fitminiapp_api.schemas.exercise_setup import ExerciseSetupMemoryResponse
 from fitminiapp_api.schemas.program import (
     EquipmentIdentifier,
+    ExerciseGuideMediaSource,
     ExercisePrescriptionPlan,
     PrescriptionGroupKind,
     PrescriptionRole,
@@ -310,9 +311,12 @@ class WorkoutExerciseItem(BaseModel):
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = None
     has_guide: bool = False
-    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_state: Literal["approved_animated", "approved_static", "blocked"] | None = None
     media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+    media_preferred_mode: Literal["static", "animation"] | None = None
     media_animation_url: str | None = None
+    media_video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 

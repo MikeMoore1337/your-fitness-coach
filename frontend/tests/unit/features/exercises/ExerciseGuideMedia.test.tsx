@@ -256,6 +256,7 @@ const h264Pilot: ExerciseGuide['media'] = [
     type: 'animation',
     url: '/static/exercise-guides/gymvisual/barbell-curl.gif',
     poster: '/static/exercise-guides/exercises-media/barbell-curl-hq720.jpg',
+    poster_preferred: true,
     phase_id: 'movement',
     phase: 'Движение',
     alt: 'Сгибание рук со штангой',

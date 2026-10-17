@@ -204,9 +204,12 @@ def _serialize_exercise(
         "has_guide": guide is not None,
         "media_state": media_preview["state"],
         "media_thumbnail_url": media_preview["thumbnail_url"],
+        "media_thumbnail_sources": media_preview["thumbnail_sources"],
+        "media_preferred_mode": media_preview["preferred_mode"],
         # The catalog/picker only needs posters. Keep animated media on the
         # detail response and workout payloads to avoid inflating the list.
         "media_animation_url": media_preview["animation_url"] if include_guide else None,
+        "media_video_sources": media_preview["video_sources"] if include_guide else [],
         "guide": guide if include_guide else None,
     }
 

@@ -179,6 +179,30 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   const continueWorkout = page.getByRole('button', { name: 'Продолжить тренировку' });
   await expect(continueWorkout).toBeVisible();
   await continueWorkout.click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  const toggle = summary.getByRole('button', { name: 'Что делать сейчас?' });
+  const assertSharedSummaryFrame = async () => {
+    const styles = await summary.evaluate((element) => {
+      const summaryStyle = getComputedStyle(element);
+      return {
+        width: summaryStyle.borderTopWidth,
+        style: summaryStyle.borderTopStyle,
+        radius: summaryStyle.borderTopLeftRadius,
+      };
+    });
+    expect(styles.width).toBe('1px');
+    expect(styles.style).toBe('solid');
+    expect(styles.radius).not.toBe('0px');
+  };
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await assertSharedSummaryFrame();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await assertSharedSummaryFrame();
+  await expect(summary.locator('.active-session-summary__details')).toHaveCSS(
+    'border-top-width',
+    '0px',
+  );
 
   await expect(page.locator('.active-workout')).toBeVisible();
   await assertMobileShellGeometry(page);
@@ -194,6 +218,7 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await finish.focus();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
   await expect(page.locator('#appBottomNav')).toBeVisible();
+  await expectNoOverlap(finish, page.locator('#appBottomNav'));
   await reps.evaluate((element) => (element as HTMLElement).blur());
   await expectDockWithinViewport(page);
   // Focus-driven scrolling can leave the pointer hovering over a different button.
@@ -235,16 +260,45 @@ test('@critical active workout keeps the current set primary across mobile width
     await expect(currentSet).toContainText(/Отдых \d+ с/);
     await expect(currentSetDone).toBeVisible();
     await expect(page.locator('.app-bottom-nav__quick-add')).toBeVisible();
+
+    // A previous viewport/click can leave a long active-session page at an
+    // intermediate scroll position, where a fixed dock temporarily covers
+    // ordinary content. Audit the canonical top viewport first; below we
+    // still scroll the *actual current set action* into view and explicitly
+    // assert it is not covered by the dock.
+    await page.evaluate(async () => {
+      window.scrollTo(0, 0);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
     await assertMobileShellGeometry(page);
 
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
       viewport.height,
     );
+    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
     await currentSetDone.evaluate((element) => {
       element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
     });
     await expect(currentSetDone).toBeInViewport();
     await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
+    await expect(currentSetDone).toHaveJSProperty('disabled', false);
+    await expect(
+      currentSetDone.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2,
+        );
+        return hit === element || hit?.closest('[data-workout-field="done"]') === element;
+      }),
+    ).resolves.toBe(true);
+    await expectNoOverlap(
+      page.getByRole('button', { name: 'Завершить тренировку' }),
+      page.locator('#appBottomNav'),
+    );
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
     const numberInputs = currentSet.locator('input[type="number"]:visible');

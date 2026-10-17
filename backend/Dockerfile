@@ -19,10 +19,12 @@ RUN apt-get update \
     && apt-get upgrade --yes \
     && apt-get install -y --no-install-recommends \
         fonts-dejavu-core \
+        libexpat1 \
         libgl1 \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-rus \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libexpat1)" ge "2.9.0-1~deb13u1" \
     && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \

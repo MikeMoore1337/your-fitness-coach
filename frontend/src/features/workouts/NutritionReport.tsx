@@ -362,7 +362,13 @@ function NutritionReportInsights({
 }
 
 function TargetChanges({ report }: { report: NutritionReport }) {
-  if (!report.target_changes.length) return null;
+  if (!report.target_changes.length) {
+    return (
+      <p className="nutrition-report-target-history__empty progress-note">
+        За выбранный период изменений целей питания не было.
+      </p>
+    );
+  }
   return (
     <div className="nutrition-report-targets">
       <h3>Изменения цели в периоде</h3>
@@ -400,6 +406,32 @@ function TargetChanges({ report }: { report: NutritionReport }) {
   );
 }
 
+function TargetHistory({ report }: { report: NutritionReport }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="nutrition-report-target-history"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary
+        className="yfc-disclosure-summary"
+        aria-controls="nutrition-report-target-history-content"
+        aria-expanded={open}
+      >
+        <span>История целей питания</span>
+        <DisclosureIcon />
+      </summary>
+      <div
+        className="nutrition-report-target-history__body"
+        id="nutrition-report-target-history-content"
+      >
+        <TargetChanges report={report} />
+      </div>
+    </details>
+  );
+}
+
 function DailyTable({
   dayLink,
   report,
@@ -407,16 +439,23 @@ function DailyTable({
   dayLink: ((date: string) => string) | null;
   report: NutritionReport;
 }) {
+  // A 30-day table is too long to expand automatically on a mobile screen.
+  const [open, setOpen] = useState(false);
   return (
     <details
       className="nutrition-report-days"
-      open={report.daily.length <= 30 && report.summary.logged_days > 0}
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="yfc-disclosure-summary">
-        Дни периода: {report.daily.length}
+      <summary
+        className="yfc-disclosure-summary"
+        aria-controls="nutrition-report-days-content"
+        aria-expanded={open}
+      >
+        <span>Дни периода: {report.daily.length}</span>
         <DisclosureIcon />
       </summary>
-      <div className="nutrition-report-days__table-wrap">
+      <div className="nutrition-report-days__table-wrap" id="nutrition-report-days-content">
         <table>
           <caption className="sr-only">
             Дневные КБЖУ, статус заполнения и действовавшая цель
@@ -790,14 +829,12 @@ export function NutritionPeriodReport({
               />
             </>
           )}
-          <details className="nutrition-report-target-history">
-            <summary className="yfc-disclosure-summary">
-              История целей питания
-              <DisclosureIcon />
-            </summary>
-            <TargetChanges report={report.data} />
-          </details>
-          <DailyTable dayLink={dayLink} report={report.data} />
+          <TargetHistory report={report.data} />
+          <DailyTable
+            dayLink={dayLink}
+            key={`${report.data.period}-${report.data.period_start}-${report.data.period_end}`}
+            report={report.data}
+          />
           <p className="progress-note nutrition-period-report__methodology">
             Отчёт описывает записи КБЖУ и известную клетчатку. Отсутствующие значения не считаются
             нулём. Он не оценивает качество рациона, витамины, здоровье или причины изменения веса.

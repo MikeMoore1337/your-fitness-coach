@@ -53,4 +53,43 @@ describe('ExerciseMediaAsset', () => {
     expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/bench-press.jpg');
     expect(image).toHaveAttribute('data-media-mode', 'static-poster');
   });
+
+  it('keeps animation primary and uses the verified HD poster only after a playback failure', () => {
+    render(
+      <ExerciseMediaAsset
+        alt="Тяга: техника движения"
+        animationUrl="/static/exercise-guides/gymvisual/example.gif"
+        thumbnailUrl="/static/exercise-guides/exercises-media/example/poster-1280.jpg"
+        thumbnailSources={[
+          {
+            url: '/static/exercise-guides/exercises-media/example/poster-1280.webp',
+            mime_type: 'image/webp',
+            width: 1280,
+          },
+          {
+            url: '/static/exercise-guides/exercises-media/example/poster-1280.jpg',
+            mime_type: 'image/jpeg',
+            width: 1280,
+          },
+        ]}
+        preferredMode="static"
+        variant="animation"
+      />,
+    );
+
+    const image = screen.getByAltText('Тяга: техника движения');
+    expect(image).toHaveAttribute('data-media-mode', 'animated');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/example.gif');
+    fireEvent.error(image);
+    const fallback = screen.getByAltText('Тяга: техника движения');
+    expect(fallback).toHaveAttribute('data-media-mode', 'static-poster');
+    expect(fallback).toHaveAttribute(
+      'src',
+      '/static/exercise-guides/exercises-media/example/poster-1280.jpg',
+    );
+    expect(document.querySelector('source[type="image/webp"]')).toHaveAttribute(
+      'srcset',
+      expect.stringContaining('poster-1280.webp 1280w'),
+    );
+  });
 });

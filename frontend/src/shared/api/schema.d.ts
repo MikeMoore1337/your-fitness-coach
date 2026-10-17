@@ -10169,11 +10169,17 @@ export interface components {
              */
             has_guide: boolean;
             /** Media State */
-            media_state?: ("approved_animated" | "blocked") | null;
+            media_state?: ("approved_animated" | "approved_static" | "blocked") | null;
             /** Media Thumbnail Url */
             media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Media Preferred Mode */
+            media_preferred_mode?: ("static" | "animation") | null;
             /** Media Animation Url */
             media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             guide?: components["schemas"]["ExerciseGuide"] | null;
         };
         /** ExerciseEstimated1RM */
@@ -10279,6 +10285,14 @@ export interface components {
             sort_order: number;
             /** Sources */
             sources: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Poster Sources */
+            poster_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Poster Width */
+            poster_width?: number | null;
+            /** Poster Height */
+            poster_height?: number | null;
+            /** Poster Preferred */
+            poster_preferred?: boolean | null;
             /** Video Sources */
             video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
         };
@@ -13221,6 +13235,11 @@ export interface components {
             effective_from?: string | null;
             /** Note */
             note?: string | null;
+            /**
+             * Record Weight Measurement
+             * @default false
+             */
+            record_weight_measurement: boolean;
             /**
              * Sex
              * @enum {string}
@@ -17580,11 +17599,17 @@ export interface components {
              */
             has_guide: boolean;
             /** Media State */
-            media_state?: ("approved_animated" | "blocked") | null;
+            media_state?: ("approved_animated" | "approved_static" | "blocked") | null;
             /** Media Thumbnail Url */
             media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
+            /** Media Preferred Mode */
+            media_preferred_mode?: ("static" | "animation") | null;
             /** Media Animation Url */
             media_animation_url?: string | null;
+            /** Media Video Sources */
+            media_video_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
             progression_guidance?: components["schemas"]["ProgressionGuidance"] | null;
             /** Sets */
             sets: components["schemas"]["LoggedSetItem"][];
