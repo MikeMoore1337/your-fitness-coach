@@ -12,6 +12,7 @@ from fitminiapp_api.schemas.program import (
     PrescriptionGroupKind,
     PrescriptionRole,
 )
+from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 
 RirValue = Literal["0", "1", "2", "3", "4+"]
 SetKind = Literal["warmup", "working", "drop"]
@@ -543,6 +544,17 @@ class WorkoutCompletionFeedbackUpdate(BaseModel):
         return normalized
 
 
+class WorkoutRestHistoryItem(BaseModel):
+    source_set_id: int
+    planned_seconds: int = Field(ge=1)
+    adjusted_seconds: int = Field(ge=1)
+    measured_seconds: int | None = Field(default=None, ge=0)
+    delta_seconds: int | None = None
+    status: Literal["running", "completed", "skipped", "interrupted", "unknown"]
+    source: str | None = None
+    quality: str
+
+
 class WorkoutHistoryItem(BaseModel):
     id: int
     scheduled_date: date
@@ -557,6 +569,7 @@ class WorkoutHistoryItem(BaseModel):
     completion_note: str | None = None
     exercises: list[WorkoutHistoryExerciseItem]
     adaptations: list[WorkoutAdaptationHistoryItem]
+    rest_sessions: list[RestSessionResponse] = Field(default_factory=list)
 
 
 class WorkoutHistoryExerciseItem(BaseModel):
