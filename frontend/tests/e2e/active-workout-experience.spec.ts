@@ -4592,7 +4592,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await unchanged(page, context);
   });
 
-  test('expiry completes a pressed control before compacting without another gesture', async ({
+  test('pressed skip completes only after pointer release, including after plan expiry', async ({
     page,
   }) => {
     const context = await prepare(page, 360, 'dark');
@@ -4603,8 +4603,11 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
     await expect(context.panel.getByRole('timer')).toHaveText('0:00');
     await page.mouse.up();
-    await expect(context.panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-    await expect(context.panel).toContainText('Факт');
+    // Under Policy C the plan ending does not complete the rest. Releasing an
+    // already pressed Skip is an explicit user action, so it must be honored.
+    await expect(context.panel).toHaveClass(/is-compact/);
+    await expect(context.panel).toContainText('Отдых пропущен');
+    await expect(context.panel.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
     await unchanged(page, context);
   });
 });
