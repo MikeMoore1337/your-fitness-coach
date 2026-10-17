@@ -235,7 +235,7 @@ function ProgressTrendPanel({
       <div className="progress-trend-panel__head">
         <div>
           <span className="progress-section__eyebrow">Динамика</span>
-          <h3>{detail ? 'Один график для всех замеров' : 'Главная динамика'}</h3>
+          <h3>{detail ? 'Выберите показатель' : 'Главная динамика'}</h3>
         </div>
         {selectedTrend && (
           <strong className="progress-trend-panel__value">
@@ -994,7 +994,7 @@ function BodySection({
         eyebrow="Замеры"
         title="Тело"
         titleId="progress-body-title"
-        description="Фактические значения по датам. Пропущенные значения не восстанавливаются предположениями."
+        description="Фактические значения по датам; пропуски не считаются нулём."
         trailing={
           body.latest_measurement && (
             <Badge>Последний замер {formatDate(body.latest_measurement.measured_on)}</Badge>
@@ -1012,7 +1012,7 @@ function BodySection({
             <h3>{heroTitle}</h3>
             <p>
               {hasBodyData
-                ? 'Сравнивайте значения с собственной историей. Окружность не объясняет изменение отдельной мышцы.'
+                ? 'Сравнивайте только с собственной историей.'
                 : 'Добавьте первый факт, чтобы сохранить точку отсчёта для будущей динамики.'}
             </p>
           </div>
@@ -1026,7 +1026,7 @@ function BodySection({
                 <Icon name="plus" size={16} /> Добавить замер
               </a>
               <a href="#measurement-diary" onClick={openMeasurementDiary}>
-                История и редактирование
+                Открыть историю
               </a>
             </div>
           )}
@@ -1145,12 +1145,6 @@ function BodySection({
               )}
             </div>
           </details>
-          <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
-            <p>
-              Окружность участка тела не показывает рост отдельной мышцы, а пропущенная запись не
-              равна нулевому результату.
-            </p>
-          </ContextualHelp>
         </div>
       </div>
     </section>

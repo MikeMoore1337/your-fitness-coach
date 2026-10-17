@@ -1983,8 +1983,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 
 /* Issue #873: approved one-column detail hierarchy with compact factual cards. */
-.app-section--progress .progress-experience--approved {
+.app-section--progress .progress-experience.progress-experience--approved {
   gap: var(--v2-space-5);
+  row-gap: var(--v2-space-1);
   color: var(--v2-text-primary);
 }
 
@@ -2116,14 +2117,14 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-section--progress .progress-experience--approved .progress-body-flow {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
-  gap: var(--v2-space-4);
+  gap: var(--v2-space-3);
   align-items: start;
 }
 
 .app-section--progress .progress-experience--approved .progress-body-trends {
   display: grid;
   min-width: 0;
-  gap: var(--v2-space-3);
+  gap: var(--v2-space-2);
 }
 
 .app-section--progress .progress-experience--approved .progress-trend-panel,
@@ -2149,7 +2150,14 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 
 .app-section--progress .progress-experience--approved .progress-body-secondary {
   display: grid;
-  gap: var(--v2-space-2);
+  gap: var(--v2-space-1);
+}
+
+.app-section--progress
+  .progress-experience--approved
+  .progress-body-approved:has(.progress-body-diary[open])
+  .progress-body-guidance {
+  display: none;
 }
 
 .app-section--progress .progress-experience--approved .progress-body-secondary > details,
@@ -2292,8 +2300,9 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 }
 
 @media (max-width: 680px) {
-  .app-section--progress .progress-experience--approved {
+  .app-section--progress .progress-experience.progress-experience--approved {
     gap: var(--v2-space-3);
+    row-gap: var(--v2-space-1);
   }
 
   .app-section--progress .progress-experience--approved .progress-hero {
