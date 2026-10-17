@@ -1551,14 +1551,19 @@ export function RestTimer({
   }, [storageKey, userId, workoutId]);
   useEffect(() => {
     let retryTimer: number | undefined;
+    let syncInFlight = false;
     const hasPending = () =>
       loadRestJournal(userId, workoutId).some((item) => !item.server_id || item.pending.length > 0);
     const sync = () => {
-      if (hasPending()) {
-        void syncRestJournal(userId, workoutId).catch(() => {
+      if (!hasPending() || syncInFlight) return;
+      syncInFlight = true;
+      void syncRestJournal(userId, workoutId)
+        .catch(() => {
           // Keep the durable offline journal for the next retry.
+        })
+        .finally(() => {
+          syncInFlight = false;
         });
-      }
     };
     const scheduleRetry = () => {
       if (hasPending() && retryTimer === undefined) {
