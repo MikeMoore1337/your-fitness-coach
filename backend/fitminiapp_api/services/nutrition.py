@@ -105,7 +105,7 @@ CARDIO_INTENSITY_MULTIPLIERS = {
 LEGACY_CARDIO_INTENSITIES = {"low": "light", "moderate": "moderate", "high": "hard"}
 GOAL_MULTIPLIERS = {
     "fat_loss": 0.85,
-    "recomposition": 1.0,
+    "recomposition": 0.95,
     "maintenance": 1.0,
     "muscle_gain": 1.05,
 }
@@ -639,6 +639,26 @@ def recalculate_nutrition_target(
         return False
 
     context = nutrition_target_context(target)
+
+    # The profile stores total cardio sessions, while the calculator stores
+    # per-activity details. A single activity can be updated without guessing.
+    # With multiple activities, keep their explicit split intact.
+    requested_cardio = updates.get("cardio_trainings_per_week")
+    if isinstance(requested_cardio, int):
+        existing_cardio = context.get("cardio_trainings") or []
+        if isinstance(existing_cardio, list) and (
+            len(existing_cardio) == 1 or requested_cardio == 0
+        ):
+            if requested_cardio == 0:
+                updates = {**updates, "cardio_trainings": []}
+            elif len(existing_cardio) == 1:
+                updates = {
+                    **updates,
+                    "cardio_trainings": [
+                        {**existing_cardio[0], "trainings_per_week": requested_cardio}
+                    ],
+                }
+
     changed = False
     for field in NUTRITION_INPUT_FIELDS:
         value = updates.get(field)
@@ -731,6 +751,24 @@ def save_nutrition_target(
     )
     if created:
         _queue_nutrition_updated_notification(db, target_user, target, current_user)
+
+    if current_user.id == target_user.id:
+        # Explicitly saved calculator inputs become the shared profile facts.
+        # Trainer targets must never overwrite the client's personal profile.
+        profile = target_user.profile
+        if profile is not None:
+            profile.sex = payload.sex
+            profile.weight_kg = payload.weight_kg
+            profile.height_cm = round(payload.height_cm)
+            profile.goal = payload.goal
+            profile.workouts_per_week = payload.strength_trainings_per_week
+            profile.cardio_trainings_per_week = sum(
+                item.trainings_per_week for item in cardio_trainings
+            )
+            if payload.record_weight_measurement:
+                from fitminiapp_api.services.measurements import sync_current_weight_to_diary
+
+                sync_current_weight_to_diary(db, target_user, payload.weight_kg)
 
     db.commit()
     db.refresh(target)
