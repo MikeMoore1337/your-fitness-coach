@@ -12,8 +12,6 @@ import json
 import tempfile
 from pathlib import Path
 
-from PIL import Image
-
 from scripts.import_ai_upscaled_exercise_gifs import MANIFEST_PATH, pending_exercises, sha256
 from scripts.pilot_upscale_gymvisual_gifs import ai_frames, ffconcat_video, load_gif
 
