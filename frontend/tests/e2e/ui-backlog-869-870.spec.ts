@@ -48,6 +48,39 @@ for (const theme of themes) {
           expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
           expect(style.borderRadius).not.toBe('0px');
         }
+        // The planning cards use the same corner radius and heading typography
+        // as the nutrition settings card, rather than the large desktop headings.
+        const settings = page.locator('.nutrition-target-settings');
+        const settingsRadius = await settings.evaluate(
+          (element) => getComputedStyle(element).borderTopLeftRadius,
+        );
+        const settingsHeadingStyle = await settings
+          .locator(':scope > summary')
+          .evaluate((element) => {
+            const style = getComputedStyle(element);
+            return {
+              fontFamily: style.fontFamily,
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+            };
+          });
+        for (const detail of await planningDetails.all()) {
+          const radius = await detail.evaluate(
+            (element) => getComputedStyle(element).borderTopLeftRadius,
+          );
+          expect(radius).toBe(settingsRadius);
+          const headingStyle = await detail
+            .locator(':scope > summary strong')
+            .evaluate((element) => {
+              const style = getComputedStyle(element);
+              return {
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+              };
+            });
+          expect(headingStyle).toEqual(settingsHeadingStyle);
+        }
       }
       for (const detail of await planningDetails.all()) {
         const summary = detail.locator(':scope > summary');
