@@ -2068,6 +2068,16 @@ test('progression guidance applies a configured step once, stays optional and ma
     tmaPage.getByRole('button', { name: 'Продолжить тренировку' }).click(),
     mobilePage.getByRole('button', { name: 'Продолжить тренировку' }).click(),
   ]);
+  await Promise.all([
+    tmaPage
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click(),
+    mobilePage
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click(),
+  ]);
   const tmaGuidance = tmaPage.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
   const mobileGuidance = mobilePage.getByRole('region', {
     name: 'Рекомендация по следующей нагрузке',
@@ -2112,6 +2122,10 @@ test('progression guidance applies a configured step once, stays optional and ma
   await tma.setActive(true);
   await tmaPage.reload();
   await tmaPage.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await tmaPage
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
   await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
     '42.5',
   );
@@ -2198,6 +2212,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
       isMobile: current.width <= 430,
       reducedMotion: 'reduce',
     });
+    await page.emulateMedia({ colorScheme: current.theme, reducedMotion: 'reduce' });
     if (current.surface === 'tma-mock') {
       await installTelegramHarness(page, {
         colorScheme: current.theme,
@@ -2220,6 +2235,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
     }
 
     await page.goto('/app');
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', current.theme);
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const exerciseTitle =
       'longExerciseName' in current && current.longExerciseName
@@ -2227,6 +2243,10 @@ test('progression guidance screenshots cover outcomes, long content and responsi
         : 'Приседания';
     const exercise = namedArticle(page, exerciseTitle);
     await expect(exercise).toHaveCount(1);
+    await exercise
+      .getByRole('region', { name: 'Что делать сейчас?' })
+      .getByRole('button', { name: 'Что делать сейчас?' })
+      .click();
     const guidance = exercise.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
     await guidance.getByText('Почему?', { exact: true }).click();
     await expect(guidance).toBeVisible();
