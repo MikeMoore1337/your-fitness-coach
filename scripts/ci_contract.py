@@ -330,6 +330,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "pytest",
                 "tests/test_release_safeguards.py",
                 "tests/test_ci_contract.py",
+                "tests/test_pytest_shard.py",
                 "tests/test_ci_timing.py",
                 "tests/test_agent_flow.py",
                 "tests/test_qa_skill_architecture.py",
@@ -1321,30 +1322,20 @@ def _sharded_python_command(
     shard_index: int,
     shard_count: int,
 ) -> CommandSpec:
-    all_nodes = _collect_python_test_nodes(root, env)
-    selected_nodes = select_shard(all_nodes, shard_index=shard_index, shard_count=shard_count)
-    if not selected_nodes:
-        raise CIContractError(f"No Python tests selected for shard {shard_index + 1}/{shard_count}")
-
-    target_paths = {"backend/tests", "bot/tests"}
-    target_positions = [
-        position for position, argument in enumerate(command.argv) if argument in target_paths
-    ]
-    if not target_positions:
-        raise CIContractError("Python test command has no test target paths to shard")
-    first_target = min(target_positions)
-    last_target = max(target_positions) + 1
-    argv = (
-        *command.argv[:first_target],
-        *selected_nodes,
-        *command.argv[last_target:],
+    del root, env  # Pytest now collects once while selecting this shard in-process.
+    if not {"backend/tests", "bot/tests"}.issubset(command.argv):
+        raise CIContractError("Python test command must collect both test suites")
+    return CommandSpec(
+        name=f"{command.name}-shard",
+        argv=(
+            *command.argv,
+            "-p",
+            "scripts.pytest_shard",
+            "--yfc-shard",
+            f"{shard_index + 1}/{shard_count}",
+        ),
+        cwd=command.cwd,
     )
-    print(
-        f"Selected {len(selected_nodes)} of {len(all_nodes)} Python tests "
-        f"for shard {shard_index + 1}/{shard_count}",
-        flush=True,
-    )
-    return CommandSpec(name=f"{command.name}-shard", argv=argv, cwd=command.cwd)
 
 
 def _sharded_frontend_command(
