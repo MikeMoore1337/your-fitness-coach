@@ -2,8 +2,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { emptyHydrationDay } from './fixtures/platform-api';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
+import {
+  expectNoHorizontalOverflow,
+  expectNoOverlap,
+  expectTouchTargets,
+} from './fixtures/mobile-tma';
 
 const captureFeedbackAudit = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
@@ -1890,6 +1895,79 @@ test('light progress keeps the compact overview readable', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
   await expect(page.locator('.progress-bento__adherence')).toHaveCount(0);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 393, 430, 1440]) {
+    test(`#1052 compact cardio cards stay usable at ${width}px ${theme}`, async ({ page }) => {
+      await page.setViewportSize({
+        width,
+        height: width >= 1000 ? 900 : width === 430 ? 932 : 844,
+      });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((selectedTheme) => {
+        localStorage.setItem('app-theme', selectedTheme);
+      }, theme);
+      await installPlatformApi(page, {
+        browserSession: true,
+        cardioState: 'many',
+        fixedDate: '2030-01-30',
+      });
+      await page.goto('/app?section=progress&progress_period=days_30');
+
+      const cardioTab = page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('tab', { name: /^Кардио/ });
+      await cardioTab.click();
+
+      const history = page.locator('#progress-cardio');
+      await expect(history).toBeVisible();
+      const rows = history.locator('.cardio-session-row');
+      await expect(rows).toHaveCount(3);
+      if (process.env.CAPTURE_1052_SCREENSHOTS === '1' && [393, 1440].includes(width)) {
+        const captureTarget = rows.first();
+        await captureTarget.scrollIntoViewIfNeeded();
+        await captureTarget.screenshot({
+          path: resolve(
+            WORKTREE_ROOT,
+            'docs',
+            'ux',
+            'issue-1052-compact-cardio-session-cards',
+            'evidence',
+            `${process.env.CAPTURE_1052_PHASE ?? 'capture'}-${theme}-${width}.png`,
+          ),
+        });
+      }
+
+      const cards = history.locator('.cardio-session-row--compact');
+      await expect(cards).toHaveCount(3);
+      await expect(cards.first()).toHaveCSS('border-top-width', '1px');
+      expect(
+        await cards.first().evaluate((element) => getComputedStyle(element).borderRadius),
+      ).not.toBe('0px');
+
+      const noMetrics = cards.filter({ hasText: 'Эллиптический тренажёр' });
+      await expect(noMetrics).toContainText('40 мин');
+      await expect(noMetrics.getByText(/Средний пульс/)).toHaveCount(0);
+      await expect(noMetrics.getByText(/уд\/мин/)).toHaveCount(0);
+
+      const withMetrics = cards.filter({ hasText: 'Велотренажёр / велоэргометр' });
+      await expect(withMetrics).toContainText('136 уд/мин');
+      await withMetrics.getByText('Дополнительные показатели').click();
+      await expect(withMetrics).toContainText('8,1 км');
+      await withMetrics.getByText('Действия с записью').click();
+      await expect(withMetrics.getByRole('button', { name: 'Изменить' })).toBeVisible();
+      await expectTouchTargets(withMetrics.locator('.cardio-session-row__menu > summary'));
+
+      await expectNoHorizontalOverflow(page);
+      if (width <= 430) {
+        await withMetrics.scrollIntoViewIfNeeded();
+        const dock = page.locator('#appBottomNav');
+        await expect(dock).toBeVisible();
+        await expectNoOverlap(withMetrics, dock);
+      }
+    });
+  }
+}
 
 test('canonical charts and icons remain operable in forced colors and reduced motion', async ({
   page,

@@ -24,7 +24,7 @@ export interface PlatformApiOptions {
   authProviders?: string[];
   trainerActive?: boolean;
   measurementHistory?: 'none' | 'many';
-  cardioState?: 'empty' | 'planned' | 'completed';
+  cardioState?: 'empty' | 'planned' | 'completed' | 'many';
   progressState?: 'sparse' | 'populated';
   avatarState?: 'default' | 'provider' | 'custom';
 }
@@ -268,25 +268,73 @@ export async function installPlatformApi(
   let failNextCardioSave = false;
   let cardioSaveCalls = 0;
   let cardioSessions: Array<Record<string, unknown>> =
-    options.cardioState && options.cardioState !== 'empty'
+    options.cardioState === 'many'
       ? [
           {
             id: 659,
-            activity_type: 'walking',
-            duration_minutes: 30,
+            activity_type: 'elliptical',
+            duration_minutes: 40,
             distance_km: null,
             average_heart_rate_bpm: null,
             heart_rate_zone: null,
-            note: options.cardioState === 'planned' ? 'План на сегодня' : 'Фактический результат',
-            scheduled_at: `${today}T09:00:00`,
-            completed_at: options.cardioState === 'completed' ? `${today}T09:30:00` : null,
-            status: options.cardioState,
+            note: null,
+            scheduled_at: `${today}T14:33:00`,
+            completed_at: `${today}T15:13:00`,
+            status: 'completed',
             source: 'manual',
-            created_at: `${today}T08:00:00`,
-            updated_at: `${today}T09:30:00`,
+            created_at: `${today}T15:13:00`,
+            updated_at: `${today}T15:13:00`,
+          },
+          {
+            id: 660,
+            activity_type: 'stationary_bike',
+            duration_minutes: 28,
+            distance_km: 8.1,
+            average_heart_rate_bpm: 136,
+            heart_rate_zone: 3,
+            note: 'Ровный темп без рывков',
+            scheduled_at: `${today}T12:05:00`,
+            completed_at: `${today}T12:33:00`,
+            status: 'completed',
+            source: 'manual',
+            created_at: `${today}T12:33:00`,
+            updated_at: `${today}T12:33:00`,
+          },
+          {
+            id: 661,
+            activity_type: 'running',
+            duration_minutes: 32,
+            distance_km: 4.8,
+            average_heart_rate_bpm: 142,
+            heart_rate_zone: 4,
+            note: null,
+            scheduled_at: `${today}T09:10:00`,
+            completed_at: `${today}T09:42:00`,
+            status: 'completed',
+            source: 'manual',
+            created_at: `${today}T09:42:00`,
+            updated_at: `${today}T09:42:00`,
           },
         ]
-      : [];
+      : options.cardioState && options.cardioState !== 'empty'
+        ? [
+            {
+              id: 659,
+              activity_type: 'walking',
+              duration_minutes: 30,
+              distance_km: null,
+              average_heart_rate_bpm: null,
+              heart_rate_zone: null,
+              note: options.cardioState === 'planned' ? 'План на сегодня' : 'Фактический результат',
+              scheduled_at: `${today}T09:00:00`,
+              completed_at: options.cardioState === 'completed' ? `${today}T09:30:00` : null,
+              status: options.cardioState,
+              source: 'manual',
+              created_at: `${today}T08:00:00`,
+              updated_at: `${today}T09:30:00`,
+            },
+          ]
+        : [];
   let completionFeedback: string | null = null;
   let completionNote: string | null = null;
   let adaptationApplyCalls = 0;
