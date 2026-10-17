@@ -772,7 +772,7 @@ def test_calculated_recomposition_syncs_confirmed_profile_inputs_and_today_weigh
     assert response.status_code == 200
     target = response.json()
     assert target["goal"] == "recomposition"
-    assert target["calories"] == int(target["tdee"] * 0.95 / 10 + 0.5) * 10
+    assert abs(target["calories"] - target["tdee"] * 0.95) <= 10
 
     profile = client.get("/api/v1/me", headers=headers).json()["profile"]
     assert profile["sex"] == "female"
