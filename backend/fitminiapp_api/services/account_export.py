@@ -74,7 +74,6 @@ from fitminiapp_api.models.public_share import PublicShare, PublicShareImport
 from fitminiapp_api.models.recipe import Recipe
 from fitminiapp_api.models.reminder_template import ReminderTemplateSchedule
 from fitminiapp_api.models.report_handoff import ReportHandoff
-from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.models.user import (
     BodyMeasurement,
     BodyMeasurementCustomValue,
@@ -84,6 +83,7 @@ from fitminiapp_api.models.user import (
     User,
 )
 from fitminiapp_api.models.weekly_digest import WeeklyDigestDelivery, WeeklyDigestPreference
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.services.profile import serialize_body_priority
 
 if TYPE_CHECKING:
