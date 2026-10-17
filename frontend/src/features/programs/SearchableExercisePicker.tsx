@@ -27,6 +27,8 @@ export type ExercisePickerExercise = ExerciseSearchItem & {
   has_guide?: boolean;
   media_animation_url?: string | null;
   media_thumbnail_url?: string | null;
+  media_thumbnail_sources?: Exercise['media_thumbnail_sources'];
+  media_preferred_mode?: Exercise['media_preferred_mode'];
 };
 
 export function SearchableExercisePicker({
@@ -146,6 +148,8 @@ export function SearchableExercisePicker({
                   alt={`${exercise.title}: изображение упражнения`}
                   className="exercise-picker__option-thumb"
                   thumbnailUrl={exercise.media_thumbnail_url}
+                  thumbnailSources={exercise.media_thumbnail_sources}
+                  preferredMode={exercise.media_preferred_mode}
                   variant="thumbnail"
                 />
                 <span className="exercise-picker__option-copy">
@@ -337,6 +341,8 @@ export function SearchableExercisePicker({
                             alt=""
                             className="exercise-picker__option-thumb"
                             thumbnailUrl={exercise.media_thumbnail_url}
+                            thumbnailSources={exercise.media_thumbnail_sources}
+                            preferredMode={exercise.media_preferred_mode}
                             variant="thumbnail"
                           />
                           <span className="exercise-picker__option-copy">

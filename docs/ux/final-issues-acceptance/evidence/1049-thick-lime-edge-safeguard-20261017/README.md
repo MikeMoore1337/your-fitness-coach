@@ -14,6 +14,16 @@ synthetic source-level baseline, not a physical-device or production capture.
 - Light, 1440x900, Chromium: [BEFORE](before/progress-overview-1440-light-chromium.png) · [AFTER](after/progress-overview-1440-light-chromium.png)
 - Dark, 1440x900, Chromium: [BEFORE](before/progress-overview-1440-dark-chromium.png) · [AFTER](after/progress-overview-1440-dark-chromium.png)
 
+## Mobile BEFORE / AFTER (393px)
+
+Two extra mobile close-ups were captured after rebasing the implementation onto the current
+master. BEFORE deliberately injects only the original 3px lime decoration into the test
+fixture; AFTER uses the corrected production CSS. These are **synthetic test captures**, not
+production screenshots or personal user data.
+
+- Dark: [BEFORE](before/progress-good-card-mobile-393-dark.png) · [AFTER](after/progress-good-card-mobile-393-dark.png)
+- Light: [BEFORE](before/progress-good-card-mobile-393-light.png) · [AFTER](after/progress-good-card-mobile-393-light.png)
+
 ## Audited and changed sources
 
 - Removed the decorative 3px lime `border-left` from the Progress “Что идёт хорошо” column in `ux-ia-redesign.css`.

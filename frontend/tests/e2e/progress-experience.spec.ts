@@ -1203,6 +1203,22 @@ test('Progress has no decorative one-sided lime rails across themes and widths',
         await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
       }
 
+      if (CAPTURE_1049_EVIDENCE && viewport.width === 393) {
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        const goodCard = page.locator('.progress-insights__column--good');
+        const baselineStyle = await page.addStyleTag({
+          content:
+            '.app-section--progress .progress-insights__column--good { border-left: 3px solid var(--v2-lime) !important; }',
+        });
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-good.png'),
+        });
+        await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-good.png'),
+        });
+      }
+
       if (CAPTURE_1049_EVIDENCE && viewport.width >= 1440) {
         await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
         await page.locator('.progress-experience').screenshot({

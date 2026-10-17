@@ -27,13 +27,118 @@ for (const theme of themes) {
         '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
       );
       await expect(planningDetails).toHaveCount(2);
+      if (phase === 'after') {
+        const cardStyles = await planningDetails.evaluateAll((elements) =>
+          elements.map((element) => {
+            const styles = getComputedStyle(element);
+            return {
+              backgroundColor: styles.backgroundColor,
+              borderWidths: [
+                styles.borderTopWidth,
+                styles.borderRightWidth,
+                styles.borderBottomWidth,
+                styles.borderLeftWidth,
+              ],
+              borderRadius: styles.borderTopLeftRadius,
+            };
+          }),
+        );
+        for (const style of cardStyles) {
+          expect(style.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+          expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+          expect(style.borderRadius).not.toBe('0px');
+        }
+        // The planning cards use the same corner radius and heading typography
+        // as the nutrition settings card, rather than the large desktop headings.
+        const settings = page.locator('.nutrition-target-settings');
+        const settingsRadius = await settings.evaluate(
+          (element) => getComputedStyle(element).borderTopLeftRadius,
+        );
+        const settingsHeadingStyle = await settings
+          .locator(':scope > summary')
+          .evaluate((element) => {
+            const style = getComputedStyle(element);
+            return {
+              fontFamily: style.fontFamily,
+              fontSize: style.fontSize,
+              fontWeight: style.fontWeight,
+            };
+          });
+        for (const detail of await planningDetails.all()) {
+          const radius = await detail.evaluate(
+            (element) => getComputedStyle(element).borderTopLeftRadius,
+          );
+          expect(radius).toBe(settingsRadius);
+          const headingStyle = await detail
+            .locator(':scope > summary strong')
+            .evaluate((element) => {
+              const style = getComputedStyle(element);
+              return {
+                fontFamily: style.fontFamily,
+                fontSize: style.fontSize,
+                fontWeight: style.fontWeight,
+              };
+            });
+          expect(headingStyle).toEqual(settingsHeadingStyle);
+        }
+        // All three mobile sections must have the same frame color and spacing,
+        // regardless of whether #1048 puts KBJU settings first or last.
+        const sectionLayout = await page
+          .locator(
+            '.nutrition-experience > :is(.meal-planner, .grocery-list, .nutrition-target-settings)',
+          )
+          .evaluateAll((elements) =>
+            elements.map((element) => {
+              const bounds = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              return {
+                className: element.className,
+                top: bounds.top,
+                bottom: bounds.bottom,
+                borderColors: [
+                  style.borderTopColor,
+                  style.borderRightColor,
+                  style.borderBottomColor,
+                  style.borderLeftColor,
+                ],
+                backgroundColor: style.backgroundColor,
+              };
+            }),
+          );
+        expect(sectionLayout).toHaveLength(3);
+        const settingsLayout = sectionLayout.find((item) =>
+          item.className.includes('nutrition-target-settings'),
+        );
+        expect(settingsLayout).toBeDefined();
+        for (const item of sectionLayout) {
+          expect(item.borderColors).toEqual(settingsLayout!.borderColors);
+          expect(item.backgroundColor).toBe(settingsLayout!.backgroundColor);
+        }
+        for (let index = 1; index < sectionLayout.length; index++) {
+          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(16, 0);
+        }
+      }
       for (const detail of await planningDetails.all()) {
         const summary = detail.locator(':scope > summary');
-        await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+        const disclosure = summary.locator('svg[data-icon="disclosure-closed"]');
+        await expect(disclosure).toHaveCount(1);
+        await expect(disclosure).toBeVisible();
+        const closedTransform =
+          phase === 'after'
+            ? await disclosure.evaluate((element) => getComputedStyle(element).transform)
+            : null;
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'false');
         await summary.press('Enter');
         await expect(detail).toHaveAttribute('open', '');
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'true');
+        if (phase === 'after') {
+          await expect
+            .poll(() => disclosure.evaluate((element) => getComputedStyle(element).transform))
+            .not.toBe(closedTransform);
+        }
         await summary.press('Space');
         await expect(detail).not.toHaveAttribute('open', '');
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'false');
       }
       await hydration.scrollIntoViewIfNeeded();
       await hydration.screenshot({
@@ -181,4 +286,41 @@ for (const theme of themes) {
       ).toBe(true);
     });
   }
+}
+
+for (const theme of themes) {
+  test(`#1047 desktop keeps nutrition section cards intact - ${theme}`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-10T12:00:00+03:00'));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installPlatformApi(page, { browserSession: true, fixedDate: '2026-10-10' });
+    await page.goto('/app?section=nutrition&date=2026-10-10');
+
+    const planningDetails = page.locator(
+      '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+    );
+    await expect(planningDetails).toHaveCount(2);
+    const cardStyles = await planningDetails.evaluateAll((elements) =>
+      elements.map((element) => {
+        const styles = getComputedStyle(element);
+        return {
+          borderWidths: [
+            styles.borderTopWidth,
+            styles.borderRightWidth,
+            styles.borderBottomWidth,
+            styles.borderLeftWidth,
+          ],
+          borderRadius: styles.borderTopLeftRadius,
+        };
+      }),
+    );
+    for (const style of cardStyles) {
+      expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(style.borderRadius).not.toBe('0px');
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
+  });
 }

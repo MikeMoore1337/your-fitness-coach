@@ -1181,8 +1181,37 @@ details:not([open]) > :not(summary) {
   color: var(--muted);
   font-size: 0.62rem;
   line-height: 1.15;
-  object-fit: cover;
+  object-fit: contain;
   text-align: center;
+}
+.exercise-media-picture {
+  display: block;
+  min-width: 0;
+}
+.exercise-media-picture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.exercise-picker__option > .exercise-media-picture {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-picker__option > .exercise-media-picture > img,
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture > img {
+  width: 100%;
+  height: 100%;
 }
 .exercise-catalog-item__thumb {
   width: 58px;
@@ -3257,6 +3286,10 @@ details:not([open]) > :not(summary) {
     padding: 7px 8px;
   }
   .exercise-picker__option-thumb {
+    width: 46px;
+    height: 46px;
+  }
+  .exercise-picker__option > .exercise-media-picture {
     width: 46px;
     height: 46px;
   }
@@ -8954,7 +8987,11 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   outline-offset: -3px;
 }
 .nutrition-target-settings__body {
-  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border);
 }
 .nutrition-picker {
   align-items: center;

@@ -14,7 +14,10 @@ import {
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
-test.use({ serviceWorkers: 'block', video: 'on' });
+test.use({
+  serviceWorkers: 'block',
+  video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on',
+});
 
 const CAPTURE_980_AFTER = process.env.CAPTURE_980_AFTER === '1';
 const ISSUE_980_AFTER_DIR = resolve(
