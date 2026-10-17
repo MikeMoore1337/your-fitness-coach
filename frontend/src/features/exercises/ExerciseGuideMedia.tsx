@@ -102,7 +102,9 @@ export function ExerciseGuideMedia({
     !failedPosterUrls.has(activeItem.url) &&
     (reducedMotion ||
       posterFallbackUrls.has(activeItem.url) ||
-      (activeItem.poster_preferred && !animationFallbackUrls.has(activeItem.url))),
+      (activeItem.poster_preferred &&
+        !animationFallbackUrls.has(activeItem.url) &&
+        !failedVideoUrls.has(activeItem.url))),
   );
   const activeItemDisplayUrl = activeItem
     ? activeItemUsesPoster
@@ -173,7 +175,9 @@ export function ExerciseGuideMedia({
             !failedPosterUrls.has(item.url) &&
             (reducedMotion ||
               posterFallbackUrls.has(item.url) ||
-              (item.poster_preferred && !animationFallbackUrls.has(item.url)));
+              (item.poster_preferred &&
+                !animationFallbackUrls.has(item.url) &&
+                !failedVideoUrls.has(item.url)));
           const displayUrl = showPoster ? item.poster : item.url;
           const displaySources = showPoster
             ? (item.poster_sources ?? [])
