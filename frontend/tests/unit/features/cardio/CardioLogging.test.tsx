@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CardioQuickLog } from '../../../../src/features/cardio/CardioLogging';
+import { CardioHistory, CardioQuickLog } from '../../../../src/features/cardio/CardioLogging';
 import { addCalendarDays, dateInputValue } from '../../../../src/shared/dateTime';
+import type { ProgressSummary } from '../../../../src/shared/api/types';
 import { FeedbackProvider } from '../../../../src/shared/ui/FeedbackProvider';
 
 const apiMock = vi.hoisted(() => vi.fn());
@@ -47,6 +48,33 @@ const plannedSession = {
   created_at: '2030-01-09T12:00:00',
   updated_at: '2030-01-09T12:00:00',
 };
+
+const historySummary: ProgressSummary['cardio'] = {
+  completed_sessions: 2,
+  planned_sessions: 0,
+  frequency_per_week: 0.5,
+  duration_minutes: 68,
+  distance_km: 8.1,
+  zone_duration: [{ zone: 3, duration_minutes: 28 }],
+};
+
+function renderHistory() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <FeedbackProvider>
+        <CardioHistory
+          dateFrom="2030-01-01"
+          dateTo="2030-01-30"
+          summary={historySummary}
+          timeZone="Europe/Moscow"
+        />
+      </FeedbackProvider>
+    </QueryClientProvider>,
+  );
+}
 
 describe('CardioQuickLog', () => {
   beforeEach(() => {
@@ -194,5 +222,114 @@ describe('CardioQuickLog', () => {
       expect(apiMock.mock.calls.filter((call) => call[1]?.method === 'PATCH')).toHaveLength(1),
     );
     expect(trackProductEventMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the compact history useful without inventing missing metrics', async () => {
+    const sessions = [
+      {
+        ...plannedSession,
+        id: 101,
+        activity_type: 'elliptical',
+        duration_minutes: 40,
+        scheduled_at: '2030-01-16T14:33:00',
+        completed_at: '2030-01-16T15:13:00',
+        status: 'completed',
+        note: null,
+      },
+      {
+        ...plannedSession,
+        id: 102,
+        activity_type: 'stationary_bike',
+        duration_minutes: 28,
+        distance_km: 8.1,
+        average_heart_rate_bpm: 136,
+        heart_rate_zone: 3,
+        scheduled_at: '2030-01-12T12:05:00',
+        completed_at: '2030-01-12T12:33:00',
+        status: 'completed',
+        note: 'Ровный темп без рывков',
+      },
+    ];
+    apiMock.mockResolvedValue(sessions);
+
+    renderHistory();
+
+    const history = await screen.findByRole('region', { name: 'Кардио' });
+    await waitFor(() =>
+      expect(history.querySelectorAll('article.cardio-session-row--compact')).toHaveLength(2),
+    );
+    const cards = history.querySelectorAll('article.cardio-session-row--compact');
+    expect(cards).toHaveLength(2);
+
+    const withoutMetrics = within(cards[0] as HTMLElement);
+    expect(withoutMetrics.getByText('Эллиптический тренажёр')).toBeVisible();
+    expect(withoutMetrics.getByText('Завершено')).toBeVisible();
+    expect(withoutMetrics.getByText('40 мин')).toBeVisible();
+    expect(withoutMetrics.queryByText('Средний пульс')).not.toBeInTheDocument();
+    expect(withoutMetrics.queryByText(/уд\/мин/)).not.toBeInTheDocument();
+
+    const withMetrics = within(cards[1] as HTMLElement);
+    expect(withMetrics.getByText('Велотренажёр / велоэргометр')).toBeVisible();
+    expect(withMetrics.getByText('136 уд/мин')).toBeVisible();
+    expect(withMetrics.getByText('Дополнительные показатели')).toBeVisible();
+    expect(withMetrics.queryByText('8,1 км')).not.toBeVisible();
+    fireEvent.click(withMetrics.getByText('Дополнительные показатели'));
+    expect(withMetrics.getByText('8,1 км')).toBeVisible();
+    expect(withMetrics.getByText('Зона 3 · умеренно')).toBeVisible();
+
+    fireEvent.click(withMetrics.getByText('Действия с записью'));
+    expect(withMetrics.getByRole('button', { name: 'Изменить' })).toBeVisible();
+  });
+
+  it('preserves editing and confirmed deletion through compact-card actions', async () => {
+    let sessions = [
+      {
+        ...plannedSession,
+        id: 103,
+        activity_type: 'running',
+        distance_km: 4.8,
+        average_heart_rate_bpm: 142,
+        heart_rate_zone: 4,
+        status: 'completed',
+      },
+    ];
+    let deleteCalls = 0;
+    apiMock.mockImplementation(async (_path: string, options?: { method?: string }) => {
+      if (options?.method === 'DELETE') {
+        deleteCalls += 1;
+        sessions = [];
+        return null;
+      }
+      return sessions;
+    });
+
+    renderHistory();
+
+    const history = await screen.findByRole('region', { name: 'Кардио' });
+    await waitFor(() =>
+      expect(history.querySelectorAll('article.cardio-session-row--compact')).toHaveLength(1),
+    );
+    const getCard = () => within(history).getByText('Бег').closest('article') as HTMLElement;
+
+    fireEvent.click(within(getCard()).getByText('Действия с записью'));
+    fireEvent.click(within(getCard()).getByRole('button', { name: 'Изменить' }));
+    expect(screen.getByRole('button', { name: 'Сохранить изменения' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Отмена' }));
+    expect(screen.getByText('Бег')).toBeVisible();
+    expect(apiMock.mock.calls.filter((call) => call[1]?.method === 'PATCH')).toHaveLength(0);
+
+    fireEvent.click(within(getCard()).getByText('Действия с записью'));
+    fireEvent.click(within(getCard()).getByRole('button', { name: 'Удалить' }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
+    expect(deleteCalls).toBe(0);
+    expect(screen.getByText('Бег')).toBeVisible();
+
+    fireEvent.click(within(getCard()).getByText('Действия с записью'));
+    fireEvent.click(within(getCard()).getByRole('button', { name: 'Удалить' }));
+    const confirmation = await screen.findByRole('dialog');
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Удалить' }));
+    await waitFor(() => expect(deleteCalls).toBe(1));
+    await waitFor(() => expect(history.querySelector('article.cardio-session-row')).toBeNull());
   });
 });

@@ -171,6 +171,14 @@ function formatSessionDate(value: string): string {
   return time ? `${calendarDate}, ${time.slice(0, 5)}` : calendarDate;
 }
 
+function cardioStatusLabel(status: CardioStatus): string {
+  return status === 'completed' ? 'Завершено' : 'Запланировано';
+}
+
+function cardioStatusTone(status: CardioStatus): 'success' | 'neutral' {
+  return status === 'completed' ? 'success' : 'neutral';
+}
+
 function CardioSessionForm({
   editing,
   onCancel,
@@ -437,7 +445,15 @@ function CardioSessionForm({
   );
 }
 
-function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZone: string }) {
+function SessionList({
+  compact = false,
+  sessions,
+  timeZone,
+}: {
+  compact?: boolean;
+  sessions: CardioSession[];
+  timeZone: string;
+}) {
   const queryClient = useQueryClient();
   const { confirm, toast } = useFeedback();
   const [editing, setEditing] = useState<CardioSession | null>(null);
@@ -475,9 +491,17 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
 
   return (
     <div className="cardio-session-list">
-      {sessions.map((session) =>
-        editing?.id === session.id ? (
-          <div className="cardio-session-row cardio-session-row--editing" key={session.id}>
+      {sessions.map((session) => {
+        const hasSecondaryMetrics =
+          session.distance_km != null || session.heart_rate_zone != null || Boolean(session.note);
+
+        return editing?.id === session.id ? (
+          <div
+            className={`cardio-session-row cardio-session-row--editing${
+              compact ? ' cardio-session-row--compact' : ''
+            }`}
+            key={session.id}
+          >
             <CardioSessionForm
               editing={session}
               onCancel={() => setEditing(null)}
@@ -486,41 +510,102 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
             />
           </div>
         ) : (
-          <article className="cardio-session-row" key={session.id}>
+          <article
+            className={`cardio-session-row${compact ? ' cardio-session-row--compact' : ''}`}
+            key={session.id}
+          >
             <div className="cardio-session-row__main">
-              <div>
-                <strong>{activityLabels[session.activity_type]}</strong>
-                <span>{formatSessionDate(session.scheduled_at)}</span>
-              </div>
-              <Badge tone={session.status === 'completed' ? 'success' : 'neutral'}>
-                {session.status === 'completed' ? 'Завершено' : 'Запланировано'}
-              </Badge>
+              {compact ? (
+                <>
+                  <div className="cardio-session-row__heading">
+                    <strong>{activityLabels[session.activity_type]}</strong>
+                    <Badge tone={cardioStatusTone(session.status)}>
+                      {cardioStatusLabel(session.status)}
+                    </Badge>
+                  </div>
+                  <time className="cardio-session-row__date" dateTime={session.scheduled_at}>
+                    {formatSessionDate(session.scheduled_at)}
+                  </time>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <strong>{activityLabels[session.activity_type]}</strong>
+                    <span>{formatSessionDate(session.scheduled_at)}</span>
+                  </div>
+                  <Badge tone={cardioStatusTone(session.status)}>
+                    {cardioStatusLabel(session.status)}
+                  </Badge>
+                </>
+              )}
             </div>
-            <dl className="cardio-session-row__facts">
-              <div>
-                <dt>Длительность</dt>
-                <dd>{session.duration_minutes} мин</dd>
-              </div>
-              {session.distance_km != null && (
+
+            {compact ? (
+              <dl className="cardio-session-row__facts cardio-session-row__facts--compact">
                 <div>
-                  <dt>Дистанция</dt>
-                  <dd>{session.distance_km.toLocaleString('ru-RU')} км</dd>
+                  <dt>Длительность</dt>
+                  <dd>{session.duration_minutes} мин</dd>
                 </div>
-              )}
-              {session.average_heart_rate_bpm != null && (
+                {session.average_heart_rate_bpm != null && (
+                  <div>
+                    <dt>Средний пульс</dt>
+                    <dd>{session.average_heart_rate_bpm} уд/мин</dd>
+                  </div>
+                )}
+              </dl>
+            ) : (
+              <dl className="cardio-session-row__facts">
                 <div>
-                  <dt>Средний пульс</dt>
-                  <dd>{session.average_heart_rate_bpm} уд/мин</dd>
+                  <dt>Длительность</dt>
+                  <dd>{session.duration_minutes} мин</dd>
                 </div>
-              )}
-              {session.heart_rate_zone != null && (
-                <div>
-                  <dt>Зона пульса</dt>
-                  <dd>{zoneLabels[session.heart_rate_zone]}</dd>
-                </div>
-              )}
-            </dl>
-            {session.note && <p className="cardio-session-row__note">{session.note}</p>}
+                {session.distance_km != null && (
+                  <div>
+                    <dt>Дистанция</dt>
+                    <dd>{session.distance_km.toLocaleString('ru-RU')} км</dd>
+                  </div>
+                )}
+                {session.average_heart_rate_bpm != null && (
+                  <div>
+                    <dt>Средний пульс</dt>
+                    <dd>{session.average_heart_rate_bpm} уд/мин</dd>
+                  </div>
+                )}
+                {session.heart_rate_zone != null && (
+                  <div>
+                    <dt>Зона пульса</dt>
+                    <dd>{zoneLabels[session.heart_rate_zone]}</dd>
+                  </div>
+                )}
+              </dl>
+            )}
+
+            {compact && hasSecondaryMetrics ? (
+              <details className="cardio-session-row__secondary">
+                <summary className="yfc-disclosure-summary">
+                  Дополнительные показатели
+                  <DisclosureIcon />
+                </summary>
+                <dl>
+                  {session.distance_km != null && (
+                    <div>
+                      <dt>Дистанция</dt>
+                      <dd>{session.distance_km.toLocaleString('ru-RU')} км</dd>
+                    </div>
+                  )}
+                  {session.heart_rate_zone != null && (
+                    <div>
+                      <dt>Зона пульса</dt>
+                      <dd>{zoneLabels[session.heart_rate_zone]}</dd>
+                    </div>
+                  )}
+                </dl>
+                {session.note && <p className="cardio-session-row__note">{session.note}</p>}
+              </details>
+            ) : (
+              !compact && session.note && <p className="cardio-session-row__note">{session.note}</p>
+            )}
+
             <div className="cardio-session-row__actions">
               {session.status === 'planned' && (
                 <Button
@@ -561,8 +646,8 @@ function SessionList({ sessions, timeZone }: { sessions: CardioSession[]; timeZo
               </details>
             </div>
           </article>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }
@@ -760,7 +845,7 @@ export function CardioHistory({
           retry={() => void sessions.refetch()}
         />
       ) : (
-        <SessionList sessions={sessions.data ?? []} timeZone={timeZone} />
+        <SessionList compact sessions={sessions.data ?? []} timeZone={timeZone} />
       )}
     </section>
   );
