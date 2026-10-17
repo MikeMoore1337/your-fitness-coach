@@ -1,0 +1,55 @@
+{
+  "issue": 996,
+  "pr": 1095,
+  "approved_design": "Variant 02",
+  "approved_design_sha": "3a8cd073d8c3b0570d640190099be7c0209cbb0b9",
+  "implementation_sha": "ce2e8ba8ae40bb0785d2c6a703d3389bfc67d7e6",
+  "captured_at": "2026-10-18",
+  "timezone": "Europe/Moscow",
+  "capture": {
+    "browser": "Playwright Chromium project",
+    "server": "local Vite preview of the production build",
+    "themes": ["dark", "light"],
+    "reduced_motion": true,
+    "viewport_height": 844,
+    "viewport_widths": [320, 360, 393, 430, 1440],
+    "fixture": "synthetic active workout, no production credentials or personal data",
+    "catalog_media": "/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg",
+    "capture_tests": 20,
+    "capture_passed": 20
+  },
+  "mandatory_captures": [
+    "issue-996-after-dark-320.png",
+    "issue-996-after-light-320.png",
+    "issue-996-after-dark-360.png",
+    "issue-996-after-light-360.png",
+    "issue-996-after-dark-393.png",
+    "issue-996-after-light-393.png",
+    "issue-996-after-dark-430.png",
+    "issue-996-after-light-430.png",
+    "issue-996-after-dark-1440.png",
+    "issue-996-after-light-1440.png"
+  ],
+  "state_captures": [
+    "issue-996-after-preview-dark-393.png",
+    "issue-996-after-preview-light-393.png",
+    "issue-996-after-error-dark-393.png",
+    "issue-996-after-error-light-393.png",
+    "issue-996-after-offline-dark-393.png",
+    "issue-996-after-offline-light-393.png",
+    "issue-996-after-conflict-dark-393.png",
+    "issue-996-after-conflict-light-393.png",
+    "issue-996-after-keyboard-modeled-dark-393.png",
+    "issue-996-after-keyboard-modeled-light-393.png"
+  ],
+  "cross_browser": {
+    "chromium_issue_996_tests": { "passed": 31, "total": 31 },
+    "webkit_issue_996_tests": { "passed": 31, "total": 31 },
+    "webkit_png_capture": false
+  },
+  "gates": {
+    "owner_visual_acceptance": "PENDING",
+    "merge": "NOT_APPROVED",
+    "production_deploy": "NOT_APPROVED"
+  }
+}
