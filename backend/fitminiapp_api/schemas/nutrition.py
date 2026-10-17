@@ -41,6 +41,8 @@ class NutritionTargetSave(BaseModel):
     target_telegram_user_id: int | None = Field(default=None, ge=1)
     effective_from: date | None = None
     note: str | None = Field(default=None, max_length=500)
+    # Avoid turning an unchanged calculator default into a fabricated weigh-in.
+    record_weight_measurement: bool = False
     sex: Literal["male", "female"]
     weight_kg: float = Field(ge=20, le=350, allow_inf_nan=False)
     height_cm: float = Field(ge=100, le=250, allow_inf_nan=False)
