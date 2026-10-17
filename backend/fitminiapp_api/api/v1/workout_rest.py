@@ -223,10 +223,10 @@ def mutate_rest_session(
             row.quality = "normal"
         else:
             if (
-            payload.ended_at is not None
-            or payload.corrected
-            or payload.corrected_seconds is not None
-        ):
+                payload.ended_at is not None
+                or payload.corrected
+                or payload.corrected_seconds is not None
+            ):
                 raise HTTPException(status_code=422, detail="Конечное время не требуется")
             row.ended_at = _now()
             row.status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
