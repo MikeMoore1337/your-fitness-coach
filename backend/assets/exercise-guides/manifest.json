@@ -22,11 +22,11 @@
     "static_only": 4,
     "remote_runtime_assets": 0,
     "approved_static": 4,
-    "hd_coverage_percent": 35.44
+    "hd_coverage_percent": 37.38
   },
-  "asset_count": 707,
-  "derivative_count": 73,
-  "total_bytes": 35592679,
+  "asset_count": 727,
+  "derivative_count": 77,
+  "total_bytes": 36358573,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -2666,7 +2666,7 @@
         {
           "type": "animation",
           "path": "gymvisual/chin-up-1326-T2mxWqc.gif",
-          "poster_path": "gymvisual/chin-up-1326-T2mxWqc.jpg",
+          "poster_path": "exercises-media/chin-up/poster-1280.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подтягивания обратным хватом: движение",
@@ -2676,10 +2676,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 65350,
-          "poster_byte_size": 5564,
+          "poster_byte_size": 41002,
           "sort_order": 0,
           "asset_sha256": "d35d8f6ac84bcde2f3657a0d4d2e2e2eff08c7ab6dc29a37dd7f5ce24e19dd19",
-          "poster_sha256": "8961948d629fad2d5245269eb5a02495cfdab7a1069e4ad18fee86b53df3204c",
+          "poster_sha256": "96485743e770dd802618697ce3e524b235127184d2849e3dc982d9ec943cb4f6",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2692,8 +2692,79 @@
               "byte_size": 65350
             }
           ],
-          "poster_source": null,
-          "poster_sources": []
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/reverse-grip-pull-up.jpg",
+            "source_gender": "male",
+            "source_slug": "reverse-grip-pull-up",
+            "git_blob_sha1": "874001bc94ce078304618e1392136120a6ddba67",
+            "source_sha256": "d279e7ffbbe50769751470d27875a579543b23c41b798669cadc9ecaa1cb2cac",
+            "source_byte_size": 65128,
+            "source_dimensions": {
+              "width": 1920,
+              "height": 1080
+            },
+            "canonical_slug": "chin-up",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
+          },
+          "poster_sources": [
+            {
+              "path": "exercises-media/chin-up/poster-640.jpg",
+              "mime_type": "image/jpeg",
+              "width": 640,
+              "height": 360,
+              "byte_size": 14244,
+              "sha256": "ad9b0df4d57dd448880a593b61c6a05d61ac3c3aeb3c2907d63513ec610fc7c2"
+            },
+            {
+              "path": "exercises-media/chin-up/poster-640.webp",
+              "mime_type": "image/webp",
+              "width": 640,
+              "height": 360,
+              "byte_size": 7408,
+              "sha256": "8a6fce5d4e1fcf20297f4591c2d242f99e902a0efa0ec1a9fc58834a8dc3388d"
+            },
+            {
+              "path": "exercises-media/chin-up/poster-1280.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 41002,
+              "sha256": "96485743e770dd802618697ce3e524b235127184d2849e3dc982d9ec943cb4f6"
+            },
+            {
+              "path": "exercises-media/chin-up/poster-1280.webp",
+              "mime_type": "image/webp",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 18144,
+              "sha256": "ff6bf147fb63f6e4552df0a69abb717c21478f4ac270788deaaca1642cfd3bd5"
+            },
+            {
+              "path": "exercises-media/chin-up/poster-1920.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 75719,
+              "sha256": "545e8511b0c10fb969a914f08fad567771721756563fa19d97691e10bdc0cc92"
+            },
+            {
+              "path": "exercises-media/chin-up/poster-1920.webp",
+              "mime_type": "image/webp",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 29928,
+              "sha256": "4bd7ea68add7bca44334277e8f4ba68ad4e4ae9f1294c5a5ef301c151816f1e1"
+            }
+          ],
+          "poster_dimensions": {
+            "width": 1280,
+            "height": 720
+          },
+          "poster_preferred": true
         }
       ]
     },
@@ -7455,7 +7526,7 @@
         {
           "type": "animation",
           "path": "gymvisual/lying-dumbbell-triceps-extension-0351-mpKZGWz.gif",
-          "poster_path": "gymvisual/lying-dumbbell-triceps-extension-0351-mpKZGWz.jpg",
+          "poster_path": "exercises-media/lying-dumbbell-triceps-extension/poster-1280.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Разгибание гантелей лежа: движение",
@@ -7465,10 +7536,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 124003,
-          "poster_byte_size": 8153,
+          "poster_byte_size": 47471,
           "sort_order": 0,
           "asset_sha256": "418001c2b4976b51f859406a0a1ad237cf4b5349ba4ab54c138daa5912493cdd",
-          "poster_sha256": "124b6ba591c30e7e1af6ba0169561d450c5ad7b86bad97e9aa178f2c7611256f",
+          "poster_sha256": "e6f0347b56e3a98fc724b72ba6102f86b6b529878a4a6f6f8e449089ca1471c5",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -7479,6 +7550,79 @@
               "width": 180,
               "height": 180,
               "byte_size": 124003
+            }
+          ],
+          "poster_dimensions": {
+            "width": 1280,
+            "height": 720
+          },
+          "poster_preferred": true,
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/dumbbell-lying-triceps-extension.jpg",
+            "source_gender": "male",
+            "source_slug": "dumbbell-lying-triceps-extension",
+            "git_blob_sha1": "71c6fd745c46208baccdb25b6e0e1d1c1c6af69d",
+            "source_sha256": "0813f46ddf02be480e57c5b278c4ff97cad66bf059df3cdca7fc58b5b93e6db1",
+            "source_byte_size": 80975,
+            "source_dimensions": {
+              "width": 1920,
+              "height": 1080
+            },
+            "canonical_slug": "lying-dumbbell-triceps-extension",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
+          },
+          "poster_sources": [
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-640.jpg",
+              "mime_type": "image/jpeg",
+              "width": 640,
+              "height": 360,
+              "byte_size": 16397,
+              "sha256": "4cc9dc2a17c13011434f87e290f4ff6b2eb9cfff87fbe4970540ae2aecfd8740"
+            },
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-640.webp",
+              "mime_type": "image/webp",
+              "width": 640,
+              "height": 360,
+              "byte_size": 9616,
+              "sha256": "aa7e286566d31803edbc1ad8ddedb5c4b178e28960c8cc59574767a0423dc90a"
+            },
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-1280.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 47471,
+              "sha256": "e6f0347b56e3a98fc724b72ba6102f86b6b529878a4a6f6f8e449089ca1471c5"
+            },
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-1280.webp",
+              "mime_type": "image/webp",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 23826,
+              "sha256": "1a55c1cc2cef2b39866189a3bec2a0b3463398e5b5c714fc47275da912714232"
+            },
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-1920.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 86863,
+              "sha256": "b3728bb5cca1c71457fb95d705bc523902b0c99fba7f3e14bfad7f0250b0871d"
+            },
+            {
+              "path": "exercises-media/lying-dumbbell-triceps-extension/poster-1920.webp",
+              "mime_type": "image/webp",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 39800,
+              "sha256": "6208ec4984ed7948586b7bf260d35cd781e97f252b17808ae70c1cd63fd645ab"
             }
           ]
         }
@@ -9426,7 +9570,7 @@
         {
           "type": "animation",
           "path": "gymvisual/pull-up-0652-lBDjFxJ.gif",
-          "poster_path": "gymvisual/pull-up-0652-lBDjFxJ.jpg",
+          "poster_path": "exercises-media/pull-up/poster-1280.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подтягивания: движение",
@@ -9436,10 +9580,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 62671,
-          "poster_byte_size": 5301,
+          "poster_byte_size": 36045,
           "sort_order": 0,
           "asset_sha256": "f03e96137aeb0e655c2028c211cc8b368c9e72e77b57c8cd1df65a27aa3b50c9",
-          "poster_sha256": "44ba2083c82e73f581487a278c2cb9667a9002e52af0191b528515f047bb2f71",
+          "poster_sha256": "2fb00ef8f75e9f7630f3ec6f9581bb9d05d2d8cd26d7b6d5a611839489d9d0a7",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -9450,6 +9594,79 @@
               "width": 180,
               "height": 180,
               "byte_size": 62671
+            }
+          ],
+          "poster_dimensions": {
+            "width": 1280,
+            "height": 720
+          },
+          "poster_preferred": true,
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/pull-up-wide-front-grip.jpg",
+            "source_gender": "male",
+            "source_slug": "pull-up-wide-front-grip",
+            "git_blob_sha1": "21d360ae8d3242b4308de16ea46d8869c1af57b0",
+            "source_sha256": "cee286fd8a98f5de4ce7646b9b25540ab83606b748c256b714235071b461c43b",
+            "source_byte_size": 56927,
+            "source_dimensions": {
+              "width": 1920,
+              "height": 1080
+            },
+            "canonical_slug": "pull-up",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
+          },
+          "poster_sources": [
+            {
+              "path": "exercises-media/pull-up/poster-640.jpg",
+              "mime_type": "image/jpeg",
+              "width": 640,
+              "height": 360,
+              "byte_size": 12495,
+              "sha256": "62d08fe0ed6be4eadf8d49662746e5aad6b6f95c74c90913eb98d824e6ae4c4a"
+            },
+            {
+              "path": "exercises-media/pull-up/poster-640.webp",
+              "mime_type": "image/webp",
+              "width": 640,
+              "height": 360,
+              "byte_size": 6782,
+              "sha256": "762348877fc50253ae66b5c561581e775e5f558f88c647f907140b09440caa0e"
+            },
+            {
+              "path": "exercises-media/pull-up/poster-1280.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 36045,
+              "sha256": "2fb00ef8f75e9f7630f3ec6f9581bb9d05d2d8cd26d7b6d5a611839489d9d0a7"
+            },
+            {
+              "path": "exercises-media/pull-up/poster-1280.webp",
+              "mime_type": "image/webp",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 16822,
+              "sha256": "b072e2a852989e7d2c2169bf9dd4bb4312eec08fe877a1495b048391597df66c"
+            },
+            {
+              "path": "exercises-media/pull-up/poster-1920.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 66501,
+              "sha256": "b3913ea679e494c62cb7fa8cdfe21efcd08b9d790b7a0876c88bac800d9d2f80"
+            },
+            {
+              "path": "exercises-media/pull-up/poster-1920.webp",
+              "mime_type": "image/webp",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 27314,
+              "sha256": "db90c77f919b6420528d3154b08914634f3a7821dd55394e76858d86ca450c7c"
             }
           ]
         }
@@ -12573,7 +12790,7 @@
         {
           "type": "animation",
           "path": "gymvisual/t-bar-row-0606-aaXr7ld.gif",
-          "poster_path": "gymvisual/t-bar-row-0606-aaXr7ld.jpg",
+          "poster_path": "exercises-media/t-bar-row/poster-1280.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Тяга Т-грифа: движение",
@@ -12583,10 +12800,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 81102,
-          "poster_byte_size": 6282,
+          "poster_byte_size": 46357,
           "sort_order": 0,
           "asset_sha256": "6207e933301a4678875399b3867cb2ed8c5c8b6ea91d98a0769b318fcd6aad92",
-          "poster_sha256": "c2f7015388bae1a27e7ac76858a7de2e8af1c755ae826b9cdcffac83b7c28a63",
+          "poster_sha256": "07620c38c04feecbc7abc8f46394aae507003aa300dd53eaf1e88915a953a0bf",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -12597,6 +12814,79 @@
               "width": 180,
               "height": 180,
               "byte_size": 81102
+            }
+          ],
+          "poster_dimensions": {
+            "width": 1280,
+            "height": 720
+          },
+          "poster_preferred": true,
+          "poster_source": {
+            "name": "Exercises Media",
+            "url": "https://github.com/akajdid-mostafa/exercises-media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/thumbnails/male/lever-t-bar-row.jpg",
+            "source_gender": "male",
+            "source_slug": "lever-t-bar-row",
+            "git_blob_sha1": "7f6f813735912f218d47029da90bdbc6bfce5be5",
+            "source_sha256": "dafe147e1388d85039926b0b26df944895dfdcdd62ab68cce02d97764eb2efad",
+            "source_byte_size": 77956,
+            "source_dimensions": {
+              "width": 1920,
+              "height": 1080
+            },
+            "canonical_slug": "t-bar-row",
+            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
+            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
+          },
+          "poster_sources": [
+            {
+              "path": "exercises-media/t-bar-row/poster-640.jpg",
+              "mime_type": "image/jpeg",
+              "width": 640,
+              "height": 360,
+              "byte_size": 16440,
+              "sha256": "50e0a85ff06a5d37256f54efee4adcf8a3f84267be05e5248d4a7a93cd081eb9"
+            },
+            {
+              "path": "exercises-media/t-bar-row/poster-640.webp",
+              "mime_type": "image/webp",
+              "width": 640,
+              "height": 360,
+              "byte_size": 9470,
+              "sha256": "4715fa64f686cbf945769305ed4e173dbb61051c274013bf909dd132ab0a5507"
+            },
+            {
+              "path": "exercises-media/t-bar-row/poster-1280.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 46357,
+              "sha256": "07620c38c04feecbc7abc8f46394aae507003aa300dd53eaf1e88915a953a0bf"
+            },
+            {
+              "path": "exercises-media/t-bar-row/poster-1280.webp",
+              "mime_type": "image/webp",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 22302,
+              "sha256": "e83da72a5194d65b7d9a3ccd8466c09dc2beecbd568321ff9852c77f3a87e4fc"
+            },
+            {
+              "path": "exercises-media/t-bar-row/poster-1920.jpg",
+              "mime_type": "image/jpeg",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 83786,
+              "sha256": "35588d22660664b954812b2cdc520febd462456b1bbde18c3929bc1da77eb359"
+            },
+            {
+              "path": "exercises-media/t-bar-row/poster-1920.webp",
+              "mime_type": "image/webp",
+              "width": 1920,
+              "height": 1080,
+              "byte_size": 36462,
+              "sha256": "5febf8ede5a22d2c8cf936ac88a59ac3a09c59c2e717a2819ba8038a0e78f778"
             }
           ]
         }
@@ -13306,7 +13596,7 @@
       ]
     }
   },
-  "hq_poster_count": 73,
+  "hq_poster_count": 77,
   "hq_video_count": 2,
   "hq_video_total_bytes": 531115,
   "hd_source": {
@@ -13318,7 +13608,7 @@
   "hd_source_repository": "https://github.com/akajdid-mostafa/exercises-media",
   "hd_source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
   "hd_rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
-  "poster_variant_count": 438,
+  "poster_variant_count": 462,
   "hd_baseline_asset_count": 334,
   "hd_baseline_total_bytes": 18352704
 }
