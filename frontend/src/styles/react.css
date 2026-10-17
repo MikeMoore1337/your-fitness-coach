@@ -7413,17 +7413,41 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-muscle-workload {
   display: grid;
-  border-top: 1px solid var(--border);
+  gap: var(--v2-space-2);
 }
 
-.progress-muscle-workload .progress-exercise {
+.app-section--progress .progress-muscle-workload .progress-exercise {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  transition:
+    border-color var(--motion-state) var(--motion-ease),
+    background var(--motion-state) var(--motion-ease);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-hover);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary {
+  min-height: var(--touch-target);
+  padding: var(--v2-space-2) var(--v2-space-3);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary:active {
+  background: var(--surface-active);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise[open] > summary {
   border-bottom: 1px solid var(--border);
 }
 
 .progress-workload__body {
   display: grid;
   gap: 12px;
-  padding: 0 4px 16px;
+  padding: var(--v2-space-3);
 }
 
 .progress-workload__comparison {
@@ -7472,7 +7496,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-workload__contributors li {
   padding-left: 10px;
-  border-left: 2px solid var(--accent);
   font-size: 0.75rem;
 }
 
