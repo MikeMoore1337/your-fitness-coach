@@ -23,7 +23,7 @@ Implementation branch: `codex/issue-960-rest-implementation`. This is distinct f
 - Very old offline sessions (the API currently bounds `started_at` to 24 hours) need a reconciliation strategy; pending records must never be silently deleted.
 - Full terminal transition coverage: workout finish/cancel, navigation away, user change, and verified manual correction across browser/Telegram TMA; the inline correction form is implemented but still requires browser acceptance.
 - Layout verification that the existing RestTimer geometry stays the same aside from the compact right-hand fact/stop controls.
-- **Policy C was approved by the owner.** When the app was in the background or closed for at least 15 minutes AND the planned rest expired at least 15 minutes ago, restoring the timer asks for an actual rest duration or `Не учитывать`. Extended foreground rest is not treated as an error. The time in background is never automatically saved as a measurement.
+- **Policy C was approved by the owner.** A concrete **15-minute threshold is proposed for review** (not yet separately approved): after at least 15 minutes away AND at least 15 minutes beyond the planned deadline, returning to the app asks for an actual rest duration or `Не учитывать`. Extended foreground rest is not treated as an error. The time in background is never automatically saved as a measurement.
 
 ## Semantics
 
@@ -32,7 +32,7 @@ Implementation branch: `codex/issue-960-rest-implementation`. This is distinct f
 ## Release gates
 
 1. Complete reliability and integration tests and collect real AFTER evidence.
-2. Policy C is approved; obtain final visual acceptance of its implementation and the existing RestTimer layout.
+2. Policy C is approved. Obtain approval for the proposed 15-minute threshold and final visual acceptance of its implementation and the existing RestTimer layout.
 3. Rebase or otherwise synchronize with the current `master` safely.
 4. Green exact-head required CI; distinct explicit merge and production deploy authorization.
 
