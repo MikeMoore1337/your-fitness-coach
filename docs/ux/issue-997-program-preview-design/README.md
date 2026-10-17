@@ -178,4 +178,3 @@ diagnostic 125%; системные настройки доступности О
 
 Существующий [Draft PR #1043](https://github.com/MikeMoore1337/your-fitness-coach/pull/1043)
 обновляется этим пакетом. Merge, auto-merge и deploy в этой design-only стадии не выполнялись.
-
