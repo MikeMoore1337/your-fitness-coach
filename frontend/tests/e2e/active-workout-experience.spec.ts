@@ -2021,7 +2021,9 @@ test('V9-01 keeps pain inside the safety-stop boundary', async ({ page }) => {
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
-  await page.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await summary.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
   await page.getByRole('button', { name: 'Показать рекомендации' }).click();
   await expect(page.getByRole('heading', { name: 'Безопасность прежде всего' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Применить' })).toHaveCount(0);
@@ -2273,8 +2275,8 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   await page
-    .getByRole('region', { name: 'Что делать сейчас' })
-    .getByRole('button', { name: 'Что делать сейчас' })
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
@@ -2289,8 +2291,8 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   await page
-    .getByRole('region', { name: 'Что делать сейчас' })
-    .getByRole('button', { name: 'Что делать сейчас' })
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
   const reloadedMemory = page
     .locator('.active-workout-exercise')
@@ -2318,8 +2320,8 @@ test('V9-04 fits Mobile Web and mocked TMA widths without moving the next-set ac
   await page.goto('/app?tgWebAppPlatform=android');
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   await page
-    .getByRole('region', { name: 'Что делать сейчас' })
-    .getByRole('button', { name: 'Что делать сейчас' })
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
@@ -2345,8 +2347,8 @@ test('V9-04 preserves a draft when the memory save is offline', async ({ page })
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   await page
-    .getByRole('region', { name: 'Что делать сейчас' })
-    .getByRole('button', { name: 'Что делать сейчас' })
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
 
   const setupMemory = page

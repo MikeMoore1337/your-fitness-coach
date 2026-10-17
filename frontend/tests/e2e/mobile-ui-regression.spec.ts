@@ -180,8 +180,8 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await expect(continueWorkout).toBeVisible();
   await continueWorkout.click();
   await page
-    .getByRole('region', { name: 'Что делать сейчас' })
-    .getByRole('button', { name: 'Что делать сейчас' })
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
 
   await expect(page.locator('.active-workout')).toBeVisible();
@@ -198,6 +198,7 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   await finish.focus();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'hidden');
   await expect(page.locator('#appBottomNav')).toBeVisible();
+  await expectNoOverlap(finish, page.locator('#appBottomNav'));
   await reps.evaluate((element) => (element as HTMLElement).blur());
   await expectDockWithinViewport(page);
   // Focus-driven scrolling can leave the pointer hovering over a different button.
@@ -244,11 +245,27 @@ test('@critical active workout keeps the current set primary across mobile width
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeGreaterThan(
       viewport.height,
     );
+    await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
     await currentSetDone.evaluate((element) => {
       element.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'nearest' });
     });
     await expect(currentSetDone).toBeInViewport();
     await expectNoOverlap(currentSetDone, page.locator('#appBottomNav'));
+    await expect(currentSetDone).toHaveJSProperty('disabled', false);
+    await expect(
+      currentSetDone.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.left + rect.width / 2,
+          rect.top + rect.height / 2,
+        );
+        return hit === element || hit?.closest('[data-workout-field="done"]') === element;
+      }),
+    ).resolves.toBe(true);
+    await expectNoOverlap(
+      page.getByRole('button', { name: 'Завершить тренировку' }),
+      page.locator('#appBottomNav'),
+    );
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
     const numberInputs = currentSet.locator('input[type="number"]:visible');

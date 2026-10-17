@@ -1215,7 +1215,22 @@ export function TodayDashboard({
 
   useEffect(() => {
     if (!detailsOpen) return;
-    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    const details = detailsRef.current;
+    details?.scrollIntoView?.({ behavior: 'instant', block: 'start' });
+    const action = details?.querySelector<HTMLElement>(
+      '.active-workout-set.is-current [data-workout-field="done"]',
+    );
+    const dock = document.getElementById('appBottomNav');
+    if (!action || !dock) return;
+    const viewport = window.visualViewport;
+    const viewportTop = viewport?.offsetTop ?? 0;
+    const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+    const dockRect = dock.getBoundingClientRect();
+    if (dockRect.top <= viewportTop || dockRect.height >= viewportBottom) return;
+    const actionRect = action.getBoundingClientRect();
+    const safeBottom = Math.min(viewportBottom, dockRect.top) - 8;
+    if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom)
+      window.scrollBy({ top: Math.ceil(actionRect.bottom - safeBottom), behavior: 'instant' });
   }, [detailsOpen]);
 
   const requestedRecoveryWorkoutId = Number(new URLSearchParams(search).get('recovery_workout_id'));
