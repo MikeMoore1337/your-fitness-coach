@@ -124,11 +124,10 @@ def test_python_shard_collects_and_runs_only_its_node_ids(monkeypatch, tmp_path:
         shard="2/4",
     )
 
-    assert calls[1][-2:] == ["--collect-only", "-q"]
-    assert calls[2][2:4] == [
-        "backend/tests/test_b.py::test_b",
-        "bot/tests/test_f.py::test_f",
-    ]
+    assert len(calls) == 2  # uv lock + one pytest invocation, no collect-only subprocess.
+    assert "--collect-only" not in calls[1]
+    assert calls[1][2:4] == ["backend/tests", "bot/tests"]
+    assert calls[1][-4:] == ["-p", "scripts.pytest_shard", "--yfc-shard", "2/4"]
 
 
 def test_local_sqlite_python_checks_use_one_windows_worker(monkeypatch) -> None:
