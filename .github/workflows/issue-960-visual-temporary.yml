@@ -1,0 +1,58 @@
+name: Issue 960 temporary visual evidence
+on:
+  push:
+    branches:
+      - codex/issue-960-rest-implementation
+    paths:
+      - .github/workflows/issue-960-visual-temporary.yml
+
+permissions:
+  contents: write
+
+jobs:
+  capture-visuals:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          ref: codex/issue-960-rest-implementation
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+      - name: Capture genuine browser screenshots
+        working-directory: frontend
+        env:
+          YFC_CAPTURE_960_AFTER: '1'
+        run: npx playwright test active-workout-experience.spec.ts --project=chromium --grep 'issue960-visual' --workers=1 --reporter=line
+      - name: Format evidence test and commit browser images
+        run: |
+          cd frontend
+          npx prettier --write tests/e2e/active-workout-experience.spec.ts
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/tests/e2e/active-workout-experience.spec.ts docs/ux/issue-960-implementation/visuals
+          git commit -m "ci-issue960-visual-evidence"
+          git push origin HEAD:codex/issue-960-rest-implementation
+      - name: Upload browser screenshots and failure reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue960-visual-capture
+          path: |
+            docs/ux/issue-960-implementation/visuals
+            frontend/test-results
+          if-no-files-found: ignore
