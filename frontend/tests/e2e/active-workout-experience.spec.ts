@@ -4746,3 +4746,55 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
   await page.screenshot({ path: `${packagePath}/mobile-light-completed.png`, fullPage: true });
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 393, 430]) {
+    test(`issue960-visual ${theme} ${width}px actual rest and recovery`, async ({ page }) => {
+      test.skip(process.env.YFC_CAPTURE_960_AFTER !== '1', 'Run only for owner visual evidence');
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const started = new Date('2026-10-17T12:00:00Z');
+      await page.clock.setFixedTime(started);
+      await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const set = page.locator('[data-workout-set-id="201"]');
+      await set.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
+      await set.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
+      await set.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+      const rest = page.locator('.active-workout-rest');
+      await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(rest).toContainText('Факт');
+      const folder = resolve(process.cwd(), '..', 'docs', 'ux', 'issue-960-implementation', 'visuals');
+      await mkdir(folder, { recursive: true });
+      await page.screenshot({
+        path: resolve(folder, `after-${theme}-${width}-actual.png`),
+        animations: 'disabled',
+      });
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'hidden',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.clock.setFixedTime(new Date(started.getTime() + 17 * 60_000));
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'visible',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      const review = rest.getByRole('group', { name: 'Уточнение фактического отдыха' });
+      await expect(review).toBeVisible();
+      await expect(review).toContainText('Вы забыли завершить отдых?');
+      await page.screenshot({
+        path: resolve(folder, `after-${theme}-${width}-recovery.png`),
+        animations: 'disabled',
+      });
+    });
+  }
+}
