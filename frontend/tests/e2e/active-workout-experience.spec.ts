@@ -1042,6 +1042,10 @@ test.describe('#1001 completion navigation', () => {
             )
             .toBeLessThanOrEqual(1);
           if (id === 202) await setNetworkOffline(page, false);
+          // Wait for the server to persist the offline completion before starting
+          // the next held-autosave scenario. Queue length zero alone can precede
+          // the server acknowledgement and lead to a stale current-set reload.
+          await expect.poll(() => server.readSet(id).is_completed).toBe(true);
           await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
           await page.evaluate(() => {
             Object.assign(window.visualViewport!, { height: 844 });
