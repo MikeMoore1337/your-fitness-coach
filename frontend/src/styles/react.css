@@ -4546,12 +4546,9 @@ button.today-text-link {
 }
 .active-session-summary {
   display: grid;
-  gap: 12px;
+  gap: 0;
   margin-top: 2px;
-  padding: 13px;
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-control);
-  background: var(--bg-soft);
+  padding: 0;
 }
 .active-session-summary__header,
 .active-session-summary__primary,
@@ -4561,18 +4558,24 @@ button.today-text-link {
   justify-content: space-between;
   gap: 12px;
 }
-.active-session-summary__header > div,
+.active-session-summary__header > h4,
 .active-session-summary__primary > div {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
+.active-session-summary__header > h4 {
+  width: 100%;
+  margin: 0;
+}
 .active-session-summary__toggle {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  width: 100%;
   min-height: var(--touch-target);
-  padding: 6px 0;
+  padding: 0;
   border: 0;
   border-radius: var(--radius-action);
   background: transparent;
@@ -4587,7 +4590,6 @@ button.today-text-link {
   outline: 2px solid var(--focus-ring);
   outline-offset: 3px;
 }
-.active-session-summary__eyebrow,
 .active-session-summary__primary > div > span,
 .active-session-summary__facts span,
 .active-session-summary__section-label > span {
@@ -4602,7 +4604,7 @@ button.today-text-link {
   line-height: 1.1;
 }
 .active-session-summary__state {
-  flex: 0 0 auto;
+  justify-self: end;
   padding: 5px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -4622,6 +4624,11 @@ button.today-text-link {
 .active-session-summary__details {
   display: grid;
   gap: 12px;
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-control);
+  background: var(--bg-soft);
 }
 .active-session-summary__details[hidden] {
   display: none;
@@ -4682,9 +4689,6 @@ button.today-text-link {
   display: grid;
   gap: 6px;
   padding-top: 2px;
-}
-.active-session-summary > .active-workout-setup-memory {
-  margin-top: 0;
 }
 .active-workout-setup-memory {
   display: grid;

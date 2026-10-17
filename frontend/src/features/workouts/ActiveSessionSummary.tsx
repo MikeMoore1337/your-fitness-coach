@@ -105,29 +105,25 @@ export function ActiveSessionSummary({
       aria-labelledby={`active-session-summary-${exercise.id}-title`}
     >
       <header className="active-session-summary__header">
-        <div>
-          <span className="active-session-summary__eyebrow">Следующее действие</span>
-          <h4 id={`active-session-summary-${exercise.id}-title`}>
-            <button
-              type="button"
-              className="active-session-summary__toggle"
-              aria-controls={detailsId}
-              aria-expanded={open}
-              onClick={() => setOpen((current) => !current)}
-            >
-              <span>Что делать сейчас</span>
-              <Icon aria-hidden="true" name={open ? 'chevron-up' : 'chevron-down'} size={16} />
-            </button>
-          </h4>
-        </div>
+        <h4 id={`active-session-summary-${exercise.id}-title`}>
+          <button
+            type="button"
+            className="active-session-summary__toggle"
+            aria-controls={detailsId}
+            aria-expanded={open}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <span>Что делать сейчас?</span>
+            <Icon aria-hidden="true" name={open ? 'chevron-up' : 'chevron-down'} size={16} />
+          </button>
+        </h4>
+      </header>
+
+      <div className="active-session-summary__details" id={detailsId} hidden={!open}>
         <span className={`active-session-summary__state${online ? '' : ' is-offline'}`}>
           {online ? 'Актуальные данные' : 'Офлайн-снимок'}
         </span>
-      </header>
 
-      {safetyAction && <div className="active-session-summary__safety">{safetyAction}</div>}
-
-      <div className="active-session-summary__details" id={detailsId} hidden={!open}>
         <div className="active-session-summary__primary">
           <div>
             <span>{isCardio ? 'Следующий этап' : 'Следующий подход'}</span>
@@ -193,6 +189,7 @@ export function ActiveSessionSummary({
 
         {setupMemory}
         {adaptation && <div className="active-session-summary__adaptation">{adaptation}</div>}
+        {safetyAction && <div className="active-session-summary__safety">{safetyAction}</div>}
       </div>
     </section>
   );

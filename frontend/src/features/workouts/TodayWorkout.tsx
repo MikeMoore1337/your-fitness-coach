@@ -2334,7 +2334,7 @@ export function TodayWorkout({
 
                 {isCurrentExercise && currentSet && (
                   <ActiveSessionSummary
-                    key={`active-session-summary-${exercise.id}`}
+                    key={`active-session-summary-${exercise.id}-${exercise.exercise_id}`}
                     adaptation={started ? undefined : adaptationEntry}
                     currentSet={currentSet.set}
                     exercise={exercise}

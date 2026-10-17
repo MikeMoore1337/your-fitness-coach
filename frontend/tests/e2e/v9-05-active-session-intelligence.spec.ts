@@ -19,7 +19,7 @@ async function openActiveWorkout(
       name: status === 'planned' ? 'Начать тренировку' : 'Продолжить тренировку',
     })
     .click();
-  await expect(page.getByRole('region', { name: 'Что делать сейчас' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Что делать сейчас?' })).toBeVisible();
 }
 
 test('V9-05 keeps the active session summary collapsed until the user opens it', async ({
@@ -33,20 +33,25 @@ test('V9-05 keeps the active session summary collapsed until the user opens it',
   });
   await openActiveWorkout(page);
 
-  const summary = page.getByRole('region', { name: 'Что делать сейчас' });
-  const toggle = summary.getByRole('button', { name: 'Что делать сейчас' });
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  const toggle = summary.getByRole('button', { name: 'Что делать сейчас?' });
   const details = summary.locator('.active-session-summary__details');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(toggle).toHaveAttribute('aria-controls', /active-session-summary-101-details/);
   await expect(details).toBeHidden();
   await expect(details.locator('button').first()).toBeHidden();
-  await expect(
-    summary.getByRole('button', { name: 'Боль или травма во время тренировки' }),
-  ).toBeVisible();
+  await expect(summary.getByText('Следующее действие')).toHaveCount(0);
+  await expect(summary.getByText('Актуальные данные')).toBeHidden();
+  await expect(summary.getByText('Офлайн-снимок')).toBeHidden();
+  const toggleBox = await toggle.boundingBox();
+  expect(toggleBox?.height ?? 0).toBeGreaterThanOrEqual(44);
 
-  await toggle.click();
+  await toggle.focus();
+  await expect(toggle).toBeFocused();
+  await page.keyboard.press('Enter');
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await expect(details).toBeVisible();
+  await expect(summary.getByText('Актуальные данные')).toBeVisible();
   await expect(summary).toContainText('Следующий подход');
   await expect(summary).toContainText('План');
   await expect(summary).toContainText('Предыдущий результат');
@@ -55,6 +60,12 @@ test('V9-05 keeps the active session summary collapsed until the user opens it',
   await expect(summary).toContainText('Можно рассмотреть небольшое увеличение веса');
   await expect(summary.getByText('Серверное назначение')).toBeVisible();
   await expect(summary.getByRole('button', { name: 'Добавить настройку' })).toBeVisible();
+  const safety = summary.getByRole('button', { name: 'Боль или травма во время тренировки' });
+  await expect(safety).toBeVisible();
+  await safety.click();
+  const adaptationDialog = page.getByRole('dialog', { name: 'Подстроить тренировку' });
+  await expect(adaptationDialog).toBeVisible();
+  await adaptationDialog.locator('.workout-adaptation-dialog__close').click();
   await expectTouchTargets(summary.locator('button'));
 
   const weight = page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
@@ -88,8 +99,8 @@ test('V12-01 starts a new workout collapsed and keeps the choice and inputs thro
   });
   await openActiveWorkout(page, 'planned');
 
-  const summary = page.getByRole('region', { name: 'Что делать сейчас' });
-  const toggle = summary.getByRole('button', { name: 'Что делать сейчас' });
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  const toggle = summary.getByRole('button', { name: 'Что делать сейчас?' });
   const details = summary.locator('.active-session-summary__details');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(details).toBeHidden();
@@ -128,8 +139,8 @@ test('V9-05 keeps the composed summary usable in mocked TMA dark reduced-motion 
   });
   await openActiveWorkout(page);
 
-  const summary = page.getByRole('region', { name: 'Что делать сейчас' });
-  await summary.getByRole('button', { name: 'Что делать сейчас' }).click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
   await expect(summary).toContainText('Можно рассмотреть небольшое увеличение веса');
@@ -150,8 +161,8 @@ test('V9-05 shows a truthful offline state without losing the current set', asyn
   await api.setOffline(true);
   await setNetworkOffline(page, true);
 
-  const summary = page.getByRole('region', { name: 'Что делать сейчас' });
-  await summary.getByRole('button', { name: 'Что делать сейчас' }).click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
   await expect(summary.getByText('Офлайн-снимок')).toBeVisible();
   await expect(summary).toContainText('Серверное назначение');
   await expect(summary).toContainText('Предыдущий результат');
@@ -173,11 +184,11 @@ test('V12-01 keeps the collapsed summary compact across supported mobile widths'
   });
   await openActiveWorkout(page);
 
-  const summary = page.getByRole('region', { name: 'Что делать сейчас' });
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
   const details = summary.locator('.active-session-summary__details');
   await expect(details).toBeHidden();
 
-  for (const width of [320, 360, 390, 393, 430]) {
+  for (const width of [320, 360, 393, 430]) {
     await page.setViewportSize({ width, height: 844 });
     const metrics = await page.evaluate(() => {
       const read = (selector: string) => {

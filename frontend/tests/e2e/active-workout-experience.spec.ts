@@ -1794,6 +1794,13 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await expect(summary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+
   const exercise = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
@@ -1813,6 +1820,12 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Применить' }).click();
   await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  const replacedSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await expect(replacedSummary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(replacedSummary.locator('.active-session-summary__details')).toBeHidden();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
