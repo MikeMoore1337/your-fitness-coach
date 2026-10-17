@@ -29,6 +29,16 @@ import {
   type ActiveWorkoutSetValues,
 } from './activeWorkoutQueue';
 import { legacyWorkoutRestStorageKey } from '../../shared/userScopedStorage';
+import {
+  acknowledgeRestPlan,
+  activeRestJournalSession,
+  beginMeasuredRest,
+  loadRestJournal,
+  listenToRestJournal,
+  restHardCutoffMs,
+  syncRestJournal,
+  updateMeasuredRest,
+} from './restSessions';
 import { hasWorkoutExecutionEvidence, WorkoutAdaptation } from './WorkoutAdaptation';
 import { WorkoutCompletionSummary } from './WorkoutCompletionSummary';
 import { WorkoutRecovery } from './WorkoutRecovery';
@@ -1478,6 +1488,9 @@ export function RestTimer({
     return legacy;
   });
   const [now, setNow] = useState(() => Date.now());
+  const [measuredRest, setMeasuredRest] = useState(() =>
+    activeRestJournalSession(userId, workoutId),
+  );
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState('');
@@ -1489,6 +1502,9 @@ export function RestTimer({
     typeof document !== 'undefined' && document.visibilityState === 'hidden',
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const measuredElapsedSeconds = measuredRest
+    ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
+    : 0;
   const captureLayoutAnchor = useCallback(() => {
     const element = panel.current?.parentElement?.querySelector('.active-workout-exercises');
     if (element) layoutAnchor.current = { element, top: element.getBoundingClientRect().top };
@@ -1506,11 +1522,22 @@ export function RestTimer({
   useEffect(() => {
     const handler = (event: Event) => {
       const detail = (
-        event as CustomEvent<{ workoutId: number; seconds: number; deadline?: number }>
+        event as CustomEvent<{
+          workoutId: number;
+          setId?: number;
+          seconds: number;
+          deadline?: number;
+        }>
       ).detail;
       if (!detail || detail.workoutId !== workoutId) return;
-      const nextDeadline = detail.deadline ?? Date.now() + detail.seconds * 1000;
-      setNow(Date.now());
+      const acceptedAt = Date.now();
+      const started = detail.setId
+        ? beginMeasuredRest(userId, workoutId, detail.setId, detail.seconds, acceptedAt)
+        : null;
+      const nextDeadline =
+        started?.deadline ?? detail.deadline ?? acceptedAt + detail.seconds * 1000;
+      setMeasuredRest(started);
+      setNow(acceptedAt);
       setDeadline(nextDeadline);
       setCompletedNotice(null);
       setCompact(false);
@@ -1521,7 +1548,48 @@ export function RestTimer({
     };
     window.addEventListener('fit:rest', handler);
     return () => window.removeEventListener('fit:rest', handler);
-  }, [storageKey, workoutId]);
+  }, [storageKey, userId, workoutId]);
+  useEffect(() => {
+    let retryTimer: number | undefined;
+    const hasPending = () =>
+      loadRestJournal(userId, workoutId).some((item) => !item.server_id || item.pending.length > 0);
+    const sync = () => {
+      if (hasPending()) {
+        void syncRestJournal(userId, workoutId).catch(() => {
+          // Keep the durable offline journal for the next retry.
+        });
+      }
+    };
+    const scheduleRetry = () => {
+      if (hasPending() && retryTimer === undefined) {
+        retryTimer = window.setInterval(() => {
+          if (!hasPending()) {
+            if (retryTimer !== undefined) window.clearInterval(retryTimer);
+            retryTimer = undefined;
+          } else if (navigator.onLine) sync();
+        }, 15000);
+      }
+    };
+    const refresh = () => {
+      setMeasuredRest(activeRestJournalSession(userId, workoutId));
+      scheduleRetry();
+      sync();
+    };
+    const unsubscribe = listenToRestJournal(refresh);
+    const reconcile = () => {
+      refresh();
+    };
+    scheduleRetry();
+    sync();
+    window.addEventListener('online', reconcile);
+    window.addEventListener('pageshow', reconcile);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('online', reconcile);
+      window.removeEventListener('pageshow', reconcile);
+      if (retryTimer !== undefined) window.clearInterval(retryTimer);
+    };
+  }, [userId, workoutId]);
   useEffect(() => {
     const flushPendingCompact = () => {
       if (!compactWhenPointersRelease.current || pressedPointers.current.size) return;
@@ -1570,6 +1638,38 @@ export function RestTimer({
       }
       const currentTime = Date.now();
       setNow(currentTime);
+      if (measuredRest?.status === 'running') {
+        const startedAt = Date.parse(measuredRest.started_at);
+        if (currentTime - startedAt >= restHardCutoffMs(measuredRest.adjusted_seconds)) {
+          updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'unknown', currentTime);
+          removeStorage(storageKey);
+          setDeadline(0);
+          setMeasuredRest(null);
+          setCompletedNotice('Нет достоверного замера отдыха');
+          compactNotice();
+          return;
+        }
+        if (deadline <= currentTime && !measuredRest.notified) {
+          acknowledgeRestPlan(userId, workoutId, measuredRest.source_set_id);
+          setAnnouncement('Плановый отдых завершён');
+          const wasHidden = wasBackgrounded.current || document.visibilityState === 'hidden';
+          if (
+            wasHidden &&
+            typeof Notification !== 'undefined' &&
+            Notification.permission === 'granted'
+          ) {
+            new Notification('Плановый отдых завершён', {
+              body: 'Далее: ' + nextLabel,
+              tag: 'fit-rest-' + workoutId + '-' + measuredRest.source_set_id,
+            });
+          }
+          wasBackgrounded.current = false;
+          haptic('success');
+        }
+        // Keep counting until the user explicitly stops the interval.
+        timer = window.setTimeout(update, 1000);
+        return;
+      }
       if (deadline <= currentTime) {
         if (expired) return;
         expired = true;
@@ -1603,7 +1703,7 @@ export function RestTimer({
       document.removeEventListener('visibilitychange', update);
       window.removeEventListener('pageshow', update);
     };
-  }, [compactNotice, deadline, nextLabel, storageKey, workoutId]);
+  }, [compactNotice, deadline, measuredRest, nextLabel, storageKey, userId, workoutId]);
   useLayoutEffect(() => {
     const anchor = layoutAnchor.current;
     layoutAnchor.current = null;
@@ -1636,6 +1736,39 @@ export function RestTimer({
         <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
         <span>{nextPosition}</span>
       </div>
+      {measuredRest && !compact && (
+        <div className="active-workout-rest__actual">
+          <div className="active-workout-rest__actual-value">
+            <span>Факт</span>
+            <strong aria-label="Время по отметке пользователя" aria-live="off">
+              {formatWorkoutDuration(measuredElapsedSeconds)}
+            </strong>
+          </div>
+          <button
+            className="active-workout-rest__stop"
+            type="button"
+            aria-label="Завершить отдых"
+            onClick={() => {
+              const stoppedAt = Date.now();
+              updateMeasuredRest(
+                userId,
+                workoutId,
+                measuredRest.source_set_id,
+                'complete',
+                stoppedAt,
+              );
+              setMeasuredRest(null);
+              removeStorage(storageKey);
+              setDeadline(0);
+              setNow(stoppedAt);
+              setCompletedNotice('Отдых завершён по отметке');
+              compactNotice();
+            }}
+          >
+            Стоп
+          </button>
+        </div>
+      )}
       <div className="active-workout-rest__actions" hidden={compact}>
         {[30, 60].map((extraSeconds) => (
           <Button
@@ -1649,7 +1782,18 @@ export function RestTimer({
             onClick={() => {
               if (!deadline || completedNotice) return;
               const currentTime = Date.now();
-              const nextDeadline = Math.max(deadline, currentTime) + extraSeconds * 1000;
+              const nextSession = measuredRest
+                ? updateMeasuredRest(
+                    userId,
+                    workoutId,
+                    measuredRest.source_set_id,
+                    extraSeconds === 30 ? 'add30' : 'add60',
+                    currentTime,
+                  )
+                : null;
+              const nextDeadline =
+                nextSession?.deadline ?? Math.max(deadline, currentTime) + extraSeconds * 1000;
+              if (nextSession) setMeasuredRest(nextSession);
               setNow(currentTime);
               setDeadline(nextDeadline);
               writeStorage(storageKey, nextDeadline);
@@ -1667,6 +1811,10 @@ export function RestTimer({
           tabIndex={completedNotice ? -1 : undefined}
           onClick={() => {
             if (completedNotice) return;
+            if (measuredRest) {
+              updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
+              setMeasuredRest(null);
+            }
             removeStorage(storageKey);
             setDeadline(0);
             setNow(Date.now());

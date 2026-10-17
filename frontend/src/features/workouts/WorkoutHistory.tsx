@@ -14,6 +14,46 @@ import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
 
+interface RestHistoryEntry {
+  source_set_id: number;
+  status: string;
+  planned_seconds: number;
+  adjusted_seconds: number;
+  measured_seconds: number | null;
+}
+
+function restDuration(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
+  if (!sessions?.length) {
+    return <p className="muted">Отдых: нет достоверных замеров.</p>;
+  }
+  return (
+    <details className="workout-history__rest">
+      <summary>
+        Отдых по подходам · {sessions.filter((row) => row.status === 'completed').length} замеров
+      </summary>
+      <ul>
+        {sessions.map((row) => (
+          <li key={row.source_set_id}>
+            План {restDuration(row.planned_seconds)}
+            {row.adjusted_seconds !== row.planned_seconds
+              ? ` · скорректирован до ${restDuration(row.adjusted_seconds)}`
+              : ''}
+            {' · '}
+            {row.status === 'completed' && row.measured_seconds !== null
+              ? `по отметке ${restDuration(row.measured_seconds)} (разница ${row.measured_seconds - row.adjusted_seconds > 0 ? '+' : ''}${row.measured_seconds - row.adjusted_seconds} с)`
+              : 'нет достоверного замера'}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 const HISTORY_PAGE_SIZE = 10;
 const adaptationReasonLabels: Record<string, string> = {
   limited_time: 'мало времени',
@@ -185,6 +225,59 @@ export function WorkoutHistory({
                         </button>
                       ))}
                     </div>
+                    <RestHistory
+                      sessions={
+                        (item as WorkoutHistoryItem & { rest_sessions?: RestHistoryEntry[] })
+                          .rest_sessions
+                      }
+                    />
+                    {(
+                      item as WorkoutHistoryItem & {
+                        rest_sessions?: Array<{
+                          id: number;
+                          planned_seconds: number;
+                          adjusted_seconds: number;
+                          measured_seconds: number | null;
+                          status: string;
+                          source: string | null;
+                        }>;
+                      }
+                    ).rest_sessions?.length ? (
+                      <div className="workout-history__rest-log" aria-label="Отдых между подходами">
+                        <strong>Отдых по отметке пользователя</strong>
+                        {(
+                          item as WorkoutHistoryItem & {
+                            rest_sessions: Array<{
+                              id: number;
+                              planned_seconds: number;
+                              adjusted_seconds: number;
+                              measured_seconds: number | null;
+                              status: string;
+                              source: string | null;
+                            }>;
+                          }
+                        ).rest_sessions.map((rest, index) => {
+                          const measured =
+                            rest.status === 'completed' ? rest.measured_seconds : null;
+                          const delta = measured === null ? null : measured - rest.adjusted_seconds;
+                          const minutes = (seconds: number) =>
+                            `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+                          return (
+                            <p className="muted" key={rest.id}>
+                              {index + 1}. План {minutes(rest.planned_seconds)}
+                              {rest.adjusted_seconds !== rest.planned_seconds
+                                ? ` (скорректирован: ${minutes(rest.adjusted_seconds)})`
+                                : ''}
+                              {' · '}
+                              {measured === null
+                                ? 'Нет достоверного замера'
+                                : `По отметке: ${minutes(measured)}, отклонение ${delta! >= 0 ? '+' : ''}${delta} сек`}
+                              {rest.source === 'USER_CORRECTED' ? ' · Исправлено вручную' : ''}
+                            </p>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                     {item.adaptations.map((adaptation) => (
                       <p className="workout-history__adaptation" key={adaptation.id}>
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}

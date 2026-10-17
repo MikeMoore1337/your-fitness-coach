@@ -5,6 +5,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.v1.workout_rest import _as_response as serialize_rest_session
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
@@ -17,6 +18,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.schemas.cardio import (
     CardioSessionCreate,
     CardioSessionResponse,
@@ -1516,6 +1518,18 @@ def workout_history(
         .all()
     )
 
+    rest_by_workout: dict[int, list] = {workout.id: [] for workout in workouts}
+    if rest_by_workout:
+        for rest_row in (
+            db.query(WorkoutRestSession)
+            .filter(
+                WorkoutRestSession.user_id == current_user.id,
+                WorkoutRestSession.workout_id.in_(rest_by_workout),
+            )
+            .order_by(WorkoutRestSession.started_at.asc(), WorkoutRestSession.id.asc())
+            .all()
+        ):
+            rest_by_workout[rest_row.workout_id].append(serialize_rest_session(rest_row))
     rows = []
     for item in workouts:
         sets = [set_row for exercise in item.exercises for set_row in exercise.sets]
@@ -1538,6 +1552,7 @@ def workout_history(
                 "volume_kg": round(volume_kg, 1),
                 "completion_feedback": item.completion_feedback,
                 "completion_note": item.completion_note,
+                "rest_sessions": rest_by_workout.get(item.id, []),
                 "exercises": [
                     {
                         "workout_exercise_id": exercise.id,
