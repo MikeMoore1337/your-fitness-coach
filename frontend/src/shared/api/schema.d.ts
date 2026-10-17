@@ -3308,6 +3308,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/{workout_id}/rest-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Rest Sessions */
+        get: operations["list_rest_sessions_api_v1_workouts__workout_id__rest_sessions_get"];
+        put?: never;
+        /** Start Rest Session */
+        post: operations["start_rest_session_api_v1_workouts__workout_id__rest_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workouts/rest-sessions/{session_id}/actions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mutate Rest Session */
+        post: operations["mutate_rest_session_api_v1_workouts_rest_sessions__session_id__actions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/check-ins/daily": {
         parameters: {
             query?: never;
@@ -14919,6 +14954,17 @@ export interface components {
             check_ins: components["schemas"]["ProgressReportCheckIn"][];
             wellbeing?: components["schemas"]["DailyWellbeingReport"] | null;
         };
+        /** ProgressReportRestSummary */
+        ProgressReportRestSummary: {
+            /** Observation Count */
+            observation_count: number;
+            /** Mean Seconds */
+            mean_seconds?: number | null;
+            /** Median Seconds */
+            median_seconds?: number | null;
+            /** Mean Difference Seconds */
+            mean_difference_seconds?: number | null;
+        };
         /** ProgressReportSubject */
         ProgressReportSubject: {
             /** Name */
@@ -14951,6 +14997,7 @@ export interface components {
             new_personal_records: number;
             /** Exercises */
             exercises: components["schemas"]["ProgressReportExerciseTrend"][];
+            rest?: components["schemas"]["ProgressReportRestSummary"] | null;
         };
         /** ProgressReportTrainingBlock */
         ProgressReportTrainingBlock: {
@@ -15917,6 +15964,74 @@ export interface components {
             report: components["schemas"]["ReportHandoffProgressReport"];
             /** Data Changed Since Send */
             data_changed_since_send: boolean;
+        };
+        /** RestActionRequest */
+        RestActionRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add30" | "add60" | "complete" | "skip" | "interrupt" | "unknown";
+            /** Mutation Id */
+            mutation_id: string;
+            /** Expected Version */
+            expected_version: number;
+            /** Ended At */
+            ended_at?: string | null;
+            /** Occurred At */
+            occurred_at?: string | null;
+            /**
+             * Corrected
+             * @default false
+             */
+            corrected: boolean;
+            /** Corrected Seconds */
+            corrected_seconds?: number | null;
+        };
+        /** RestSessionResponse */
+        RestSessionResponse: {
+            /** Id */
+            id: number;
+            /** Workout Id */
+            workout_id: number;
+            /** Source Set Id */
+            source_set_id: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Ended At */
+            ended_at: string | null;
+            /** Planned Seconds */
+            planned_seconds: number;
+            /** Adjusted Seconds */
+            adjusted_seconds: number;
+            /** Measured Seconds */
+            measured_seconds: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "completed" | "skipped" | "interrupted" | "unknown";
+            /** Source */
+            source: string | null;
+            /** Quality */
+            quality: string;
+            /** Version */
+            version: number;
+        };
+        /** RestStartRequest */
+        RestStartRequest: {
+            /** Source Set Id */
+            source_set_id: number;
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Mutation Id */
+            mutation_id: string;
         };
         /** RirDistributionBucket */
         RirDistributionBucket: {
@@ -17668,6 +17783,8 @@ export interface components {
             exercises: components["schemas"]["WorkoutHistoryExerciseItem"][];
             /** Adaptations */
             adaptations: components["schemas"]["WorkoutAdaptationHistoryItem"][];
+            /** Rest Sessions */
+            rest_sessions?: components["schemas"]["RestSessionResponse"][];
         };
         /** WorkoutHistorySummary */
         WorkoutHistorySummary: {
@@ -25012,6 +25129,107 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_rest_sessions_api_v1_workouts__workout_id__rest_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_rest_session_api_v1_workouts__workout_id__rest_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                workout_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mutate_rest_session_api_v1_workouts_rest_sessions__session_id__actions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestActionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
             };
             /** @description Validation Error */
             422: {
