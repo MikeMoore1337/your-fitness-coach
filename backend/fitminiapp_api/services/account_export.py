@@ -843,9 +843,16 @@ def build_account_export(db: Session, user: User) -> dict[str, object]:
             _fields(
                 row,
                 (
-                    "id", "source_set_id", "started_at", "ended_at",
-                    "planned_seconds", "adjusted_seconds", "measured_seconds",
-                    "status", "source", "quality",
+                    "id",
+                    "source_set_id",
+                    "started_at",
+                    "ended_at",
+                    "planned_seconds",
+                    "adjusted_seconds",
+                    "measured_seconds",
+                    "status",
+                    "source",
+                    "quality",
                 ),
             )
         )
