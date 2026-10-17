@@ -3,7 +3,6 @@
 from types import SimpleNamespace
 
 import pytest
-
 from scripts import pytest_shard
 
 
