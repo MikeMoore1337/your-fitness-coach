@@ -1,0 +1,114 @@
+[
+  {
+    "name": "recomposition_strength_cardio",
+    "input": {
+      "sex": "male",
+      "weight_kg": 78,
+      "height_cm": 165,
+      "age": 34,
+      "daily_routine": "mixed",
+      "steps_range": "from_4000_to_7000",
+      "strength_trainings_per_week": 4,
+      "strength_training_duration_minutes": 60,
+      "strength_training_type": "regular",
+      "strength_rest": "two_to_three",
+      "cardio_trainings": [
+        {
+          "kind": "running",
+          "trainings_per_week": 3,
+          "duration_minutes": 30,
+          "intensity": "moderate"
+        }
+      ],
+      "goal": "recomposition"
+    },
+    "expected": {
+      "calories": 2330,
+      "protein_g": 156,
+      "fat_g": 62,
+      "carbs_g": 287
+    }
+  },
+  {
+    "name": "fat_loss_sedentary_male",
+    "input": {
+      "sex": "male",
+      "weight_kg": 80,
+      "height_cm": 180,
+      "age": 30,
+      "daily_routine": "mostly_sitting",
+      "steps_range": "up_to_4000",
+      "strength_trainings_per_week": 0,
+      "strength_training_duration_minutes": 60,
+      "strength_training_type": "regular",
+      "strength_rest": "varied",
+      "cardio_trainings": [],
+      "goal": "fat_loss"
+    },
+    "expected": {
+      "calories": 1820,
+      "protein_g": 176,
+      "fat_g": 64,
+      "carbs_g": 135
+    }
+  },
+  {
+    "name": "maintenance_sedentary_female",
+    "input": {
+      "sex": "female",
+      "weight_kg": 64,
+      "height_cm": 168,
+      "age": 28,
+      "daily_routine": "mostly_sitting",
+      "steps_range": "up_to_4000",
+      "strength_trainings_per_week": 0,
+      "strength_training_duration_minutes": 60,
+      "strength_training_type": "regular",
+      "strength_rest": "varied",
+      "cardio_trainings": [],
+      "goal": "maintenance"
+    },
+    "expected": {
+      "calories": 1670,
+      "protein_g": 115,
+      "fat_g": 58,
+      "carbs_g": 172
+    }
+  },
+  {
+    "name": "infeasible_high_bodyweight",
+    "input": {
+      "sex": "female",
+      "weight_kg": 350,
+      "height_cm": 100,
+      "age": 100,
+      "daily_routine": "mostly_sitting",
+      "steps_range": "up_to_4000",
+      "strength_trainings_per_week": 0,
+      "strength_training_duration_minutes": 60,
+      "strength_training_type": "regular",
+      "strength_rest": "varied",
+      "cardio_trainings": [],
+      "goal": "fat_loss"
+    },
+    "expected": null
+  },
+  {
+    "name": "infeasible_below_budget_at_high_bmi",
+    "input": {
+      "sex": "female",
+      "weight_kg": 160,
+      "height_cm": 170,
+      "age": 65,
+      "daily_routine": "mostly_sitting",
+      "steps_range": "up_to_4000",
+      "strength_trainings_per_week": 0,
+      "strength_training_duration_minutes": 60,
+      "strength_training_type": "regular",
+      "strength_rest": "varied",
+      "cardio_trainings": [],
+      "goal": "fat_loss"
+    },
+    "expected": null
+  }
+]
