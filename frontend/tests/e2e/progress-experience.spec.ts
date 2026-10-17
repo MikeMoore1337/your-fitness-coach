@@ -54,6 +54,9 @@ const ISSUE_970_AFTER_DIR = resolve(
   '970-report-mobile-20261013',
   'after',
 );
+const CAPTURE_1049_EVIDENCE = process.env.CAPTURE_1049_EVIDENCE === '1';
+const CAPTURE_1049_BEFORE_EVIDENCE = process.env.CAPTURE_1049_BEFORE_EVIDENCE === '1';
+const ISSUE_1049_EVIDENCE_DIR = resolve(WORKTREE_ROOT, '.artifacts', 'tasks', '1049', 'evidence');
 
 type DateVisualMetrics = {
   contentWidth: number;
@@ -1246,6 +1249,20 @@ test('muscle workload groups use compact cards without changing analytics or dri
         )
         .toBe(true);
       await expect(workload).toBeVisible();
+      const textColors = await workload.evaluate((element) => {
+        const title = element.querySelector<HTMLElement>('.progress-exercise > summary strong');
+        const value = element.querySelector<HTMLElement>('.progress-exercise__best');
+        const heading = element
+          .closest('.progress-subsection')
+          ?.querySelector<HTMLElement>('.progress-subsection__head h3');
+        return {
+          title: title ? getComputedStyle(title).color : null,
+          value: value ? getComputedStyle(value).color : null,
+          heading: heading ? getComputedStyle(heading).color : null,
+        };
+      });
+      expect(textColors.title).toBe(textColors.value);
+      expect(textColors.heading).toBe(textColors.value);
     }
   }
 
@@ -1310,6 +1327,167 @@ test('captures synthetic #1050 muscle workload before/after evidence', async ({ 
   await section.screenshot({
     path: resolve(ISSUE_1050_EVIDENCE_DIR, `${CAPTURE_1050_PHASE}-mobile-393-light-open.png`),
   });
+});
+
+test('Progress has no decorative one-sided lime rails across themes and widths', async ({
+  page,
+}) => {
+  await mockProgress(page);
+  const viewports = [
+    { width: 320, height: 780 },
+    { width: 360, height: 800 },
+    { width: 393, height: 852 },
+    { width: 430, height: 932 },
+    { width: 1440, height: 900 },
+  ];
+
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.goto('/app?section=progress');
+  await expect(page.getByRole('button', { name: 'Клиент' })).toBeVisible();
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    const detailBack = page.locator('.progress-detail-header__back');
+    if (await detailBack.isVisible()) {
+      await detailBack.click();
+    }
+    await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator('.progress-insights__column--good')).toBeVisible();
+      const contract = await page.evaluate(() => {
+        const root = document.querySelector<HTMLElement>('.progress-experience');
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--v2-lime)';
+        document.body.append(probe);
+        const lime = getComputedStyle(probe).color;
+        probe.remove();
+        const allowed = (element: HTMLElement) =>
+          Boolean(
+            element.closest(
+              '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta',
+            ),
+          );
+        const violations: string[] = [];
+        for (const element of Array.from(root?.querySelectorAll<HTMLElement>('*') ?? [])) {
+          const style = getComputedStyle(element);
+          const sides = [
+            ['left', style.borderLeftWidth, style.borderLeftColor],
+            ['right', style.borderRightWidth, style.borderRightColor],
+            ['top', style.borderTopWidth, style.borderTopColor],
+            ['bottom', style.borderBottomWidth, style.borderBottomColor],
+          ].filter(([, width, color]) => Number.parseFloat(width ?? '0') >= 3 && color === lime);
+          if (sides.length === 1 && !allowed(element)) {
+            violations.push(`${element.className}:border-${sides[0]?.[0]}`);
+          }
+          const shadow = style.boxShadow;
+          if (shadow.includes('inset') && shadow.includes(lime)) {
+            const edgeShadow = shadow.match(/inset\s+(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px/);
+            if (
+              edgeShadow &&
+              ((Math.abs(Number(edgeShadow[1] ?? 0)) >= 3 &&
+                Math.abs(Number(edgeShadow[2] ?? 0)) < 3) ||
+                (Math.abs(Number(edgeShadow[2] ?? 0)) >= 3 &&
+                  Math.abs(Number(edgeShadow[1] ?? 0)) < 3)) &&
+              !allowed(element)
+            ) {
+              violations.push(`${element.className}:inset-shadow`);
+            }
+          }
+        }
+        const good = root?.querySelector<HTMLElement>('.progress-insights__column--good');
+        const confidence = root?.querySelector<HTMLElement>('.data-confidence--sufficient');
+        return {
+          violations,
+          goodBorderLeftWidth: good ? getComputedStyle(good).borderLeftWidth : null,
+          confidenceBorderLeftWidth: confidence
+            ? getComputedStyle(confidence).borderLeftWidth
+            : null,
+          confidenceBorderLeftColor: confidence
+            ? getComputedStyle(confidence).borderLeftColor
+            : null,
+          confidenceBorderTopColor: confidence ? getComputedStyle(confidence).borderTopColor : null,
+          lime,
+        };
+      });
+      expect(contract.violations).toEqual([]);
+      expect(contract.goodBorderLeftWidth).not.toBe('3px');
+      expect(contract.confidenceBorderLeftWidth).toBe('1px');
+      expect(contract.confidenceBorderLeftColor).toBe(contract.confidenceBorderTopColor);
+      expect(contract.confidenceBorderLeftColor).not.toBe(contract.lime);
+
+      if (CAPTURE_1049_BEFORE_EVIDENCE && viewport.width >= 1440) {
+        const baselineStyle = await page.addStyleTag({
+          content:
+            '.app-section--progress .progress-insights__column--good { border-left: 3px solid var(--v2-lime) !important; }',
+        });
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        await page.locator('.progress-experience').screenshot({
+          path: resolve(
+            ISSUE_1049_EVIDENCE_DIR,
+            colorScheme + '-desktop-1440x900-before-origin-master.png',
+          ),
+        });
+        await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
+      }
+
+      if (CAPTURE_1049_EVIDENCE && viewport.width === 393) {
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        const goodCard = page.locator('.progress-insights__column--good');
+        const baselineStyle = await page.addStyleTag({
+          content:
+            '.app-section--progress .progress-insights__column--good { border-left: 3px solid var(--v2-lime) !important; }',
+        });
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-good.png'),
+        });
+        await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-good.png'),
+        });
+
+        const confidenceCard = page.locator('.data-confidence--sufficient').first();
+        const historicalConfidenceRail = await page.addStyleTag({
+          content:
+            '.app-section--progress .data-confidence { border-inline-start-width: 3px !important; border-inline-start-color: var(--v2-lime) !important; }',
+        });
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-confidence.png'),
+        });
+        await historicalConfidenceRail.evaluate((element) =>
+          element.parentNode?.removeChild(element),
+        );
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-confidence.png'),
+        });
+      }
+
+      if (CAPTURE_1049_EVIDENCE && viewport.width >= 1440) {
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        await page.locator('.progress-experience').screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-desktop-1440x900-after.png'),
+        });
+      }
+    }
+
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тренировки/ })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    const trainingContract = await page.locator('.progress-experience').evaluate((root) => {
+      const cards = Array.from(root.querySelectorAll<HTMLElement>('.program-history-workout'));
+      return cards.map((card) => getComputedStyle(card).boxShadow);
+    });
+    expect(trainingContract.every((shadow) => shadow === 'none')).toBe(true);
+  }
 });
 
 test('shared data confidence keeps analytics factual, responsive and explicit while refreshing', async ({
@@ -1399,8 +1577,8 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
         : null,
     };
   });
-  expect(visualContract.sufficientBoundary).toBe(visualContract.lime);
-  expect(visualContract.limitedBoundary).toBe(visualContract.lime);
+  expect(visualContract.sufficientBoundary).not.toBe(visualContract.lime);
+  expect(visualContract.limitedBoundary).not.toBe(visualContract.lime);
   expect(visualContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
   for (const viewport of [

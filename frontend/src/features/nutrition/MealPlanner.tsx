@@ -724,7 +724,7 @@ export function MealPlanner({
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="meal-planner__summary yfc-disclosure-summary">
+      <summary aria-expanded={open} className="meal-planner__summary yfc-disclosure-summary">
         <span>
           <span className="eyebrow">Планирование питания</span>
           <strong>План питания</strong>

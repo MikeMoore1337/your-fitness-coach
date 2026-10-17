@@ -64,6 +64,19 @@ async function expectLimeStartBoundary(locator: Locator) {
   expect(colors.boundary).toBe(colors.lime);
 }
 
+async function expectNeutralStartBoundary(locator: Locator) {
+  const boundary = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      width: style.borderInlineStartWidth,
+      start: style.borderInlineStartColor,
+      top: style.borderTopColor,
+    };
+  });
+  expect(boundary.width).toBe('1px');
+  expect(boundary.start).toBe(boundary.top);
+}
+
 test('TMA auth, shared UI, theme, viewport, safe areas and BackButton stay on one platform contract', async ({
   browserName,
   mobilePage,
@@ -1318,7 +1331,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     await expect(insufficient).toBeVisible();
     await expect(insufficient).toContainText('0 рабочих подходов');
     await expect(page.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-    await expectLimeStartBoundary(insufficient);
+    await expectNeutralStartBoundary(insufficient);
     await expectNoHorizontalOverflow(page);
     await expectTouchTargets(
       page.locator('#progress-training .data-confidence__details > summary:visible'),
@@ -1401,7 +1414,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(limited).toBeVisible();
   await expect(limited).toContainText('1 рабочий подход в 1 тренировке');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toBeVisible();
-  await expectLimeStartBoundary(limited);
+  await expectNeutralStartBoundary(limited);
   await expectNoHorizontalOverflow(tmaPage);
   await expectTouchTargets(limited.locator('.data-confidence__details > summary'));
   await limited.screenshot({
@@ -1414,7 +1427,7 @@ test('data confidence keeps limited and stale transitions explicit in TMA', asyn
   await expect(stale).toBeVisible();
   await expect(stale).toContainText('Новые данные загружаются');
   await expect(training.getByRole('link', { name: 'Открыть тренировку' })).toHaveCount(0);
-  await expectLimeStartBoundary(stale);
+  await expectNeutralStartBoundary(stale);
   await expectNoHorizontalOverflow(tmaPage);
   // Period changes move the card through the floating dock; verify its reachable reading position.
   await stale.evaluate((element) =>
@@ -2586,10 +2599,15 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
 
   for (const currentPage of [tmaPage, mobilePage]) {
     await currentPage.locator('details.nutrition-target-settings > summary').click();
-    await currentPage
-      .locator('details.nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    const targetSettings = currentPage.locator('details.nutrition-target-settings');
+    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
+    await expect(
+      targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+    ).toBeVisible();
     if (currentPage === mobilePage) {
       await expect(currentPage.getByText('Назначено тренером', { exact: true })).toBeVisible();
       await expect(
@@ -2674,6 +2692,15 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
   if ((await targetCard.getAttribute('open')) === null) {
     await targetCard.locator(':scope > summary').click();
   }
+  await targetCard.locator(':scope > summary').click();
+  await expect(targetCard).not.toHaveAttribute('open', '');
+  await targetCard.locator(':scope > summary').click();
+  await expect(targetCard).toHaveAttribute('open', '');
+  await expect(targetCard.getByRole('button', { name: 'Указать вручную' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(tmaPage.getByText('Калории 2100 → 1200 ккал')).toBeAttached();
   for (const viewport of Object.values(MOBILE_CONTEXTS)) {
     await tmaPage.setViewportSize(viewport);
     await tma.setViewport(viewport.height, viewport.height);
@@ -2681,26 +2708,37 @@ test('manual nutrition targets validate, preserve keyboard flow and expose effec
       await targetCard.locator(':scope > summary').click();
     }
     await expect(targetCard).toHaveAttribute('open', '');
-    const formCard = targetCard.locator('details').filter({ hasText: 'Рассчитайте ориентир' });
-    if ((await formCard.getAttribute('open')) === null) {
-      await formCard.locator(':scope > summary').click();
-    }
+    await expect(targetCard.locator('details.card-disclosure')).toHaveCount(0);
     await expectNoHorizontalOverflow(tmaPage);
-    await expectTouchTargets(formCard.locator('.nutrition-target-mode > button'));
+    await expectTouchTargets(targetCard.locator('.nutrition-target-mode > button'));
   }
+
+  await tma.setViewport(MOBILE_CONTEXTS.baseline.height, MOBILE_CONTEXTS.baseline.height);
+  await expect(tmaPage.locator('#appBottomNav')).toBeVisible();
+  await save.scrollIntoViewIfNeeded();
+  const saveAvoidsDock = await tmaPage.evaluate(() => {
+    const saveButton = document.querySelector<HTMLElement>('.nutrition-target-save');
+    const dock = document.querySelector<HTMLElement>('#appBottomNav');
+    if (!saveButton || !dock) return false;
+    return saveButton.getBoundingClientRect().bottom <= dock.getBoundingClientRect().top - 8;
+  });
+  expect(saveAvoidsDock).toBe(true);
 });
 
 test('manual nutrition target history screenshots cover all responsive surfaces and themes', async ({
   browser,
 }) => {
+  test.setTimeout(120_000);
   const cases = [
+    { surface: 'mobile-web', width: 320, height: 760, theme: 'light' },
     { surface: 'mobile-web', width: 360, height: 800, theme: 'light' },
-    { surface: 'mobile-web', width: 390, height: 844, theme: 'dark' },
+    { surface: 'mobile-web', width: 393, height: 852, theme: 'dark' },
     { surface: 'mobile-web', width: 430, height: 932, theme: 'light' },
-    { surface: 'mobile-web', width: 768, height: 900, theme: 'dark' },
+    { surface: 'desktop-web', width: 1280, height: 900, theme: 'dark' },
     { surface: 'desktop-web', width: 1440, height: 900, theme: 'light' },
+    { surface: 'tma-mock', width: 320, height: 760, theme: 'dark' },
     { surface: 'tma-mock', width: 360, height: 800, theme: 'dark' },
-    { surface: 'tma-mock', width: 390, height: 844, theme: 'light' },
+    { surface: 'tma-mock', width: 393, height: 852, theme: 'light' },
     { surface: 'tma-mock', width: 430, height: 932, theme: 'dark' },
   ] as const;
 
@@ -2725,10 +2763,16 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
 
     await page.goto('/app?section=nutrition');
     await page.locator('details.nutrition-target-settings > summary').click();
-    await page
-      .locator('details.nutrition-target-settings')
-      .getByRole('heading', { name: 'КБЖУ', exact: true })
-      .click();
+    const targetSettings = page.locator('details.nutrition-target-settings');
+    await expect(targetSettings.locator(':scope > summary')).toHaveText('Настройки КБЖУ');
+    await expect(targetSettings.locator(':scope > summary')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    await expect(targetSettings.locator('details.card-disclosure')).toHaveCount(0);
+    await expect(
+      targetSettings.getByRole('button', { name: 'Рассчитать ориентиры' }),
+    ).toBeVisible();
     if (current.surface === 'tma-mock') {
       await expect(page.getByText('Назначено тренером', { exact: true })).toBeVisible();
       await page.getByRole('button', { name: 'Указать вручную' }).click();
@@ -2778,9 +2822,8 @@ test('manual nutrition target history screenshots cover all responsive surfaces 
       ),
     ).toBe(true);
 
-    const targetCard = page.locator('details.nutrition-target-settings');
-    await targetCard.scrollIntoViewIfNeeded();
-    await targetCard.screenshot({
+    await targetSettings.scrollIntoViewIfNeeded();
+    await targetSettings.screenshot({
       path: `../.artifacts/screenshots/task-55/${current.surface}-${current.width}x${current.height}-${current.theme}.png`,
     });
     await page.close();
@@ -2824,10 +2867,9 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
 
   await tmaPage.getByRole('link', { name: 'Питание', exact: true }).click();
   await tmaPage.locator('details.nutrition-target-settings > summary').click();
-  await tmaPage
-    .locator('details.nutrition-target-settings')
-    .getByRole('heading', { name: 'КБЖУ', exact: true })
-    .click();
+  await expect(
+    tmaPage.locator('details.nutrition-target-settings').locator('details.card-disclosure'),
+  ).toHaveCount(0);
   await tmaPage.getByRole('button', { name: 'Рассчитать ориентиры' }).click();
   const nutritionHelp = tmaPage.locator('.contextual-help').getByText('Что это?', { exact: true });
   await nutritionHelp.click();
@@ -2939,7 +2981,7 @@ test('task 72 screenshot packet keeps shared composition across core surfaces', 
           .getByRole('region', { name: /^Достаточно ли данных:/ });
         for (const confidence of await confidences.all()) {
           await confidence.scrollIntoViewIfNeeded();
-          await expectLimeStartBoundary(confidence);
+          await expectNeutralStartBoundary(confidence);
         }
       }
       if (scenario.label === 'nutrition-search') {
