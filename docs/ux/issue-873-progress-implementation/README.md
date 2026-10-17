@@ -8,7 +8,8 @@ production- и не физическое устройство.
 
 - Base master: `4c92832415d4eb994cf6b849a67074742f07ea50`
 - Approved design package: `18002f8bdf938ba9d7ed0e3b0353f2682000ba6d`
-- Implementation evidence commit: `c4f8c8c2`
+- Initial implementation evidence commit: `c4f8c8c2`
+- Continuation application commit: `223408e2`
 - Implementation branch: `codex/issue-873-progress-implementation-v2`
 - Capture browser: Playwright Chromium, reduced motion; cross-browser regression также
   выполнен в Playwright WebKit.
@@ -19,6 +20,24 @@ production- и не физическое устройство.
   training — 7 завершённых из 8 запланированных, nutrition — complete/incomplete/fasted/
   missing states, cardio — 2 завершённые сессии, wellbeing — сохранённый weekly review,
   history — 1 завершённая тренировка.
+
+## Paired BEFORE/AFTER comparison — 2026-10-17
+
+- BEFORE снят на exact owner-requested base `4c92832415d4eb994cf6b849a67074742f07ea50`;
+  AFTER — на application revision `223408e2`, продолжившей проверенный PR HEAD
+  `71f9876b6ffd679a8fca42681c1d7e2c93524da0`.
+- [HTML-галерея парных сравнений](./evidence/paired-20261017/gallery.html) — 88 пар рядом,
+  шесть разделов, light/dark, 320/360/393/430/1440 px, обычные/раскрытые состояния и
+  действие «Добавить замер».
+- [Полная таблица высоты, прокрутки и действий](./evidence/paired-20261017/metrics.md).
+- [Разбор Frontend smoke timeout](./evidence/paired-20261017/ci-timeout.md).
+- Фикстура, область `.progress-details`, высоты viewport и `scrollY=0` одинаковы; capture
+  использует Chromium и синтетические данные, изображения JPEG quality 88.
+
+В «Теле» сокращены повторные пояснения и заголовок графика, уменьшены локальные интервалы;
+яркая кнопка добавления замера остаётся рядом с последним фактом, а история/редактирование
+сохраняются. При открытом редакторе внешний повтор «Как сравнивать замеры» скрывается, но
+ограничения и пояснения остаются в confidence/note и встроенной подсказке дневника.
 
 ## Captures
 
@@ -59,5 +78,6 @@ Detail captures use the `.progress-details` region. Control captures use the
   acceptance is still pending; merge and deploy are forbidden for this task.
 - No backend, API, database, formula, history, RBAC, privacy, environment-variable or secret
   change is included.
-- PNG-кадры реализации привязаны к `c4f8c8c2`; последующее исправление E2E-селектора и
-  обновление mobile golden отражены в том же Draft PR.
+- Исторические PNG-кадры реализации привязаны к `c4f8c8c2`; новая парная browser-галерея
+  снята на `223408e2`. Последующее исправление E2E-селектора и обновление mobile golden
+  отражены в том же Draft PR.
