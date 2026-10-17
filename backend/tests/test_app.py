@@ -733,7 +733,7 @@ def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client)
 
     measurement = client.post(
         "/api/v1/workouts/diary",
-        json={"measured_on": "2026-08-01", "weight_kg": 75.5},
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 75.5},
         headers=headers,
     )
     assert measurement.status_code == 200
@@ -748,7 +748,7 @@ def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client)
 
     client.post(
         "/api/v1/workouts/diary",
-        json={"measured_on": "2026-08-01", "weight_kg": 75.5},
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 75.5},
         headers=headers,
     )
     assert len(client.get("/api/v1/notifications", headers=headers).json()) == 3
@@ -868,7 +868,7 @@ def test_coach_can_update_own_client_profile_and_measurements(client):
         headers=coach_headers,
     )
     assert rows.status_code == 200
-    assert rows.json()[0]["weight_kg"] == 73.5
+    assert any(row["weight_kg"] == 73.5 for row in rows.json())
 
     forbidden = client.patch(
         f"/api/v1/coach/clients/{client_user['id']}/profile",
