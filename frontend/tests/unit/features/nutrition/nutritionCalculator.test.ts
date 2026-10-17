@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import goldenCases from '../../../fixtures/nutrition-calculator-golden.json';
 import {
   calculateNutritionEstimate,
   type NutritionCalculatorInput,
@@ -207,5 +208,27 @@ describe('nutrition calculator', () => {
     expect(result.errors).toEqual(
       expect.arrayContaining([expect.stringContaining('превышают целевую калорийность')]),
     );
+  });
+});
+
+describe('scientific golden cases shared with backend', () => {
+  it.each(goldenCases)('matches %s input across calculator runtimes', (testCase) => {
+    const result = calculateNutritionEstimate(
+      testCase.input as NutritionCalculatorInput,
+    );
+    if (testCase.expected === null) {
+      expect(result.valid).toBe(false);
+      expect(result.estimate).toBeNull();
+      return;
+    }
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect({
+      calories: result.estimate.calories,
+      protein_g: result.estimate.protein,
+      fat_g: result.estimate.fat,
+      carbs_g: result.estimate.carbs,
+    }).toEqual(testCase.expected);
   });
 });
