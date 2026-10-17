@@ -129,6 +129,7 @@ def update_profile(
         if resting_heart_rate >= calculate_max_heart_rate(age):
             raise ProfileError("Resting heart rate must be below maximum heart rate")
     nutrition_field_map = {
+        "sex": "sex",
         "goal": "goal",
         "height_cm": "height_cm",
         "weight_kg": "weight_kg",
@@ -145,6 +146,27 @@ def update_profile(
         if field in nutrition_field_map and value is not None and getattr(profile, field) != value:
             nutrition_updates[nutrition_field_map[field]] = value
         setattr(profile, field, value)
+
+    # The user's explicitly saved profile weight is a current measurement too.
+    # Mirror it into today's dated ledger without triggering another target version.
+    if "weight_kg" in nutrition_updates:
+        from fitminiapp_api.services.measurements import sync_current_weight_to_diary
+
+        sync_current_weight_to_diary(db, user, float(nutrition_updates["weight_kg"]))
+
+    # Birth date, not a previously entered calculator age, is the durable fact.
+    if "birth_date" in changes and profile.birth_date is not None:
+        reference_date = date.today()
+        age = (
+            reference_date.year
+            - profile.birth_date.year
+            - (
+                (reference_date.month, reference_date.day)
+                < (profile.birth_date.month, profile.birth_date.day)
+            )
+        )
+        if 18 <= age <= 100:
+            nutrition_updates["age"] = age
 
     if body_priority is not ...:
         _replace_body_priority(
