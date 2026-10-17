@@ -2796,10 +2796,6 @@ body:has(.app-shell--design-v2) {
   box-shadow: none;
 }
 
-.workout-completion__hero {
-  border-left: 5px solid var(--v2-lime);
-}
-
 .workout-completion__check {
   border-color: var(--v2-lime);
   background: var(--v2-lime);
