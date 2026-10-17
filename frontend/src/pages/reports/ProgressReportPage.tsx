@@ -447,6 +447,16 @@ function ReportContent({
       report.training.completed_workouts -
       report.training.skipped_workouts,
   );
+  const restFacts = (
+    report.training as typeof report.training & {
+      rest?: {
+        observation_count: number;
+        mean_seconds: number | null;
+        median_seconds: number | null;
+        mean_difference_seconds: number | null;
+      };
+    }
+  ).rest;
 
   return (
     <div className="progress-report-document">
@@ -566,6 +576,13 @@ function ReportContent({
             <dd>{report.training.new_personal_records}</dd>
           </div>
         </dl>
+        <p className="progress-report-limit">
+          Отдых по отметке пользователя:{' '}
+          {restFacts?.observation_count
+            ? `${restFacts.observation_count} замеров · среднее ${restFacts.mean_seconds ?? '—'} с · медиана ${restFacts.median_seconds ?? '—'} с · среднее отклонение ${restFacts.mean_difference_seconds ?? '—'} с`
+            : 'нет достоверных замеров'}
+          . Это не объективное измерение начала следующего подхода.
+        </p>
         <p className="progress-report-limit">
           Объём внешней нагрузки — сумма веса × повторения только для завершённых рабочих подходов.
           Он не сравнивает технику, амплитуду, тренажёры и разные упражнения.

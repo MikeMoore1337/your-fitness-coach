@@ -247,6 +247,20 @@ def build_progress_report_pdf(report: dict[str, Any]) -> bytes:
             ),
         ]
     )
+    rest = training.get("rest")
+    if rest:
+        count = rest.get("observation_count", 0)
+        if count:
+            story.append(
+                Paragraph(
+                    "Отдых между подходами (по отметке пользователя): "
+                    f"наблюдений {count}, среднее {_number(rest.get('mean_seconds'), ' с')}, "
+                    f"медиана {_number(rest.get('median_seconds'), ' с')}",
+                    body,
+                )
+            )
+        else:
+            story.append(Paragraph("Отдых между подходами: нет достоверных замеров", muted))
     exercises = training.get("exercises", [])
     if exercises:
         rows = [

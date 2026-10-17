@@ -318,6 +318,13 @@ class ProgressReportExerciseTrend(BaseModel):
     sessions: list[ProgressReportExerciseSession]
 
 
+class ProgressReportRestSummary(BaseModel):
+    observation_count: int = Field(ge=0)
+    mean_seconds: float | None = Field(default=None, ge=0)
+    median_seconds: float | None = Field(default=None, ge=0)
+    mean_difference_seconds: float | None = None
+
+
 class ProgressReportTraining(BaseModel):
     planned_workouts: int = Field(ge=0)
     completed_workouts: int = Field(ge=0)
@@ -328,6 +335,7 @@ class ProgressReportTraining(BaseModel):
     volume_recorded_sets: int = Field(ge=0)
     new_personal_records: int = Field(ge=0)
     exercises: list[ProgressReportExerciseTrend]
+    rest: ProgressReportRestSummary | None = None
 
 
 class ProgressReportProgramChange(BaseModel):
