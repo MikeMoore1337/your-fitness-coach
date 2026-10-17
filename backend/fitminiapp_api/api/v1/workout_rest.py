@@ -117,14 +117,12 @@ def start_rest_session(
         raise HTTPException(status_code=409, detail="Сначала завершите подход")
     # Offline completion and rest may reach the server after the workout finish.
     # Preserve accepted, owner-scoped measurements that began before its completion.
-    if (
-        workout.status == "completed"
-        and workout.completed_at is not None
-        and started_at
-        > recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user)
-        + timedelta(minutes=1)
-    ):
-        raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
+    if workout.status == "completed" and workout.completed_at is not None:
+        completed_utc = recovery_user_local_naive_to_utc_naive(
+            workout.completed_at, current_user
+        )
+        if started_at > completed_utc + timedelta(minutes=1):
+            raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
     if (
         (set_row.set_kind or "working") != "working"
         or set_row.planned_role in ("warmup", "activation")
