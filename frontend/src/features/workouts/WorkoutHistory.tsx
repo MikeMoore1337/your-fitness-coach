@@ -7,6 +7,7 @@ import type {
   WorkoutScheduleItem,
 } from '../../shared/api/types';
 import { Badge, Card, EmptyState, ErrorState, LoadingState } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
@@ -33,8 +34,9 @@ function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
   }
   return (
     <details className="workout-history__rest">
-      <summary>
+      <summary className="yfc-disclosure-summary">
         Отдых по подходам · {sessions.filter((row) => row.status === 'completed').length} замеров
+        <Icon name="chevron-down" size={16} />
       </summary>
       <ul>
         {sessions.map((row) => (
