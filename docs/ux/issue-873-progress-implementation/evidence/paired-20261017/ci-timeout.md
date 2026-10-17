@@ -24,13 +24,25 @@ drift, not evidence of a renderer loop or a slow product request.
 
 The test now accepts both valid render modes: it verifies the history card, clicks the direct
 summary only when one exists, and asserts the contextual row. No global timeout was changed,
-no test was skipped, and no golden was updated to mask the failure.
+and no test was skipped.
+
+The first post-change CI run also exposed four deterministic Progress screenshot mismatches in
+the mobile regression job (48/52 passed): the approved continuation reduced the Progress outer
+vertical gap from 28px to 4px. Chromium and WebKit retry actuals were byte-identical within the
+CI artifact. After inspecting those actual/diff images, only the four Progress captures for each
+tracked platform (8 files: Linux and Windows, light and dark) were refreshed from stable actual
+captures. This is a visual-contract update for the intentional layout change, not a timeout
+workaround, tolerance increase or unrelated golden refresh.
 
 - `npx playwright test --shard=2/5 --workers=2 --retries=0`: `165 passed (4.1m)` locally;
   the run passed the former stall point and both `glass-polish` contrast cases.
 - `final-ux-closeout.spec.ts`: `3 passed (44.4s)` on the current application revision.
 - Body measurement/history regression: `1 passed (3.1s)`.
 - `glass-polish.spec.ts` contrast regression: `2 passed (3.1s)`.
+- Critical mobile Progress screenshot contract after the oracle update: `4 passed (14.4s)`
+  locally; the full local mobile run was `51 passed, 1 failed` on the unrelated existing
+  WebKit active-workout screenshot baseline, while the CI artifact's other 48 mobile tests had
+  passed before the four Progress mismatches.
 - `npm run typecheck`, `npm run lint` (including Russian UI guard), `npm run build` and
   targeted Prettier check: passed.
 - The evidence-only capture test is explicitly skipped unless `CAPTURE_ISSUE_873=1`.
