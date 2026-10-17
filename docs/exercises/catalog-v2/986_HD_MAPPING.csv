@@ -74,3 +74,5 @@ stationary-bike,male,stationary-bike,VERIFIED_SEMANTIC,high,replace_hd,"exact sl
 straight-arm-pulldown,male,cable-straight-arm-pulldown,VERIFIED_SEMANTIC,high,replace_hd,"кроссовер, тяга прямыми руками","точное движение и оборудование"
 battle-rope,male,battling-ropes,VERIFIED_SEMANTIC,high,add_static,"канаты, волнообразное движение","раньше blocked; exact semantic name"
 woodchopper,male,cable-twist-up-down,VERIFIED_SEMANTIC,high,add_static,"кроссовер, вращение/диагональная тяга","раньше blocked; визуально соответствует cable woodchop"
+t-bar-row,male,lever-t-bar-row,VERIFIED_SEMANTIC,high,replace_hd,t-bar lever machine exact movement and equipment,visual match to original GymVisual pose
+lying-dumbbell-triceps-extension,male,dumbbell-lying-triceps-extension,VERIFIED_SEMANTIC,high,replace_hd,flat bench and dumbbells extension,visual match to original GymVisual pose

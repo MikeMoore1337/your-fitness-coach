@@ -21,10 +21,10 @@ def test_full_hd_matrix_records_final_import_statuses() -> None:
 
     assert len(rows) == 206
     assert Counter(row["import_status"] for row in rows) == Counter(
-        {"imported_replaced": 69, "imported_added": 4, "skipped": 133}
+        {"imported_replaced": 71, "imported_added": 4, "skipped": 131}
     )
     assert Counter(row["semantic_status"] for row in rows) == Counter(
-        {"VERIFIED_SEMANTIC": 73, "REVIEW": 39, "NO_MATCH": 94}
+        {"VERIFIED_SEMANTIC": 75, "REVIEW": 37, "NO_MATCH": 94}
     )
     assert Counter(row["previous_status"] for row in rows) == Counter(
         {"approved": 167, "blocked": 39}
