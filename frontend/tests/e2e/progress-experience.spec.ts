@@ -1817,9 +1817,62 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     report.getByText('Средние значения рассчитаны только по заполненным дням.'),
   ).toBeVisible();
   await expect(report.getByRole('img', { name: /Калории по дням/ })).toBeVisible();
+  const targetHistory = report.locator('.nutrition-report-target-history');
+  const targetHistorySummary = targetHistory.locator(':scope > summary');
+  await expect(targetHistory).not.toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'false');
+  const days = report.locator('.nutrition-report-days');
+  const daysSummary = days.locator(':scope > summary');
+  const daysStyle = await days.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderWidths: [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ],
+      borderRadius: style.borderRadius,
+    };
+  });
+  expect(daysStyle.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+  expect(Number.parseFloat(daysStyle.borderRadius)).toBeGreaterThan(0);
+  await expect(days.locator('.nutrition-report-days__table-wrap')).toHaveCSS(
+    'border-left-width',
+    '0px',
+  );
+  await expect(daysSummary).toHaveText('Дни периода: 7');
+  await expect(days).not.toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'false');
+  if (process.env.CAPTURE_1051_EVIDENCE === '1') {
+    const dir = resolve('..', 'docs/ux/issue-1051-progress-nutrition-cards-20261017/after');
+    await mkdir(dir, { recursive: true });
+    const originalViewport = page.viewportSize();
+    await page.setViewportSize({ width: 393, height: 932 });
+    for (const colorScheme of ['dark', 'light'] as const) {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await targetHistory.screenshot({
+        path: resolve(dir, `mobile-393-${colorScheme}-target-history-collapsed.png`),
+      });
+      await days.screenshot({
+        path: resolve(dir, `mobile-393-${colorScheme}-days-collapsed.png`),
+      });
+    }
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    if (originalViewport) await page.setViewportSize(originalViewport);
+  }
+  await daysSummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(days).toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'true');
   await expect(report.getByText('Изменения цели в периоде')).toBeHidden();
-  await report.getByText('История целей питания', { exact: true }).click();
+  await targetHistorySummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(targetHistory).toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'true');
   await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
+  await expect(days).toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'true');
   await expect(
     report.getByRole('table', {
       name: 'Дневные КБЖУ, статус заполнения и действовавшая цель',
@@ -1850,6 +1903,23 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     await expect
       .poll(async () => (await previousPointButton.boundingBox())?.height ?? 0)
       .toBeGreaterThanOrEqual(44);
+    await expect(report.locator('.nutrition-report-days > summary')).toContainText(
+      `Дни периода: ${period === '30 дней' ? '30' : '90'}`,
+    );
+    await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
+    if (process.env.CAPTURE_1051_EVIDENCE === '1' && period === '30 дней') {
+      const dir = resolve('..', 'docs/ux/issue-1051-progress-nutrition-cards-20261017/after');
+      const originalViewport = page.viewportSize();
+      await page.setViewportSize({ width: 393, height: 932 });
+      for (const colorScheme of ['dark', 'light'] as const) {
+        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        await report.locator('.nutrition-report-days').screenshot({
+          path: resolve(dir, `mobile-393-${colorScheme}-days30-collapsed.png`),
+        });
+      }
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      if (originalViewport) await page.setViewportSize(originalViewport);
+    }
   }
   await expect(page).toHaveURL(/progress_period=days_90/);
   await expect(report.getByText(/Заполнено \d+ из 90 дней/)).toBeVisible();
@@ -1860,6 +1930,8 @@ test('nutrition report preserves truthful period context, daily drill-down and r
   await page.getByRole('button', { name: 'Показать период' }).click();
   await expect(page).toHaveURL(/progress_period=custom/);
   await expect(report.getByText(/Заполнено \d+ из 365 дней/)).toBeVisible();
+  await expect(report.locator('.nutrition-report-days > summary')).toHaveText('Дни периода: 365');
+  await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
   const longRangeNavigation = report.getByRole('group', {
     name: 'Навигация по точкам графика',
   });
@@ -2020,7 +2092,22 @@ for (const width of [320, 360, 390, 393, 430]) {
         .click();
 
       const report = page.locator('#nutrition-period-report');
-      await report.getByText('История целей питания', { exact: true }).click();
+      const history = report.locator('.nutrition-report-target-history');
+      const historyStyle = await history.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          borderRadius: style.borderRadius,
+        };
+      });
+      expect(historyStyle.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(Number.parseFloat(historyStyle.borderRadius)).toBeGreaterThan(0);
+      await history.locator(':scope > summary').press('Enter');
       const targetChanges = report
         .locator('.nutrition-report-targets')
         .filter({ hasText: 'Изменения цели в периоде' });
@@ -2078,6 +2165,13 @@ for (const width of [320, 360, 390, 393, 430]) {
               left: box.left,
               right: box.right,
               width: box.width,
+              borderWidths: [
+                getComputedStyle(cardElement).borderTopWidth,
+                getComputedStyle(cardElement).borderRightWidth,
+                getComputedStyle(cardElement).borderBottomWidth,
+                getComputedStyle(cardElement).borderLeftWidth,
+              ],
+              borderRadius: getComputedStyle(cardElement).borderRadius,
               descendants,
             };
           }),
@@ -2086,14 +2180,18 @@ for (const width of [320, 360, 390, 393, 430]) {
       expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
       expect(geometry.rowGap).toBeGreaterThanOrEqual(12);
       expect(geometry.headingToFirstCard).toBeGreaterThanOrEqual(geometry.rowGap - 0.5);
-      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(12);
-      expect(geometry.cardRowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(0);
+      expect(geometry.cardRowGap).toBe(0);
       expect(geometry.firstToSecondCard).toBeCloseTo(geometry.cardRowGap, 1);
       expect(geometry.listBorderWidths).toEqual(['0px', '0px', '0px', '0px']);
-      for (const card of geometry.cards) {
+      for (const [index, card] of geometry.cards.entries()) {
         expect(card.width).toBeGreaterThan(0);
         expect(card.left).toBeGreaterThanOrEqual(-1);
         expect(card.right).toBeLessThanOrEqual(geometry.viewport + 1);
+        expect(card.borderWidths).toEqual(
+          index === 0 ? ['0px', '0px', '0px', '0px'] : ['1px', '0px', '0px', '0px'],
+        );
+        expect(card.borderRadius).toBe('0px');
         for (const child of card.descendants) {
           expect(child.left).toBeGreaterThanOrEqual(card.left - 1);
           expect(child.right).toBeLessThanOrEqual(card.right + 1);
@@ -2155,7 +2253,18 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
-  await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
+  const targetHistory = report.locator('.nutrition-report-target-history');
+  const targetHistorySummary = targetHistory.locator(':scope > summary');
+  await expect(targetHistory).not.toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'false');
+  await targetHistorySummary.press('Enter');
+  await expect(
+    report.getByText('За выбранный период изменений целей питания не было.'),
+  ).toBeVisible();
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'true');
+  const days = report.locator('.nutrition-report-days');
+  await expect(days).not.toHaveAttribute('open', '');
+  await expect(days.locator(':scope > summary')).toHaveAttribute('aria-expanded', 'false');
   await report.screenshot({
     path: '../.artifacts/screenshots/task-69b/sparse-insufficient-mobile-light.png',
   });
