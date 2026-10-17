@@ -1,0 +1,78 @@
+{
+  "method": "realesrgan-x4plus ncnn Vulkan (x4)",
+  "source_resolution": [
+    180,
+    180
+  ],
+  "ai_resolution": [
+    720,
+    720
+  ],
+  "format": [
+    "MP4 (H264)",
+    "animated WebP",
+    "GIF (360x360)"
+  ],
+  "samples": [
+    {
+      "slug": "machine-chest-press",
+      "input": "backend/assets/exercise-guides/gymvisual/machine-chest-press-0577-T0yTjgW.gif",
+      "source_sha256": "789515907e5001da8ced127bcf8969e7ab265f25545bf7f0a80dbb6f0da213b0",
+      "frames": 12,
+      "duration_ms": 3000,
+      "loop": 0,
+      "ai_mp4_bytes": 147140,
+      "ai_webp_bytes": 366324,
+      "lanczos_mp4_bytes": 66741,
+      "lanczos_webp_bytes": 217992,
+      "comparison": "machine-chest-press-general-comparison.jpg",
+      "ai_gif_bytes": 570159,
+      "lanczos_gif_bytes": 589660
+    },
+    {
+      "slug": "deadlift",
+      "input": "backend/assets/exercise-guides/gymvisual/deadlift-0032-ila4NZS.gif",
+      "source_sha256": "85ca4e4f562df04d5b3d4f5378792873e4fab954c850f7104e14161f680dd568",
+      "frames": 12,
+      "duration_ms": 3000,
+      "loop": 0,
+      "ai_mp4_bytes": 111130,
+      "ai_webp_bytes": 221980,
+      "lanczos_mp4_bytes": 56564,
+      "lanczos_webp_bytes": 146672,
+      "comparison": "deadlift-general-comparison.jpg",
+      "ai_gif_bytes": 375762,
+      "lanczos_gif_bytes": 404742
+    },
+    {
+      "slug": "russian-twist",
+      "input": "backend/assets/exercise-guides/gymvisual/russian-twist-0687-XVDdcoj.gif",
+      "source_sha256": "e2b6ff4dbe4dd75c88b17d51380fe8426b3cc5705ca789a9b850bf56514b3c7d",
+      "frames": 24,
+      "duration_ms": 5000,
+      "loop": 0,
+      "ai_mp4_bytes": 196448,
+      "ai_webp_bytes": 493958,
+      "lanczos_mp4_bytes": 100470,
+      "lanczos_webp_bytes": 307382,
+      "comparison": "russian-twist-general-comparison.jpg",
+      "ai_gif_bytes": 736033,
+      "lanczos_gif_bytes": 789586
+    },
+    {
+      "slug": "walking-lunge",
+      "input": "backend/assets/exercise-guides/gymvisual/walking-lunge-1460-IZVHb27.gif",
+      "source_sha256": "4e7878086e684439f88bb9e69e5f4b07bdcdaf37a0418f2956f99f5d70082bb7",
+      "frames": 24,
+      "duration_ms": 5000,
+      "loop": 0,
+      "ai_mp4_bytes": 160255,
+      "ai_webp_bytes": 356562,
+      "lanczos_mp4_bytes": 80491,
+      "lanczos_webp_bytes": 231480,
+      "comparison": "walking-lunge-general-comparison.jpg",
+      "ai_gif_bytes": 589280,
+      "lanczos_gif_bytes": 632630
+    }
+  ]
+}
