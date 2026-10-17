@@ -1067,6 +1067,10 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
     await expect(report.getByText('Заполнено 3 из 7 дней')).toBeVisible();
     await report.getByText('История целей питания', { exact: true }).click();
     await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
+    const days = report.locator('.nutrition-report-days');
+    await expect(days).not.toHaveAttribute('open', '');
+    await days.locator(':scope > summary').click();
+    await expect(days).toHaveAttribute('open', '');
     await expect(
       report.getByRole('table', {
         name: 'Дневные КБЖУ, статус заполнения и действовавшая цель',
@@ -1097,6 +1101,11 @@ test('nutrition report keeps period analytics and diary return aligned in Mobile
     await expectNoHorizontalOverflow(tmaPage);
     await expectTouchTargets(tmaSelector.getByRole('tab'));
   }
+  // Changing the selected period resets the long day list to its compact state.
+  const selectedDays = tmaReport.locator('.nutrition-report-days');
+  await expect(selectedDays).not.toHaveAttribute('open', '');
+  await selectedDays.locator(':scope > summary').click();
+  await expect(selectedDays).toHaveAttribute('open', '');
   const diaryLink = tmaReport.getByRole('row').filter({ hasText: '· сегодня' }).getByRole('link');
   await expect(diaryLink).toHaveCount(1);
   await diaryLink.scrollIntoViewIfNeeded();
