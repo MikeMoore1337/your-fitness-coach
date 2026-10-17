@@ -213,9 +213,7 @@ describe('nutrition calculator', () => {
 
 describe('scientific golden cases shared with backend', () => {
   it.each(goldenCases)('matches %s input across calculator runtimes', (testCase) => {
-    const result = calculateNutritionEstimate(
-      testCase.input as NutritionCalculatorInput,
-    );
+    const result = calculateNutritionEstimate(testCase.input as NutritionCalculatorInput);
     if (testCase.expected === null) {
       expect(result.valid).toBe(false);
       expect(result.estimate).toBeNull();
