@@ -111,8 +111,17 @@ def start_rest_session(
     )
     if existing is not None:
         return _as_response(existing)
-    if workout.status != "in_progress" or not set_row.is_completed:
+    started_at = _utc_naive(payload.started_at)
+    if not set_row.is_completed or workout.status not in ("in_progress", "completed"):
         raise HTTPException(status_code=409, detail="Сначала завершите подход")
+    # Offline completion and rest may reach the server after the workout finish.
+    # Preserve accepted, owner-scoped measurements that began before its completion.
+    if (
+        workout.status == "completed"
+        and workout.completed_at is not None
+        and started_at > workout.completed_at + timedelta(minutes=1)
+    ):
+        raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
     if (
         (set_row.set_kind or "working") != "working"
         or set_row.planned_role in ("warmup", "activation")
@@ -120,7 +129,6 @@ def start_rest_session(
         or exercise.rest_seconds <= 0
     ):
         raise HTTPException(status_code=422, detail="Отдых для этого подхода не предусмотрен")
-    started_at = _utc_naive(payload.started_at)
     now = _now()
     if started_at > now + timedelta(minutes=1) or started_at < now - timedelta(hours=24):
         raise HTTPException(status_code=422, detail="Время начала отдыха вне допустимого диапазона")
