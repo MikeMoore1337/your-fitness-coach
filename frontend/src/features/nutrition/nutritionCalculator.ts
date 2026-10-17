@@ -9,6 +9,7 @@ type CardioTraining = NonNullable<NutritionTargetSave['cardio_trainings']>[numbe
 export type NutritionCalculatorInput = Omit<
   NutritionTargetSave,
   | 'daily_activity_level'
+  | 'record_weight_measurement'
   | 'cardio_trainings_per_week'
   | 'cardio_training_duration_minutes'
   | 'cardio_intensity'
@@ -109,7 +110,7 @@ const legacyCardioIntensities = {
 
 export const goalMultipliers = {
   fat_loss: 0.85,
-  recomposition: 1,
+  recomposition: 0.95,
   maintenance: 1,
   muscle_gain: 1.05,
 } as const;

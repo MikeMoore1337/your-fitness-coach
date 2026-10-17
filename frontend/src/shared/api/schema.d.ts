@@ -13234,6 +13234,11 @@ export interface components {
             /** Note */
             note?: string | null;
             /**
+             * Record Weight Measurement
+             * @default false
+             */
+            record_weight_measurement: boolean;
+            /**
              * Sex
              * @enum {string}
              */

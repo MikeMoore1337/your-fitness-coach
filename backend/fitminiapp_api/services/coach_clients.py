@@ -125,6 +125,7 @@ def _client_entry_from_user(
     include_preferences_context: bool,
     operational_status: str | None = "active",
     labels: list[str] | None = None,
+    latest_weight_kg: float | None = None,
 ) -> dict:
     from fitminiapp_api.services.training_preferences import serialize_training_preferences
 
@@ -139,7 +140,13 @@ def _client_entry_from_user(
         "goal": profile.goal if profile else None,
         "level": profile.level if profile else None,
         "height_cm": profile.height_cm if profile else None,
-        "weight_kg": profile.weight_kg if profile else None,
+        "weight_kg": (
+            latest_weight_kg
+            if latest_weight_kg is not None
+            else profile.weight_kg
+            if profile
+            else None
+        ),
         "workouts_per_week": profile.workouts_per_week if profile else None,
         "cardio_trainings_per_week": (profile.cardio_trainings_per_week if profile else None),
         "resting_heart_rate": profile.resting_heart_rate if profile else None,
