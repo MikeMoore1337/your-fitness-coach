@@ -374,7 +374,7 @@ def evaluate_energy_calibration(
             else:
                 proposed_target = None
                 proposed_macros = None
-        if proposed_target is None:
+        if proposed_target is None and status != "limited":
             rationale_keys.append("current_target_within_range")
 
     return CalibrationEvaluation(
