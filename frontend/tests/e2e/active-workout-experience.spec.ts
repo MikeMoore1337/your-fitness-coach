@@ -30,6 +30,15 @@ const ISSUE_980_AFTER_DIR = resolve(
   '980-completed-set-20261013',
   'after',
 );
+const ISSUE_996_AFTER_DIR = resolve(
+  process.cwd(),
+  '..',
+  '.artifacts',
+  'tasks',
+  '996',
+  'evidence',
+  'after',
+);
 
 const captureLandingProductProofs =
   (
@@ -490,8 +499,46 @@ async function mockActiveWorkout(
             exercise_id: 13,
             title: 'Жим гантелей лёжа',
             equipment_ids: ['dumbbell', 'bench'],
+            media_thumbnail_url:
+              '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+            media_thumbnail_sources: [
+              {
+                url: '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+                mime_type: 'image/jpeg',
+                width: 180,
+                height: 180,
+                byte_size: 8103,
+              },
+            ],
             score: 0.96,
             reason_keys: ['same_movement_pattern', 'same_primary_muscle'],
+          },
+          {
+            exercise_id: 14,
+            title: 'Жим в тренажёре от груди',
+            equipment_ids: ['machine'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.8,
+            reason_keys: ['same_movement_pattern'],
+          },
+          {
+            exercise_id: 15,
+            title: 'Отжимания от пола',
+            equipment_ids: ['bodyweight'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.7,
+            reason_keys: ['same_primary_muscle'],
+          },
+          {
+            exercise_id: 16,
+            title: 'Жим в тренажёре Смита',
+            equipment_ids: ['machine', 'bench'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.6,
+            reason_keys: ['same_movement_pattern'],
           },
         ],
       });
@@ -1845,7 +1892,7 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   const replacedSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
@@ -1962,13 +2009,15 @@ for (const width of [360, 393, 430]) {
           available_equipment_ids: ['cable', 'machine', 'dumbbell', 'bench'],
         });
         await page.screenshot({ path: testInfo.outputPath('preview-visible.png') });
-        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
         await expect(error).toContainText('Состав тренировки изменился');
         await expect(error).toBeInViewport();
-        await expect(dialog.getByRole('button', { name: 'Применить', exact: true })).toHaveCount(0);
+        await expect(
+          dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }),
+        ).toHaveCount(0);
         await dialog.getByRole('button', { name: 'Обновить изменения', exact: true }).click();
         await expect(previewHeading).toBeFocused();
-        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
         await expect(
           page.getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
         ).toBeVisible();
@@ -2010,7 +2059,7 @@ test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page 
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
   expect(
@@ -2037,12 +2086,70 @@ test('V9-01 desktop smoke keeps replacement scoped to the current workout', asyn
   await page.getByRole('checkbox', { name: 'Скамья' }).check();
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
 });
+
+for (const [theme, width] of [
+  ['dark', 393],
+  ['light', 393],
+  ['dark', 1440],
+  ['light', 1440],
+] as const) {
+  test(`#996 real AFTER ${theme} ${width}px`, async ({ page }) => {
+    await mkdir(ISSUE_996_AFTER_DIR, { recursive: true });
+    await page.setViewportSize({ width, height: 844 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((selectedTheme) => {
+      localStorage.setItem('app-theme', selectedTheme);
+    }, theme);
+    const exerciseGuidesDir = resolve(process.cwd(), '..', 'backend', 'assets', 'exercise-guides');
+    for (const fileName of [
+      'gymvisual/bench-press-0025-EIeI8Vf.jpg',
+      'gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+    ]) {
+      await page.route(`**/static/exercise-guides/${fileName}`, (route) =>
+        route.fulfill({ path: resolve(exerciseGuidesDir, fileName), contentType: 'image/jpeg' }),
+      );
+    }
+    await mockActiveWorkout(page);
+    await page.goto('/app');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+    await page
+      .locator('.active-workout-exercise')
+      .filter({ hasText: 'Жим штанги лёжа' })
+      .first()
+      .getByRole('button', { name: 'Заменить только в этой тренировке' })
+      .click();
+
+    const dialog = page.getByRole('dialog', {
+      name: 'Заменить только в этой тренировке',
+      exact: true,
+    });
+    await dialog.getByRole('checkbox', { name: 'Гантели', exact: true }).check();
+    await dialog.getByRole('checkbox', { name: 'Скамья', exact: true }).check();
+    await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toBeVisible();
+    await expect(dialog.locator('.adaptation-original-card img')).toBeVisible();
+    await expect(dialog.locator('.adaptation-alternative-card img')).toHaveCount(1);
+    if (width === 1440) {
+      await dialog.getByRole('button', { name: 'Все подходящие' }).click();
+      await expect(dialog.getByRole('searchbox')).toBeVisible();
+    } else {
+      await dialog
+        .locator('.workout-adaptation-dialog__body')
+        .evaluate((body) => body.scrollTo({ top: 0 }));
+    }
+
+    await page.screenshot({
+      path: resolve(ISSUE_996_AFTER_DIR, `issue-996-after-${theme}-${width}.png`),
+      fullPage: false,
+    });
+  });
+}
 
 test('V9-01 does not offer replacement after the target has actual data', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
