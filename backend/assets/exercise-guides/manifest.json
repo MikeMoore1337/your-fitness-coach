@@ -24,9 +24,9 @@
     "approved_static": 4,
     "hd_coverage_percent": 37.38
   },
-  "asset_count": 727,
+  "asset_count": 881,
   "derivative_count": 77,
-  "total_bytes": 36358573,
+  "total_bytes": 49658088,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -185,7 +185,37 @@
               "byte_size": 35466,
               "sha256": "4af5b8c3a86d74adddcafa6286afb86775dd1030c6ca1a1b05c6c822311d7503"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/arnold-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 52359,
+              "sha256": "070d720571a7fad4036b760ebabbba67d50de760f63a1ac2692341fe29fec18b"
+            },
+            {
+              "path": "exercises-media/videos/arnold-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 94580,
+              "sha256": "81fa895b3fe7592110f55cd6ea30fa8648b2e0733aeb98337442894250081ed0"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-arnold-press.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-arnold-press",
+            "source_git_blob_sha1": "6605750322098c136d7d271c3e307c54441a21ae",
+            "source_byte_size": 874282,
+            "source_sha256": "40e18268aae5e474a508039326a81e97b897cce44d1bc7f1badb4a74dd70b430",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -346,7 +376,37 @@
               "byte_size": 50630,
               "sha256": "9b474e56e54f605851505d7cdac7a482e0365f8f09b87c246a94fc8d2396f325"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/assisted-dips-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 43068,
+              "sha256": "fd660c80d48ff862848696b62e8bd3e0aaf3fd6527afdc4d1574fecf7db60705"
+            },
+            {
+              "path": "exercises-media/videos/assisted-dips-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 79431,
+              "sha256": "08968d2c80676d74777c3bfdbab6984c4179920917877d3830318ec0d5853bee"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-dips.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-dips",
+            "source_git_blob_sha1": "ce48841311ac7bb0b6cdc8a854ff129f3f94fbed",
+            "source_byte_size": 998440,
+            "source_sha256": "68c14881eda61f449a01f176c32e37b6ab2243b43b6357f817d1bf832bbf7e99",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -743,7 +803,37 @@
               "byte_size": 37200,
               "sha256": "f6b5cbb4a293b0794e8e5553911da7158f2eecad697417260c755ee9058764aa"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/barbell-shrug-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 28282,
+              "sha256": "9205d3eafe4844389bd8a7a9984461b829117264f4a6762afdb5fbe5d5e9bbd0"
+            },
+            {
+              "path": "exercises-media/videos/barbell-shrug-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 49408,
+              "sha256": "a2e2659e6bb6e696d865b6e8a6641f1ea221f03c1ce8f720d4316ad824354060"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-shrug.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-shrug",
+            "source_git_blob_sha1": "5b97b059a9ae2deb209655cab2aea08f499d1042",
+            "source_byte_size": 234340,
+            "source_sha256": "0beb56b1baf7cb99b0798a0c26249ca8c6ebd12eecb2cae262998bab06ecbfe7",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -860,7 +950,37 @@
               "byte_size": 31446,
               "sha256": "e5ea3f39685565909e1a9d090729d48d1274fa6a8578e0ae585bd9d429eb1e9e"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/barbell-wrist-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 23420,
+              "sha256": "c1c85124525278b9fbd1568ecf586da6eff4e91395d001ecce902c3f97e707cb"
+            },
+            {
+              "path": "exercises-media/videos/barbell-wrist-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 42004,
+              "sha256": "bfe581e31c534214a3e42a1b7d1a68ad9a6ffcfecfcf6c6dc53d4b6751343d12"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-standing-back-wrist-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-standing-back-wrist-curl",
+            "source_git_blob_sha1": "1d62852480d4da4f74520ee298e5619945dea1c3",
+            "source_byte_size": 585801,
+            "source_sha256": "18b0fa6bc5206f395733b37e63fe84552e2f17777e82251ab04debbd58d981c0",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -977,7 +1097,37 @@
               "byte_size": 47262,
               "sha256": "6a0d820d192b354068b8c9bb4a1edf61ccf70eb3ca98212b812c8513fc023334"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/barbell-wrist-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 36907,
+              "sha256": "26832c27a9e64dbd3f91c0bbdd57782209fb54b309c8243a536bdfaeb6e718e1"
+            },
+            {
+              "path": "exercises-media/videos/barbell-wrist-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 71093,
+              "sha256": "71feb182fd2d1e4681897d37e1e51ce8b8b656105715825b48d81f2497b1a831"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-reverse-wrist-curl-over-grip.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-reverse-wrist-curl-over-grip",
+            "source_git_blob_sha1": "929db2c9d132105ea59491a0c89c9e300ef6d33f",
+            "source_byte_size": 1061805,
+            "source_sha256": "f7568ba22088f125182fa257140902d0b55da489bd3dab01e8309546f807d446",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -1134,7 +1284,37 @@
               "byte_size": 50794,
               "sha256": "52de5a12a42a5d8f6ffb3261b6739a43360a7ea2ee5463f5f5e8f79fbf56b1e8"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/battle-rope-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 235698,
+              "sha256": "d386c872b8bff2ff1560835c763a439bb179dbe5c77dbe1aaf3f5e791c4c9a94"
+            },
+            {
+              "path": "exercises-media/videos/battle-rope-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 427520,
+              "sha256": "a011d42f535d8971566ba5793849af46b7db557b175dbf99b2a7ae0bf2a18059"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/battling-ropes.mp4",
+            "source_gender": "male",
+            "source_slug": "battling-ropes",
+            "source_git_blob_sha1": "a793b5ed89b104650c45a43f4254c94dbd7907f9",
+            "source_byte_size": 1417969,
+            "source_sha256": "f2b52aaf18b0a912dae916ea498505265bb2705e2c3ff354b7955ec23557fe4d",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -1345,7 +1525,37 @@
               "byte_size": 41632,
               "sha256": "1de53e87f719ff3eaba7bd7ade76f45a4667f9e19aa5fd279e5396c0cfb2ddd0"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/bench-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 50133,
+              "sha256": "881665e2c697a5681b4e2a12e5ae9a476d75a01e591ceb8362236daae7934eac"
+            },
+            {
+              "path": "exercises-media/videos/bench-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 89250,
+              "sha256": "25709565db314c3c4f924708e3e80e66f8cc35cd41a0a2b62d6682fa8576cc3f"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-bench-press.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-bench-press",
+            "source_git_blob_sha1": "c3efd4a9f329edbe2b88bd4603539122b2eab865",
+            "source_byte_size": 342101,
+            "source_sha256": "2213efc53d0a8f5ac9dc6a952fe8e025f880496a7a55e768fd1bb367656a9fb8",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -1512,7 +1722,37 @@
               "byte_size": 31366,
               "sha256": "703831f4792cb40c76db2dcd887acfa6e2ec820ccae1e6b06ea3555ceb7d19a0"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/bodyweight-squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 55120,
+              "sha256": "1b7cde4ca44a8256dbc9d423f871e9a53a2b3c2dc2c954b431c0fb2b584d4409"
+            },
+            {
+              "path": "exercises-media/videos/bodyweight-squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 104399,
+              "sha256": "4d353a1bbfa6ccb42bb79c157053d9218ad64ae518f77f31341429746603473e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/squat.mp4",
+            "source_gender": "male",
+            "source_slug": "squat",
+            "source_git_blob_sha1": "569875f0aed28511c2d1cdde028fbd3b997f8405",
+            "source_byte_size": 1007268,
+            "source_sha256": "24cc1798f059e0e03ab0c483612387c15cba9b5d63ffd3ad28209ca9e4217840",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -1821,7 +2061,37 @@
               "byte_size": 35298,
               "sha256": "054d6a8c66a16f8a85f2fd9093a81609b2e35a795c8668a73005a685bf6be134"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/cable-crunch-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 40210,
+              "sha256": "6f4fb4e089301a1fc548a102c239b2d096e94530c20a4a3660d86056e24a2a93"
+            },
+            {
+              "path": "exercises-media/videos/cable-crunch-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 75808,
+              "sha256": "6aa47f59a32b18115dccdef71ef988e10583c6f95ba5707035918b378eb100fe"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-kneeling-crunch.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-kneeling-crunch",
+            "source_git_blob_sha1": "bb64d4e46c5b55018b9990de221f004f45d1a9fb",
+            "source_byte_size": 818852,
+            "source_sha256": "e747209f81cb6bfdda0e80f6f65ad7080bd05c5b517e6a7ce688a08d451f0ba7",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2026,7 +2296,37 @@
               "byte_size": 44118,
               "sha256": "b7ba2060bccb49a6d21c189db67bb7d853ede7218c473a284136d7ab32366e42"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/cable-fly-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 69410,
+              "sha256": "1546aa856b8b8a129e6959909bf23e6ccaf995396198a1d94e241bcfff8ead6e"
+            },
+            {
+              "path": "exercises-media/videos/cable-fly-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 126379,
+              "sha256": "ef5dabb6fa3238c04949614b80d5bc80615d5e9105ceda7c01ee27607660e657"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-standing-fly-crossover-fly.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-standing-fly-crossover-fly",
+            "source_git_blob_sha1": "9d52a724c001478ca6165bf95098f542ba237539",
+            "source_byte_size": 1077890,
+            "source_sha256": "5f9f9cb444e57b8637cc29821092b3ec0bd1150a1ad8648bdb9b0fd594b8c37d",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2187,7 +2487,37 @@
               "byte_size": 42610,
               "sha256": "170dc65d4d62c72380c6a5ff423898091e3bdc0fab25e599a87c38401d8e6744"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/cable-lateral-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 67322,
+              "sha256": "5a8c6c768e29f289dc1eee1f45e71523d2e1569be851e7692efd06a816f378f6"
+            },
+            {
+              "path": "exercises-media/videos/cable-lateral-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 121531,
+              "sha256": "16436cc6fcff71c8dded878ce74cbeb72c4c2c1887c5fc7d18b6ea89be484e5e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-lateral-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-lateral-raise",
+            "source_git_blob_sha1": "8b4b5e254a4c3297e7beea35f765e50e4ec5695b",
+            "source_byte_size": 1077687,
+            "source_sha256": "25ddb1dac82b16cde6984faba31a98d10edf661a95d0266f9e449dcc1713236b",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2348,7 +2678,37 @@
               "byte_size": 38022,
               "sha256": "3310bf5eae281c3c21d01886b8348220dd67114525332042b4eac29810b7ea46"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/cable-pushdown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 36567,
+              "sha256": "9da7a0ee1062ba7bca95530c1a0e3eea769d955bd00e8bd8d0e7f2bd5a4b2195"
+            },
+            {
+              "path": "exercises-media/videos/cable-pushdown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 66087,
+              "sha256": "9bcf0f63e072bc20e1cdb2d5b45fecd5d1f46f227a92376900aaff0ed835497f"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-triceps-pushdown.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-triceps-pushdown",
+            "source_git_blob_sha1": "a845bf4f483a6d40df782b04ffcc8e92b0d26cb8",
+            "source_byte_size": 818153,
+            "source_sha256": "d3dd7d327782383d1d6abdf91c0a21abec43a278c46a81b1932994f447fcc337",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2509,7 +2869,37 @@
               "byte_size": 55712,
               "sha256": "267e9da5519cb0d51d992aef654bd7a1d9d38a472ef49b6be71a418b3eea35be"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/calf-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 31552,
+              "sha256": "f3a873501ae4c8ae3d63a38e73c30f933ef9c7bbc6dffe29e08abb298dcf1980"
+            },
+            {
+              "path": "exercises-media/videos/calf-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 55925,
+              "sha256": "ac11e94ec433e82a66e913c368679c4527c6b91cd2ae32e6b74dcb5c89cc1bdc"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/sled-45-degree-calf-press.mp4",
+            "source_gender": "male",
+            "source_slug": "sled-45-degree-calf-press",
+            "source_git_blob_sha1": "5fc6d8003e9a917dc5cfcc76a83de5befca0e76e",
+            "source_byte_size": 251168,
+            "source_sha256": "04eb228aa6f460964c39fe2ef9507a1738558f54b4382207d662a77d25121bee",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2764,7 +3154,37 @@
             "width": 1280,
             "height": 720
           },
-          "poster_preferred": true
+          "poster_preferred": true,
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/chin-up-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 49457,
+              "sha256": "a34bc0e1bec2b38deb40443d3fcb538565c978129b6b422d6fa6766c382bff35"
+            },
+            {
+              "path": "exercises-media/videos/chin-up-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 91971,
+              "sha256": "41423eff61e7f43b15cff4f565f8193334ae1c8f0c1c88eea9a64ff4dbdf126c"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/reverse-grip-pull-up.mp4",
+            "source_gender": "male",
+            "source_slug": "reverse-grip-pull-up",
+            "source_git_blob_sha1": "b084e33ff90c4e17665bc169976d3198a7d14697",
+            "source_byte_size": 613023,
+            "source_sha256": "c4dd43ba34005cd8aac606cd761a9adf944462cc1149bdd7a11d7886a68d6871",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -2887,7 +3307,37 @@
               "byte_size": 49038,
               "sha256": "b6ef780ffdcb10636441d90f1395e65544aacf12732657d1f6f5f22e56e1bb06"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/close-grip-bench-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 58463,
+              "sha256": "19e59725d4aeed28cb816367cab825006b055de09a599b88007d286c72f5d8c8"
+            },
+            {
+              "path": "exercises-media/videos/close-grip-bench-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 104630,
+              "sha256": "adf012b044db18a880d83e3a02e6260e50a60456fcea94c3b3c334f1c87619ce"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-close-grip-bench-press.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-close-grip-bench-press",
+            "source_git_blob_sha1": "34da15a0e1b7251db45aa0453348d7449263b825",
+            "source_byte_size": 1061281,
+            "source_sha256": "6676c47c40ef7d72824f6a54904d0f15004929a71b3960cf0453e3284858f6c4",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3004,7 +3454,37 @@
               "byte_size": 37528,
               "sha256": "2ace336401ead9cea00f498ad10ea0b13b481aa03b342c79859f0f07fb07486c"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/close-grip-lat-pulldown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 47578,
+              "sha256": "0d0d0ad09dada979c82c5b117107acfd12ccaa8be8522ff95d81a4f7affb9fd9"
+            },
+            {
+              "path": "exercises-media/videos/close-grip-lat-pulldown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 85425,
+              "sha256": "40213c49e8d9771720323929aba119883ad26a5d089a09972c7fb6e6a22609d6"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-close-grip-front-lat-pulldown.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-close-grip-front-lat-pulldown",
+            "source_git_blob_sha1": "cded3b2b622bc0b5d964d6dcb8b08fa51dd46d02",
+            "source_byte_size": 854896,
+            "source_sha256": "bf800abe0f8f9304a9f7d4d22bed25adef97cfa6dea504aef87533e95a2f9098",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3121,7 +3601,37 @@
               "byte_size": 63504,
               "sha256": "f734ca3dea975ad094f974c60077370ab45ab7741e5bfb813480378eb1dac749"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/concentration-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 52017,
+              "sha256": "ee3de6cb962b8fed905d0fe1b50f4d6ff76e52ac17af0cabe297994fc63c8179"
+            },
+            {
+              "path": "exercises-media/videos/concentration-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 96134,
+              "sha256": "c4b3315c49d9357d0c614610394fbb587dc53ab4f39ce37752f148c9b03d9d2b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-concentration-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-concentration-curl",
+            "source_git_blob_sha1": "1bd3bd1b4f79b4f48a46e78d9e877be18e59ef72",
+            "source_byte_size": 400927,
+            "source_sha256": "34a8d9c900ef3bd4af43ec217291844e216f8de574facc99d78d4f80fdf69a10",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3282,7 +3792,37 @@
               "byte_size": 34284,
               "sha256": "5885800baea81a64c591f1ead07a225e19e19b3a54fabf23fdbddd1ab15177fb"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/db-squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 76893,
+              "sha256": "9d2f174ef2b22cb4415efe1536220936e83bb85e4f010c11ac4e46075eabe61b"
+            },
+            {
+              "path": "exercises-media/videos/db-squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 147740,
+              "sha256": "fac5b17d7f3b413b2e53a94ed50a6aafa418424628aaac6ca9a6241138d8464c"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-squat.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-squat",
+            "source_git_blob_sha1": "db3bd972435fa5d19d08f5fe0913a4cc449dd6a5",
+            "source_byte_size": 680920,
+            "source_sha256": "21bfdddd79626ab7fea80315c85bf43112a9bdd7207aaed0fc92cd68501f7ee6",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3376,7 +3916,36 @@
               "height": 180,
               "byte_size": 83236
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/deadlift-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111130,
+              "sha256": "afd8eedcefe2075cbf1bafb146876c9d04bfceb12bcb17038ed998446cd938bb"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/deadlift-0032-ila4NZS.gif",
+            "source_sha256": "85ca4e4f562df04d5b3d4f5378792873e4fab954c850f7104e14161f680dd568",
+            "source_asset_id": "gymvisual:0032:ila4NZS",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -3493,7 +4062,37 @@
               "byte_size": 45152,
               "sha256": "0ea6e6005946176f0fbc5163c6452b1a36151b87f72ec0368eebf28720d8ddf6"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/decline-bench-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 62407,
+              "sha256": "bf4ca4ef08542cf2485dd00535444ae9e910ed2f701f0853427fa97c4cf35bb3"
+            },
+            {
+              "path": "exercises-media/videos/decline-bench-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 111234,
+              "sha256": "052deb3613945dfa6e23d04d8b2bf9396947e9269d0b63978b9d1723bef02ef5"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-decline-bench-press.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-decline-bench-press",
+            "source_git_blob_sha1": "0bafd43e5304dfb4f2ce00b22bbb37542760fcb5",
+            "source_byte_size": 1076491,
+            "source_sha256": "7987edb735cc3d28509c4d545e551f619956803938a115aedcf2a28167009731",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3654,7 +4253,37 @@
               "byte_size": 42436,
               "sha256": "e61e6a9e0a9426b9ca7eabe32aecac6b152ef4ea91287a8fbc8a493fff826bb6"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/decline-dumbbell-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 69915,
+              "sha256": "66880cb934720d1402afec95a9795a4b239583d066d5a1880d25abd45bfcba25"
+            },
+            {
+              "path": "exercises-media/videos/decline-dumbbell-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 129684,
+              "sha256": "6e6f4dd16aebb86be773f3e380cb2c9303330e3a1a2251d4377fc4c15ea93472"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/decline-dumbbell-bench-press-45-degree.mp4",
+            "source_gender": "male",
+            "source_slug": "decline-dumbbell-bench-press-45-degree",
+            "source_git_blob_sha1": "9d3c71ddafc8a9f14adc5bee719872e17c9d358f",
+            "source_byte_size": 1145062,
+            "source_sha256": "c8b50249514f0286486cf450d3b5d8aa60e832669d1c16985515d3065e9fcc54",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3771,7 +4400,37 @@
               "byte_size": 48778,
               "sha256": "161652f269dc8ff210fcf2ba4043c2b232d2e86d192110cfca774522a37e76cc"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/donkey-calf-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 45164,
+              "sha256": "df6b09d7ee6e94a9f99edf9c36f53c8fbae1a1c2670bab8f2f24ed5b6bea1479"
+            },
+            {
+              "path": "exercises-media/videos/donkey-calf-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 82914,
+              "sha256": "c4d66d37ca31ac60748947a32b65da74256d1c572666c346f0c9ea857be03bb2"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/donkey-calf-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "donkey-calf-raise",
+            "source_git_blob_sha1": "77fc7c67af12ce12bf355fb18676f5f65fdad2dd",
+            "source_byte_size": 764627,
+            "source_sha256": "02647cfc93c884363c48fba4aa98ec2956c6fb7edc24d603fd6566dd0ebc3270",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -3976,7 +4635,37 @@
               "byte_size": 31730,
               "sha256": "7582c2dc4941625ac1bb1e1c16f67e9b4de37ffdd2de6a80b5fc5c06d5e92095"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/dumbbell-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 46753,
+              "sha256": "4f5ef940deffd979a44b894121abcb89817b1caf0c27c5ccd1dfa093200c8387"
+            },
+            {
+              "path": "exercises-media/videos/dumbbell-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 81733,
+              "sha256": "2b08fa1406b9bc199bfe9f69f70a86877c711d3722c3deba2670e9d1637dcd22"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-biceps-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-biceps-curl",
+            "source_git_blob_sha1": "631400700b0dd28cb1e2f10cfc23771330e71e72",
+            "source_byte_size": 304602,
+            "source_sha256": "a0b63b72251ff8ee8bad80e274ca90481f00503a0f245c9013ea8351d4a70378",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4093,7 +4782,37 @@
               "byte_size": 39002,
               "sha256": "5ba67c2ed2a2b889a7d37944946d6b057ac8cee8a371396f1da40b82e28b0e2c"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/dumbbell-fly-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 81438,
+              "sha256": "d434b2287ce5ad9f9f7f5008928e29a0d84d22e639b60fff68cb61edfb6a9fd4"
+            },
+            {
+              "path": "exercises-media/videos/dumbbell-fly-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 153802,
+              "sha256": "b8a267bb41a405676ea49e20f5b5ae53628840770c77dacc95bcf7c101b711b5"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-fly.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-fly",
+            "source_git_blob_sha1": "d3f6094164ad3572e7a4d7daa8a28af8dd99e7e8",
+            "source_byte_size": 570574,
+            "source_sha256": "b9d3562dc3a1b8d6a4fefbca36abe5525dce0b660738601d58e1798efb5b0d64",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4210,7 +4929,37 @@
               "byte_size": 29936,
               "sha256": "ef48469d5f19902a3233e7720acb841791b2858251237c3d6aebc281c064a8a2"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/dumbbell-front-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 46166,
+              "sha256": "2d88397b8f91693ac683c2ad1e7ab63c891c927aedd7de5cfca017aa3633dc5b"
+            },
+            {
+              "path": "exercises-media/videos/dumbbell-front-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 83456,
+              "sha256": "b686ff04895e6c62b09cc1e5bbe6f4a014d87ade9b209763462592568a200e80"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-front-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-front-raise",
+            "source_git_blob_sha1": "5dd2c90f8d68b1196cd95c4d0a39d33147375d3e",
+            "source_byte_size": 312469,
+            "source_sha256": "c2666be914b7580f1f85520544ea75a1f87359c54b245a99f3c819c836143ac6",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4327,7 +5076,37 @@
               "byte_size": 32646,
               "sha256": "1718371ace6ac8764a019a63138cf1343764fabb37fbd667a6917f4be3c57e2d"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/dumbbell-lateral-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 47739,
+              "sha256": "abd992a84a4a40426941028501b23756c9c12b2914b98eb4711e67cf4ddea669"
+            },
+            {
+              "path": "exercises-media/videos/dumbbell-lateral-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 87334,
+              "sha256": "93ae781211d795b6da01bace68aaa33113c0db0867e9a9a29d9ac9e454fcb4aa"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-lateral-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-lateral-raise",
+            "source_git_blob_sha1": "81f79ee47d08b8703fb39a29ddb7e58923731613",
+            "source_byte_size": 324030,
+            "source_sha256": "83a2e1a45c0ab7bf168072ae5e129abb9e0e6324578cc06abe77e07b3408115b",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4532,7 +5311,37 @@
               "byte_size": 30972,
               "sha256": "3995bbd552286aee74d60ea27af2cfccf6194992f01eebebab422a01b03dc5a1"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/dumbbell-shrug-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 24654,
+              "sha256": "b3d7b7deaf76c3151e42dccf95894232924949ac5dd3264ce519764c0732b95f"
+            },
+            {
+              "path": "exercises-media/videos/dumbbell-shrug-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 41790,
+              "sha256": "f6ddeeb3319af64dbe538ad2d5cbb238f6394835d55b8b3a0f100d6935c469d3"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-shrug.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-shrug",
+            "source_git_blob_sha1": "9d30760e8b130a84f544364c0c8dcc64f052a224",
+            "source_byte_size": 190816,
+            "source_sha256": "79167df756f3a09febe2786c71df09b55d9d94f948a05ff71ae55578202746d0",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4649,7 +5458,37 @@
               "byte_size": 48610,
               "sha256": "3bc5d3f882379db691294ef2c5c87f0329f0c3535df73f36754b09b01e9347f4"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/elliptical-trainer-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 95202,
+              "sha256": "510c76ae597bd7bc30cd343cb721c687ce023ed5be4727d339240c8ba59badab"
+            },
+            {
+              "path": "exercises-media/videos/elliptical-trainer-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 177245,
+              "sha256": "b1da367462d8704a4fbdbdc3c533dc3e5c48485b02d1c0ab63316ec2b967e5e0"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/elliptical.mp4",
+            "source_gender": "male",
+            "source_slug": "elliptical",
+            "source_git_blob_sha1": "5fb22e8ae9a76e5425524544435a186e23acad03",
+            "source_byte_size": 1443633,
+            "source_sha256": "5a025f6c2971339358c989ff1001bf63ce7f7ab537ab264d41016ede5a3834e5",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4766,7 +5605,37 @@
               "byte_size": 36974,
               "sha256": "0e0ebfe6662469a914055d7589a7082a1caf7ee0b9356e1fc605053f90351603"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/ez-bar-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 43769,
+              "sha256": "d314f3cad0bb6a965fa65248da62edc72a44a2109a911ccf8e04ac728dd70393"
+            },
+            {
+              "path": "exercises-media/videos/ez-bar-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 78774,
+              "sha256": "9c0644056f87013b7fa6bfe0ea4864a0f756ba8af9587d4bef89a8ccbadef9e7"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/ez-barbell-biceps-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "ez-barbell-biceps-curl",
+            "source_git_blob_sha1": "06b13d5625c6ecb336fd7fa4717d486b92b5996c",
+            "source_byte_size": 298518,
+            "source_sha256": "f7e09044f3f0d71a26170c54d417831e6e4da8896baa584a2154b6e82539a52e",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -4939,7 +5808,37 @@
               "byte_size": 35974,
               "sha256": "96109ddd8f6a8b9524e6e7fcf79b7902978cb184646a97d62a61a54b1db73a4a"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/front-squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 64576,
+              "sha256": "a07285f0824aeadbc81758ba828de2b19e3497981d004b861712830ccc8d2519"
+            },
+            {
+              "path": "exercises-media/videos/front-squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 125893,
+              "sha256": "acfbf395da0c1b38ea210203456e5d0dd0c24cd8e3ebf7cb7583b337df729d2c"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-front-chest-squat.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-front-chest-squat",
+            "source_git_blob_sha1": "502e35e9b95398f615584f5ac6b093ae298221bb",
+            "source_byte_size": 540786,
+            "source_sha256": "56cea6807289858f242edde6e984e55ff2e2e334fffccefa235ce1fdd1c8a3c0",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5100,7 +5999,37 @@
               "byte_size": 34138,
               "sha256": "4c2b2869a63b012fa5c94591f150a7978baac7533a1cbe4ab0606557c952d15a"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/goblet-squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 64891,
+              "sha256": "dee15df7da75913877471fef8cecab3b50eed9303ce2d250f37b30b59c63a711"
+            },
+            {
+              "path": "exercises-media/videos/goblet-squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 125601,
+              "sha256": "f9c4c32f97dcc281489252fe91dda9922fdf86a99c633e6220c3fdfc34f3263b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-goblet-squat.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-goblet-squat",
+            "source_git_blob_sha1": "e68a7269873ff7806219ceaedc9cf504e02d5909",
+            "source_byte_size": 742562,
+            "source_sha256": "6630a8b65dccb8d08a5fed9cb3e4da69132e55a62e138fa29c8ff9a51e1069ce",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5261,7 +6190,37 @@
               "byte_size": 56874,
               "sha256": "936194875ecbc20496f301d051d95c327798af1e2eeea0a21b72f2f88dda797d"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/hack-squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 57306,
+              "sha256": "ab799f1bb5ebc298864037982f43b19353b1cfcdedef1d2f9f9648610f51345f"
+            },
+            {
+              "path": "exercises-media/videos/hack-squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 109144,
+              "sha256": "7df516402fb29adeaac1cc01d6e104a669f2fbddf17cfc225419f46c11df1ba0"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/sled-hack-squat.mp4",
+            "source_gender": "male",
+            "source_slug": "sled-hack-squat",
+            "source_git_blob_sha1": "9ea581757599ad1a5fa7c8b50907995cc6ee7877",
+            "source_byte_size": 767008,
+            "source_sha256": "8f9bbe0d29dcf007e6bbf2fe0dcf1cca1d9330c715a52cdc90d78ff2d9590f03",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5472,7 +6431,37 @@
               "byte_size": 30164,
               "sha256": "10bee02713491a56a009715dd015b8bd19fb455eb802fe43cf46267340c3e3c0"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/hanging-leg-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 40356,
+              "sha256": "bb5131570f4c458e5d50abc9e48b17ac680f7801a9c622d1ccc442506200fa40"
+            },
+            {
+              "path": "exercises-media/videos/hanging-leg-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 73871,
+              "sha256": "78c26629b0d5fa07fe03fa3f83505c4223cfa7f40887be81c82759aac58fbd5a"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/hanging-straight-leg-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "hanging-straight-leg-raise",
+            "source_git_blob_sha1": "30b1741c00f421b64181bd107df435e6d3b43c80",
+            "source_byte_size": 254232,
+            "source_sha256": "e10d39fd9de3784ef4eb3a99c01352d7cac630478492c309757ffa762b1efee4",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5589,7 +6578,37 @@
               "byte_size": 36976,
               "sha256": "7da34b7ed277debb1549d12f4273eb042714f8f2cf6688ba18c7dd4486572c94"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/hip-abduction-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 57529,
+              "sha256": "ce1790a864e151b5cf880002ed49941bf485d9a57cedf823bfbd574384df5283"
+            },
+            {
+              "path": "exercises-media/videos/hip-abduction-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 106435,
+              "sha256": "99487a99369e8699d4fbb159a691632efb52e3fd186bca9d78a36afa063b7e09"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-hip-abduction.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-hip-abduction",
+            "source_git_blob_sha1": "3bbf8c40c479ced0781422e44bad384f437172ea",
+            "source_byte_size": 1064772,
+            "source_sha256": "89da735038c3f5b4b63816142814db0291a2a34baddd82b1192f2cb6b8d32f2a",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5706,7 +6725,37 @@
               "byte_size": 38778,
               "sha256": "36b4165894b8fb7def815e3e58c6aac7c28829ffe1edd4142c6a1d0db191e064"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/hip-adduction-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 56019,
+              "sha256": "bb2e8587691ab07be34767459c450d7bc7cc6a1688e2a6fcc157df4e8884b6f0"
+            },
+            {
+              "path": "exercises-media/videos/hip-adduction-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 97737,
+              "sha256": "b0766278ae8d232ef4a68895d7e9b4075b8cea5c3cdfee8470acca75d4902fef"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-hip-adduction.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-hip-adduction",
+            "source_git_blob_sha1": "f5d7fae89fb4d839295e75bf07c9229304aa7e65",
+            "source_byte_size": 957965,
+            "source_sha256": "dd07724755bf157c676f02c9a8724e222709cf7c65a830733709fd14c7370c52",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5873,7 +6922,37 @@
               "byte_size": 36220,
               "sha256": "eb4c613f7ec2827283b717f26f7067ff8bc0de032e6dcff6f3ad31256dad9532"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/hyperextension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 61066,
+              "sha256": "64e1634aeff822613cd285181412fe127274dff226cf0b34a37dd923da29a040"
+            },
+            {
+              "path": "exercises-media/videos/hyperextension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 114810,
+              "sha256": "777ac8d8825ff74d4f8627c97c773064cb34e71f454117332eaabad79b36aff4"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/45-degree-hyperextension.mp4",
+            "source_gender": "male",
+            "source_slug": "45-degree-hyperextension",
+            "source_git_blob_sha1": "91ab570dbfa0aea33644bed44cdc170a1f0b46c4",
+            "source_byte_size": 644586,
+            "source_sha256": "f9b354d87db239dc47debd769f9e6e41921575ad960beb47a31e1e0419e8f85d",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -5990,7 +7069,37 @@
               "byte_size": 43710,
               "sha256": "89d1a0b82f19f7a9494c2ab2fdcca3db885192023d0e36a01b1f7057af911d94"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/incline-bench-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 57031,
+              "sha256": "b8ddd2c69c02b71e9df60a250a59cacccbed5f569ddfee186a2dbfc6d1be8a3a"
+            },
+            {
+              "path": "exercises-media/videos/incline-bench-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 101018,
+              "sha256": "9da6632b9c00f77098da26cc178e240c7b43fac267813bbb78a1ab853518269e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-incline-bench-press.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-incline-bench-press",
+            "source_git_blob_sha1": "a672070c498bcdef2645573da36057174e78dc36",
+            "source_byte_size": 977670,
+            "source_sha256": "1ff6f81704f098a9437cd9bac4ac61a26cbbe2b19987951c3a7d2d89028bf4d1",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -6107,7 +7216,37 @@
               "byte_size": 40944,
               "sha256": "0579570a57d2d0023c3bc4b7efd5af65bd6503993c6c5f275348a181ba437ed9"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/incline-dumbbell-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 54141,
+              "sha256": "60b8a3b000b8733cde8d7a618c086dd7d903c61e1390259a23309f15efffa903"
+            },
+            {
+              "path": "exercises-media/videos/incline-dumbbell-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 94162,
+              "sha256": "b79c25ff642b2a4b0da1504388f971e6796b9ddbf1452b224634d3200b6dc7a3"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-incline-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-incline-curl",
+            "source_git_blob_sha1": "953e9c4491e6fd18fd47902dc44949fdbd5d7b90",
+            "source_byte_size": 346142,
+            "source_sha256": "89667c23ad544f41c77d97bf0cf6707c4df826789244a196cad965f8d32f883e",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -6224,7 +7363,37 @@
               "byte_size": 37052,
               "sha256": "f71cbfdbfd04cdfa36d857d04b7ceb5c5fafc03293e6a126395da23fd852d32f"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/incline-dumbbell-fly-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 51669,
+              "sha256": "a0c74fdd376f531baeb15b5ac51da3b431c45af425de2278a3fc576cc2dcc3ec"
+            },
+            {
+              "path": "exercises-media/videos/incline-dumbbell-fly-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 95969,
+              "sha256": "1a92ad72f8bbe2075b0c16b1ef5b1831e7a9d4ed5a170c289f486ea0db6ef289"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-incline-fly.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-incline-fly",
+            "source_git_blob_sha1": "91eff7a5a89395a4862fe42e20b53b8269fdca2a",
+            "source_byte_size": 895142,
+            "source_sha256": "e8252e1e651618575745ea867cd875902dd3e23cfcafa068a05aa85acfc83b7b",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -6341,7 +7510,37 @@
               "byte_size": 39514,
               "sha256": "94470f575eb554436ce8014e8a9412b8909ed905732cf3b7b10b90847e7ed543"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/incline-dumbbell-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 48867,
+              "sha256": "163f21f1c092bb4377ee7dc655f8c1a46d32dccb0b9c46a74f3c54d3f5177b44"
+            },
+            {
+              "path": "exercises-media/videos/incline-dumbbell-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 85196,
+              "sha256": "adcc9f3172fd3df1f8812f5971e5a1e1dd2e0267a779133fb24f723a960747b1"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-incline-bench-press.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-incline-bench-press",
+            "source_git_blob_sha1": "dcd5a183af0e7637d4ec614fc0b6b1b3a2163c97",
+            "source_byte_size": 326492,
+            "source_sha256": "aa1ae461a7a1a2d914f93bbf533519b458b359616a7556e77871fe4938f1caee",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -6596,7 +7795,37 @@
               "byte_size": 48040,
               "sha256": "364248384d2eaef5ee1d361cbdd1ad727b729259dc88808aa6e5e8d2eebdab63"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/jackknife-sit-up-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 76087,
+              "sha256": "749147dd85139e579ad3c7afd73719a5e7731f1c278eb748b4819b68f02a67d6"
+            },
+            {
+              "path": "exercises-media/videos/jackknife-sit-up-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 141002,
+              "sha256": "a90a5b3483841365f45de8aca26ca98c36d9f2a77c24c1d289e56309b5146f32"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/female/jack-knife-floor.mp4",
+            "source_gender": "female",
+            "source_slug": "jack-knife-floor",
+            "source_git_blob_sha1": "0ac265b860692c46c15b557a358a95eabb4376ae",
+            "source_byte_size": 7953885,
+            "source_sha256": "4c2f0a8b2c47e53a37a94c1749b35c11cbb59183a9ead599b2478df664d660e7",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -6713,7 +7942,37 @@
               "byte_size": 35530,
               "sha256": "ca36cdc2b3b4c488c101905c5d48e5afe530835a5cec3d06bb2b292ae7fecb43"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/jump-rope-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 201325,
+              "sha256": "828cd7202d2b2821bd91b60b99cf8f0113ab3276b323c4be2b410331a7ea006f"
+            },
+            {
+              "path": "exercises-media/videos/jump-rope-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 384524,
+              "sha256": "042c81fb5f04c881aa24ac75d900c32417e439611ccd779200f241f4b0911111"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/jump-rope.mp4",
+            "source_gender": "male",
+            "source_slug": "jump-rope",
+            "source_git_blob_sha1": "f912c6256686e8537ad1cd47bc152880b94a643c",
+            "source_byte_size": 2199174,
+            "source_sha256": "850cc02cdcfbafd84eebffc01485cea92f4b8ab0889b6a63eabfdeacc31f65f7",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7018,7 +8277,37 @@
               "byte_size": 34812,
               "sha256": "15d7624481948c1daf6ad67bda8913fb009bf738862b255e10ee017b82e707f4"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/lat-pulldown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 46094,
+              "sha256": "cb8c9bb2d91f9f29f301d010c532c3c65b167b1682e12825ca0c7364c49907ac"
+            },
+            {
+              "path": "exercises-media/videos/lat-pulldown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 79722,
+              "sha256": "4d3d2016347a76318a36af94597ae520f8630c3e6f3657760e52e08b6568cc0f"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-pulldown.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-pulldown",
+            "source_git_blob_sha1": "811be949fb5844f9133817d0aaefc1c676f53a40",
+            "source_byte_size": 859822,
+            "source_sha256": "9292066327f28663f29460ef834e7ee9d6f2982d9cb89d746ed9bdb3a8c293e6",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7135,7 +8424,37 @@
               "byte_size": 52976,
               "sha256": "9da8cd37e7125f2e8b35e52b33b5b1b5d726654724544632a498bd3f8b1330a1"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/leg-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 64040,
+              "sha256": "e9fa3bd1ea2ccd3b633420ed80d8df9c2f5c270d9f1214315cb07d8aa959719e"
+            },
+            {
+              "path": "exercises-media/videos/leg-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 120204,
+              "sha256": "1ef2207754ba9a6b525dc2c24ad5e163e18837fe6ac63e97c0ea1b4345448d7e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-leg-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-leg-curl",
+            "source_git_blob_sha1": "51d6059b21d951bf56fcd717f06eecaa44afd94f",
+            "source_byte_size": 1207672,
+            "source_sha256": "270f23601e5ef4d7ee08c1940f8be2b194490bb260468c225b4758ed4c3fcc8c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7252,7 +8571,37 @@
               "byte_size": 52770,
               "sha256": "0ef78b90e398696e23b6f3634fc4f96946aedd24d7bbb0973dce5e1138c7bf1b"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/leg-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 61191,
+              "sha256": "060f28d19e93af11023fdf3bd3561c42f6d47b3f7321ab33a1c17324bdc4618a"
+            },
+            {
+              "path": "exercises-media/videos/leg-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 112524,
+              "sha256": "4e5092bba0d1be84368aa879b9e670ef28820a2bab481ee6e002476b014b70d9"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-leg-extension.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-leg-extension",
+            "source_git_blob_sha1": "0312096bb18113853193d89f39ed6295c8194b7e",
+            "source_byte_size": 1123427,
+            "source_sha256": "ae50bef981128f5ffb3adb0dbe6e567594fafc8c03abb8fa449d0e6834d2391c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7413,7 +8762,37 @@
               "byte_size": 56534,
               "sha256": "a2a476c0893b59ba2394a23e2aca5269acd8c2df38b98170a10f566d516deadf"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/lever-high-row-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 84153,
+              "sha256": "b6622616c5fc7937e2594971a9e9f6ed3fda874278d6a48d151ff495725f2ccf"
+            },
+            {
+              "path": "exercises-media/videos/lever-high-row-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 156014,
+              "sha256": "af25d74caaa0535003cb80a828cb7d321f1f1e89f309e1a57074df3b5fbd9c51"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-high-row.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-high-row",
+            "source_git_blob_sha1": "6c814d10d6cbdf5253ccc932cf398bb1c565e093",
+            "source_byte_size": 656426,
+            "source_sha256": "41036fa064c7f4659f131ee1fa38085016f76be0b5dd47d6399ff55ffa7b5864",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7624,7 +9003,37 @@
               "byte_size": 39800,
               "sha256": "6208ec4984ed7948586b7bf260d35cd781e97f252b17808ae70c1cd63fd645ab"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/lying-dumbbell-triceps-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 57128,
+              "sha256": "810b64b58472ffafbd866c622fd439efb2be312fd3d7cf673bd974456970f8cf"
+            },
+            {
+              "path": "exercises-media/videos/lying-dumbbell-triceps-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 106238,
+              "sha256": "dea5262232ba16c812a4ee33b2f68dcf38fe454c46ec8a89ab438db6f4cb6d4d"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-lying-triceps-extension.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-lying-triceps-extension",
+            "source_git_blob_sha1": "8f627f56f3b5c0f8d193b4470057bc911e13d7a4",
+            "source_byte_size": 932887,
+            "source_sha256": "55ef9582da5eeacbb0908dc6d7bd333176c881f7d2cb73a097260f012b059e78",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -7712,7 +9121,36 @@
               "height": 180,
               "byte_size": 135362
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-chest-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 147140,
+              "sha256": "3b7f1a72870c55858996da96736c1271dd8ff2bf7140716770dde5d321125614"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-chest-press-0577-T0yTjgW.gif",
+            "source_sha256": "789515907e5001da8ced127bcf8969e7ab265f25545bf7f0a80dbb6f0da213b0",
+            "source_asset_id": "gymvisual:0577:T0yTjgW",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -7957,7 +9395,37 @@
               "byte_size": 36718,
               "sha256": "d44b838d48b1efc18e844eea0e25c8e0ae30b413c194582db4caabfe62bfe2a4"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/machine-glute-kickback-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 50909,
+              "sha256": "611da1989f6ce7d8814b6f2b2c35acebcc81deb4eae54fae2c0969c6c365c41b"
+            },
+            {
+              "path": "exercises-media/videos/machine-glute-kickback-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 84140,
+              "sha256": "1f8f3eda17ff05dd23011c8de746b74f5d71996df7946d404a44d93fdd203411"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-standing-rear-kick.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-standing-rear-kick",
+            "source_git_blob_sha1": "99258c19c63d9c86688c502c1805b1b58a784c96",
+            "source_byte_size": 715920,
+            "source_sha256": "8563b3dcbc6f617ac526ba10c33120b8c354584af8c7df036e826098e77d4b53",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -8080,7 +9548,37 @@
               "byte_size": 47092,
               "sha256": "2df8bfc98af69ead490cb7642ad823b348413c6ddee81339319acbc454fa0863"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/machine-incline-chest-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 73423,
+              "sha256": "2f2774b08101bf5b21ff55659121ff92178ca9ccbfbfce9b0e240bc438fba275"
+            },
+            {
+              "path": "exercises-media/videos/machine-incline-chest-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 129498,
+              "sha256": "8be81ba4bd8d950e60d5acb293d26d53f49d1284d160c839a705543ae77b59d8"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-incline-hammer-chest-press.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-incline-hammer-chest-press",
+            "source_git_blob_sha1": "085f128851e1a8e868313056aa0616a097a575cc",
+            "source_byte_size": 1135223,
+            "source_sha256": "fa9907b735cfa1c8ce971b56ac4f4389cbaba66b54d3089418f1c94e01c6bb38",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -8197,7 +9695,37 @@
               "byte_size": 41126,
               "sha256": "d79aefffa0ad4bf318aceabdf7cbea82dc38d5e18004437e2b51059746660299"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/machine-lateral-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 56998,
+              "sha256": "ca058dbb3feaab8b4356a6c4cbd8da46d47b92474ea070c424c084217c9c0698"
+            },
+            {
+              "path": "exercises-media/videos/machine-lateral-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 105056,
+              "sha256": "43abf5de235c99862ba1c3665b71bffb59185d173fe7955c7b50199cad0db03c"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-lateral-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-lateral-raise",
+            "source_git_blob_sha1": "bc2bb901e38a4e72bd858a50c1b84a2613d83265",
+            "source_byte_size": 989851,
+            "source_sha256": "f0399830a61066d5dfc1ec852a5e1c9408d0dadca7b8e88f731ee00d9497956c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -8402,7 +9930,37 @@
               "byte_size": 44936,
               "sha256": "9770d863a29c09855a8cb1a8105ed181c6f41676a677cd72675c1a0f7bf1957d"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/machine-seated-crunch-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 51965,
+              "sha256": "6c47583c7b1db9f6a8b27ce658f53924c512e8b6a1ff7d4d91401446af621a64"
+            },
+            {
+              "path": "exercises-media/videos/machine-seated-crunch-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 97569,
+              "sha256": "60bc696599a1d7011033a1cb59735c06b46368833c947c856793d6a94ec3bc7f"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-crunch-1.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-crunch-1",
+            "source_git_blob_sha1": "54483745cb129f8ead979c16f179fdf55242b2ec",
+            "source_byte_size": 1086233,
+            "source_sha256": "9b0c35f11dac6a78582383c9e3a66791f2634db2ae2fc30b6cd6b9fda01adaf2",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -8563,7 +10121,37 @@
               "byte_size": 44054,
               "sha256": "a964365540ff50680ffb814ff2ee236d0a35e5eabcf1baea59ba23a228965af8"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/machine-triceps-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 60689,
+              "sha256": "dd5c187819aa707ca5e498c7ddd1484b74f9dd95c3338202a177ee9e4767b6a4"
+            },
+            {
+              "path": "exercises-media/videos/machine-triceps-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 107371,
+              "sha256": "28c24fbfe8a438a6bab06d5f7b7fe96caf9b96c3b896fa78ea01fe9e3a4ffa36"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-triceps-extension.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-triceps-extension",
+            "source_git_blob_sha1": "5ec5c2881c80b8bb53e40890a761e7ff83b2bd4b",
+            "source_byte_size": 1054455,
+            "source_sha256": "b48a3889f623039e8a86cd44288308fe6d300208fab08b0c512572249b34d95a",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9056,7 +10644,37 @@
               "byte_size": 48500,
               "sha256": "79b61822be2281787422418d69a63729d4ec8358db5da23600eba8f805c2992f"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/overhead-triceps-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 53192,
+              "sha256": "2d7cd202f76962ae84c00c1e786cd4503fd33fa6e38b27b6cf518bddef3489dc"
+            },
+            {
+              "path": "exercises-media/videos/overhead-triceps-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 98327,
+              "sha256": "4131e7a5bd17318df9774d007efd67f94123184027e150c22cb0ccacf51abe6e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-rope-high-pulley-overhead-triceps-extension.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-rope-high-pulley-overhead-triceps-extension",
+            "source_git_blob_sha1": "f3c533a7325b446bb6cdb82a5f869f1433033ae1",
+            "source_byte_size": 1121213,
+            "source_sha256": "e4216a596b224cfe8590137e6d53cd7fe80e7215e2064ab1b7b1c366b1416bf1",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9179,7 +10797,37 @@
               "byte_size": 44302,
               "sha256": "ce2a21cd239daaf42974832251b8fe39322445100537cea98f69af433646f937"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/pec-deck-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 64426,
+              "sha256": "915a6200c1c59cbe6e878fcfa17e47ce83843af99cc2a209d6d4c5f4326ffe2d"
+            },
+            {
+              "path": "exercises-media/videos/pec-deck-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 111354,
+              "sha256": "80e310ab14291f2b5384b95254d40b8df42dab56f122390ddcc389e57c912393"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-pec-deck-fly.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-pec-deck-fly",
+            "source_git_blob_sha1": "a8dfe9930cb76d68962ebbbfc8ebb071cfa6ed06",
+            "source_byte_size": 393293,
+            "source_sha256": "e346e32ef22fbb83aa762c7d596f82c74dbc3124947d5e61d2565dbb8382ac0c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9390,7 +11038,37 @@
               "byte_size": 56116,
               "sha256": "a1ebbd9662c84d7bee5a12b83e27e2f38f671a588143fc3f2c649673a2f7e625"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/plank-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 39147,
+              "sha256": "00883c483782d0006c66b14eda79c3ce109909ce8f7d615913c275a62fb0165d"
+            },
+            {
+              "path": "exercises-media/videos/plank-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 74557,
+              "sha256": "2f446bd48f8d82312b773fcf141e673e2b460015248e5dd7cc03cc0b2138621b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/female/front-plank-female.mp4",
+            "source_gender": "female",
+            "source_slug": "front-plank-female",
+            "source_git_blob_sha1": "a7fa89e2561a48ecfbd77c25470b1fe95b587491",
+            "source_byte_size": 5377462,
+            "source_sha256": "78b40862cbac1a64be869846b20a494298e4e04b87c7e4d66df373444101ba8e",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9551,7 +11229,37 @@
               "byte_size": 48278,
               "sha256": "32c4e07fb664845b7558a36e9270a8171e8d63aed8ca1f4eaca0ce3122b43727"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/preacher-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 55553,
+              "sha256": "15d34858da96a2f2437136eefa4315c863cbc2c1b7af00a9d85d8b2923eac7ba"
+            },
+            {
+              "path": "exercises-media/videos/preacher-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 99758,
+              "sha256": "48de41787d2ce6e4d0c1a3d6b1a9a2afff39b840ff15f37aa4a9751da2433172"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-preacher-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-preacher-curl",
+            "source_git_blob_sha1": "6cd45fdfc5e91d3dff75c8cccb9ebf62e3a26d11",
+            "source_byte_size": 1054680,
+            "source_sha256": "2d2dfaace6ba18a10e4c7b86512ab16b49c2268463af6d70f59cc412d36eca28",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9668,7 +11376,37 @@
               "byte_size": 27314,
               "sha256": "db90c77f919b6420528d3154b08914634f3a7821dd55394e76858d86ca450c7c"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/pull-up-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 43545,
+              "sha256": "21a8d140e55cf7aa69141b1a8b14b8dffdb980071de0c4c5851d2a702837df7e"
+            },
+            {
+              "path": "exercises-media/videos/pull-up-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 78357,
+              "sha256": "263eaa601d087cab36644718d9c1fa8102901a524e88bd65809df588288d5c0d"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/pull-up-wide-front-grip.mp4",
+            "source_gender": "male",
+            "source_slug": "pull-up-wide-front-grip",
+            "source_git_blob_sha1": "e8c24808afc56e7d453c78d8b13eadd495c1b56b",
+            "source_byte_size": 326231,
+            "source_sha256": "7c8c370728bedd628f6250873b26146fb656dc67dc1fef1898a792aad0d37956",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -9791,7 +11529,37 @@
               "byte_size": 40914,
               "sha256": "e14b42dad1b20174a864c8495dcff992ea674a96f7f8ee365cdf964c6d798d4d"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/push-up-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 74675,
+              "sha256": "6345102171b1a360e2caa03ee8aa10d63ebd1c5c7945a094dd49735102430e40"
+            },
+            {
+              "path": "exercises-media/videos/push-up-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 140013,
+              "sha256": "2c853b7d1b9b74a4dbbd0d3c638f23a445905a7593ce13badd27ad39327d5525"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/push-ups.mp4",
+            "source_gender": "male",
+            "source_slug": "push-ups",
+            "source_git_blob_sha1": "8aba5de51cbdb214a596bba18bd72332e7fed26a",
+            "source_byte_size": 698022,
+            "source_sha256": "957dc6f62aa47fa550aff7cfabdf1e5390a4a232e94bdbfb71c8aa81cbe12490",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10046,7 +11814,37 @@
               "byte_size": 46036,
               "sha256": "7a79eef531a0fcd1791275905521978e3b9821d06248143dc9df991d0ed6faf4"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/reverse-crunch-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 92121,
+              "sha256": "4949b9b5972224570fffb128236142140add5fe362548bace7c8de54bdf587fd"
+            },
+            {
+              "path": "exercises-media/videos/reverse-crunch-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 175418,
+              "sha256": "11592ce1c61c0de1d6a62f141371237e2d1a3cc6d06791edd6fec9aadbf2f8b6"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/female/reverse-crunch-female.mp4",
+            "source_gender": "female",
+            "source_slug": "reverse-crunch-female",
+            "source_git_blob_sha1": "8a0a3b091a18c91372a448f28699ee4eb527a432",
+            "source_byte_size": 8976640,
+            "source_sha256": "690f3fd970da08d1a0b9deeb7c1984e1f1e2d099e7b38a6cd29491d0e8d3fd35",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10207,7 +12005,37 @@
               "byte_size": 45702,
               "sha256": "ad89b1b2a3a7e447f97a201018b3da0ce9bbe37beb14d878f2131cb0fb817fca"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/reverse-grip-lat-pulldown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 72442,
+              "sha256": "957fd9e824a77aaae6a3f30c2ba3eca0603ed87e6579ab0679f34877e607a186"
+            },
+            {
+              "path": "exercises-media/videos/reverse-grip-lat-pulldown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 127764,
+              "sha256": "4e227913a48033064e634fd1e94274d7e40f63c5bbeb7118944eadc17bdfc2a6"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/reverse-grip-machine-lat-pulldown.mp4",
+            "source_gender": "male",
+            "source_slug": "reverse-grip-machine-lat-pulldown",
+            "source_git_blob_sha1": "db9c7c3834231d7f3b9b9a985ecbef0da489abaa",
+            "source_byte_size": 1069802,
+            "source_sha256": "e9ada3e7692e3ba9fd8f3a214903ae8d8e20bb97653043451b1e505e5766d9cd",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10324,7 +12152,37 @@
               "byte_size": 49942,
               "sha256": "8cfbc40746daa1714ddf2ddeec0c08ea3cdecab0d439df4a27fb8f2bc5196360"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/reverse-hyperextension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 111738,
+              "sha256": "4b383c7a37d8fb823170612d7bd4526bd0c1e07220da041b522410d07425c20b"
+            },
+            {
+              "path": "exercises-media/videos/reverse-hyperextension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 207250,
+              "sha256": "ffeda8c011203dd6e73ab6833881991ebf8d125788d498dcf8508ad70195e81e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-reverse-hyperextension.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-reverse-hyperextension",
+            "source_git_blob_sha1": "765d12590fa02afaba42101c3a49eaf429656c10",
+            "source_byte_size": 766983,
+            "source_sha256": "17e8e03cecad2bfe1c9f927aa8347ad1787f15f7fba027e69eceddd706d99d7e",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10485,7 +12343,37 @@
               "byte_size": 41634,
               "sha256": "2ec79a8b34ecbf15803bf65f8511ac4336ac59e064e2194e76b8be9f56729a81"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/reverse-pec-deck-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 53031,
+              "sha256": "fe6ea5418591c6bcad2ed48b2d8b85fbd32a648900492c4c800bd1c681742171"
+            },
+            {
+              "path": "exercises-media/videos/reverse-pec-deck-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 96517,
+              "sha256": "2bb431b1071b3377ea809c5b280a332713760f85fd98e2a7ee19040ef161e553"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-reverse-fly.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-reverse-fly",
+            "source_git_blob_sha1": "19f80fe6c1e3a8aaf522d31b6d3a7b1efcde5f8c",
+            "source_byte_size": 968597,
+            "source_sha256": "46610fd85793d5dd395a9acbf1d778a3a2fd95537f65899b79d427b724f20601",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10690,7 +12578,37 @@
               "byte_size": 40108,
               "sha256": "1ab7d021e237fa04d52cb9cfe07b3aed4ef6b77aa323de33322d691dc5a50cc5"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/rope-pushdown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 34508,
+              "sha256": "78448d82ae2911f728ca933ebc4359491383566bfc110c48ec1dc05caf9e8964"
+            },
+            {
+              "path": "exercises-media/videos/rope-pushdown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 61396,
+              "sha256": "4c9d18b9c07a89c527ac994de18602b473b754ddf09a4a3b17d6939c3517e9e0"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-pushdown-rope-attachment.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-pushdown-rope-attachment",
+            "source_git_blob_sha1": "b177fb0ff87ed17ec608c0c24e563bbfa7ef7d45",
+            "source_byte_size": 601072,
+            "source_sha256": "8d61fd3ef8691a0105d521a19410b378260828e760ca65c119f561ed7cdad304",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -10742,7 +12660,36 @@
             }
           ],
           "poster_source": null,
-          "poster_sources": []
+          "poster_sources": [],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/russian-twist-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 196448,
+              "sha256": "a1fa19b9906701d2eea055dcc539e6f9ae24341e5ce37293b1f2ddbf1bd29c73"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/russian-twist-0687-XVDdcoj.gif",
+            "source_sha256": "e2b6ff4dbe4dd75c88b17d51380fe8426b3cc5705ca789a9b850bf56514b3c7d",
+            "source_asset_id": "gymvisual:0687:XVDdcoj",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10953,7 +12900,37 @@
               "byte_size": 35772,
               "sha256": "98f217a05feed3e4eb19fd1cf5311b299548e988ce757e89151e554f928df119"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/seated-calf-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 37976,
+              "sha256": "2bbb1744956e96fc2809faf3f7dac6b2b5fe250c1c8a97f2b0ac8aa1df18c46a"
+            },
+            {
+              "path": "exercises-media/videos/seated-calf-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 68678,
+              "sha256": "c902d97408dd3e6c5ae5dd5de7b2c3caa79690751f22f622b50570cebf6c9791"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-calf-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-calf-raise",
+            "source_git_blob_sha1": "74fd0bf404d4d11aa3b0c82466b3c704fce0a790",
+            "source_byte_size": 953172,
+            "source_sha256": "fc2f82c34e312221c2fadc4edc3ed11bd354b9eff5497975ad5956cb6f830a2c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -11070,7 +13047,37 @@
               "byte_size": 38316,
               "sha256": "604c84b8ee9a84dab82d524844623413dd8aa74ba6cf6c019f73f064855f6b42"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/seated-dumbbell-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 42159,
+              "sha256": "28b1cde0b1e8e718ee2916bb82098e10dd57b2afe6efb2f886650158947f8f43"
+            },
+            {
+              "path": "exercises-media/videos/seated-dumbbell-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 77019,
+              "sha256": "c4a88a055797fe2f4b740fc718cc9be41a4ec13c17aa4889e33356ad67ae741d"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/dumbbell-bench-seated-press.mp4",
+            "source_gender": "male",
+            "source_slug": "dumbbell-bench-seated-press",
+            "source_git_blob_sha1": "005565fe6b603ff136de35ef77e3bb8c6827a094",
+            "source_byte_size": 304048,
+            "source_sha256": "19a5abb57f831fce30124ff9dadc7205060a8d5524de5a396f8c1e5864a7a616",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -11187,7 +13194,37 @@
               "byte_size": 52976,
               "sha256": "9da8cd37e7125f2e8b35e52b33b5b1b5d726654724544632a498bd3f8b1330a1"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/seated-leg-curl-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 64040,
+              "sha256": "e9fa3bd1ea2ccd3b633420ed80d8df9c2f5c270d9f1214315cb07d8aa959719e"
+            },
+            {
+              "path": "exercises-media/videos/seated-leg-curl-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 120204,
+              "sha256": "1ef2207754ba9a6b525dc2c24ad5e163e18837fe6ac63e97c0ea1b4345448d7e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-seated-leg-curl.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-seated-leg-curl",
+            "source_git_blob_sha1": "51d6059b21d951bf56fcd717f06eecaa44afd94f",
+            "source_byte_size": 1207672,
+            "source_sha256": "270f23601e5ef4d7ee08c1940f8be2b194490bb260468c225b4758ed4c3fcc8c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -11344,7 +13381,37 @@
               "byte_size": 55080,
               "sha256": "429ce700113cf5063a1a4b8472177f0450598c0a2f321100ac5d625fa795abfd"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/side-plank-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 35812,
+              "sha256": "0a00d5b6a8b97582257503be7c46433c348afc9ae50dfb54bd15debfc2bf8a38"
+            },
+            {
+              "path": "exercises-media/videos/side-plank-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 66722,
+              "sha256": "7692933efd8aeaf2944f02ab8e3678019577e3d2e22ea25511e87f1ff86e6257"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/side-bridge-side-plank.mp4",
+            "source_gender": "male",
+            "source_slug": "side-bridge-side-plank",
+            "source_git_blob_sha1": "b287dd5a9e86ebdee5701ab31cf0c2d11df32cbd",
+            "source_byte_size": 409003,
+            "source_sha256": "b1cf7eaadfb80516e376528cc757a6e09a2902977b3b573b6a3f48807c315619",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -11461,7 +13528,37 @@
               "byte_size": 33746,
               "sha256": "2f36b83738c876d251fbff53d65ee81318508b15a956539b8ffba1eb99baf8dc"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/single-arm-cable-triceps-extension-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 31135,
+              "sha256": "a597e6033cbbfedcc30c3e8cedca2896dc59a32a3d087105d251a06f661eed19"
+            },
+            {
+              "path": "exercises-media/videos/single-arm-cable-triceps-extension-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 54026,
+              "sha256": "0bbed803fe69b01e2a00729a3ff86443e9b4bc1bb3927994fd546288d2b2800b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-standing-one-arm-triceps-extension.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-standing-one-arm-triceps-extension",
+            "source_git_blob_sha1": "234f1496646335d028fb4e654992a5a80c5cae18",
+            "source_byte_size": 654305,
+            "source_sha256": "66687472a79a8b07b487fccfa6653fa537f5f03d265a57d945524f0e97ea6d89",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -11860,7 +13957,37 @@
               "byte_size": 47320,
               "sha256": "dc6f83e56d889c5c1353497e57b43363b644fea7649dbdf1cbefcbd3eb6a0318"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/smith-shoulder-press-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 53886,
+              "sha256": "7bb4c5400e6eac2cf22684b11d2f87fe5d3fad637327ebc6210211bd0be8033d"
+            },
+            {
+              "path": "exercises-media/videos/smith-shoulder-press-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 95801,
+              "sha256": "7082c17438b99c7d61dc19d2fa05b4d5bb3fcece5304d5e68675ec9358e1cd6b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/smith-seated-shoulder-press.mp4",
+            "source_gender": "male",
+            "source_slug": "smith-seated-shoulder-press",
+            "source_git_blob_sha1": "54941bc7472352d0292fd251161e35cff0c8d5db",
+            "source_byte_size": 1037398,
+            "source_sha256": "ebfab014c32d09d9d3a3c56283fca6fc53c9ca77cbdcb0514caf965fa100184c",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12153,7 +14280,37 @@
               "byte_size": 31366,
               "sha256": "703831f4792cb40c76db2dcd887acfa6e2ec820ccae1e6b06ea3555ceb7d19a0"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/squat-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 55120,
+              "sha256": "1b7cde4ca44a8256dbc9d423f871e9a53a2b3c2dc2c954b431c0fb2b584d4409"
+            },
+            {
+              "path": "exercises-media/videos/squat-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 104399,
+              "sha256": "4d353a1bbfa6ccb42bb79c157053d9218ad64ae518f77f31341429746603473e"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/squat.mp4",
+            "source_gender": "male",
+            "source_slug": "squat",
+            "source_git_blob_sha1": "569875f0aed28511c2d1cdde028fbd3b997f8405",
+            "source_byte_size": 1007268,
+            "source_sha256": "24cc1798f059e0e03ab0c483612387c15cba9b5d63ffd3ad28209ca9e4217840",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12314,7 +14471,37 @@
               "byte_size": 39708,
               "sha256": "ce0df3de2e83e90183de6741b9e5d88aa01e41637dbb23de5819b2696fc2c8bf"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/standing-calf-raise-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 31964,
+              "sha256": "2c7c0331d617d59940b1122b3991685364895a88b28ae86063979a348abcd9f3"
+            },
+            {
+              "path": "exercises-media/videos/standing-calf-raise-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 59133,
+              "sha256": "42a41c6e423b32b5c975ab93446283b66a65b8e164eacf02f103392cada02324"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-standing-calf-raise.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-standing-calf-raise",
+            "source_git_blob_sha1": "c36a7d2614c3f877ca863c32ae5581bc2b2f088f",
+            "source_byte_size": 315258,
+            "source_sha256": "e58b11a05b5f715738440a3bcddf2e7a2efeda048a32a00d0a9008d5b27e1193",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12437,7 +14624,37 @@
               "byte_size": 35482,
               "sha256": "6faaf5e393aacbdf269bf26c6f944cf3a64debfe917ac1810036a366ebbc1f60"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/stationary-bike-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 55715,
+              "sha256": "7849fcefda3e699e01b0f8164a19b317dcfcc35bd9dbd046fec5f889709afd6c"
+            },
+            {
+              "path": "exercises-media/videos/stationary-bike-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 98942,
+              "sha256": "916eb4a4318acf8ffbdee2ca136370c9fb271fc6f829f89341e06eefdbc7c152"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/stationary-bike.mp4",
+            "source_gender": "male",
+            "source_slug": "stationary-bike",
+            "source_git_blob_sha1": "5403dd4122f033b8ff4600946ad6f15b2ac24cb2",
+            "source_byte_size": 964289,
+            "source_sha256": "aca9d5adb759229ac0d162fdb2212e4c24c0660395edbc595a18ae0e3df86a77",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12598,7 +14815,37 @@
               "byte_size": 31318,
               "sha256": "ff65e4eefeede2fb30a800b84fe1a19ae6fa251beb3e23cad275d56a7fe08b2c"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/stiff-leg-deadlift-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 81937,
+              "sha256": "b8c36040fa701801d16f1501bf8d817bc638e85473cae2fa6d6fc2a91b13bfff"
+            },
+            {
+              "path": "exercises-media/videos/stiff-leg-deadlift-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 154528,
+              "sha256": "ce82b5811706882aa2ad08657ce12314db46f4a8833adfe71d2591c75745bc9b"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/barbell-straight-leg-deadlift.mp4",
+            "source_gender": "male",
+            "source_slug": "barbell-straight-leg-deadlift",
+            "source_git_blob_sha1": "0dda23fed97ec01fe10f8cd870172a90724e7b35",
+            "source_byte_size": 591588,
+            "source_sha256": "76056e077fa4017ae19c0239e1e7e9e260d1f474acd53baf691958ada1736960",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12715,7 +14962,37 @@
               "byte_size": 45676,
               "sha256": "da2b90753d9c0e11146b47989fc4cc98c532671f1682a15a45052563eb968cbc"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/straight-arm-pulldown-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 45830,
+              "sha256": "f712fb576efffcdb6f32821c978b04914781a3b6b97e42a86aff24e815d40286"
+            },
+            {
+              "path": "exercises-media/videos/straight-arm-pulldown-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 83281,
+              "sha256": "d5fabd320e253022ad9229eb81c8e33f498c7feafcae7e5b0a36a228d7b41dee"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-straight-arm-pulldown.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-straight-arm-pulldown",
+            "source_git_blob_sha1": "5d98645060152642b371246c274d201ca371ec6b",
+            "source_byte_size": 335758,
+            "source_sha256": "ba035bad3738ee8259f6f6439e2e1e96cb08c7faf8286ab68b599980511dc24a",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -12888,7 +15165,37 @@
               "byte_size": 36462,
               "sha256": "5febf8ede5a22d2c8cf936ac88a59ac3a09c59c2e717a2819ba8038a0e78f778"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/t-bar-row-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 51466,
+              "sha256": "f647edfab7c13e1ea1ab57ec7b52790c3fe03a892f938bcf2fc6af893eba2abb"
+            },
+            {
+              "path": "exercises-media/videos/t-bar-row-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 97294,
+              "sha256": "b8df3a6c9d369abc607173b1f2e5cde0f3088babf34a2a220f64b2afe1910729"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/lever-t-bar-row.mp4",
+            "source_gender": "male",
+            "source_slug": "lever-t-bar-row",
+            "source_git_blob_sha1": "7edc48a65bd4d6bb727a79dd0d3d22ec83adc8c8",
+            "source_byte_size": 1018720,
+            "source_sha256": "b73050249bf6a0dac281a9b48ad5e9c7945043fc136bb0d55a7d20968de924ea",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -13290,7 +15597,36 @@
               "height": 180,
               "byte_size": 125502
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/walking-lunge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 160255,
+              "sha256": "a74a9a92deac7134ff1ef68ad80b658b32321163924b642bdf4994e2364cc0f0"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/walking-lunge-1460-IZVHb27.gif",
+            "source_sha256": "4e7878086e684439f88bb9e69e5f4b07bdcdaf37a0418f2956f99f5d70082bb7",
+            "source_asset_id": "gymvisual:1460:IZVHb27",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13503,7 +15839,37 @@
               "byte_size": 39402,
               "sha256": "8ff869669327263e9d7e657cba70801488b1b227a2ea69a78d794bfbf7a71e6e"
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "exercises-media/videos/woodchopper-480p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 854,
+              "height": 480,
+              "byte_size": 78037,
+              "sha256": "af6282a254e02f679466618328032ae39b899dbf68af4ff9157f0c4418fe2a78"
+            },
+            {
+              "path": "exercises-media/videos/woodchopper-720p-h264.mp4",
+              "mime_type": "video/mp4",
+              "width": 1280,
+              "height": 720,
+              "byte_size": 148254,
+              "sha256": "019ee8556792bd1fb449438375e0b2367de86143de1ed125a1e413d8bd223bed"
+            }
+          ],
+          "video_provenance": {
+            "source_name": "Exercises Media",
+            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
+            "source_path": "public/videos/male/cable-twist-up-down.mp4",
+            "source_gender": "male",
+            "source_slug": "cable-twist-up-down",
+            "source_git_blob_sha1": "ace90f9993b6e4cea5ae17e0cfb3dba08ab0f1ee",
+            "source_byte_size": 1287272,
+            "source_sha256": "fbe43288975e64dba66c3ad83aff8235df1e61a2d78e785d8e4f490832f421a0",
+            "rights_basis": "owner_confirmed_unrestricted_use_2026-10-16",
+            "transformation": "ffmpeg-h264-24fps-yuv420p-480p-crf30-720p-crf29"
+          }
         }
       ]
     },
@@ -13597,8 +15963,8 @@
     }
   },
   "hq_poster_count": 77,
-  "hq_video_count": 2,
-  "hq_video_total_bytes": 531115,
+  "hq_video_count": 77,
+  "hq_video_total_bytes": 13215657,
   "hd_source": {
     "name": "Exercises Media",
     "url": "https://github.com/akajdid-mostafa/exercises-media",
@@ -13610,5 +15976,7 @@
   "hd_rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
   "poster_variant_count": 462,
   "hd_baseline_asset_count": 334,
-  "hd_baseline_total_bytes": 18352704
+  "hd_baseline_total_bytes": 18352704,
+  "ai_upscaled_video_count": 4,
+  "ai_upscaled_video_total_bytes": 614973
 }

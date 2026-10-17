@@ -54,7 +54,7 @@ describe('ExerciseMediaAsset', () => {
     expect(image).toHaveAttribute('data-media-mode', 'static-poster');
   });
 
-  it('prefers a verified HD poster and keeps animation as a fallback', () => {
+  it('keeps animation primary and uses the verified HD poster only after a playback failure', () => {
     render(
       <ExerciseMediaAsset
         alt="Тяга: техника движения"
@@ -78,8 +78,12 @@ describe('ExerciseMediaAsset', () => {
     );
 
     const image = screen.getByAltText('Тяга: техника движения');
-    expect(image).toHaveAttribute('data-media-mode', 'static-poster');
-    expect(image).toHaveAttribute(
+    expect(image).toHaveAttribute('data-media-mode', 'animated');
+    expect(image).toHaveAttribute('src', '/static/exercise-guides/gymvisual/example.gif');
+    fireEvent.error(image);
+    const fallback = screen.getByAltText('Тяга: техника движения');
+    expect(fallback).toHaveAttribute('data-media-mode', 'static-poster');
+    expect(fallback).toHaveAttribute(
       'src',
       '/static/exercise-guides/exercises-media/example/poster-1280.jpg',
     );
@@ -87,9 +91,31 @@ describe('ExerciseMediaAsset', () => {
       'srcset',
       expect.stringContaining('poster-1280.webp 1280w'),
     );
-    fireEvent.error(image);
-    const fallback = screen.getByAltText('Тяга: техника движения');
+  });
+  it('uses approved AI video before the original GIF and recovers on error', () => {
+    render(
+      <ExerciseMediaAsset
+        alt="Становая тяга"
+        variant="animation"
+        animationUrl="/static/exercise-guides/gymvisual/deadlift.gif"
+        thumbnailUrl="/static/exercise-guides/gymvisual/deadlift.jpg"
+        videoSources={[
+          {
+            url: '/static/exercise-guides/gymvisual/ai-reviewed/deadlift-x4plus-720.mp4',
+            mime_type: 'video/mp4',
+            width: 720,
+          },
+        ]}
+      />,
+    );
+    const video = screen.getByLabelText('Становая тяга');
+    expect(video).toHaveAttribute('data-media-mode', 'video');
+    expect(video).toHaveAttribute('autoplay');
+    expect(video).toHaveProperty('muted', true);
+    expect(video).toHaveAttribute('playsinline');
+    fireEvent.error(video);
+    const fallback = screen.getByAltText('Становая тяга');
+    expect(fallback).toHaveAttribute('src', '/static/exercise-guides/gymvisual/deadlift.gif');
     expect(fallback).toHaveAttribute('data-media-mode', 'animated');
-    expect(fallback).toHaveAttribute('src', '/static/exercise-guides/gymvisual/example.gif');
   });
 });

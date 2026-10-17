@@ -484,6 +484,7 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 "media_thumbnail_sources": media_previews[item.id]["thumbnail_sources"],
                 "media_preferred_mode": media_previews[item.id]["preferred_mode"],
                 "media_animation_url": media_previews[item.id]["animation_url"],
+                "media_video_sources": media_previews[item.id]["video_sources"],
                 "progression_guidance": (
                     progression_guidance[item.id] if metric_types[item.id] == "strength" else None
                 ),

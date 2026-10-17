@@ -41,19 +41,23 @@ def test_video_profiles_are_additive_and_keep_original_gif() -> None:
         assert get_guide_media_preview(slug)["animation_url"] == source.url
 
 
-def test_video_variants_never_escape_approved_pilot() -> None:
-    (still_gif,) = guide("squat")
+def test_unmatched_exercises_retain_legacy_gif() -> None:
+    (still_gif,) = guide("ab-wheel")
     assert still_gif["video_sources"] == []
     assert still_gif["url"].endswith(".gif")
     assert guide("unknown-slug") == []
 
 
-def test_verified_static_media_is_image_only_and_responsive() -> None:
+def test_verified_static_media_plays_hd_video_and_keeps_responsive_poster() -> None:
     (source,) = guide("machine-glute-kickback")
     media = ExerciseGuideMedia.model_validate(source)
     assert media.type == "image"
     assert media.url.endswith("/poster-1280.jpg")
-    assert media.video_sources == []
+    assert [(variant.width, variant.height) for variant in media.video_sources] == [
+        (854, 480),
+        (1280, 720),
+    ]
+    assert get_guide_media_preview("machine-glute-kickback")["video_sources"]
     assert [(variant.width, variant.mime_type) for variant in media.sources] == [
         (640, "image/jpeg"),
         (640, "image/webp"),
@@ -62,3 +66,17 @@ def test_verified_static_media_is_image_only_and_responsive() -> None:
         (1920, "image/jpeg"),
         (1920, "image/webp"),
     ]
+
+
+def test_ai_upscaled_media_uses_video_and_falls_back_to_source_gif() -> None:
+    for slug in ("machine-chest-press", "deadlift", "russian-twist", "walking-lunge"):
+        (item,) = guide(slug)
+        media = ExerciseGuideMedia.model_validate(item)
+        assert media.type == "animation"
+        assert media.url.endswith(".gif")
+        assert media.sources[0].mime_type == "image/gif"
+        assert [(s.width, s.height) for s in media.video_sources] == [(720, 720)]
+        assert media.video_sources[0].url.endswith(f"/{slug}-x4plus-720.mp4")
+        preview = get_guide_media_preview(slug)
+        assert preview["animation_url"] == media.url
+        assert preview["video_sources"][0]["mime_type"] == "video/mp4"

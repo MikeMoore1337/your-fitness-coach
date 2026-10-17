@@ -4863,6 +4863,7 @@ button.today-text-link {
   background: var(--bg-soft);
 }
 .active-workout-exercise__media img,
+.active-workout-exercise__media video,
 .active-workout-exercise__media .exercise-media-asset--missing {
   display: block;
   width: 100%;
