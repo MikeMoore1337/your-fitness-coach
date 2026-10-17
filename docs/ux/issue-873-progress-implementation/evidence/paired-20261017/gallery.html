@@ -1,12 +1,12 @@
 <!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Issue #873 · BEFORE / AFTER</title>
 <style>:root{color-scheme:light dark;--bg:#f7f7f4;--surface:#fff;--ink:#171914;--muted:#62665b;--line:#d9ddd2;--accent:#a8ff00}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:1600px;margin:0 auto;padding:32px}h1{margin:0 0 8px;font-size:clamp(28px,4vw,48px);letter-spacing:-.04em}h2{font-size:18px;margin:0 0 12px}p{color:var(--muted)}code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em}.meta{padding:20px;border:1px solid var(--line);border-radius:18px;background:var(--surface);margin:24px 0 32px}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,680px),1fr));gap:24px}.pair{border:1px solid var(--line);border-radius:18px;background:var(--surface);padding:16px;box-shadow:0 5px 18px #0000000d}.images{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}figure{margin:0;min-width:0}figcaption{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 8px;word-break:break-word}img{display:block;width:100%;height:auto;border:1px solid var(--line);border-radius:12px;background:#fff}.pair-metrics{width:100%;border-collapse:collapse;margin-top:14px;font-size:12px}.pair-metrics th,.pair-metrics td{border-top:1px solid var(--line);padding:5px;text-align:right}.pair-metrics th:first-child{text-align:left}.pair-metrics td:last-child{font-weight:700;color:#527500}@media(max-width:640px){main{padding:16px}.images{grid-template-columns:1fr}.gallery{display:block}.pair{margin-bottom:16px}}@media(prefers-color-scheme:dark){:root{--bg:#151713;--surface:#20231d;--ink:#f2f4ec;--muted:#aeb5a5;--line:#444a3e}.pair-metrics td:last-child{color:#baff45}}</style></head><body><main>
 <h1>Issue #873 · парная галерея</h1>
-<div class="meta"><p><strong>BEFORE</strong> — exact base <code>4c92832415d4eb994cf6b849a67074742f07ea50</code>; <strong>AFTER</strong> — PR application revision <code>223408e2</code>.</p><p>Одинаковые synthetic fixture, Chromium, light/dark, viewport widths 320/360/393/430/1440, heights 844/1000, region <code>.progress-details</code>, scrollY=0. Клик по каждой паре открывает исходный JPEG.</p><p>Галерея содержит 88 пар: six sections × default matrix, expanded states at 393/1440 and Add measurement action states at 393/1440.</p></div>
+<div class="meta"><p><strong>BEFORE</strong> — exact base <code>4c92832415d4eb994cf6b849a67074742f07ea50</code>; <strong>AFTER</strong> — PR application revision <code>66e5f050cba410c605c0cbb804c7d153e9e8aee7</code>.</p><p>Одинаковые synthetic fixture, Chromium, light/dark, viewport widths 320/360/393/430/1440, heights 844/1000, region <code>.progress-details</code>, scrollY=0. Клик по каждой паре открывает исходный JPEG.</p><p>Галерея содержит 88 пар: six sections × default matrix, expanded states at 393/1440 and Add measurement action states at 393/1440.</p></div>
 <section class="gallery"><article class="pair" data-section="body" data-theme="light" data-state="default">
 <h2>Тело · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-320-default.jpg"><img loading="lazy" src="before/light-body-320-default.jpg" alt="BEFORE: Тело · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-320-default.jpg"><img loading="lazy" src="after/light-body-320-default.jpg" alt="AFTER: Тело · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-320-default.jpg"><img loading="lazy" src="after/light-body-320-default.jpg" alt="AFTER: Тело · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1629</td><td>1753</td><td>+124</td></tr>
@@ -18,7 +18,7 @@
 <h2>Тренировки · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-320-default.jpg"><img loading="lazy" src="before/light-training-320-default.jpg" alt="BEFORE: Тренировки · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-320-default.jpg"><img loading="lazy" src="after/light-training-320-default.jpg" alt="AFTER: Тренировки · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-320-default.jpg"><img loading="lazy" src="after/light-training-320-default.jpg" alt="AFTER: Тренировки · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1033</td><td>1014</td><td>-19</td></tr>
@@ -30,7 +30,7 @@
 <h2>Питание · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-320-default.jpg"><img loading="lazy" src="before/light-nutrition-320-default.jpg" alt="BEFORE: Питание · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-320-default.jpg"><img loading="lazy" src="after/light-nutrition-320-default.jpg" alt="AFTER: Питание · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-320-default.jpg"><img loading="lazy" src="after/light-nutrition-320-default.jpg" alt="AFTER: Питание · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8093</td><td>8343</td><td>+250</td></tr>
@@ -42,7 +42,7 @@
 <h2>Кардио · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-320-default.jpg"><img loading="lazy" src="before/light-cardio-320-default.jpg" alt="BEFORE: Кардио · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-320-default.jpg"><img loading="lazy" src="after/light-cardio-320-default.jpg" alt="AFTER: Кардио · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-320-default.jpg"><img loading="lazy" src="after/light-cardio-320-default.jpg" alt="AFTER: Кардио · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>579</td><td>487</td><td>-92</td></tr>
@@ -54,7 +54,7 @@
 <h2>Самочувствие · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-320-default.jpg"><img loading="lazy" src="before/light-wellbeing-320-default.jpg" alt="BEFORE: Самочувствие · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-320-default.jpg"><img loading="lazy" src="after/light-wellbeing-320-default.jpg" alt="AFTER: Самочувствие · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-320-default.jpg"><img loading="lazy" src="after/light-wellbeing-320-default.jpg" alt="AFTER: Самочувствие · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>273</td><td>+203</td></tr>
@@ -66,7 +66,7 @@
 <h2>История · 320×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-320-default.jpg"><img loading="lazy" src="before/light-history-320-default.jpg" alt="BEFORE: История · 320×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-320-default.jpg"><img loading="lazy" src="after/light-history-320-default.jpg" alt="AFTER: История · 320×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-320-default.jpg"><img loading="lazy" src="after/light-history-320-default.jpg" alt="AFTER: История · 320×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>509</td><td>+359</td></tr>
@@ -78,7 +78,7 @@
 <h2>Тело · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-360-default.jpg"><img loading="lazy" src="before/light-body-360-default.jpg" alt="BEFORE: Тело · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-360-default.jpg"><img loading="lazy" src="after/light-body-360-default.jpg" alt="AFTER: Тело · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-360-default.jpg"><img loading="lazy" src="after/light-body-360-default.jpg" alt="AFTER: Тело · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1580</td><td>1700</td><td>+120</td></tr>
@@ -90,7 +90,7 @@
 <h2>Тренировки · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-360-default.jpg"><img loading="lazy" src="before/light-training-360-default.jpg" alt="BEFORE: Тренировки · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-360-default.jpg"><img loading="lazy" src="after/light-training-360-default.jpg" alt="AFTER: Тренировки · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-360-default.jpg"><img loading="lazy" src="after/light-training-360-default.jpg" alt="AFTER: Тренировки · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>994</td><td>957</td><td>-37</td></tr>
@@ -102,7 +102,7 @@
 <h2>Питание · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-360-default.jpg"><img loading="lazy" src="before/light-nutrition-360-default.jpg" alt="BEFORE: Питание · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-360-default.jpg"><img loading="lazy" src="after/light-nutrition-360-default.jpg" alt="AFTER: Питание · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-360-default.jpg"><img loading="lazy" src="after/light-nutrition-360-default.jpg" alt="AFTER: Питание · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8054</td><td>8304</td><td>+250</td></tr>
@@ -114,7 +114,7 @@
 <h2>Кардио · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-360-default.jpg"><img loading="lazy" src="before/light-cardio-360-default.jpg" alt="BEFORE: Кардио · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-360-default.jpg"><img loading="lazy" src="after/light-cardio-360-default.jpg" alt="AFTER: Кардио · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-360-default.jpg"><img loading="lazy" src="after/light-cardio-360-default.jpg" alt="AFTER: Кардио · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>556</td><td>445</td><td>-111</td></tr>
@@ -126,7 +126,7 @@
 <h2>Самочувствие · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-360-default.jpg"><img loading="lazy" src="before/light-wellbeing-360-default.jpg" alt="BEFORE: Самочувствие · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-360-default.jpg"><img loading="lazy" src="after/light-wellbeing-360-default.jpg" alt="AFTER: Самочувствие · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-360-default.jpg"><img loading="lazy" src="after/light-wellbeing-360-default.jpg" alt="AFTER: Самочувствие · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>253</td><td>+183</td></tr>
@@ -138,7 +138,7 @@
 <h2>История · 360×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-360-default.jpg"><img loading="lazy" src="before/light-history-360-default.jpg" alt="BEFORE: История · 360×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-360-default.jpg"><img loading="lazy" src="after/light-history-360-default.jpg" alt="AFTER: История · 360×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-360-default.jpg"><img loading="lazy" src="after/light-history-360-default.jpg" alt="AFTER: История · 360×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -150,7 +150,7 @@
 <h2>Тело · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-393-default.jpg"><img loading="lazy" src="before/light-body-393-default.jpg" alt="BEFORE: Тело · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-393-default.jpg"><img loading="lazy" src="after/light-body-393-default.jpg" alt="AFTER: Тело · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-393-default.jpg"><img loading="lazy" src="after/light-body-393-default.jpg" alt="AFTER: Тело · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1561</td><td>1700</td><td>+139</td></tr>
@@ -162,7 +162,7 @@
 <h2>Тренировки · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-393-default.jpg"><img loading="lazy" src="before/light-training-393-default.jpg" alt="BEFORE: Тренировки · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-393-default.jpg"><img loading="lazy" src="after/light-training-393-default.jpg" alt="AFTER: Тренировки · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-393-default.jpg"><img loading="lazy" src="after/light-training-393-default.jpg" alt="AFTER: Тренировки · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>975</td><td>938</td><td>-37</td></tr>
@@ -174,7 +174,7 @@
 <h2>Питание · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-393-default.jpg"><img loading="lazy" src="before/light-nutrition-393-default.jpg" alt="BEFORE: Питание · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-393-default.jpg"><img loading="lazy" src="after/light-nutrition-393-default.jpg" alt="AFTER: Питание · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-393-default.jpg"><img loading="lazy" src="after/light-nutrition-393-default.jpg" alt="AFTER: Питание · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8002</td><td>8228</td><td>+226</td></tr>
@@ -186,7 +186,7 @@
 <h2>Кардио · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-393-default.jpg"><img loading="lazy" src="before/light-cardio-393-default.jpg" alt="BEFORE: Кардио · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-393-default.jpg"><img loading="lazy" src="after/light-cardio-393-default.jpg" alt="AFTER: Кардио · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-393-default.jpg"><img loading="lazy" src="after/light-cardio-393-default.jpg" alt="AFTER: Кардио · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -198,7 +198,7 @@
 <h2>Самочувствие · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-393-default.jpg"><img loading="lazy" src="before/light-wellbeing-393-default.jpg" alt="BEFORE: Самочувствие · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-393-default.jpg"><img loading="lazy" src="after/light-wellbeing-393-default.jpg" alt="AFTER: Самочувствие · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-393-default.jpg"><img loading="lazy" src="after/light-wellbeing-393-default.jpg" alt="AFTER: Самочувствие · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>253</td><td>+183</td></tr>
@@ -210,7 +210,7 @@
 <h2>История · 393×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-393-default.jpg"><img loading="lazy" src="before/light-history-393-default.jpg" alt="BEFORE: История · 393×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-393-default.jpg"><img loading="lazy" src="after/light-history-393-default.jpg" alt="AFTER: История · 393×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-393-default.jpg"><img loading="lazy" src="after/light-history-393-default.jpg" alt="AFTER: История · 393×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -222,7 +222,7 @@
 <h2>Тело · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-430-default.jpg"><img loading="lazy" src="before/light-body-430-default.jpg" alt="BEFORE: Тело · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-430-default.jpg"><img loading="lazy" src="after/light-body-430-default.jpg" alt="AFTER: Тело · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-430-default.jpg"><img loading="lazy" src="after/light-body-430-default.jpg" alt="AFTER: Тело · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1534</td><td>1657</td><td>+123</td></tr>
@@ -234,7 +234,7 @@
 <h2>Тренировки · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-430-default.jpg"><img loading="lazy" src="before/light-training-430-default.jpg" alt="BEFORE: Тренировки · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-430-default.jpg"><img loading="lazy" src="after/light-training-430-default.jpg" alt="AFTER: Тренировки · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-430-default.jpg"><img loading="lazy" src="after/light-training-430-default.jpg" alt="AFTER: Тренировки · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>975</td><td>925</td><td>-50</td></tr>
@@ -246,7 +246,7 @@
 <h2>Питание · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-430-default.jpg"><img loading="lazy" src="before/light-nutrition-430-default.jpg" alt="BEFORE: Питание · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-430-default.jpg"><img loading="lazy" src="after/light-nutrition-430-default.jpg" alt="AFTER: Питание · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-430-default.jpg"><img loading="lazy" src="after/light-nutrition-430-default.jpg" alt="AFTER: Питание · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>7972</td><td>8198</td><td>+226</td></tr>
@@ -258,7 +258,7 @@
 <h2>Кардио · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-430-default.jpg"><img loading="lazy" src="before/light-cardio-430-default.jpg" alt="BEFORE: Кардио · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-430-default.jpg"><img loading="lazy" src="after/light-cardio-430-default.jpg" alt="AFTER: Кардио · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-430-default.jpg"><img loading="lazy" src="after/light-cardio-430-default.jpg" alt="AFTER: Кардио · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -270,7 +270,7 @@
 <h2>Самочувствие · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-430-default.jpg"><img loading="lazy" src="before/light-wellbeing-430-default.jpg" alt="BEFORE: Самочувствие · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-430-default.jpg"><img loading="lazy" src="after/light-wellbeing-430-default.jpg" alt="AFTER: Самочувствие · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-430-default.jpg"><img loading="lazy" src="after/light-wellbeing-430-default.jpg" alt="AFTER: Самочувствие · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>233</td><td>+163</td></tr>
@@ -282,7 +282,7 @@
 <h2>История · 430×844 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-430-default.jpg"><img loading="lazy" src="before/light-history-430-default.jpg" alt="BEFORE: История · 430×844 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-430-default.jpg"><img loading="lazy" src="after/light-history-430-default.jpg" alt="AFTER: История · 430×844 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-430-default.jpg"><img loading="lazy" src="after/light-history-430-default.jpg" alt="AFTER: История · 430×844 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -294,7 +294,7 @@
 <h2>Тело · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-1440-default.jpg"><img loading="lazy" src="before/light-body-1440-default.jpg" alt="BEFORE: Тело · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-1440-default.jpg"><img loading="lazy" src="after/light-body-1440-default.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-1440-default.jpg"><img loading="lazy" src="after/light-body-1440-default.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1302</td><td>1294</td><td>-8</td></tr>
@@ -306,7 +306,7 @@
 <h2>Тренировки · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-1440-default.jpg"><img loading="lazy" src="before/light-training-1440-default.jpg" alt="BEFORE: Тренировки · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-1440-default.jpg"><img loading="lazy" src="after/light-training-1440-default.jpg" alt="AFTER: Тренировки · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-1440-default.jpg"><img loading="lazy" src="after/light-training-1440-default.jpg" alt="AFTER: Тренировки · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>694</td><td>715</td><td>+21</td></tr>
@@ -318,7 +318,7 @@
 <h2>Питание · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-1440-default.jpg"><img loading="lazy" src="before/light-nutrition-1440-default.jpg" alt="BEFORE: Питание · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-1440-default.jpg"><img loading="lazy" src="after/light-nutrition-1440-default.jpg" alt="AFTER: Питание · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-1440-default.jpg"><img loading="lazy" src="after/light-nutrition-1440-default.jpg" alt="AFTER: Питание · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3912</td><td>4059</td><td>+147</td></tr>
@@ -330,7 +330,7 @@
 <h2>Кардио · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-1440-default.jpg"><img loading="lazy" src="before/light-cardio-1440-default.jpg" alt="BEFORE: Кардио · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-1440-default.jpg"><img loading="lazy" src="after/light-cardio-1440-default.jpg" alt="AFTER: Кардио · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-1440-default.jpg"><img loading="lazy" src="after/light-cardio-1440-default.jpg" alt="AFTER: Кардио · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>334</td><td>334</td><td>0</td></tr>
@@ -342,7 +342,7 @@
 <h2>Самочувствие · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-1440-default.jpg"><img loading="lazy" src="before/light-wellbeing-1440-default.jpg" alt="BEFORE: Самочувствие · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-1440-default.jpg"><img loading="lazy" src="after/light-wellbeing-1440-default.jpg" alt="AFTER: Самочувствие · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-1440-default.jpg"><img loading="lazy" src="after/light-wellbeing-1440-default.jpg" alt="AFTER: Самочувствие · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>82</td><td>215</td><td>+133</td></tr>
@@ -354,7 +354,7 @@
 <h2>История · 1440×1000 · светлая · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-1440-default.jpg"><img loading="lazy" src="before/light-history-1440-default.jpg" alt="BEFORE: История · 1440×1000 · светлая · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-1440-default.jpg"><img loading="lazy" src="after/light-history-1440-default.jpg" alt="AFTER: История · 1440×1000 · светлая · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-1440-default.jpg"><img loading="lazy" src="after/light-history-1440-default.jpg" alt="AFTER: История · 1440×1000 · светлая · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>176</td><td>485</td><td>+309</td></tr>
@@ -366,7 +366,7 @@
 <h2>Тело · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-393-expanded.jpg"><img loading="lazy" src="before/light-body-393-expanded.jpg" alt="BEFORE: Тело · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-393-expanded.jpg"><img loading="lazy" src="after/light-body-393-expanded.jpg" alt="AFTER: Тело · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-393-expanded.jpg"><img loading="lazy" src="after/light-body-393-expanded.jpg" alt="AFTER: Тело · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3532</td><td>3448</td><td>-84</td></tr>
@@ -378,7 +378,7 @@
 <h2>Тренировки · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-393-expanded.jpg"><img loading="lazy" src="before/light-training-393-expanded.jpg" alt="BEFORE: Тренировки · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-393-expanded.jpg"><img loading="lazy" src="after/light-training-393-expanded.jpg" alt="AFTER: Тренировки · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-393-expanded.jpg"><img loading="lazy" src="after/light-training-393-expanded.jpg" alt="AFTER: Тренировки · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1686</td><td>1649</td><td>-37</td></tr>
@@ -390,7 +390,7 @@
 <h2>Питание · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-393-expanded.jpg"><img loading="lazy" src="before/light-nutrition-393-expanded.jpg" alt="BEFORE: Питание · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-393-expanded.jpg"><img loading="lazy" src="after/light-nutrition-393-expanded.jpg" alt="AFTER: Питание · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-393-expanded.jpg"><img loading="lazy" src="after/light-nutrition-393-expanded.jpg" alt="AFTER: Питание · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8191</td><td>8518</td><td>+327</td></tr>
@@ -402,7 +402,7 @@
 <h2>Кардио · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-393-expanded.jpg"><img loading="lazy" src="before/light-cardio-393-expanded.jpg" alt="BEFORE: Кардио · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-393-expanded.jpg"><img loading="lazy" src="after/light-cardio-393-expanded.jpg" alt="AFTER: Кардио · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-393-expanded.jpg"><img loading="lazy" src="after/light-cardio-393-expanded.jpg" alt="AFTER: Кардио · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -414,7 +414,7 @@
 <h2>Самочувствие · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-393-expanded.jpg"><img loading="lazy" src="before/light-wellbeing-393-expanded.jpg" alt="BEFORE: Самочувствие · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-393-expanded.jpg"><img loading="lazy" src="after/light-wellbeing-393-expanded.jpg" alt="AFTER: Самочувствие · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-393-expanded.jpg"><img loading="lazy" src="after/light-wellbeing-393-expanded.jpg" alt="AFTER: Самочувствие · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>229</td><td>253</td><td>+24</td></tr>
@@ -426,7 +426,7 @@
 <h2>История · 393×844 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-393-expanded.jpg"><img loading="lazy" src="before/light-history-393-expanded.jpg" alt="BEFORE: История · 393×844 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-393-expanded.jpg"><img loading="lazy" src="after/light-history-393-expanded.jpg" alt="AFTER: История · 393×844 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-393-expanded.jpg"><img loading="lazy" src="after/light-history-393-expanded.jpg" alt="AFTER: История · 393×844 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>925</td><td>901</td><td>-24</td></tr>
@@ -438,7 +438,7 @@
 <h2>Тело · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-1440-expanded.jpg"><img loading="lazy" src="before/light-body-1440-expanded.jpg" alt="BEFORE: Тело · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-1440-expanded.jpg"><img loading="lazy" src="after/light-body-1440-expanded.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-1440-expanded.jpg"><img loading="lazy" src="after/light-body-1440-expanded.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>2477</td><td>1824</td><td>-653</td></tr>
@@ -450,7 +450,7 @@
 <h2>Тренировки · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-training-1440-expanded.jpg"><img loading="lazy" src="before/light-training-1440-expanded.jpg" alt="BEFORE: Тренировки · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-training-1440-expanded.jpg"><img loading="lazy" src="after/light-training-1440-expanded.jpg" alt="AFTER: Тренировки · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-training-1440-expanded.jpg"><img loading="lazy" src="after/light-training-1440-expanded.jpg" alt="AFTER: Тренировки · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1132</td><td>1153</td><td>+21</td></tr>
@@ -462,7 +462,7 @@
 <h2>Питание · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-nutrition-1440-expanded.jpg"><img loading="lazy" src="before/light-nutrition-1440-expanded.jpg" alt="BEFORE: Питание · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-nutrition-1440-expanded.jpg"><img loading="lazy" src="after/light-nutrition-1440-expanded.jpg" alt="AFTER: Питание · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-nutrition-1440-expanded.jpg"><img loading="lazy" src="after/light-nutrition-1440-expanded.jpg" alt="AFTER: Питание · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>4007</td><td>4204</td><td>+197</td></tr>
@@ -474,7 +474,7 @@
 <h2>Кардио · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-cardio-1440-expanded.jpg"><img loading="lazy" src="before/light-cardio-1440-expanded.jpg" alt="BEFORE: Кардио · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-cardio-1440-expanded.jpg"><img loading="lazy" src="after/light-cardio-1440-expanded.jpg" alt="AFTER: Кардио · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-cardio-1440-expanded.jpg"><img loading="lazy" src="after/light-cardio-1440-expanded.jpg" alt="AFTER: Кардио · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>334</td><td>334</td><td>0</td></tr>
@@ -486,7 +486,7 @@
 <h2>Самочувствие · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-wellbeing-1440-expanded.jpg"><img loading="lazy" src="before/light-wellbeing-1440-expanded.jpg" alt="BEFORE: Самочувствие · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-wellbeing-1440-expanded.jpg"><img loading="lazy" src="after/light-wellbeing-1440-expanded.jpg" alt="AFTER: Самочувствие · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-wellbeing-1440-expanded.jpg"><img loading="lazy" src="after/light-wellbeing-1440-expanded.jpg" alt="AFTER: Самочувствие · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>187</td><td>215</td><td>+28</td></tr>
@@ -498,7 +498,7 @@
 <h2>История · 1440×1000 · светлая · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-history-1440-expanded.jpg"><img loading="lazy" src="before/light-history-1440-expanded.jpg" alt="BEFORE: История · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-history-1440-expanded.jpg"><img loading="lazy" src="after/light-history-1440-expanded.jpg" alt="AFTER: История · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-history-1440-expanded.jpg"><img loading="lazy" src="after/light-history-1440-expanded.jpg" alt="AFTER: История · 1440×1000 · светлая · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>894</td><td>857</td><td>-37</td></tr>
@@ -510,7 +510,7 @@
 <h2>Тело · 393×844 · светлая · Действие: добавить замер</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-393-action-add-measurement.jpg"><img loading="lazy" src="before/light-body-393-action-add-measurement.jpg" alt="BEFORE: Тело · 393×844 · светлая · Действие: добавить замер"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-393-action-add-measurement.jpg"><img loading="lazy" src="after/light-body-393-action-add-measurement.jpg" alt="AFTER: Тело · 393×844 · светлая · Действие: добавить замер"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-393-action-add-measurement.jpg"><img loading="lazy" src="after/light-body-393-action-add-measurement.jpg" alt="AFTER: Тело · 393×844 · светлая · Действие: добавить замер"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3048</td><td>3161</td><td>+113</td></tr>
@@ -522,7 +522,7 @@
 <h2>Тело · 1440×1000 · светлая · Действие: добавить замер</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/light-body-1440-action-add-measurement.jpg"><img loading="lazy" src="before/light-body-1440-action-add-measurement.jpg" alt="BEFORE: Тело · 1440×1000 · светлая · Действие: добавить замер"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/light-body-1440-action-add-measurement.jpg"><img loading="lazy" src="after/light-body-1440-action-add-measurement.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Действие: добавить замер"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/light-body-1440-action-add-measurement.jpg"><img loading="lazy" src="after/light-body-1440-action-add-measurement.jpg" alt="AFTER: Тело · 1440×1000 · светлая · Действие: добавить замер"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>2204</td><td>1736</td><td>-468</td></tr>
@@ -534,7 +534,7 @@
 <h2>Тело · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-320-default.jpg"><img loading="lazy" src="before/dark-body-320-default.jpg" alt="BEFORE: Тело · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-320-default.jpg"><img loading="lazy" src="after/dark-body-320-default.jpg" alt="AFTER: Тело · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-320-default.jpg"><img loading="lazy" src="after/dark-body-320-default.jpg" alt="AFTER: Тело · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1629</td><td>1753</td><td>+124</td></tr>
@@ -546,7 +546,7 @@
 <h2>Тренировки · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-320-default.jpg"><img loading="lazy" src="before/dark-training-320-default.jpg" alt="BEFORE: Тренировки · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-320-default.jpg"><img loading="lazy" src="after/dark-training-320-default.jpg" alt="AFTER: Тренировки · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-320-default.jpg"><img loading="lazy" src="after/dark-training-320-default.jpg" alt="AFTER: Тренировки · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1033</td><td>1014</td><td>-19</td></tr>
@@ -558,7 +558,7 @@
 <h2>Питание · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-320-default.jpg"><img loading="lazy" src="before/dark-nutrition-320-default.jpg" alt="BEFORE: Питание · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-320-default.jpg"><img loading="lazy" src="after/dark-nutrition-320-default.jpg" alt="AFTER: Питание · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-320-default.jpg"><img loading="lazy" src="after/dark-nutrition-320-default.jpg" alt="AFTER: Питание · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8093</td><td>8343</td><td>+250</td></tr>
@@ -570,7 +570,7 @@
 <h2>Кардио · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-320-default.jpg"><img loading="lazy" src="before/dark-cardio-320-default.jpg" alt="BEFORE: Кардио · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-320-default.jpg"><img loading="lazy" src="after/dark-cardio-320-default.jpg" alt="AFTER: Кардио · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-320-default.jpg"><img loading="lazy" src="after/dark-cardio-320-default.jpg" alt="AFTER: Кардио · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>579</td><td>487</td><td>-92</td></tr>
@@ -582,7 +582,7 @@
 <h2>Самочувствие · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-320-default.jpg"><img loading="lazy" src="before/dark-wellbeing-320-default.jpg" alt="BEFORE: Самочувствие · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-320-default.jpg"><img loading="lazy" src="after/dark-wellbeing-320-default.jpg" alt="AFTER: Самочувствие · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-320-default.jpg"><img loading="lazy" src="after/dark-wellbeing-320-default.jpg" alt="AFTER: Самочувствие · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>273</td><td>+203</td></tr>
@@ -594,7 +594,7 @@
 <h2>История · 320×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-320-default.jpg"><img loading="lazy" src="before/dark-history-320-default.jpg" alt="BEFORE: История · 320×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-320-default.jpg"><img loading="lazy" src="after/dark-history-320-default.jpg" alt="AFTER: История · 320×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-320-default.jpg"><img loading="lazy" src="after/dark-history-320-default.jpg" alt="AFTER: История · 320×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>509</td><td>+359</td></tr>
@@ -606,7 +606,7 @@
 <h2>Тело · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-360-default.jpg"><img loading="lazy" src="before/dark-body-360-default.jpg" alt="BEFORE: Тело · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-360-default.jpg"><img loading="lazy" src="after/dark-body-360-default.jpg" alt="AFTER: Тело · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-360-default.jpg"><img loading="lazy" src="after/dark-body-360-default.jpg" alt="AFTER: Тело · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1580</td><td>1700</td><td>+120</td></tr>
@@ -618,7 +618,7 @@
 <h2>Тренировки · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-360-default.jpg"><img loading="lazy" src="before/dark-training-360-default.jpg" alt="BEFORE: Тренировки · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-360-default.jpg"><img loading="lazy" src="after/dark-training-360-default.jpg" alt="AFTER: Тренировки · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-360-default.jpg"><img loading="lazy" src="after/dark-training-360-default.jpg" alt="AFTER: Тренировки · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>994</td><td>957</td><td>-37</td></tr>
@@ -630,7 +630,7 @@
 <h2>Питание · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-360-default.jpg"><img loading="lazy" src="before/dark-nutrition-360-default.jpg" alt="BEFORE: Питание · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-360-default.jpg"><img loading="lazy" src="after/dark-nutrition-360-default.jpg" alt="AFTER: Питание · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-360-default.jpg"><img loading="lazy" src="after/dark-nutrition-360-default.jpg" alt="AFTER: Питание · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8054</td><td>8304</td><td>+250</td></tr>
@@ -642,7 +642,7 @@
 <h2>Кардио · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-360-default.jpg"><img loading="lazy" src="before/dark-cardio-360-default.jpg" alt="BEFORE: Кардио · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-360-default.jpg"><img loading="lazy" src="after/dark-cardio-360-default.jpg" alt="AFTER: Кардио · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-360-default.jpg"><img loading="lazy" src="after/dark-cardio-360-default.jpg" alt="AFTER: Кардио · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>556</td><td>445</td><td>-111</td></tr>
@@ -654,7 +654,7 @@
 <h2>Самочувствие · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-360-default.jpg"><img loading="lazy" src="before/dark-wellbeing-360-default.jpg" alt="BEFORE: Самочувствие · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-360-default.jpg"><img loading="lazy" src="after/dark-wellbeing-360-default.jpg" alt="AFTER: Самочувствие · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-360-default.jpg"><img loading="lazy" src="after/dark-wellbeing-360-default.jpg" alt="AFTER: Самочувствие · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>253</td><td>+183</td></tr>
@@ -666,7 +666,7 @@
 <h2>История · 360×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-360-default.jpg"><img loading="lazy" src="before/dark-history-360-default.jpg" alt="BEFORE: История · 360×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-360-default.jpg"><img loading="lazy" src="after/dark-history-360-default.jpg" alt="AFTER: История · 360×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-360-default.jpg"><img loading="lazy" src="after/dark-history-360-default.jpg" alt="AFTER: История · 360×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -678,7 +678,7 @@
 <h2>Тело · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-393-default.jpg"><img loading="lazy" src="before/dark-body-393-default.jpg" alt="BEFORE: Тело · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-393-default.jpg"><img loading="lazy" src="after/dark-body-393-default.jpg" alt="AFTER: Тело · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-393-default.jpg"><img loading="lazy" src="after/dark-body-393-default.jpg" alt="AFTER: Тело · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1561</td><td>1700</td><td>+139</td></tr>
@@ -690,7 +690,7 @@
 <h2>Тренировки · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-393-default.jpg"><img loading="lazy" src="before/dark-training-393-default.jpg" alt="BEFORE: Тренировки · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-393-default.jpg"><img loading="lazy" src="after/dark-training-393-default.jpg" alt="AFTER: Тренировки · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-393-default.jpg"><img loading="lazy" src="after/dark-training-393-default.jpg" alt="AFTER: Тренировки · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>975</td><td>938</td><td>-37</td></tr>
@@ -702,7 +702,7 @@
 <h2>Питание · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-393-default.jpg"><img loading="lazy" src="before/dark-nutrition-393-default.jpg" alt="BEFORE: Питание · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-393-default.jpg"><img loading="lazy" src="after/dark-nutrition-393-default.jpg" alt="AFTER: Питание · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-393-default.jpg"><img loading="lazy" src="after/dark-nutrition-393-default.jpg" alt="AFTER: Питание · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8002</td><td>8228</td><td>+226</td></tr>
@@ -714,7 +714,7 @@
 <h2>Кардио · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-393-default.jpg"><img loading="lazy" src="before/dark-cardio-393-default.jpg" alt="BEFORE: Кардио · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-393-default.jpg"><img loading="lazy" src="after/dark-cardio-393-default.jpg" alt="AFTER: Кардио · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-393-default.jpg"><img loading="lazy" src="after/dark-cardio-393-default.jpg" alt="AFTER: Кардио · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -726,7 +726,7 @@
 <h2>Самочувствие · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-393-default.jpg"><img loading="lazy" src="before/dark-wellbeing-393-default.jpg" alt="BEFORE: Самочувствие · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-393-default.jpg"><img loading="lazy" src="after/dark-wellbeing-393-default.jpg" alt="AFTER: Самочувствие · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-393-default.jpg"><img loading="lazy" src="after/dark-wellbeing-393-default.jpg" alt="AFTER: Самочувствие · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>253</td><td>+183</td></tr>
@@ -738,7 +738,7 @@
 <h2>История · 393×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-393-default.jpg"><img loading="lazy" src="before/dark-history-393-default.jpg" alt="BEFORE: История · 393×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-393-default.jpg"><img loading="lazy" src="after/dark-history-393-default.jpg" alt="AFTER: История · 393×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-393-default.jpg"><img loading="lazy" src="after/dark-history-393-default.jpg" alt="AFTER: История · 393×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -750,7 +750,7 @@
 <h2>Тело · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-430-default.jpg"><img loading="lazy" src="before/dark-body-430-default.jpg" alt="BEFORE: Тело · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-430-default.jpg"><img loading="lazy" src="after/dark-body-430-default.jpg" alt="AFTER: Тело · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-430-default.jpg"><img loading="lazy" src="after/dark-body-430-default.jpg" alt="AFTER: Тело · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1534</td><td>1657</td><td>+123</td></tr>
@@ -762,7 +762,7 @@
 <h2>Тренировки · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-430-default.jpg"><img loading="lazy" src="before/dark-training-430-default.jpg" alt="BEFORE: Тренировки · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-430-default.jpg"><img loading="lazy" src="after/dark-training-430-default.jpg" alt="AFTER: Тренировки · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-430-default.jpg"><img loading="lazy" src="after/dark-training-430-default.jpg" alt="AFTER: Тренировки · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>975</td><td>925</td><td>-50</td></tr>
@@ -774,7 +774,7 @@
 <h2>Питание · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-430-default.jpg"><img loading="lazy" src="before/dark-nutrition-430-default.jpg" alt="BEFORE: Питание · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-430-default.jpg"><img loading="lazy" src="after/dark-nutrition-430-default.jpg" alt="AFTER: Питание · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-430-default.jpg"><img loading="lazy" src="after/dark-nutrition-430-default.jpg" alt="AFTER: Питание · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>7972</td><td>8198</td><td>+226</td></tr>
@@ -786,7 +786,7 @@
 <h2>Кардио · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-430-default.jpg"><img loading="lazy" src="before/dark-cardio-430-default.jpg" alt="BEFORE: Кардио · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-430-default.jpg"><img loading="lazy" src="after/dark-cardio-430-default.jpg" alt="AFTER: Кардио · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-430-default.jpg"><img loading="lazy" src="after/dark-cardio-430-default.jpg" alt="AFTER: Кардио · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -798,7 +798,7 @@
 <h2>Самочувствие · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-430-default.jpg"><img loading="lazy" src="before/dark-wellbeing-430-default.jpg" alt="BEFORE: Самочувствие · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-430-default.jpg"><img loading="lazy" src="after/dark-wellbeing-430-default.jpg" alt="AFTER: Самочувствие · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-430-default.jpg"><img loading="lazy" src="after/dark-wellbeing-430-default.jpg" alt="AFTER: Самочувствие · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>70</td><td>233</td><td>+163</td></tr>
@@ -810,7 +810,7 @@
 <h2>История · 430×844 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-430-default.jpg"><img loading="lazy" src="before/dark-history-430-default.jpg" alt="BEFORE: История · 430×844 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-430-default.jpg"><img loading="lazy" src="after/dark-history-430-default.jpg" alt="AFTER: История · 430×844 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-430-default.jpg"><img loading="lazy" src="after/dark-history-430-default.jpg" alt="AFTER: История · 430×844 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>150</td><td>485</td><td>+335</td></tr>
@@ -822,7 +822,7 @@
 <h2>Тело · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-1440-default.jpg"><img loading="lazy" src="before/dark-body-1440-default.jpg" alt="BEFORE: Тело · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-1440-default.jpg"><img loading="lazy" src="after/dark-body-1440-default.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-1440-default.jpg"><img loading="lazy" src="after/dark-body-1440-default.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1302</td><td>1294</td><td>-8</td></tr>
@@ -834,7 +834,7 @@
 <h2>Тренировки · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-1440-default.jpg"><img loading="lazy" src="before/dark-training-1440-default.jpg" alt="BEFORE: Тренировки · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-1440-default.jpg"><img loading="lazy" src="after/dark-training-1440-default.jpg" alt="AFTER: Тренировки · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-1440-default.jpg"><img loading="lazy" src="after/dark-training-1440-default.jpg" alt="AFTER: Тренировки · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>694</td><td>715</td><td>+21</td></tr>
@@ -846,7 +846,7 @@
 <h2>Питание · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-1440-default.jpg"><img loading="lazy" src="before/dark-nutrition-1440-default.jpg" alt="BEFORE: Питание · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-1440-default.jpg"><img loading="lazy" src="after/dark-nutrition-1440-default.jpg" alt="AFTER: Питание · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-1440-default.jpg"><img loading="lazy" src="after/dark-nutrition-1440-default.jpg" alt="AFTER: Питание · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3912</td><td>4059</td><td>+147</td></tr>
@@ -858,7 +858,7 @@
 <h2>Кардио · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-1440-default.jpg"><img loading="lazy" src="before/dark-cardio-1440-default.jpg" alt="BEFORE: Кардио · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-1440-default.jpg"><img loading="lazy" src="after/dark-cardio-1440-default.jpg" alt="AFTER: Кардио · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-1440-default.jpg"><img loading="lazy" src="after/dark-cardio-1440-default.jpg" alt="AFTER: Кардио · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>334</td><td>334</td><td>0</td></tr>
@@ -870,7 +870,7 @@
 <h2>Самочувствие · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-1440-default.jpg"><img loading="lazy" src="before/dark-wellbeing-1440-default.jpg" alt="BEFORE: Самочувствие · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-1440-default.jpg"><img loading="lazy" src="after/dark-wellbeing-1440-default.jpg" alt="AFTER: Самочувствие · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-1440-default.jpg"><img loading="lazy" src="after/dark-wellbeing-1440-default.jpg" alt="AFTER: Самочувствие · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>82</td><td>215</td><td>+133</td></tr>
@@ -882,7 +882,7 @@
 <h2>История · 1440×1000 · тёмная · Обычное состояние</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-1440-default.jpg"><img loading="lazy" src="before/dark-history-1440-default.jpg" alt="BEFORE: История · 1440×1000 · тёмная · Обычное состояние"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-1440-default.jpg"><img loading="lazy" src="after/dark-history-1440-default.jpg" alt="AFTER: История · 1440×1000 · тёмная · Обычное состояние"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-1440-default.jpg"><img loading="lazy" src="after/dark-history-1440-default.jpg" alt="AFTER: История · 1440×1000 · тёмная · Обычное состояние"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>176</td><td>485</td><td>+309</td></tr>
@@ -894,7 +894,7 @@
 <h2>Тело · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-393-expanded.jpg"><img loading="lazy" src="before/dark-body-393-expanded.jpg" alt="BEFORE: Тело · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-393-expanded.jpg"><img loading="lazy" src="after/dark-body-393-expanded.jpg" alt="AFTER: Тело · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-393-expanded.jpg"><img loading="lazy" src="after/dark-body-393-expanded.jpg" alt="AFTER: Тело · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3532</td><td>3448</td><td>-84</td></tr>
@@ -906,7 +906,7 @@
 <h2>Тренировки · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-393-expanded.jpg"><img loading="lazy" src="before/dark-training-393-expanded.jpg" alt="BEFORE: Тренировки · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-393-expanded.jpg"><img loading="lazy" src="after/dark-training-393-expanded.jpg" alt="AFTER: Тренировки · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-393-expanded.jpg"><img loading="lazy" src="after/dark-training-393-expanded.jpg" alt="AFTER: Тренировки · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1686</td><td>1649</td><td>-37</td></tr>
@@ -918,7 +918,7 @@
 <h2>Питание · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-393-expanded.jpg"><img loading="lazy" src="before/dark-nutrition-393-expanded.jpg" alt="BEFORE: Питание · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-393-expanded.jpg"><img loading="lazy" src="after/dark-nutrition-393-expanded.jpg" alt="AFTER: Питание · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-393-expanded.jpg"><img loading="lazy" src="after/dark-nutrition-393-expanded.jpg" alt="AFTER: Питание · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>8191</td><td>8518</td><td>+327</td></tr>
@@ -930,7 +930,7 @@
 <h2>Кардио · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-393-expanded.jpg"><img loading="lazy" src="before/dark-cardio-393-expanded.jpg" alt="BEFORE: Кардио · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-393-expanded.jpg"><img loading="lazy" src="after/dark-cardio-393-expanded.jpg" alt="AFTER: Кардио · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-393-expanded.jpg"><img loading="lazy" src="after/dark-cardio-393-expanded.jpg" alt="AFTER: Кардио · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>537</td><td>426</td><td>-111</td></tr>
@@ -942,7 +942,7 @@
 <h2>Самочувствие · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-393-expanded.jpg"><img loading="lazy" src="before/dark-wellbeing-393-expanded.jpg" alt="BEFORE: Самочувствие · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-393-expanded.jpg"><img loading="lazy" src="after/dark-wellbeing-393-expanded.jpg" alt="AFTER: Самочувствие · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-393-expanded.jpg"><img loading="lazy" src="after/dark-wellbeing-393-expanded.jpg" alt="AFTER: Самочувствие · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>229</td><td>253</td><td>+24</td></tr>
@@ -954,7 +954,7 @@
 <h2>История · 393×844 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-393-expanded.jpg"><img loading="lazy" src="before/dark-history-393-expanded.jpg" alt="BEFORE: История · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-393-expanded.jpg"><img loading="lazy" src="after/dark-history-393-expanded.jpg" alt="AFTER: История · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-393-expanded.jpg"><img loading="lazy" src="after/dark-history-393-expanded.jpg" alt="AFTER: История · 393×844 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>925</td><td>901</td><td>-24</td></tr>
@@ -966,7 +966,7 @@
 <h2>Тело · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-1440-expanded.jpg"><img loading="lazy" src="before/dark-body-1440-expanded.jpg" alt="BEFORE: Тело · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-1440-expanded.jpg"><img loading="lazy" src="after/dark-body-1440-expanded.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-1440-expanded.jpg"><img loading="lazy" src="after/dark-body-1440-expanded.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>2477</td><td>1824</td><td>-653</td></tr>
@@ -978,7 +978,7 @@
 <h2>Тренировки · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-training-1440-expanded.jpg"><img loading="lazy" src="before/dark-training-1440-expanded.jpg" alt="BEFORE: Тренировки · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-training-1440-expanded.jpg"><img loading="lazy" src="after/dark-training-1440-expanded.jpg" alt="AFTER: Тренировки · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-training-1440-expanded.jpg"><img loading="lazy" src="after/dark-training-1440-expanded.jpg" alt="AFTER: Тренировки · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>1132</td><td>1153</td><td>+21</td></tr>
@@ -990,7 +990,7 @@
 <h2>Питание · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-nutrition-1440-expanded.jpg"><img loading="lazy" src="before/dark-nutrition-1440-expanded.jpg" alt="BEFORE: Питание · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-nutrition-1440-expanded.jpg"><img loading="lazy" src="after/dark-nutrition-1440-expanded.jpg" alt="AFTER: Питание · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-nutrition-1440-expanded.jpg"><img loading="lazy" src="after/dark-nutrition-1440-expanded.jpg" alt="AFTER: Питание · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>4007</td><td>4204</td><td>+197</td></tr>
@@ -1002,7 +1002,7 @@
 <h2>Кардио · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-cardio-1440-expanded.jpg"><img loading="lazy" src="before/dark-cardio-1440-expanded.jpg" alt="BEFORE: Кардио · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-cardio-1440-expanded.jpg"><img loading="lazy" src="after/dark-cardio-1440-expanded.jpg" alt="AFTER: Кардио · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-cardio-1440-expanded.jpg"><img loading="lazy" src="after/dark-cardio-1440-expanded.jpg" alt="AFTER: Кардио · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>334</td><td>334</td><td>0</td></tr>
@@ -1014,7 +1014,7 @@
 <h2>Самочувствие · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-wellbeing-1440-expanded.jpg"><img loading="lazy" src="before/dark-wellbeing-1440-expanded.jpg" alt="BEFORE: Самочувствие · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-wellbeing-1440-expanded.jpg"><img loading="lazy" src="after/dark-wellbeing-1440-expanded.jpg" alt="AFTER: Самочувствие · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-wellbeing-1440-expanded.jpg"><img loading="lazy" src="after/dark-wellbeing-1440-expanded.jpg" alt="AFTER: Самочувствие · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>187</td><td>215</td><td>+28</td></tr>
@@ -1026,7 +1026,7 @@
 <h2>История · 1440×1000 · тёмная · Раскрытые пояснения</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-history-1440-expanded.jpg"><img loading="lazy" src="before/dark-history-1440-expanded.jpg" alt="BEFORE: История · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-history-1440-expanded.jpg"><img loading="lazy" src="after/dark-history-1440-expanded.jpg" alt="AFTER: История · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-history-1440-expanded.jpg"><img loading="lazy" src="after/dark-history-1440-expanded.jpg" alt="AFTER: История · 1440×1000 · тёмная · Раскрытые пояснения"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>894</td><td>857</td><td>-37</td></tr>
@@ -1038,7 +1038,7 @@
 <h2>Тело · 393×844 · тёмная · Действие: добавить замер</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-393-action-add-measurement.jpg"><img loading="lazy" src="before/dark-body-393-action-add-measurement.jpg" alt="BEFORE: Тело · 393×844 · тёмная · Действие: добавить замер"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-393-action-add-measurement.jpg"><img loading="lazy" src="after/dark-body-393-action-add-measurement.jpg" alt="AFTER: Тело · 393×844 · тёмная · Действие: добавить замер"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-393-action-add-measurement.jpg"><img loading="lazy" src="after/dark-body-393-action-add-measurement.jpg" alt="AFTER: Тело · 393×844 · тёмная · Действие: добавить замер"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>3048</td><td>3161</td><td>+113</td></tr>
@@ -1050,7 +1050,7 @@
 <h2>Тело · 1440×1000 · тёмная · Действие: добавить замер</h2>
 <div class="images">
 <figure><figcaption>BEFORE · 4c92832415d4eb994cf6b849a67074742f07ea50</figcaption><a href="before/dark-body-1440-action-add-measurement.jpg"><img loading="lazy" src="before/dark-body-1440-action-add-measurement.jpg" alt="BEFORE: Тело · 1440×1000 · тёмная · Действие: добавить замер"></a></figure>
-<figure><figcaption>AFTER · 223408e2</figcaption><a href="after/dark-body-1440-action-add-measurement.jpg"><img loading="lazy" src="after/dark-body-1440-action-add-measurement.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Действие: добавить замер"></a></figure>
+<figure><figcaption>AFTER · 66e5f050cba410c605c0cbb804c7d153e9e8aee7</figcaption><a href="after/dark-body-1440-action-add-measurement.jpg"><img loading="lazy" src="after/dark-body-1440-action-add-measurement.jpg" alt="AFTER: Тело · 1440×1000 · тёмная · Действие: добавить замер"></a></figure>
 </div>
 <table class="pair-metrics"><thead><tr><th>Метрика</th><th>BEFORE</th><th>AFTER</th><th>Δ</th></tr></thead><tbody>
 <tr><th>Высота области, px</th><td>2204</td><td>1736</td><td>-468</td></tr>

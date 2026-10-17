@@ -7,9 +7,10 @@ production- и не физическое устройство.
 ## Provenance
 
 - Base master: `4c92832415d4eb994cf6b849a67074742f07ea50`
+- Current merged origin/master: `269d6b625c198b8c9f1d0093d2bb911ba451e709`
 - Approved design package: `18002f8bdf938ba9d7ed0e3b0353f2682000ba6d`
 - Initial implementation evidence commit: `c4f8c8c2`
-- Continuation application commit: `223408e2`
+- Continuation application commit: `66e5f050cba410c605c0cbb804c7d153e9e8aee7`
 - Implementation branch: `codex/issue-873-progress-implementation-v2`
 - Capture browser: Playwright Chromium, reduced motion; cross-browser regression также
   выполнен в Playwright WebKit.
@@ -24,8 +25,8 @@ production- и не физическое устройство.
 ## Paired BEFORE/AFTER comparison — 2026-10-17
 
 - BEFORE снят на exact owner-requested base `4c92832415d4eb994cf6b849a67074742f07ea50`;
-  AFTER — на application revision `223408e2`, продолжившей проверенный PR HEAD
-  `71f9876b6ffd679a8fca42681c1d7e2c93524da0`.
+  AFTER — на exact continuation revision
+  `66e5f050cba410c605c0cbb804c7d153e9e8aee7` после merge с текущим `origin/master`.
 - [HTML-галерея парных сравнений](./evidence/paired-20261017/gallery.html) — 88 пар рядом,
   шесть разделов, light/dark, 320/360/393/430/1440 px, обычные/раскрытые состояния и
   действие «Добавить замер».
@@ -78,6 +79,5 @@ Detail captures use the `.progress-details` region. Control captures use the
   acceptance is still pending; merge and deploy are forbidden for this task.
 - No backend, API, database, formula, history, RBAC, privacy, environment-variable or secret
   change is included.
-- Исторические PNG-кадры реализации привязаны к `c4f8c8c2`; новая парная browser-галерея
-  снята на `223408e2`. Последующее исправление E2E-селектора и обновление mobile golden
-  отражены в том же Draft PR.
+- Парная browser-галерея переснята после merge и точечного исправления каскада CSS; все
+  AFTER-кадры и `manifest.json` привязаны к `66e5f050cba410c605c0cbb804c7d153e9e8aee7`.
