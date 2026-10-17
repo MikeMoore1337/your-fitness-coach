@@ -2439,6 +2439,10 @@ body:has(.app-shell--design-v2) {
   min-height: 44px;
 }
 
+.workout-adaptation-dialog__footer > .ui-button {
+  white-space: nowrap;
+}
+
 .active-workout--design-v2 {
   gap: 12px;
   padding: 0;
@@ -3735,7 +3739,7 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
     width: 100%;
   }
 
-  .workout-adaptation-dialog__footer .ui-button:not(.ui-button--secondary, .ui-button--ghost) {
+  .workout-adaptation-dialog__footer > .ui-button:not(.ui-button--secondary, .ui-button--ghost) {
     grid-column: 1 / -1;
   }
 
@@ -3784,6 +3788,13 @@ body.public-shell-mode.public-shell-mode:has(.auth-public-shell--design-v2) {
 
   .auth-public-shell--design-v2 .login-card {
     padding-top: var(--v2-space-5);
+  }
+}
+
+@media (max-width: 360px) {
+  .workout-adaptation-dialog__choice-row .ui-button {
+    padding-inline: 4px;
+    font-size: 0.75rem;
   }
 }
 
