@@ -92,6 +92,7 @@ describe('ExerciseMediaAsset', () => {
       expect.stringContaining('poster-1280.webp 1280w'),
     );
   });
+
   it('plays an owner-reviewed 720px AI video and falls back to the original GIF on error', () => {
     const { container } = render(
       <ExerciseMediaAsset
@@ -121,6 +122,4 @@ describe('ExerciseMediaAsset', () => {
       'src',
       '/static/exercise-guides/gymvisual/deadlift-0032-ila4NZS.gif',
     );
-  });
-
-});
+  })});
