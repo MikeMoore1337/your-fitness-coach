@@ -15,6 +15,8 @@ from fitminiapp_api.schemas.nutrition import NutritionTargetSave
 from fitminiapp_api.services.energy_calibration import GOAL_MULTIPLIERS as ADAPTIVE_GOALS
 from fitminiapp_api.services.nutrition import (
     GOAL_MULTIPLIERS as CALCULATOR_GOALS,
+)
+from fitminiapp_api.services.nutrition import (
     NutritionMacroAllocationError,
     calculate_nutrition,
 )
@@ -27,24 +29,29 @@ def test_goal_multipliers_have_single_approved_semantics_across_engines() -> Non
     source = FRONTEND_CALCULATOR.read_text(encoding="utf-8")
     match = re.search(r"export const goalMultipliers\s*=\s*\{([^}]+)\}", source)
     assert match is not None, "Frontend goal multiplier declaration not found"
-    frontend_goals = dict(
-        (goal, float(value))
-        for goal, value in re.findall(r"(fat_loss|recomposition|maintenance|muscle_gain):\s*([\d.]+)", match[1])
-    )
+    frontend_goals = {
+        goal: float(value)
+        for goal, value in re.findall(
+            r"(fat_loss|recomposition|maintenance|muscle_gain):\s*([\d.]+)", match[1]
+        )
+    }
     assert frontend_goals == CALCULATOR_GOALS == ADAPTIVE_GOALS
     assert CALCULATOR_GOALS["recomposition"] == 0.95
 
 
 @pytest.mark.parametrize("sex", ["male", "female"])
 @pytest.mark.parametrize("goal", ["fat_loss", "recomposition", "maintenance", "muscle_gain"])
-@pytest.mark.parametrize("weight_kg,height_cm,age", [
-    (20, 100, 18),
-    (55, 165, 25),
-    (78, 165, 34),
-    (105, 185, 45),
-    (160, 170, 65),
-    (350, 100, 100),
-])
+@pytest.mark.parametrize(
+    "weight_kg,height_cm,age",
+    [
+        (20, 100, 18),
+        (55, 165, 25),
+        (78, 165, 34),
+        (105, 185, 45),
+        (160, 170, 65),
+        (350, 100, 100),
+    ],
+)
 def test_automated_goal_preserves_energy_and_does_not_relabel_a_surplus_as_deficit(
     sex: str, goal: str, weight_kg: int, height_cm: int, age: int
 ) -> None:
