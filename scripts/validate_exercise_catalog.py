@@ -317,10 +317,22 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 provenance = media.get("video_provenance") or {}
                 ai_upscaled = provenance.get("source_kind") == "ai_upscaled_gymvisual"
                 if ai_upscaled:
+                    pilot_slugs = {
+                        "deadlift",
+                        "machine-chest-press",
+                        "russian-twist",
+                        "walking-lunge",
+                    }
+                    pilot_approval = "2026-10-17 #1073 four-sample review"
+                    batch_approval = (
+                        "2026-10-18 #986 owner bulk approval; "
+                        "per-movement QA post-release"
+                    )
+                    approval = provenance.get("owner_visual_approval")
                     _require(
-                        slug
-                        in {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"},
-                        f"Unreviewed AI animation: {slug}",
+                        (slug in pilot_slugs and approval == pilot_approval)
+                        or (slug not in pilot_slugs and approval == batch_approval),
+                        f"Unapproved AI animation or source: {slug}",
                     )
                     _require(
                         media_type == "animation"
@@ -335,8 +347,7 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                         and provenance.get("model") == "RealESRGAN_x4plus"
                         and provenance.get("scale") == 4
                         and provenance.get("native_hd") is False
-                        and provenance.get("owner_visual_approval")
-                        == "2026-10-17 #1073 four-sample review",
+                        and approval in {pilot_approval, batch_approval},
                         f"Invalid AI source provenance: {slug}",
                     )
                     profiles = [(720, 720)]
