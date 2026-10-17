@@ -5819,6 +5819,47 @@ button.today-text-link {
   grid-column: 1 / -1;
 }
 
+/* #960 Variant C: one inline recovery panel, using existing YFC tokens. */
+.active-workout-rest__recovery {
+  grid-column: 1 / -1;
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+}
+.active-workout-rest__recovery strong {
+  font-size: 0.95rem;
+}
+.active-workout-rest__recovery p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.active-workout-rest__recovery label {
+  font-size: 0.82rem;
+}
+.active-workout-rest__recovery .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+.active-workout-rest__recovery-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2, 8px);
+}
+.active-workout-rest__recovery-actions button {
+  min-height: var(--touch-target, 44px);
+  white-space: normal;
+}
+@media (max-width: 340px) {
+  .active-workout-rest__recovery-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (min-width: 1000px) {
   .active-workout.is-embedded {
     width: min(900px, 100%);
