@@ -314,27 +314,51 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 check_source(descriptor, slug, "poster_source", require_image=True)
             video_sources = media.get("video_sources", [])
             if video_sources:
-                _require(len(video_sources) == 2, f"Unexpected HD video profile count: {slug}")
                 provenance = media.get("video_provenance") or {}
-                _require(
-                    provenance.get("source_revision") == "18742da40b0627c85925c5dd4441dc3eac0594d0",
-                    f"Unpinned H.264 source: {slug}",
-                )
-                if slug not in {"barbell-curl", "burpee"}:
-                    poster_provenance = media.get("poster_source") or {}
+                ai_upscaled = provenance.get("source_kind") == "ai_upscaled_gymvisual"
+                if ai_upscaled:
                     _require(
-                        bool(poster_provenance)
-                        and provenance.get("source_path")
-                        == "public/videos/"
-                        + poster_provenance["source_gender"]
-                        + "/"
-                        + poster_provenance["source_slug"]
-                        + ".mp4",
-                        f"Video does not match verified poster: {slug}",
+                        slug in {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"},
+                        f"Unreviewed AI animation: {slug}",
                     )
-                for video, (width, height) in zip(
-                    video_sources, [(854, 480), (1280, 720)], strict=True
-                ):
+                    _require(
+                        media_type == "animation"
+                        and len(video_sources) == 1
+                        and provenance.get("source_path") == media["path"]
+                        and provenance.get("source_sha256") == media.get("asset_sha256")
+                        and provenance.get("source_asset_id") == media.get("asset_id")
+                        and provenance.get("source_dimensions") == {"width": 180, "height": 180}
+                        and provenance.get("source_animation_frames") == media.get("frame_count")
+                        and provenance.get("source_animation_duration_ms") == media.get("duration_ms")
+                        and provenance.get("model") == "RealESRGAN_x4plus"
+                        and provenance.get("scale") == 4
+                        and provenance.get("native_hd") is False
+                        and provenance.get("owner_visual_approval")
+                        == "2026-10-17 #1073 four-sample review",
+                        f"Invalid AI source provenance: {slug}",
+                    )
+                    profiles = [(720, 720)]
+                else:
+                    _require(len(video_sources) == 2, f"Unexpected HD video profile count: {slug}")
+                    _require(
+                        provenance.get("source_revision")
+                        == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                        f"Unpinned H.264 source: {slug}",
+                    )
+                    if slug not in {"barbell-curl", "burpee"}:
+                        poster_provenance = media.get("poster_source") or {}
+                        _require(
+                            bool(poster_provenance)
+                            and provenance.get("source_path")
+                            == "public/videos/"
+                            + poster_provenance["source_gender"]
+                            + "/"
+                            + poster_provenance["source_slug"]
+                            + ".mp4",
+                            f"Video does not match verified poster: {slug}",
+                        )
+                    profiles = [(854, 480), (1280, 720)]
+                for video, (width, height) in zip(video_sources, profiles, strict=True):
                     _require(
                         video.get("mime_type") == "video/mp4"
                         and video.get("width") == width
@@ -342,9 +366,13 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                         f"Invalid H.264 source profile: {slug}",
                     )
                     relative_video = Path(video.get("path", ""))
+                    expected_path = (
+                        f"gymvisual/ai-reviewed/{slug}-x4plus-720.mp4"
+                        if ai_upscaled
+                        else f"exercises-media/videos/{slug}-{height}p-h264.mp4"
+                    )
                     _require(
-                        relative_video.as_posix()
-                        == f"exercises-media/videos/{slug}-{height}p-h264.mp4",
+                        relative_video.as_posix() == expected_path,
                         f"Unexpected video path: {slug}",
                     )
                     video_file = MEDIA_DIR / relative_video
@@ -352,7 +380,8 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                     referenced_paths.add(str(relative_video))
                     data = video_file.read_bytes()
                     _require(
-                        len(data) == video.get("byte_size")
+                        data[4:8] == b"ftyp"
+                        and len(data) == video.get("byte_size")
                         and hashlib.sha256(data).hexdigest() == video.get("sha256"),
                         f"Invalid video file checksum/size: {slug}",
                     )
@@ -361,15 +390,29 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
         for item in exercises.values()
         for media in item.get("media", [])
         if media.get("video_sources")
+        and (media.get("video_provenance") or {}).get("source_kind") != "ai_upscaled_gymvisual"
     ]
-    _require(
-        len(approved_videos) == manifest.get("hq_video_count"),
-        "Verified H.264 exercise count drift",
-    )
+    ai_upscaled_videos = [
+        media
+        for item in exercises.values()
+        for media in item.get("media", [])
+        if media.get("video_sources")
+        and (media.get("video_provenance") or {}).get("source_kind") == "ai_upscaled_gymvisual"
+    ]
+    _require(len(approved_videos) == manifest.get("hq_video_count"), "Verified H.264 exercise count drift")
     _require(
         sum(video["byte_size"] for media in approved_videos for video in media["video_sources"])
         == manifest.get("hq_video_total_bytes"),
         "Verified H.264 total size drift",
+    )
+    _require(
+        len(ai_upscaled_videos) == manifest.get("ai_upscaled_video_count"),
+        "AI-upscaled animated exercise count drift",
+    )
+    _require(
+        sum(video["byte_size"] for media in ai_upscaled_videos for video in media["video_sources"])
+        == manifest.get("ai_upscaled_video_total_bytes"),
+        "AI-upscaled animated video total size drift",
     )
     # Some approved canonical variants intentionally point to the same source
     # record. The manifest keeps the source asset identity explicit instead of
