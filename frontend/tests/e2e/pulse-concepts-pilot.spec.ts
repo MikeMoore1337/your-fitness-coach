@@ -308,7 +308,7 @@ test('body trend keeps smooth truthful geometry, area fill and measurement alter
     workoutStatus: 'completed',
   });
   await page.goto('/app?section=progress&progress_view=body');
-  const body = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const body = page.getByRole('region', { name: 'Тело', exact: true });
   const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   const chart = insight.locator('.data-viz-chart');
@@ -352,7 +352,7 @@ test('body trend keeps smooth truthful geometry, area fill and measurement alter
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/app?section=progress&progress_view=body');
-  const desktopBody = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const desktopBody = page.getByRole('region', { name: 'Тело', exact: true });
   const desktopInsight = desktopBody.locator('.progress-trend-panel').first();
   await desktopInsight.scrollIntoViewIfNeeded();
   await expect(desktopInsight.locator('.data-viz-chart__area')).toHaveCount(1);
@@ -374,7 +374,7 @@ test('mocked TMA dark uses the same chart and safe-area floating dock', async ({
   await installPlatformApi(page, { measurementHistory: 'many', workoutStatus: 'completed' });
   await page.goto('/app?section=progress&progress_view=body');
   const dock = page.locator('#appBottomNav');
-  const body = page.getByRole('region', { name: 'Замеры и приоритеты', exact: true });
+  const body = page.getByRole('region', { name: 'Тело', exact: true });
   const insight = body.locator('.progress-trend-panel').first();
   await insight.scrollIntoViewIfNeeded();
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');

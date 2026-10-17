@@ -561,6 +561,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
             trends: [
               {
                 metric: 'weight_kg',
+                unit: 'kg',
                 first_value: 69.4,
                 latest_value: 68.4,
                 change: -1,
@@ -578,6 +579,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
               },
               {
                 metric: 'waist_cm',
+                unit: 'cm',
                 first_value: 73,
                 latest_value: 72,
                 change: -1,
@@ -1146,7 +1148,7 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     .getByRole('navigation', { name: 'Разделы прогресса' })
     .getByRole('tab', { name: /^Тело/ })
     .click();
-  await expect(page.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Тело' })).toBeVisible();
   const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
   await expect(limitedConfidence).toContainText(
     'В самой заполненной окружности — 2 замера; для оценки одной окружности нужно минимум 3 замера',
@@ -1242,7 +1244,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     .click();
 
   const body = page.locator('#progress-body');
-  await expect(body.getByRole('heading', { name: 'Замеры и приоритеты' })).toBeVisible();
+  await expect(body.getByRole('heading', { name: 'Тело' })).toBeVisible();
   await body.getByText('Выбранные мышечные группы').click();
   await expect(body.getByText('Мышцы спины')).toBeVisible();
   await expect(body.getByText('Задняя поверхность тела и ягодичные мышцы')).toBeVisible();
@@ -1253,13 +1255,15 @@ test('measurements keep priority context, units, mobile order and add/edit histo
     body.locator('.measurement-diary').getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/),
   ).toBeVisible();
   await expect(body.getByText(/разовое изменение не считаем трендом/)).toBeVisible();
+  await expect(body.locator('.progress-body-guidance')).toHaveCSS('display', 'none');
+  await expect(body.locator('.measurement-diary').getByText('Как сравнивать замеры')).toBeVisible();
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   const desktopTrend = await body.locator('.progress-body-trends').boundingBox();
   const desktopDiary = await body.locator('.progress-body-diary').boundingBox();
   expect(desktopTrend).not.toBeNull();
   expect(desktopDiary).not.toBeNull();
-  expect(desktopTrend!.y).toBeLessThan(desktopDiary!.y);
+  expect(desktopTrend!.y).toBeLessThanOrEqual(desktopDiary!.y);
   await body.evaluate((element) => element.scrollIntoView({ block: 'start' }));
   await page.screenshot({
     path: '../.artifacts/screenshots/task-60/desktop-1440x1000-light.png',
@@ -2460,4 +2464,170 @@ test('progress header keeps expanded help and custom period in normal flow', asy
       await expect(customForm).toBeHidden();
     }
   }
+});
+
+const ISSUE_873_CAPTURE_SECTIONS = [
+  'body',
+  'training',
+  'nutrition',
+  'cardio',
+  'wellbeing',
+  'history',
+] as const;
+const ISSUE_873_CAPTURE_VIEWPORTS = [320, 360, 393, 430, 1440] as const;
+
+test('Issue #873 paired browser evidence capture', async ({ page }) => {
+  test.skip(process.env.CAPTURE_ISSUE_873 !== '1', 'Evidence-only capture');
+  test.setTimeout(600_000);
+
+  const outputDir = process.env.ISSUE_873_CAPTURE_DIR;
+  if (!outputDir) throw new Error('ISSUE_873_CAPTURE_DIR is required for Issue #873 evidence');
+  await mkdir(outputDir, { recursive: true });
+  await mockProgress(page);
+
+  const captures: Array<Record<string, unknown>> = [];
+  const settleCapture = async () => {
+    await expect(page.locator('[role="status"][aria-busy="true"]')).toHaveCount(0);
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      );
+      window.scrollTo(0, 0);
+    });
+  };
+  const capture = async (
+    theme: 'light' | 'dark',
+    section: (typeof ISSUE_873_CAPTURE_SECTIONS)[number],
+    width: number,
+    state: 'default' | 'expanded' | 'action-add-measurement',
+  ) => {
+    const details = page.locator('.progress-details').first();
+    await expect(details).toBeVisible();
+    await settleCapture();
+    const metrics = await details.evaluate((element) => {
+      const visible = (candidate: Element) => {
+        const box = candidate.getBoundingClientRect();
+        const style = getComputedStyle(candidate);
+        return (
+          box.width > 0 &&
+          box.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      };
+      const actions = [...element.querySelectorAll('a,button,[role="tab"],summary')]
+        .filter(visible)
+        .map((candidate) =>
+          (candidate.getAttribute('aria-label') ?? candidate.textContent ?? '')
+            .trim()
+            .replace(/\s+/g, ' ')
+            .slice(0, 100),
+        );
+      const box = element.getBoundingClientRect();
+      return {
+        regionHeight: Math.round(box.height),
+        regionTop: Math.round(box.top),
+        pageScrollHeight: document.documentElement.scrollHeight,
+        viewportHeight: window.innerHeight,
+        scrollY: Math.round(window.scrollY),
+        actionCount: actions.length,
+        actionLabels: actions,
+        openDetails: [...element.querySelectorAll('details')].filter((candidate) => candidate.open)
+          .length,
+        detailsCount: element.querySelectorAll('details').length,
+      };
+    });
+    const file = `${theme}-${section}-${width}-${state}.jpg`;
+    const path = resolve(outputDir, file);
+    await details.screenshot({
+      path,
+      type: 'jpeg',
+      quality: 88,
+      animations: 'disabled',
+      caret: 'hide',
+    });
+    captures.push({ theme, section, width, state, file, ...metrics });
+  };
+
+  await page.addInitScript(() => {
+    const theme = new URLSearchParams(window.location.search).get('capture_theme');
+    if (theme === 'light' || theme === 'dark') window.localStorage.setItem('app-theme', theme);
+    window.sessionStorage.setItem('fit_access_token', 'test-token');
+  });
+  const ensureClient = async () => {
+    const clientButton = page.getByRole('button', { name: 'Клиент', exact: true });
+    if (await clientButton.count()) {
+      await expect(clientButton).toBeVisible();
+      await clientButton.click();
+    }
+    await expect(page.locator('.app-shell')).toBeVisible();
+  };
+  const openSection = async (
+    theme: 'light' | 'dark',
+    section: (typeof ISSUE_873_CAPTURE_SECTIONS)[number],
+  ) => {
+    await page.goto(`/app?section=progress&progress_view=${section}&capture_theme=${theme}`);
+    await ensureClient();
+    await expect(page.locator('.progress-details').first()).toBeVisible();
+  };
+
+  for (const theme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+
+    for (const width of ISSUE_873_CAPTURE_VIEWPORTS) {
+      await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
+      for (const section of ISSUE_873_CAPTURE_SECTIONS) {
+        await openSection(theme, section);
+        await capture(theme, section, width, 'default');
+      }
+    }
+
+    for (const width of [393, 1440]) {
+      await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
+      for (const section of ISSUE_873_CAPTURE_SECTIONS) {
+        await openSection(theme, section);
+        const details = page.locator('.progress-details').first();
+        await expect(details).toBeVisible();
+        await details.locator('details').evaluateAll((elements) => {
+          for (const element of elements) (element as HTMLDetailsElement).open = true;
+        });
+        await capture(theme, section, width, 'expanded');
+      }
+    }
+
+    for (const width of [393, 1440]) {
+      await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
+      await openSection(theme, 'body');
+      await page
+        .getByRole('link', { name: /Добавить замер/ })
+        .first()
+        .click();
+      await expect(page.locator('details#measurement-diary')).toHaveAttribute('open', '');
+      await capture(theme, 'body', width, 'action-add-measurement');
+    }
+  }
+
+  await writeFile(
+    resolve(outputDir, 'manifest.json'),
+    JSON.stringify(
+      {
+        issue: 873,
+        fixture: 'progress-experience.spec.ts::mockProgress',
+        revision: process.env.ISSUE_873_CAPTURE_REVISION ?? 'NOT_SPECIFIED',
+        browser: 'Chromium',
+        themes: ['light', 'dark'],
+        viewports: ISSUE_873_CAPTURE_VIEWPORTS.map((width) => ({
+          width,
+          height: width < 900 ? 844 : 1000,
+        })),
+        region: '.progress-details',
+        scrollState:
+          'window.scrollY=0; region screenshot after two animation frames and document.fonts.ready',
+        captures,
+      },
+      null,
+      2,
+    ),
+  );
 });

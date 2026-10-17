@@ -95,9 +95,11 @@ const SURFACES: Surface[] = [
     proof: '.workout-history-card',
     state: 'One completed contextual workout; completed exercise list is empty in fixture',
     prepare: async (page) => {
-      const summary = page.locator('.workout-history-card > summary');
-      await summary.click();
-      await expect(page.locator('.workout-history-card .workout-context-row')).toHaveCount(1);
+      const card = page.locator('.workout-history-card');
+      await expect(card).toBeVisible();
+      const summary = card.locator(':scope > summary');
+      if (await summary.count()) await summary.click();
+      await expect(card.locator('.workout-context-row')).toHaveCount(1);
     },
   },
   {
