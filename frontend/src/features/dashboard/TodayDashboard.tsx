@@ -1215,7 +1215,53 @@ export function TodayDashboard({
 
   useEffect(() => {
     if (!detailsOpen) return;
-    detailsRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    const details = detailsRef.current;
+    details?.scrollIntoView?.({ behavior: 'instant', block: 'start' });
+    if (!details) return;
+
+    // The current set can arrive after the panel opens. Correct dock clearance
+    // once when it mounts, without scrolling again on query refresh.
+    let frame: number | null = null;
+    let corrected = false;
+    const correctOnce = () => {
+      if (corrected || frame !== null) return;
+      const action = details.querySelector<HTMLElement>(
+        '.active-workout-set.is-current [data-workout-field="done"]',
+      );
+      const dock = document.getElementById('appBottomNav');
+      if (!action || !dock) return;
+
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!details.isConnected || corrected) return;
+        const viewport = window.visualViewport;
+        const viewportTop = viewport?.offsetTop ?? 0;
+        const viewportBottom = viewportTop + (viewport?.height ?? window.innerHeight);
+        const dockRect = dock.getBoundingClientRect();
+        if (dockRect.top > viewportTop && dockRect.height < viewportBottom) {
+          const actionRect = action.getBoundingClientRect();
+          // Keep a larger clearance than the dock edge: font metrics can shift
+          // the action down after initial mount, especially on narrow WebKit/Chromium.
+          const safeBottom = Math.min(viewportBottom, dockRect.top) - 56;
+          if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom) {
+            window.scrollBy({
+              top: Math.ceil(actionRect.bottom - safeBottom),
+              behavior: 'instant',
+            });
+          }
+        }
+        corrected = true;
+        observer.disconnect();
+      });
+    };
+    const observer = new MutationObserver(correctOnce);
+    observer.observe(details, { childList: true, subtree: true });
+    correctOnce();
+
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [detailsOpen]);
 
   const requestedRecoveryWorkoutId = Number(new URLSearchParams(search).get('recovery_workout_id'));

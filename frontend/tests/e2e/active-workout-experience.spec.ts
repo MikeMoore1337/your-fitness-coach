@@ -1797,14 +1797,42 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await expect(summary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+
   const exercise = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
     .first();
-  await expect(
-    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
-  ).toBeVisible();
-  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  const replacement = exercise.getByRole('button', {
+    name: 'Заменить только в этой тренировке',
+  });
+  await expect(replacement).toBeVisible();
+  for (const mobileWidth of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width: mobileWidth, height: 844 });
+    const { triggerWidth, actionsWidth, pageWidth } = await replacement.evaluate((button) => {
+      const trigger = button.getBoundingClientRect();
+      const actions = button.closest('.active-workout-exercise__head-actions');
+      return {
+        triggerWidth: trigger.width,
+        actionsWidth: actions?.getBoundingClientRect().width ?? 0,
+        pageWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(actionsWidth).toBeGreaterThan(0);
+    expect(triggerWidth, `Replacement button width at ${mobileWidth}px`).toBeGreaterThanOrEqual(
+      actionsWidth - 1,
+    );
+    expect(pageWidth, `Horizontal overflow at ${mobileWidth}px`).toBeLessThanOrEqual(
+      mobileWidth + 1,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await replacement.click();
   await expect(
     page.getByRole('heading', { name: 'Заменить только в этой тренировке' }),
   ).toBeVisible();
@@ -1816,6 +1844,12 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Применить' }).click();
   await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  const replacedSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await expect(replacedSummary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(replacedSummary.locator('.active-session-summary__details')).toBeHidden();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -1866,10 +1900,28 @@ for (const width of [360, 393, 430]) {
         await page.goto(platform === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
         if (platform === 'browser') await page.getByRole('button', { name: 'Клиент' }).click();
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
-        await page
+        const replacementButton = page
           .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
-          .first()
-          .click();
+          .first();
+        const replacementGeometry = await replacementButton.evaluate((button) => {
+          const row = button.closest('.active-workout-exercise__head-actions');
+          const buttonRect = button.getBoundingClientRect();
+          const rowRect = row?.getBoundingClientRect();
+          return {
+            buttonWidth: buttonRect.width,
+            rowWidth: rowRect?.width ?? 0,
+            pageWidth: document.documentElement.scrollWidth,
+            viewportWidth: innerWidth,
+          };
+        });
+        expect(replacementGeometry.rowWidth).toBeGreaterThan(0);
+        expect(replacementGeometry.buttonWidth).toBeGreaterThanOrEqual(
+          replacementGeometry.rowWidth - 1,
+        );
+        expect(replacementGeometry.pageWidth).toBeLessThanOrEqual(
+          replacementGeometry.viewportWidth + 1,
+        );
+        await replacementButton.click();
         const dialog = page.getByRole('dialog', {
           name: 'Заменить только в этой тренировке',
           exact: true,
@@ -2011,7 +2063,9 @@ test('V9-01 keeps pain inside the safety-stop boundary', async ({ page }) => {
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
-  await page.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await summary.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
   await page.getByRole('button', { name: 'Показать рекомендации' }).click();
   await expect(page.getByRole('heading', { name: 'Безопасность прежде всего' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Применить' })).toHaveCount(0);
@@ -2262,6 +2316,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2274,6 +2332,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
   const reloadedMemory = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
@@ -2299,6 +2361,10 @@ test('V9-04 fits Mobile Web and mocked TMA widths without moving the next-set ac
   await mockActiveWorkout(page, false, 'approved_animated', false, 'Скамья 30°');
   await page.goto('/app?tgWebAppPlatform=android');
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2322,6 +2388,10 @@ test('V9-04 preserves a draft when the memory save is offline', async ({ page })
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const setupMemory = page
     .locator('.active-workout-exercise')
