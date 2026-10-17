@@ -455,10 +455,16 @@ def _write_matrix(rows: list[dict[str, str]], path: Path) -> None:
 def _write_report(
     rows: list[dict[str, str]], old_manifest: dict[str, Any], new_manifest: dict[str, Any]
 ) -> None:
-    imported = [row for row in rows if row["import_status"] == "planned"]
+    imported = [
+        row
+        for row in rows
+        if row["import_status"] in {"planned", "imported_added", "imported_replaced"}
+    ]
     skipped = [row for row in rows if row["import_status"] == "skipped"]
     static = [row for row in imported if row["media_type"] == "image"]
     replaced = [row for row in imported if row["media_type"] == "animation"]
+    review = [row for row in skipped if row["semantic_status"] == "REVIEW"]
+    no_match = [row for row in skipped if row["semantic_status"] == "NO_MATCH"]
     before_count = int(new_manifest.get("hd_baseline_asset_count", BASELINE_ASSET_COUNT))
     before = int(new_manifest.get("hd_baseline_total_bytes", BASELINE_TOTAL_BYTES))
     after = int(new_manifest.get("total_bytes", 0))
@@ -475,6 +481,7 @@ def _write_report(
 - Подтверждённых HD-постеров для существующего media: **{len(replaced)}**.
 - Новых статических изображений для ранее пустых записей: **{len(static)}**.
 - Осталось без подтверждённого HD: **{len(skipped)}**.
+- Из них `REVIEW`: **{len(review)}**, `NO_MATCH`: **{len(no_match)}**.
 - После импорта approved animated: **{new_manifest["counts"]["approved_animated"]}**.
 - После импорта approved static: **{new_manifest["counts"]["approved_static"]}**.
 - После импорта blocked: **{new_manifest["counts"]["blocked"]}**.
@@ -509,6 +516,17 @@ def _apply(
     payloads: dict[str, bytes],
     old_manifest: dict[str, Any],
 ) -> None:
+    applied_rows = [
+        {
+            **row,
+            "import_status": (
+                "imported_added" if row["media_type"] == "image" else "imported_replaced"
+            )
+            if row["import_status"] == "planned"
+            else row["import_status"],
+        }
+        for row in rows
+    ]
     previous = {
         relative: (
             _safe_relative(ASSETS, relative).read_bytes()
@@ -537,8 +555,8 @@ def _apply(
             newline="\n",
         )
         os.replace(manifest_temp, MANIFEST_PATH)
-        _write_matrix(rows, FULL_MATRIX_PATH)
-        _write_report(rows, old_manifest, new_manifest)
+        _write_matrix(applied_rows, FULL_MATRIX_PATH)
+        _write_report(applied_rows, old_manifest, new_manifest)
     except Exception:
         for relative, data in previous.items():
             destination = _safe_relative(ASSETS, relative)
