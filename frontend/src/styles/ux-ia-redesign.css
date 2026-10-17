@@ -1812,15 +1812,23 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     font-size: 16px;
   }
   .nutrition-experience :is(.meal-planner, .grocery-list) {
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--v2-border);
-    border-radius: 0;
-    background: transparent;
+    margin-top: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    overflow: hidden;
   }
   .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) {
-    min-height: 56px;
-    padding: 8px 4px;
+    min-height: 46px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+  .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) strong {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
   }
   .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) .eyebrow {
     display: none;
