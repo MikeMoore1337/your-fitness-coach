@@ -1240,7 +1240,9 @@ export function TodayDashboard({
         const dockRect = dock.getBoundingClientRect();
         if (dockRect.top > viewportTop && dockRect.height < viewportBottom) {
           const actionRect = action.getBoundingClientRect();
-          const safeBottom = Math.min(viewportBottom, dockRect.top) - 24;
+          // Keep a larger clearance than the dock edge: font metrics can shift
+          // the action down after initial mount, especially on narrow WebKit/Chromium.
+          const safeBottom = Math.min(viewportBottom, dockRect.top) - 56;
           if (actionRect.top < viewportBottom && actionRect.bottom > safeBottom) {
             window.scrollBy({
               top: Math.ceil(actionRect.bottom - safeBottom),
