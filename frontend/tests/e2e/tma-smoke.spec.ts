@@ -2268,6 +2268,55 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await expect(tmaPage.getByText('1 ч')).toBeVisible();
   await expect(tmaPage.getByText(/максимальный вес 40 кг/)).toBeVisible();
   await expect(tmaPage.getByText(/Следующая тренировка/)).toBeVisible();
+  const completionCardStyles = await tmaPage.locator('.workout-completion').evaluate((root) => {
+    const expectedRadius = getComputedStyle(root).getPropertyValue('--v2-region-radius').trim();
+    const selectors = [
+      '.workout-completion__hero',
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--v2-border)';
+    root.append(probe);
+    const expectedBorderColor = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      expectedRadius,
+      expectedBorderColor,
+      cards: selectors.map((selector) => {
+        const node = root.querySelector(selector);
+        if (!node) throw new Error(`Missing completion card: ${selector}`);
+        const style = getComputedStyle(node);
+        return {
+          selector,
+          radius: style.borderTopLeftRadius,
+          widths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          colors: [
+            style.borderTopColor,
+            style.borderRightColor,
+            style.borderBottomColor,
+            style.borderLeftColor,
+          ],
+        };
+      }),
+    };
+  });
+  expect(completionCardStyles.expectedRadius).toBe('20px');
+  for (const card of completionCardStyles.cards) {
+    expect(card.radius, card.selector).toBe(completionCardStyles.expectedRadius);
+    expect(card.widths, card.selector).toEqual(['1px', '1px', '1px', '1px']);
+    expect(card.colors, card.selector).toEqual(
+      Array(4).fill(completionCardStyles.expectedBorderColor),
+    );
+  }
   const completionOrderCorrect = await tmaPage.locator('.workout-completion').evaluate((root) => {
     const selectors = [
       '.workout-completion__facts',
@@ -2285,10 +2334,11 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
       );
   });
   expect(completionOrderCorrect).toBe(true);
-  if (process.env.YFC_CAPTURE_871 === '1') {
-    for (const theme of ['dark', 'light'] as const) {
-      await tma.setTheme(theme);
-      await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+  for (const theme of ['dark', 'light'] as const) {
+    await tma.setTheme(theme);
+    await expect(tmaPage.locator('html')).toHaveAttribute('data-color-scheme', theme);
+    await expectNeutralStartBoundary(tmaPage.locator('.workout-completion__hero'));
+    if (process.env.YFC_CAPTURE_871 === '1') {
       await tmaPage.screenshot({
         path: '../.artifacts/screenshots/issue-871/completion-390-' + theme + '-after.png',
         fullPage: true,
