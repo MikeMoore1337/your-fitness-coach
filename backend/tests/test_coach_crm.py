@@ -323,10 +323,12 @@ def test_client_profile_weight_preserves_fractional_values_and_missing_state(cli
     other_coach_headers = _auth(client, 29_233, is_coach=True)
     _coach_id, client_id = _link(29_231, 29_232)
 
+    # Use the client's local date, not the UTC date of the CI runner.
+    # These differ near midnight and would create a second weight-only entry.
     measurement = client.post(
         f"/api/v1/coach/clients/{client_id}/measurements",
         headers=coach_headers,
-        json={"measured_on": date.today().isoformat(), "weight_kg": 78.4, "waist_cm": 82.0},
+        json={"weight_kg": 78.4, "waist_cm": 82.0},
     )
     assert measurement.status_code == 200, measurement.text
     assert measurement.json()["weight_kg"] == 78.4
