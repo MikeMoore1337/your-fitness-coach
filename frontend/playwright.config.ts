@@ -11,6 +11,9 @@ export default defineConfig({
   ],
   outputDir: '../.artifacts/runtime/tests/playwright',
   fullyParallel: true,
+  // Trial 3 workers per 4-vCPU GitHub runner (previously Playwright's 2-worker CI default).
+  // Keep retries unchanged so the full CI run can report any extra flakiness.
+  workers: process.env.CI ? 3 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: getPlaywrightReporters(),
   use: {

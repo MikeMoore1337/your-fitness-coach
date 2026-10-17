@@ -1181,8 +1181,37 @@ details:not([open]) > :not(summary) {
   color: var(--muted);
   font-size: 0.62rem;
   line-height: 1.15;
-  object-fit: cover;
+  object-fit: contain;
   text-align: center;
+}
+.exercise-media-picture {
+  display: block;
+  min-width: 0;
+}
+.exercise-media-picture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.exercise-picker__option > .exercise-media-picture {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-picker__option > .exercise-media-picture > img,
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture > img {
+  width: 100%;
+  height: 100%;
 }
 .exercise-catalog-item__thumb {
   width: 58px;
@@ -1939,6 +1968,13 @@ details:not([open]) > :not(summary) {
   object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
 }
+.exercise-guide-image__frame .exercise-guide-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .exercise-guide-image__frame img {
     transition: none;
@@ -2257,6 +2293,16 @@ details:not([open]) > :not(summary) {
   display: block;
   max-width: 100%;
   max-height: calc(100dvh - 125px);
+  margin: auto;
+  border-radius: var(--radius-control);
+  object-fit: contain;
+}
+.exercise-lightbox .exercise-guide-video {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 125px);
+  width: 100%;
+  aspect-ratio: 16 / 9;
   margin: auto;
   border-radius: var(--radius-control);
   object-fit: contain;
@@ -3240,6 +3286,10 @@ details:not([open]) > :not(summary) {
     padding: 7px 8px;
   }
   .exercise-picker__option-thumb {
+    width: 46px;
+    height: 46px;
+  }
+  .exercise-picker__option > .exercise-media-picture {
     width: 46px;
     height: 46px;
   }
@@ -4525,6 +4575,11 @@ button.today-text-link {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.active-workout-exercise__head-actions > .workout-adaptation-entry--workout {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
 .active-workout-exercise__toggle {
   min-height: 44px;
 }
@@ -4546,12 +4601,13 @@ button.today-text-link {
 }
 .active-session-summary {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  min-width: 0;
   margin-top: 2px;
-  padding: 13px;
-  border: 1px solid var(--accent-line);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: var(--bg-soft);
+  background: var(--card-bg);
 }
 .active-session-summary__header,
 .active-session-summary__primary,
@@ -4561,13 +4617,38 @@ button.today-text-link {
   justify-content: space-between;
   gap: 12px;
 }
-.active-session-summary__header > div,
+.active-session-summary__header > h4,
 .active-session-summary__primary > div {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
-.active-session-summary__eyebrow,
+.active-session-summary__header > h4 {
+  width: 100%;
+  margin: 0;
+}
+.active-session-summary__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-action);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.active-session-summary__toggle:hover {
+  background: var(--surface-hover);
+}
+.active-session-summary__toggle:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
 .active-session-summary__primary > div > span,
 .active-session-summary__facts span,
 .active-session-summary__section-label > span {
@@ -4582,7 +4663,7 @@ button.today-text-link {
   line-height: 1.1;
 }
 .active-session-summary__state {
-  flex: 0 0 auto;
+  justify-self: end;
   padding: 5px 8px;
   border-radius: 999px;
   background: var(--accent-soft);
@@ -4594,6 +4675,19 @@ button.today-text-link {
 .active-session-summary__state.is-offline {
   background: var(--warning-soft, var(--bg-soft));
   color: var(--warning-text);
+}
+.active-session-summary__safety {
+  display: grid;
+  gap: 8px;
+}
+.active-session-summary__details {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 12px;
+}
+.active-session-summary__details[hidden] {
+  display: none;
 }
 .active-session-summary__primary {
   align-items: center;
@@ -4651,9 +4745,6 @@ button.today-text-link {
   display: grid;
   gap: 6px;
   padding-top: 2px;
-}
-.active-session-summary > .active-workout-setup-memory {
-  margin-top: 0;
 }
 .active-workout-setup-memory {
   display: grid;
@@ -4772,6 +4863,7 @@ button.today-text-link {
   background: var(--bg-soft);
 }
 .active-workout-exercise__media img,
+.active-workout-exercise__media video,
 .active-workout-exercise__media .exercise-media-asset--missing {
   display: block;
   width: 100%;
@@ -5674,6 +5766,98 @@ button.today-text-link {
   .active-workout-rest__actions {
     grid-column: auto;
     grid-template-columns: repeat(3, minmax(88px, 1fr));
+  }
+}
+
+/* #960 - additive elapsed counter in the existing RestTimer top row. */
+.active-workout-rest:has(.active-workout-rest__actual) {
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 108px);
+}
+.active-workout-rest__actual {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--touch-target, 44px);
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+}
+.active-workout-rest__actual-value {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.active-workout-rest__actual-value span {
+  color: var(--v2-text-primary);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+.active-workout-rest__actual-value strong {
+  overflow: hidden;
+  font: 700 0.96rem/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+.active-workout-rest__stop {
+  display: inline-flex;
+  width: var(--touch-target, 44px);
+  height: var(--touch-target, 44px);
+  align-items: center;
+  justify-content: center;
+  padding: 0 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: 700 0.65rem/1 var(--font-body);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.active-workout-rest__stop:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.active-workout-rest:has(.active-workout-rest__actual) .active-workout-rest__actions {
+  grid-column: 1 / -1;
+}
+
+/* #960 Variant C: one inline recovery panel, using existing YFC tokens. */
+.active-workout-rest__recovery {
+  grid-column: 1 / -1;
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+}
+.active-workout-rest__recovery strong {
+  font-size: 0.95rem;
+}
+.active-workout-rest__recovery p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+.active-workout-rest__recovery label {
+  font-size: 0.82rem;
+}
+.active-workout-rest__recovery .ui-input {
+  width: 100%;
+  min-width: 0;
+}
+.active-workout-rest__recovery-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-2, 8px);
+}
+.active-workout-rest__recovery-actions button {
+  min-height: var(--touch-target, 44px);
+  white-space: normal;
+}
+@media (max-width: 340px) {
+  .active-workout-rest__recovery-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -7396,17 +7580,50 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-muscle-workload {
   display: grid;
-  border-top: 1px solid var(--border);
+  gap: var(--v2-space-2);
 }
 
-.progress-muscle-workload .progress-exercise {
+.app-section--progress .progress-muscle-workload .progress-exercise {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  transition:
+    border-color var(--motion-state) var(--motion-ease),
+    background var(--motion-state) var(--motion-ease);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-hover);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary {
+  min-height: var(--touch-target);
+  padding: var(--v2-space-2) var(--v2-space-3);
+  color: var(--text);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary strong,
+.app-section--progress
+  .progress-subsection:has(.progress-muscle-workload)
+  .progress-subsection__head
+  h3 {
+  color: var(--text);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary:active {
+  background: var(--surface-active);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise[open] > summary {
   border-bottom: 1px solid var(--border);
 }
 
 .progress-workload__body {
   display: grid;
   gap: 12px;
-  padding: 0 4px 16px;
+  padding: var(--v2-space-3);
 }
 
 .progress-workload__comparison {
@@ -7455,7 +7672,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-workload__contributors li {
   padding-left: 10px;
-  border-left: 2px solid var(--accent);
   font-size: 0.75rem;
 }
 
@@ -8937,7 +9153,11 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   outline-offset: -3px;
 }
 .nutrition-target-settings__body {
-  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border);
 }
 .nutrition-picker {
   align-items: center;

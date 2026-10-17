@@ -496,6 +496,8 @@ export function ExerciseCatalog({
                 alt={`${exercise.title}: изображение упражнения`}
                 className="exercise-catalog-item__thumb"
                 thumbnailUrl={exercise.media_thumbnail_url}
+                thumbnailSources={exercise.media_thumbnail_sources}
+                preferredMode={exercise.media_preferred_mode}
                 variant="thumbnail"
               />
               <span className="exercise-catalog-item__copy">

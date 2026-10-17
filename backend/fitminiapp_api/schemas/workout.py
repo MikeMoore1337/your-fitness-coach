@@ -7,10 +7,12 @@ from fitminiapp_api.schemas.data_quality import TrainingDataSufficiency
 from fitminiapp_api.schemas.exercise_setup import ExerciseSetupMemoryResponse
 from fitminiapp_api.schemas.program import (
     EquipmentIdentifier,
+    ExerciseGuideMediaSource,
     ExercisePrescriptionPlan,
     PrescriptionGroupKind,
     PrescriptionRole,
 )
+from fitminiapp_api.schemas.workout_rest import RestSessionResponse
 
 RirValue = Literal["0", "1", "2", "3", "4+"]
 SetKind = Literal["warmup", "working", "drop"]
@@ -310,9 +312,12 @@ class WorkoutExerciseItem(BaseModel):
     group_kind: PrescriptionGroupKind | None = None
     group_order: int | None = None
     has_guide: bool = False
-    media_state: Literal["approved_animated", "blocked"] | None = None
+    media_state: Literal["approved_animated", "approved_static", "blocked"] | None = None
     media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
+    media_preferred_mode: Literal["static", "animation"] | None = None
     media_animation_url: str | None = None
+    media_video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 
@@ -539,6 +544,17 @@ class WorkoutCompletionFeedbackUpdate(BaseModel):
         return normalized
 
 
+class WorkoutRestHistoryItem(BaseModel):
+    source_set_id: int
+    planned_seconds: int = Field(ge=1)
+    adjusted_seconds: int = Field(ge=1)
+    measured_seconds: int | None = Field(default=None, ge=0)
+    delta_seconds: int | None = None
+    status: Literal["running", "completed", "skipped", "interrupted", "unknown"]
+    source: str | None = None
+    quality: str
+
+
 class WorkoutHistoryItem(BaseModel):
     id: int
     scheduled_date: date
@@ -553,6 +569,7 @@ class WorkoutHistoryItem(BaseModel):
     completion_note: str | None = None
     exercises: list[WorkoutHistoryExerciseItem]
     adaptations: list[WorkoutAdaptationHistoryItem]
+    rest_sessions: list[RestSessionResponse] = Field(default_factory=list)
 
 
 class WorkoutHistoryExerciseItem(BaseModel):

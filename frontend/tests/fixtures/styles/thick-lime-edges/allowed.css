@@ -1,0 +1,15 @@
+.thin-lime-frame {
+  border: 1px solid var(--v2-lime);
+}
+
+.active-tab[aria-selected='true'] {
+  border-left: 3px solid var(--v2-lime);
+}
+
+.keyboard-focus:focus-visible {
+  outline: 3px solid var(--v2-lime);
+}
+
+.semantic-warning {
+  border: 1px solid var(--v2-lime);
+}

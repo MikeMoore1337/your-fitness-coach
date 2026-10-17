@@ -14,7 +14,10 @@ import {
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
-test.use({ serviceWorkers: 'block', video: 'on' });
+test.use({
+  serviceWorkers: 'block',
+  video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on',
+});
 
 const CAPTURE_980_AFTER = process.env.CAPTURE_980_AFTER === '1';
 const ISSUE_980_AFTER_DIR = resolve(
@@ -1039,6 +1042,10 @@ test.describe('#1001 completion navigation', () => {
             )
             .toBeLessThanOrEqual(1);
           if (id === 202) await setNetworkOffline(page, false);
+          // Wait for the server to persist the offline completion before starting
+          // the next held-autosave scenario. Queue length zero alone can precede
+          // the server acknowledgement and lead to a stale current-set reload.
+          await expect.poll(() => server.readSet(id).is_completed).toBe(true);
           await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
           await page.evaluate(() => {
             Object.assign(window.visualViewport!, { height: 844 });
@@ -1794,14 +1801,42 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await expect(summary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+
   const exercise = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
     .first();
-  await expect(
-    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
-  ).toBeVisible();
-  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  const replacement = exercise.getByRole('button', {
+    name: 'Заменить только в этой тренировке',
+  });
+  await expect(replacement).toBeVisible();
+  for (const mobileWidth of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width: mobileWidth, height: 844 });
+    const { triggerWidth, actionsWidth, pageWidth } = await replacement.evaluate((button) => {
+      const trigger = button.getBoundingClientRect();
+      const actions = button.closest('.active-workout-exercise__head-actions');
+      return {
+        triggerWidth: trigger.width,
+        actionsWidth: actions?.getBoundingClientRect().width ?? 0,
+        pageWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(actionsWidth).toBeGreaterThan(0);
+    expect(triggerWidth, `Replacement button width at ${mobileWidth}px`).toBeGreaterThanOrEqual(
+      actionsWidth - 1,
+    );
+    expect(pageWidth, `Horizontal overflow at ${mobileWidth}px`).toBeLessThanOrEqual(
+      mobileWidth + 1,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await replacement.click();
   await expect(
     page.getByRole('heading', { name: 'Заменить только в этой тренировке' }),
   ).toBeVisible();
@@ -1813,6 +1848,12 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('button', { name: 'Применить' }).click();
   await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  const replacedSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await expect(replacedSummary.getByRole('button', { name: 'Что делать сейчас?' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
+  await expect(replacedSummary.locator('.active-session-summary__details')).toBeHidden();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
@@ -1863,10 +1904,28 @@ for (const width of [360, 393, 430]) {
         await page.goto(platform === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
         if (platform === 'browser') await page.getByRole('button', { name: 'Клиент' }).click();
         await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
-        await page
+        const replacementButton = page
           .getByRole('button', { name: 'Заменить только в этой тренировке', exact: true })
-          .first()
-          .click();
+          .first();
+        const replacementGeometry = await replacementButton.evaluate((button) => {
+          const row = button.closest('.active-workout-exercise__head-actions');
+          const buttonRect = button.getBoundingClientRect();
+          const rowRect = row?.getBoundingClientRect();
+          return {
+            buttonWidth: buttonRect.width,
+            rowWidth: rowRect?.width ?? 0,
+            pageWidth: document.documentElement.scrollWidth,
+            viewportWidth: innerWidth,
+          };
+        });
+        expect(replacementGeometry.rowWidth).toBeGreaterThan(0);
+        expect(replacementGeometry.buttonWidth).toBeGreaterThanOrEqual(
+          replacementGeometry.rowWidth - 1,
+        );
+        expect(replacementGeometry.pageWidth).toBeLessThanOrEqual(
+          replacementGeometry.viewportWidth + 1,
+        );
+        await replacementButton.click();
         const dialog = page.getByRole('dialog', {
           name: 'Заменить только в этой тренировке',
           exact: true,
@@ -2008,7 +2067,9 @@ test('V9-01 keeps pain inside the safety-stop boundary', async ({ page }) => {
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
-  await page.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
+  const summary = page.getByRole('region', { name: 'Что делать сейчас?' });
+  await summary.getByRole('button', { name: 'Что делать сейчас?' }).click();
+  await summary.getByRole('button', { name: 'Боль или травма во время тренировки' }).click();
   await page.getByRole('button', { name: 'Показать рекомендации' }).click();
   await expect(page.getByRole('heading', { name: 'Безопасность прежде всего' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Применить' })).toHaveCount(0);
@@ -2259,6 +2320,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2271,6 +2336,10 @@ test('V9-04 keeps a private setup memory through create, edit, delete and reload
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
   const reloadedMemory = page
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
@@ -2296,6 +2365,10 @@ test('V9-04 fits Mobile Web and mocked TMA widths without moving the next-set ac
   await mockActiveWorkout(page, false, 'approved_animated', false, 'Скамья 30°');
   await page.goto('/app?tgWebAppPlatform=android');
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const exercise = page.locator('.active-workout-exercise').filter({ hasText: 'Жим штанги лёжа' });
   const setupMemory = exercise.getByTestId('exercise-setup-memory-11');
@@ -2319,6 +2392,10 @@ test('V9-04 preserves a draft when the memory save is offline', async ({ page })
   await page.goto('/app');
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .getByRole('region', { name: 'Что делать сейчас?' })
+    .getByRole('button', { name: 'Что делать сейчас?' })
+    .click();
 
   const setupMemory = page
     .locator('.active-workout-exercise')
@@ -3983,12 +4060,11 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await expect(timer).toContainText('0:25');
   await page.clock.setFixedTime(new Date(start.getTime() + 100_000));
   await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-  await expect(timer).toHaveCount(0);
-  const panel = page.locator('.active-workout-rest--complete');
-  await expect(panel).toHaveClass(/is-compact/);
-  await expect(panel).toContainText('Отдых завершён · дальше: Жим штанги лёжа, подход 2');
-  await expect(panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
-  await expect(panel.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+  await expect(timer).toHaveText('0:00');
+  const panel = page.locator('.active-workout-rest');
+  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await expect(panel).toContainText('Факт');
+  await expect(panel).not.toHaveClass(/is-compact/);
   await expect
     .poll(() =>
       page.evaluate(
@@ -4018,16 +4094,65 @@ test('rest timer reaches its final state from the deadline without user events',
   await expect(timer).toHaveText('1:30');
   await page.clock.runFor(90_000);
 
-  await expect(timer).toHaveCount(0);
-  const panel = page.locator('.active-workout-rest--complete');
+  // Policy C keeps the actual rest running beyond the planned countdown.
+  await expect(timer).toHaveText('0:00');
+  const panel = page.locator('.active-workout-rest');
+  await expect(panel).toContainText('Факт');
+  await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await panel.getByRole('button', { name: 'Завершить отдых' }).click();
   await expect(panel).toHaveClass(/is-compact/);
-  await expect(panel).toContainText('Отдых завершён · дальше: Жим штанги лёжа, подход 2');
-  await expect(panel).not.toContainText('Отдых пропущен');
-  await expect(panel.getByRole('button', { name: '+30 сек' })).toHaveCount(0);
-  await expect(panel.getByRole('button', { name: '+60 сек' })).toHaveCount(0);
-  await expect(panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
+  await expect(panel).toContainText('Отдых завершён по отметке');
   await panel.getByRole('button', { name: 'Скрыть' }).click();
   await expect(panel).toHaveCount(0);
+});
+
+test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({
+  page,
+}) => {
+  const start = new Date('2026-09-09T12:00:00Z');
+  await page.clock.setFixedTime(start);
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
+  await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+  await expect(
+    page.locator('.active-workout-rest').getByRole('button', { name: 'Завершить отдых' }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.clock.setFixedTime(new Date(start.getTime() + 17 * 60_000));
+  await page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  const review = page.getByRole('group', { name: 'Уточнение фактического отдыха' });
+  await expect(review).toBeVisible();
+  await expect(review).toContainText('Вы забыли завершить отдых?');
+  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
+  await review
+    .getByRole('textbox', { name: 'Сколько вы фактически отдыхали (минуты)?' })
+    .fill('2,5');
+  await review.getByRole('button', { name: 'Сохранить время' }).click();
+  await expect(page.locator('.active-workout-rest')).toContainText(
+    'Отдых сохранён по вашей отметке',
+  );
+  const journal = await page.evaluate(() =>
+    Object.keys(localStorage)
+      // Per-action ':op:<id>' records are objects, not session arrays.
+      .filter((key) => key.endsWith(':measured:v1'))
+      .flatMap((key) => JSON.parse(localStorage.getItem(key) || '[]')),
+  );
+  expect(journal[0]?.source).toBe('USER_CORRECTED');
+  expect(journal[0]?.pending.at(-1)?.corrected_seconds).toBe(150);
 });
 
 test.describe('#914 rest timer pointer lifecycle', () => {
@@ -4182,7 +4307,10 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         const context = await prepare(page, width, theme);
         const mutations: string[] = [];
         page.on('request', (request) => {
-          if (/\/workouts\//.test(request.url()) && request.method() !== 'GET') {
+          const route = new URL(request.url()).pathname;
+          // Timer journaling may legitimately POST /rest-sessions on navigation.
+          // This regression specifically forbids rewriting completed workout sets.
+          if (/\/workouts\/sets\/\d+/.test(route) && request.method() !== 'GET') {
             mutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
           }
         });
@@ -4480,7 +4608,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await unchanged(page, context);
   });
 
-  test('expiry completes a pressed control before compacting without another gesture', async ({
+  test('pressed skip completes only after pointer release, including after plan expiry', async ({
     page,
   }) => {
     const context = await prepare(page, 360, 'dark');
@@ -4489,19 +4617,13 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await page.mouse.down();
     await page.clock.setFixedTime(new Date('2026-10-10T12:01:40Z'));
     await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
-    await expect(context.panel.getByRole('button', { name: 'Пропустить' })).toHaveAttribute(
-      'aria-disabled',
-      'true',
-    );
+    await expect(context.panel.getByRole('timer')).toHaveText('0:00');
     await page.mouse.up();
+    // Under Policy C the plan ending does not complete the rest. Releasing an
+    // already pressed Skip is an explicit user action, so it must be honored.
     await expect(context.panel).toHaveClass(/is-compact/);
-    await expect(context.panel).toContainText('Отдых завершён');
-    await expect(context.panel).not.toContainText('Отдых пропущен');
-    await expect(context.panel.getByRole('button', { name: 'Пропустить' })).toHaveCount(0);
-    await unchanged(page, context);
-    const hide = context.panel.getByRole('button', { name: 'Скрыть' });
-    await hide.click();
-    await expect(context.panel).toHaveCount(0);
+    await expect(context.panel).toContainText('Отдых пропущен');
+    await expect(context.panel.getByRole('button', { name: 'Завершить отдых' })).toHaveCount(0);
     await unchanged(page, context);
   });
 });
@@ -4629,3 +4751,62 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
   await expect(page.getByRole('heading', { name: 'Тренировка завершена' })).toBeVisible();
   await page.screenshot({ path: `${packagePath}/mobile-light-completed.png`, fullPage: true });
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 393, 430]) {
+    test(`issue960-visual ${theme} ${width}px actual rest and recovery`, async ({ page }) => {
+      test.skip(process.env.YFC_CAPTURE_960_AFTER !== '1', 'Run only for owner visual evidence');
+      await page.setViewportSize({ width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const started = new Date('2026-10-17T12:00:00Z');
+      await page.clock.setFixedTime(started);
+      await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const set = page.locator('[data-workout-set-id="201"]');
+      await set.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
+      await set.getByLabel('Повторы, Жим штанги лёжа, подход 1').fill('8');
+      await set.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
+      const rest = page.locator('.active-workout-rest');
+      await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await expect(rest).toContainText('Факт');
+      const folder = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux',
+        'issue-960-implementation',
+        'visuals',
+      );
+      await mkdir(folder, { recursive: true });
+      await page.screenshot({
+        path: resolve(folder, `after-${theme}-${width}-actual.png`),
+        animations: 'disabled',
+      });
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'hidden',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await page.clock.setFixedTime(new Date(started.getTime() + 17 * 60_000));
+      await page.evaluate(() => {
+        Object.defineProperty(document, 'visibilityState', {
+          configurable: true,
+          get: () => 'visible',
+        });
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      const review = rest.getByRole('group', { name: 'Уточнение фактического отдыха' });
+      await expect(review).toBeVisible();
+      await expect(review).toContainText('Вы забыли завершить отдых?');
+      await page.screenshot({
+        path: resolve(folder, `after-${theme}-${width}-recovery.png`),
+        animations: 'disabled',
+      });
+    });
+  }
+}

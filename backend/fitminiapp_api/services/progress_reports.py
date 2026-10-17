@@ -17,6 +17,7 @@ from fitminiapp_api.services.analytics import build_training_analytics_for_range
 from fitminiapp_api.services.daily_wellbeing import build_daily_wellbeing_report
 from fitminiapp_api.services.nutrition_reports import build_nutrition_report, resolve_report_bounds
 from fitminiapp_api.services.progress import build_progress_summary_for_range
+from fitminiapp_api.services.rest_statistics import rest_statistics
 
 EXERCISE_HISTORY_LIMIT = 20
 
@@ -184,6 +185,7 @@ def build_progress_report(
             "volume_recorded_sets": analytics["volume_recorded_sets"],
             "new_personal_records": summary["training"]["new_personal_records"],
             "exercises": exercises,
+            "rest": rest_statistics(db, user.id, bounds.start, bounds.end),
         },
         "cardio": summary["cardio"],
         "body": summary["body"],

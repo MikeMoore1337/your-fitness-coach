@@ -14,12 +14,61 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { workoutStatusLabel } from '../../shared/statusLabels';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { WorkoutFeedbackDisclosure } from './WorkoutFeedback';
 import { workoutCompletionFeedbackLabels } from './WorkoutCompletionSummary';
+
+interface RestHistoryEntry {
+  id: number;
+  source_set_id: number;
+  status: string;
+  source: string | null;
+  planned_seconds: number;
+  adjusted_seconds: number;
+  measured_seconds: number | null;
+}
+
+function restDuration(seconds: number): string {
+  const safe = Math.max(0, Math.round(seconds));
+  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, '0')}`;
+}
+
+function restHistoryLabel(row: RestHistoryEntry): string {
+  const original = `План ${restDuration(row.planned_seconds)}`;
+  const adjusted =
+    row.adjusted_seconds !== row.planned_seconds
+      ? ` · цель после +30/+60: ${restDuration(row.adjusted_seconds)}`
+      : '';
+  const measured = row.status === 'completed' ? row.measured_seconds : null;
+  if (measured === null) return `${original}${adjusted} · нет достоверного замера`;
+  const delta = measured - row.planned_seconds;
+  const corrected = row.source === 'USER_CORRECTED' ? ' · исправлено вручную' : '';
+  return `${original}${adjusted} · факт по отметке ${restDuration(measured)} · разница ${delta >= 0 ? '+' : ''}${delta} сек${corrected}`;
+}
+
+function RestHistory({ sessions }: { sessions?: RestHistoryEntry[] }) {
+  if (!sessions?.length) return <p className="muted">Отдых: нет достоверных замеров.</p>;
+  const confirmed = sessions.filter(
+    (row) => row.status === 'completed' && row.measured_seconds !== null,
+  ).length;
+  return (
+    <details className="workout-history__rest">
+      <summary className="yfc-disclosure-summary">
+        Отдых по подходам · {confirmed} замеров
+        <Icon name="chevron-down" size={16} />
+      </summary>
+      <ul>
+        {sessions.map((row) => (
+          <li key={row.id}>{restHistoryLabel(row)}</li>
+        ))}
+      </ul>
+    </details>
+  );
+}
 
 const HISTORY_PAGE_SIZE = 10;
 const adaptationReasonLabels: Record<string, string> = {
@@ -216,6 +265,12 @@ export function WorkoutHistory({
                         </button>
                       ))}
                     </div>
+                    <RestHistory
+                      sessions={
+                        (item as WorkoutHistoryItem & { rest_sessions?: RestHistoryEntry[] })
+                          .rest_sessions
+                      }
+                    />
                     {item.adaptations.map((adaptation) => (
                       <p className="workout-history__adaptation" key={adaptation.id}>
                         Изменено перед тренировкой: {adaptationReasonLabels[adaptation.reason]}

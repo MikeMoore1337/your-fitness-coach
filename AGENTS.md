@@ -66,6 +66,22 @@ visual redesigns.
   `Icon`/its shared adapters; CSS-drawn or Unicode glyphs are not substitutes. New text and data
   roles reuse the shared typography tokens, with tabular numerals for measurable values.
 
+### Thick one-sided lime edges
+
+Do not add a disproportionate one-sided lime edge to a user-facing component. A style is
+forbidden when a single physical or logical side, inset shadow rail, hard-stop gradient or
+positioned pseudo-element uses a YFC lime/accent color at 3px or more. A uniform 1px frame,
+ordinary thin outline, focus outline, active/current/selected state and CTA treatment
+are allowed. Semantic status and warning messages must keep their icons and text but
+must not use a thick one-sided lime strip; this is not a global ban on borders, shadows,
+outlines or lime.
+
+`npm run lint` includes `lint:lime-edges`, which checks changed CSS, CSS Modules, JSX/TSX
+inline styles and CSS-in-JS-like templates and blocks a confirmed violation in the mandatory
+`frontend-checks` group. Runtime/computed-style coverage is added for the Progress surfaces;
+dynamic values and unchanged historical code remain outside static diff coverage and must be
+reviewed when touched.
+
 ## Owner-gated visual delivery
 
 For a new or substantially changed visual composition, use this sequence:
