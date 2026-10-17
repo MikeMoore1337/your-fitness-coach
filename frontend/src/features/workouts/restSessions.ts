@@ -144,9 +144,21 @@ export function updateMeasuredRest(
   const records = loadRestJournal(userId, workoutId);
   const row = records.find((item) => item.source_set_id === sourceSetId);
   if (!row || row.status !== 'running') return null;
+  // A restored tab can receive a click before its first cutoff tick.
+  // Never label such a window as measured, even when Stop was explicitly clicked.
+  const elapsedMs = at - Date.parse(row.started_at);
+  const effectiveAction: RestAction =
+    action === 'complete' &&
+    (elapsedMs < 0 || elapsedMs >= restHardCutoffMs(row.adjusted_seconds))
+      ? 'unknown'
+      : action;
   const occurredAt = new Date(at).toISOString();
-  const entry: QueuedRestAction = { action, occurred_at: occurredAt, mutation_id: makeId() };
-  if (action === 'add30' || action === 'add60') {
+  const entry: QueuedRestAction = {
+    action: effectiveAction,
+    occurred_at: occurredAt,
+    mutation_id: makeId(),
+  };
+  if (effectiveAction === 'add30' || effectiveAction === 'add60') {
     row.deadline = Math.max(row.deadline, at) + (action === 'add30' ? 30 : 60) * 1000;
     row.adjusted_seconds = Math.max(
       1,
@@ -158,9 +170,9 @@ export function updateMeasuredRest(
       skip: 'skipped',
       interrupt: 'interrupted',
       unknown: 'unknown',
-    }[action] as RestStatus;
+    }[effectiveAction] as RestStatus;
     row.ended_at = occurredAt;
-    if (action === 'complete') {
+    if (effectiveAction === 'complete') {
       entry.ended_at = occurredAt;
       row.source = 'USER_CONFIRMED';
     }
