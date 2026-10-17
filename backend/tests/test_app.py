@@ -817,6 +817,16 @@ def test_minor_weight_changes_update_current_weight_without_rewriting_calculated
     assert updated["kbju"]["id"] == base_id
     assert updated["kbju"]["weight_kg"] == 80
 
+    # Saving unrelated profile fields with the already-shown diary weight
+    # must not turn a small fluctuation into an explicit recalculation.
+    unchanged_profile = client.patch(
+        "/api/v1/me/profile",
+        json={"full_name": "Изменил имя", "weight_kg": 79.7},
+        headers=headers,
+    )
+    assert unchanged_profile.status_code == 200
+    assert unchanged_profile.json()["profile"]["kbju"]["id"] == base_id
+
     substantial = client.post(
         "/api/v1/workouts/diary",
         json={"measured_on": today_msk().isoformat(), "weight_kg": 79.1},
