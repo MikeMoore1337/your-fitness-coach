@@ -198,4 +198,3 @@ diagnostic 125%; WebKit проверен на 393 × 900 по геометрии
 
 Существующий [Draft PR #1043](https://github.com/MikeMoore1337/your-fitness-coach/pull/1043)
 обновляется этим пакетом. Merge, auto-merge и deploy в этой design-only стадии не выполнялись.
-
