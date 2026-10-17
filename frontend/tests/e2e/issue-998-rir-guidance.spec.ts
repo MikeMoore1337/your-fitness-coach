@@ -19,6 +19,7 @@ async function preparePage(
   page: Page,
   theme: 'dark' | 'light',
   viewport: (typeof VIEWPORTS)[number],
+  options: { programHistory?: 'one' } = {},
 ) {
   await page.setViewportSize({ width: viewport.width, height: viewport.height });
   await page.clock.setFixedTime(new Date(`${FIXED_DATE}T12:00:00+03:00`));
@@ -31,6 +32,7 @@ async function preparePage(
     fixedDate: FIXED_DATE,
     workoutStatus: 'in_progress',
     progressionOutcome: 'consider_progressing',
+    programHistory: options.programHistory,
   });
 }
 
@@ -45,9 +47,9 @@ async function enterWorkout(page: Page) {
   return currentSet;
 }
 
-async function captureSurface(page: Page, name: string) {
+async function captureSurface(page: Page, name: string, selector = '.active-workout') {
   if (STAGE === undefined || !EVIDENCE_DIR || test.info().project.name !== 'chromium') return;
-  await page.locator('.active-workout').screenshot({ path: resolve(EVIDENCE_DIR, name) });
+  await page.locator(selector).screenshot({ path: resolve(EVIDENCE_DIR, name) });
 }
 
 for (const theme of ['dark', 'light'] as const) {
@@ -73,6 +75,14 @@ for (const theme of ['dark', 'light'] as const) {
         await expect(rirSummary).toBeVisible();
         await expect(rirDetails).not.toHaveAttribute('open', '');
 
+        const sessionSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
+        const sessionToggle = sessionSummary.getByRole('button', { name: 'Что делать сейчас?' });
+        await expect(sessionToggle).toHaveAttribute('aria-expanded', 'false');
+        await expect(sessionSummary.locator('.active-session-summary__details')).toBeHidden();
+        await captureSurface(page, `after-${theme}-${viewport.label}-compact.png`);
+        await sessionToggle.click();
+        await expect(sessionToggle).toHaveAttribute('aria-expanded', 'true');
+
         const guidance = page.locator('.active-session-summary .progression-guidance');
         const whySummary = guidance.getByText('Почему такой вес?', { exact: true });
         await expect(whySummary).toBeVisible();
@@ -90,6 +100,13 @@ for (const theme of ['dark', 'light'] as const) {
           guidance.getByRole('link', { name: 'Подробнее о прогрессии' }),
         ).toHaveAttribute('href', '/knowledge/training/progressive-overload');
         await captureSurface(page, `after-${theme}-${viewport.label}-open.png`);
+
+        await weight.fill('40');
+        await reps.fill('8');
+        await complete.click();
+        await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+        await expectNoHorizontalOverflow(page);
+        await captureSurface(page, `after-${theme}-${viewport.label}-rest.png`);
       } else {
         await expect(currentSet.locator('.active-workout-set__contextual-help')).toHaveCount(0);
         await captureSurface(page, `before-${theme}-${viewport.label}.png`);
@@ -166,3 +183,37 @@ test('@critical Issue #998 mocked TMA safe-area keeps the contextual action in t
   expect(geometry.left).toBeGreaterThanOrEqual(-0.5);
   expect(geometry.right).toBeLessThanOrEqual(geometry.viewport + 0.5);
 });
+
+for (const theme of ['dark', 'light'] as const) {
+  for (const viewport of [VIEWPORTS[2], VIEWPORTS[4]]) {
+    test(`@critical Issue #998 program cycle help ${viewport.label}px ${theme}`, async ({
+      page,
+    }) => {
+      await preparePage(page, theme, viewport, { programHistory: 'one' });
+      await page.goto('/app?section=programs&view=manage&start=create');
+      const builder = page.locator('.program-builder');
+      await expect(builder).toBeVisible();
+      const addDay = builder.getByRole('button', { name: 'Добавить день' });
+      for (let day = 1; day < 8; day += 1) await addDay.click();
+
+      const settings = builder.locator('details.program-builder-settings');
+      await settings.locator(':scope > summary').click();
+      const cycleHelp = settings.getByText('Как устроен цикл?', { exact: true });
+      await expect(cycleHelp).toBeVisible();
+      await expect(settings.locator('.contextual-help')).not.toHaveAttribute('open', '');
+      await captureSurface(
+        page,
+        `after-program-${theme}-${viewport.label}.png`,
+        '.program-builder-settings .program-builder-section:has(.contextual-help)',
+      );
+      await cycleHelp.click();
+      await expect(settings.locator('.contextual-help')).toHaveAttribute('open', '');
+      await expect(settings.getByText('Источник: нет ссылки.', { exact: true })).toBeVisible();
+      await captureSurface(
+        page,
+        `after-program-${theme}-${viewport.label}-open.png`,
+        '.program-builder-settings .program-builder-section:has(.contextual-help)',
+      );
+    });
+  }
+}
