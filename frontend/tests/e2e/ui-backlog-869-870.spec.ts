@@ -81,6 +81,42 @@ for (const theme of themes) {
             });
           expect(headingStyle).toEqual(settingsHeadingStyle);
         }
+        // All three mobile sections must have the same frame color and spacing,
+        // regardless of whether #1048 puts KBJU settings first or last.
+        const sectionLayout = await page
+          .locator(
+            '.nutrition-experience > :is(.meal-planner, .grocery-list, .nutrition-target-settings)',
+          )
+          .evaluateAll((elements) =>
+            elements.map((element) => {
+              const bounds = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              return {
+                className: element.className,
+                top: bounds.top,
+                bottom: bounds.bottom,
+                borderColors: [
+                  style.borderTopColor,
+                  style.borderRightColor,
+                  style.borderBottomColor,
+                  style.borderLeftColor,
+                ],
+                backgroundColor: style.backgroundColor,
+              };
+            }),
+          );
+        expect(sectionLayout).toHaveLength(3);
+        const settingsLayout = sectionLayout.find((item) =>
+          item.className.includes('nutrition-target-settings'),
+        );
+        expect(settingsLayout).toBeDefined();
+        for (const item of sectionLayout) {
+          expect(item.borderColors).toEqual(settingsLayout!.borderColors);
+          expect(item.backgroundColor).toBe(settingsLayout!.backgroundColor);
+        }
+        for (let index = 1; index < sectionLayout.length; index++) {
+          expect(sectionLayout[index]!.top - sectionLayout[index - 1]!.bottom).toBeCloseTo(16, 0);
+        }
       }
       for (const detail of await planningDetails.all()) {
         const summary = detail.locator(':scope > summary');
