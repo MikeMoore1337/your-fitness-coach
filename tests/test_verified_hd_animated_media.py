@@ -77,7 +77,7 @@ def test_approved_ai_animations_preserve_source_and_binary_integrity() -> None:
     assert MANIFEST["ai_upscaled_video_count"] == 4
     assert sum(m["video_sources"][0]["byte_size"] for m in samples.values()) == 614973
     assert MANIFEST["ai_upscaled_video_total_bytes"] == 614973
-    for slug, media in samples.items():
+    for media in samples.values():
         assert media["type"] == "animation"
         assert media["path"].endswith(".gif")
         original = ASSET_ROOT / media["path"]

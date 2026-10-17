@@ -318,7 +318,8 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 ai_upscaled = provenance.get("source_kind") == "ai_upscaled_gymvisual"
                 if ai_upscaled:
                     _require(
-                        slug in {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"},
+                        slug
+                        in {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"},
                         f"Unreviewed AI animation: {slug}",
                     )
                     _require(
@@ -329,7 +330,8 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                         and provenance.get("source_asset_id") == media.get("asset_id")
                         and provenance.get("source_dimensions") == {"width": 180, "height": 180}
                         and provenance.get("source_animation_frames") == media.get("frame_count")
-                        and provenance.get("source_animation_duration_ms") == media.get("duration_ms")
+                        and provenance.get("source_animation_duration_ms")
+                        == media.get("duration_ms")
                         and provenance.get("model") == "RealESRGAN_x4plus"
                         and provenance.get("scale") == 4
                         and provenance.get("native_hd") is False
@@ -399,7 +401,10 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
         if media.get("video_sources")
         and (media.get("video_provenance") or {}).get("source_kind") == "ai_upscaled_gymvisual"
     ]
-    _require(len(approved_videos) == manifest.get("hq_video_count"), "Verified H.264 exercise count drift")
+    _require(
+        len(approved_videos) == manifest.get("hq_video_count"),
+        "Verified H.264 exercise count drift",
+    )
     _require(
         sum(video["byte_size"] for media in approved_videos for video in media["video_sources"])
         == manifest.get("hq_video_total_bytes"),
