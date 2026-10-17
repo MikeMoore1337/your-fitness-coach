@@ -4767,7 +4767,14 @@ for (const theme of ['light', 'dark'] as const) {
       const rest = page.locator('.active-workout-rest');
       await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
       await expect(rest).toContainText('Факт');
-      const folder = resolve(process.cwd(), '..', 'docs', 'ux', 'issue-960-implementation', 'visuals');
+      const folder = resolve(
+        process.cwd(),
+        '..',
+        'docs',
+        'ux',
+        'issue-960-implementation',
+        'visuals',
+      );
       await mkdir(folder, { recursive: true });
       await page.screenshot({
         path: resolve(folder, `after-${theme}-${width}-actual.png`),
