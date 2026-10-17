@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import datetime
 
 import pytest
 
-from fitminiapp_api.core.timezone import local_naive_to_utc_naive_strict
+from fitminiapp_api.core.timezone import local_naive_to_utc_naive_strict, today_msk
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.coach_crm import (
     CoachBusinessSession,
@@ -326,7 +326,7 @@ def test_client_profile_weight_preserves_fractional_values_and_missing_state(cli
     measurement = client.post(
         f"/api/v1/coach/clients/{client_id}/measurements",
         headers=coach_headers,
-        json={"measured_on": date.today().isoformat(), "weight_kg": 78.4, "waist_cm": 82.0},
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 78.4, "waist_cm": 82.0},
     )
     assert measurement.status_code == 200, measurement.text
     assert measurement.json()["weight_kg"] == 78.4
