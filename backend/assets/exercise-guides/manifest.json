@@ -24,9 +24,9 @@
     "approved_static": 4,
     "hd_coverage_percent": 37.38
   },
-  "asset_count": 877,
+  "asset_count": 881,
   "derivative_count": 77,
-  "total_bytes": 49043115,
+  "total_bytes": 49658088,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -3916,7 +3916,36 @@
               "height": 180,
               "byte_size": 83236
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/deadlift-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111130,
+              "sha256": "afd8eedcefe2075cbf1bafb146876c9d04bfceb12bcb17038ed998446cd938bb"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/deadlift-0032-ila4NZS.gif",
+            "source_sha256": "85ca4e4f562df04d5b3d4f5378792873e4fab954c850f7104e14161f680dd568",
+            "source_asset_id": "gymvisual:0032:ila4NZS",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264-MP4-preserve-source-motion",
+            "rights_basis": "owner-confirmed-GymVisual-commercial-and-derived-use"
+          }
         }
       ]
     },
@@ -9092,7 +9121,36 @@
               "height": 180,
               "byte_size": 135362
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-chest-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 147140,
+              "sha256": "3b7f1a72870c55858996da96736c1271dd8ff2bf7140716770dde5d321125614"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-chest-press-0577-T0yTjgW.gif",
+            "source_sha256": "789515907e5001da8ced127bcf8969e7ab265f25545bf7f0a80dbb6f0da213b0",
+            "source_asset_id": "gymvisual:0577:T0yTjgW",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264-MP4-preserve-source-motion",
+            "rights_basis": "owner-confirmed-GymVisual-commercial-and-derived-use"
+          }
         }
       ]
     },
@@ -12602,7 +12660,36 @@
             }
           ],
           "poster_source": null,
-          "poster_sources": []
+          "poster_sources": [],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/russian-twist-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 196448,
+              "sha256": "a1fa19b9906701d2eea055dcc539e6f9ae24341e5ce37293b1f2ddbf1bd29c73"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/russian-twist-0687-XVDdcoj.gif",
+            "source_sha256": "e2b6ff4dbe4dd75c88b17d51380fe8426b3cc5705ca789a9b850bf56514b3c7d",
+            "source_asset_id": "gymvisual:0687:XVDdcoj",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264-MP4-preserve-source-motion",
+            "rights_basis": "owner-confirmed-GymVisual-commercial-and-derived-use"
+          }
         }
       ]
     },
@@ -15510,7 +15597,36 @@
               "height": 180,
               "byte_size": 125502
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/walking-lunge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 160255,
+              "sha256": "a74a9a92deac7134ff1ef68ad80b658b32321163924b642bdf4994e2364cc0f0"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/walking-lunge-1460-IZVHb27.gif",
+            "source_sha256": "4e7878086e684439f88bb9e69e5f4b07bdcdaf37a0418f2956f99f5d70082bb7",
+            "source_asset_id": "gymvisual:1460:IZVHb27",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-17 #1073 four-sample review",
+            "transformation": "RealESRGAN-x4plus-720x720-H264-MP4-preserve-source-motion",
+            "rights_basis": "owner-confirmed-GymVisual-commercial-and-derived-use"
+          }
         }
       ]
     },
@@ -15860,5 +15976,7 @@
   "hd_rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
   "poster_variant_count": 462,
   "hd_baseline_asset_count": 334,
-  "hd_baseline_total_bytes": 18352704
+  "hd_baseline_total_bytes": 18352704,
+  "ai_upscaled_video_count": 4,
+  "ai_upscaled_video_total_bytes": 614973
 }

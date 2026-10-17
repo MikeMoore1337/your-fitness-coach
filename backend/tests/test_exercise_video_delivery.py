@@ -42,7 +42,7 @@ def test_video_profiles_are_additive_and_keep_original_gif() -> None:
 
 
 def test_unmatched_exercises_retain_legacy_gif() -> None:
-    (still_gif,) = guide("deadlift")
+    (still_gif,) = guide("ab-wheel")
     assert still_gif["video_sources"] == []
     assert still_gif["url"].endswith(".gif")
     assert guide("unknown-slug") == []
@@ -66,3 +66,19 @@ def test_verified_static_media_plays_hd_video_and_keeps_responsive_poster() -> N
         (1920, "image/jpeg"),
         (1920, "image/webp"),
     ]
+
+
+def test_owner_reviewed_ai_video_delivery_keeps_authentic_gif() -> None:
+    for slug in ("machine-chest-press", "deadlift", "russian-twist", "walking-lunge"):
+        (item,) = guide(slug)
+        media = ExerciseGuideMedia.model_validate(item)
+        assert media.type == "animation"
+        assert media.url.endswith(".gif")
+        assert media.sources[0].mime_type == "image/gif"
+        assert [(source.width, source.height) for source in media.video_sources] == [
+            (720, 720),
+        ]
+        assert media.video_sources[0].url.endswith(f"/{slug}-x4plus-720.mp4")
+        preview = get_guide_media_preview(slug)
+        assert preview["animation_url"] == media.url
+        assert preview["video_sources"][0]["mime_type"] == "video/mp4"
