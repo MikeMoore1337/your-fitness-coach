@@ -17,12 +17,12 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
-from fitminiapp_api.services.workout_recovery import recovery_user_local_naive_to_utc_naive
 from fitminiapp_api.schemas.workout_rest import (
     RestActionRequest,
     RestSessionResponse,
     RestStartRequest,
 )
+from fitminiapp_api.services.workout_recovery import recovery_user_local_naive_to_utc_naive
 
 router = APIRouter()
 
@@ -118,9 +118,7 @@ def start_rest_session(
     # Offline completion and rest may reach the server after the workout finish.
     # Preserve accepted, owner-scoped measurements that began before its completion.
     if workout.status == "completed" and workout.completed_at is not None:
-        completed_utc = recovery_user_local_naive_to_utc_naive(
-            workout.completed_at, current_user
-        )
+        completed_utc = recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user)
         if started_at > completed_utc + timedelta(minutes=1):
             raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
     if (
