@@ -17,6 +17,7 @@ from fitminiapp_api.models.program import (
 )
 from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
+from fitminiapp_api.services.workout_recovery import recovery_user_local_naive_to_utc_naive
 from fitminiapp_api.schemas.workout_rest import (
     RestActionRequest,
     RestSessionResponse,
@@ -119,7 +120,9 @@ def start_rest_session(
     if (
         workout.status == "completed"
         and workout.completed_at is not None
-        and started_at > workout.completed_at + timedelta(minutes=1)
+        and started_at
+        > recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user)
+        + timedelta(minutes=1)
     ):
         raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
     if (
@@ -130,7 +133,8 @@ def start_rest_session(
     ):
         raise HTTPException(status_code=422, detail="Отдых для этого подхода не предусмотрен")
     now = _now()
-    if started_at > now + timedelta(minutes=1) or started_at < now - timedelta(hours=24):
+    # Offline workouts may sync after several days; do not strand their rest journals.
+    if started_at > now + timedelta(minutes=1) or started_at < now - timedelta(days=90):
         raise HTTPException(status_code=422, detail="Время начала отдыха вне допустимого диапазона")
     row = WorkoutRestSession(
         user_id=current_user.id,
