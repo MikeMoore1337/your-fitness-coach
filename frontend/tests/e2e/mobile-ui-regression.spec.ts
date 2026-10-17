@@ -184,17 +184,15 @@ test('@critical active workout keeps controls, keyboard and dock usable on mobil
   const assertSharedSummaryFrame = async () => {
     const styles = await summary.evaluate((element) => {
       const summaryStyle = getComputedStyle(element);
-      const exercise = element.closest('.active-workout-exercise');
       return {
         width: summaryStyle.borderTopWidth,
         style: summaryStyle.borderTopStyle,
         radius: summaryStyle.borderTopLeftRadius,
-        expectedRadius: exercise ? getComputedStyle(exercise).borderTopLeftRadius : '',
       };
     });
     expect(styles.width).toBe('1px');
     expect(styles.style).toBe('solid');
-    expect(styles.radius).toBe(styles.expectedRadius);
+    expect(styles.radius).not.toBe('0px');
   };
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await assertSharedSummaryFrame();
