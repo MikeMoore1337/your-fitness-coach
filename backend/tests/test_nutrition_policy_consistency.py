@@ -6,6 +6,7 @@ See docs/nutrition/scientific-validation-1072-2026-10.md.
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -90,3 +91,24 @@ def test_scientific_validation_does_not_infer_individual_accuracy_from_code_chec
     )
     assert "NOT_VALIDATED" in report
     assert "measured REE" in report
+
+
+@pytest.mark.parametrize(
+    "case",
+    json.loads(
+        (REPO_ROOT / "frontend/tests/fixtures/nutrition-calculator-golden.json").read_text(
+            encoding="utf-8"
+        )
+    ),
+    ids=lambda item: item["name"],
+)
+def test_python_calculator_matches_shared_golden_cases(case: dict) -> None:
+    payload = NutritionTargetSave(**case["input"])
+    if case["expected"] is None:
+        with pytest.raises(NutritionMacroAllocationError):
+            calculate_nutrition(payload)
+        return
+
+    actual = calculate_nutrition(payload)
+    for field, expected in case["expected"].items():
+        assert actual[field] == expected, f"{case['name']} drifted on {field}"
