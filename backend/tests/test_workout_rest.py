@@ -296,11 +296,14 @@ def test_owner_corrects_forgotten_rest_duration(client):
     workout = _new_workout(client, owner)
     sid = workout["exercises"][0]["sets"][0]["id"]
     wid = workout["id"]
-    assert client.patch(
-        f"/api/v1/workouts/sets/{sid}",
-        headers=owner,
-        json={"actual_reps": 8, "is_completed": True},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=owner,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
     started_at = datetime.now(UTC) - timedelta(minutes=20)
     response = client.post(
         f"/api/v1/workouts/{wid}/rest-sessions",
