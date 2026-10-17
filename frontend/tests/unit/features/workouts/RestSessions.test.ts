@@ -47,6 +47,16 @@ describe('measured rest journal #960', () => {
     expect(loadRestJournal(11, 56)[0]?.pending).toHaveLength(1);
   });
 
+  it('never marks a forgotten stop after the hard cutoff as measured', () => {
+    const startedAt = 2_500_000;
+    beginMeasuredRest(11, 56, 1005, 90, startedAt);
+    const elapsed = restHardCutoffMs(90) + 1000;
+    const recovered = updateMeasuredRest(11, 56, 1005, 'complete', startedAt + elapsed);
+    expect(recovered?.status).toBe('unknown');
+    expect(recovered?.source).toBeUndefined();
+    expect(recovered?.pending.at(-1)?.action).toBe('unknown');
+  });
+
   it('does not invent a duration for skipped or unknown intervals', () => {
     beginMeasuredRest(11, 56, 1003, 60, 200_000);
     expect(updateMeasuredRest(11, 56, 1003, 'skip')?.status).toBe('skipped');
