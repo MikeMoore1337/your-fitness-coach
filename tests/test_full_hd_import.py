@@ -21,10 +21,10 @@ def test_full_hd_matrix_records_final_import_statuses() -> None:
 
     assert len(rows) == 206
     assert Counter(row["import_status"] for row in rows) == Counter(
-        {"imported_replaced": 71, "imported_added": 4, "skipped": 131}
+        {"imported_replaced": 69, "imported_added": 4, "skipped": 133}
     )
     assert Counter(row["semantic_status"] for row in rows) == Counter(
-        {"VERIFIED_SEMANTIC": 75, "REVIEW": 37, "NO_MATCH": 94}
+        {"VERIFIED_SEMANTIC": 73, "REVIEW": 39, "NO_MATCH": 94}
     )
     assert Counter(row["previous_status"] for row in rows) == Counter(
         {"approved": 167, "blocked": 39}
@@ -32,11 +32,11 @@ def test_full_hd_matrix_records_final_import_statuses() -> None:
     assert Counter(row["current_status"] for row in rows) == Counter(
         {"approved": 171, "blocked": 35}
     )
-    side_plank = next(row for row in rows if row["canonical_slug"] == "side-plank")
-    assert side_plank["previous_status"] == "blocked"
-    assert side_plank["previous_media_source"] == "blocked/no media"
-    assert side_plank["current_status"] == "approved"
-    assert side_plank["current_media_source"].endswith("poster-1280.jpg")
+    for slug in ("chin-up", "russian-twist"):
+        row = next(item for item in rows if item["canonical_slug"] == slug)
+        assert row["semantic_status"] == "REVIEW"
+        assert row["import_status"] == "skipped"
+        assert row["current_media_source"].startswith("gymvisual/")
 
 
 def test_full_hd_matrix_history_is_stable_on_reimport() -> None:
@@ -59,14 +59,7 @@ def test_full_hd_matrix_history_is_stable_on_reimport() -> None:
             "status": "NO_MATCH",
         }
     }
-    old_manifest = {
-        "exercises": {
-            "side-plank": {
-                "status": "blocked",
-                "media": [],
-            }
-        }
-    }
+    old_manifest = {"exercises": {"side-plank": {"status": "blocked", "media": []}}}
     new_manifest = {
         "exercises": {
             "side-plank": {
