@@ -165,20 +165,8 @@ def database_schema():
 
 def _clear_database() -> None:
     with engine.begin() as connection:
-        if engine.dialect.name == "postgresql":
-            # Reset test rows in a single statement rather than issuing one
-            # DELETE per table per test. Workers have isolated test databases.
-            # Preserve sequence counters, as the old DELETE implementation did.
-            tables = ", ".join(
-                engine.dialect.identifier_preparer.format_table(table)
-                for table in Base.metadata.sorted_tables
-            )
-            if tables:
-                connection.exec_driver_sql(f"TRUNCATE TABLE {tables} CASCADE")
-        else:
-            # SQLite/local diagnostics keep their original cleanup semantics.
-            for table in reversed(Base.metadata.sorted_tables):
-                connection.execute(table.delete())
+        for table in reversed(Base.metadata.sorted_tables):
+            connection.execute(table.delete())
 
 
 @pytest.fixture(autouse=True)
@@ -189,7 +177,12 @@ def reset_db(database_schema):
     with get_session_context() as session:
         seed_demo_data(session)
     yield
-    _clear_database()
+    # The next test's setup clears the isolated worker database again; the
+    # session fixture drops its schema after the final test. Avoid duplicate
+    # PostgreSQL DELETE sweeps at every teardown without changing isolation.
+    # Preserve the existing local SQLite cleanup contract.
+    if engine.dialect.name != "postgresql":
+        _clear_database()
 
 
 @pytest.fixture()
