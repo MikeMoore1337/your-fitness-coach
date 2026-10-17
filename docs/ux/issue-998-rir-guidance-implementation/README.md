@@ -9,7 +9,8 @@
 - PR: [#1046](https://github.com/MikeMoore1337/your-fitness-coach/pull/1046).
 - Ветка: `codex/issue-998-rir-guidance-implementation`.
 - Утверждённое направление: Variant A — короткая подсказка рядом с соответствующим понятием.
-- Финальный application/evidence SHA: `096a4ededf95558f6996058e56826f50a1bd5f81`.
+- Финальный application/evidence SHA: `096a4ededf95558f6996058e56826f50a1bd5f81`;
+  mobile baseline reconciliation: `6e60efd6`.
 - Актуальный base при финальной синхронизации: `origin/master`
   `dc1daeb57bc7eded67a089b206e8f84375fea8d1`.
 - Последняя синхронизация с этим base: merge `82da4ddec628e8c781b5c4c36ce8e9528da78787`.
@@ -18,6 +19,10 @@
 После снятия evidence в master вошёл CI-only commit #1090. Он не меняет application-код,
 компоненты Issue #998 или визуальные поверхности; branch sync зафиксирован merge-коммитом
 `82da4dde`.
+
+После live CI был исправлен только конфликт четырёх mobile snapshots: baseline возвращён из
+исходного PR head, где сохранена высота active workout с RIR-подсказкой. Application-код и
+остальные snapshots не менялись.
 
 Изменение сохраняет компактный current-set-first интерфейс из #826. В `ActiveSessionSummary`
 подробности остаются свёрнутыми до действия пользователя; после раскрытия доступны
