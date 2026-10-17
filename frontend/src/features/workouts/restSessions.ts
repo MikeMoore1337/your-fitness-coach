@@ -92,11 +92,13 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
   // stale journal snapshot from erasing an action that has not reached the API.
   try {
     const prefix = `${journalKey}:op:`;
-    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
-      .filter((key): key is string => Boolean(key?.startsWith(prefix)));
+    const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter(
+      (key): key is string => Boolean(key?.startsWith(prefix)),
+    );
     for (const key of keys) {
       const value = readStorage<{ source_set_id: number; operation: QueuedRestAction } | null>(
-        key, null,
+        key,
+        null,
       );
       const row = valid.find((session) => session.source_set_id === value?.source_set_id);
       if (!row || !value?.operation?.mutation_id) continue;
@@ -109,7 +111,9 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
       // Rehydrate terminal state when a stale tab overwrote the primary snapshot.
       const lastTerminal = [...row.pending]
         .reverse()
-        .find((operation) => ['complete', 'skip', 'interrupt', 'unknown'].includes(operation.action));
+        .find((operation) =>
+          ['complete', 'skip', 'interrupt', 'unknown'].includes(operation.action),
+        );
       if (row.status === 'running' && lastTerminal) {
         row.status = {
           complete: 'completed',
