@@ -22,11 +22,11 @@
     "static_only": 4,
     "remote_runtime_assets": 0,
     "approved_static": 4,
-    "hd_coverage_percent": 36.41
+    "hd_coverage_percent": 35.44
   },
-  "asset_count": 717,
-  "derivative_count": 75,
-  "total_bytes": 35977801,
+  "asset_count": 707,
+  "derivative_count": 73,
+  "total_bytes": 35592679,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -2666,7 +2666,7 @@
         {
           "type": "animation",
           "path": "gymvisual/chin-up-1326-T2mxWqc.gif",
-          "poster_path": "exercises-media/chin-up/poster-1280.jpg",
+          "poster_path": "gymvisual/chin-up-1326-T2mxWqc.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Подтягивания обратным хватом: движение",
@@ -2676,10 +2676,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 65350,
-          "poster_byte_size": 39464,
+          "poster_byte_size": 5564,
           "sort_order": 0,
           "asset_sha256": "d35d8f6ac84bcde2f3657a0d4d2e2e2eff08c7ab6dc29a37dd7f5ce24e19dd19",
-          "poster_sha256": "11033a94b89c33f3f0314fa2132419506198dec276675bdeb91c48cdfedb89d0",
+          "poster_sha256": "8961948d629fad2d5245269eb5a02495cfdab7a1069e4ad18fee86b53df3204c",
           "frame_count": 12,
           "duration_ms": 3000,
           "animated": true,
@@ -2692,79 +2692,8 @@
               "byte_size": 65350
             }
           ],
-          "poster_dimensions": {
-            "width": 1280,
-            "height": 720
-          },
-          "poster_preferred": true,
-          "poster_source": {
-            "name": "Exercises Media",
-            "url": "https://github.com/akajdid-mostafa/exercises-media",
-            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
-            "source_path": "public/thumbnails/male/chin-ups-pull-ups.jpg",
-            "source_gender": "male",
-            "source_slug": "chin-ups-pull-ups",
-            "git_blob_sha1": "a01bac124d04a483cc0ce8eb04be874ebcc8edea",
-            "source_sha256": "3466622e596ceb33abdc7ac85544a4c7ac5d5d00b7bf931db210a72fd1dfeca0",
-            "source_byte_size": 61489,
-            "source_dimensions": {
-              "width": 1920,
-              "height": 1080
-            },
-            "canonical_slug": "chin-up",
-            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
-            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
-          },
-          "poster_sources": [
-            {
-              "path": "exercises-media/chin-up/poster-640.jpg",
-              "mime_type": "image/jpeg",
-              "width": 640,
-              "height": 360,
-              "byte_size": 13600,
-              "sha256": "1549ddcccea7e539c39c74c6401185754b7fe287336a4e99e10d41b9b78f6f8e"
-            },
-            {
-              "path": "exercises-media/chin-up/poster-640.webp",
-              "mime_type": "image/webp",
-              "width": 640,
-              "height": 360,
-              "byte_size": 6918,
-              "sha256": "d888e123429a95a6186ee8c52fa54e138499165878f31b260de562eff4c5d3cf"
-            },
-            {
-              "path": "exercises-media/chin-up/poster-1280.jpg",
-              "mime_type": "image/jpeg",
-              "width": 1280,
-              "height": 720,
-              "byte_size": 39464,
-              "sha256": "11033a94b89c33f3f0314fa2132419506198dec276675bdeb91c48cdfedb89d0"
-            },
-            {
-              "path": "exercises-media/chin-up/poster-1280.webp",
-              "mime_type": "image/webp",
-              "width": 1280,
-              "height": 720,
-              "byte_size": 17232,
-              "sha256": "83499f1370bec1fc70f0da10b1b2027862e6fe4c2a007851b982f1b3473456e6"
-            },
-            {
-              "path": "exercises-media/chin-up/poster-1920.jpg",
-              "mime_type": "image/jpeg",
-              "width": 1920,
-              "height": 1080,
-              "byte_size": 72726,
-              "sha256": "40f6cc45d954c287dda8828e84b35d1f9602b8d6bb20fc16460aaac585dde5b0"
-            },
-            {
-              "path": "exercises-media/chin-up/poster-1920.webp",
-              "mime_type": "image/webp",
-              "width": 1920,
-              "height": 1080,
-              "byte_size": 28228,
-              "sha256": "1780175abea84db884abc2f0c66f6498f051b941f992c4f6c418331059cedbea"
-            }
-          ]
+          "poster_source": null,
+          "poster_sources": []
         }
       ]
     },
@@ -10569,7 +10498,7 @@
         {
           "type": "animation",
           "path": "gymvisual/russian-twist-0687-XVDdcoj.gif",
-          "poster_path": "exercises-media/russian-twist/poster-1280.jpg",
+          "poster_path": "gymvisual/russian-twist-0687-XVDdcoj.jpg",
           "phase_id": "movement",
           "phase": "Движение",
           "alt": "Русские повороты: движение",
@@ -10579,10 +10508,10 @@
           "width": 180,
           "height": 180,
           "byte_size": 152384,
-          "poster_byte_size": 46333,
+          "poster_byte_size": 6515,
           "sort_order": 0,
           "asset_sha256": "e2b6ff4dbe4dd75c88b17d51380fe8426b3cc5705ca789a9b850bf56514b3c7d",
-          "poster_sha256": "c86a2cabde854c1deee2f56b5e87e10a1ffcb870ce2de98b0a2c5a7a3d93f6c9",
+          "poster_sha256": "d6ac863e3471028896c1a971056963cdf950740ad62795d217b6a8adfd480067",
           "frame_count": 24,
           "duration_ms": 5000,
           "animated": true,
@@ -10595,79 +10524,8 @@
               "byte_size": 152384
             }
           ],
-          "poster_dimensions": {
-            "width": 1280,
-            "height": 720
-          },
-          "poster_preferred": true,
-          "poster_source": {
-            "name": "Exercises Media",
-            "url": "https://github.com/akajdid-mostafa/exercises-media",
-            "source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
-            "source_path": "public/thumbnails/female/russian-twist-on-stability-ball-arms-straight.jpg",
-            "source_gender": "female",
-            "source_slug": "russian-twist-on-stability-ball-arms-straight",
-            "git_blob_sha1": "56d06bad16b44a4362ac766d4f09adade1c2f06a",
-            "source_sha256": "653ab76ca15eda15d2a734d17aa25e5893826b5b5296af23089e3c53f5c723b4",
-            "source_byte_size": 77929,
-            "source_dimensions": {
-              "width": 1920,
-              "height": 1080
-            },
-            "canonical_slug": "russian-twist",
-            "rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
-            "transformation": "pillow-exif-transpose-rgb-resize-jpeg-q88-webp-q88-no-metadata"
-          },
-          "poster_sources": [
-            {
-              "path": "exercises-media/russian-twist/poster-640.jpg",
-              "mime_type": "image/jpeg",
-              "width": 640,
-              "height": 360,
-              "byte_size": 15947,
-              "sha256": "4a4d4d5c9ddde02753067e19b66d14bccf4df72bbdf85b047be8d717d721fd3f"
-            },
-            {
-              "path": "exercises-media/russian-twist/poster-640.webp",
-              "mime_type": "image/webp",
-              "width": 640,
-              "height": 360,
-              "byte_size": 8904,
-              "sha256": "11c7721822ff713efeb64655e5c5534e25acd3509fb099ff35d31aa03be59bfe"
-            },
-            {
-              "path": "exercises-media/russian-twist/poster-1280.jpg",
-              "mime_type": "image/jpeg",
-              "width": 1280,
-              "height": 720,
-              "byte_size": 46333,
-              "sha256": "c86a2cabde854c1deee2f56b5e87e10a1ffcb870ce2de98b0a2c5a7a3d93f6c9"
-            },
-            {
-              "path": "exercises-media/russian-twist/poster-1280.webp",
-              "mime_type": "image/webp",
-              "width": 1280,
-              "height": 720,
-              "byte_size": 23422,
-              "sha256": "4bcb1d330ab56ed152fa9d39ac5a77a530d10170f96272c08dbf9298fde6d012"
-            },
-            {
-              "path": "exercises-media/russian-twist/poster-1920.jpg",
-              "mime_type": "image/jpeg",
-              "width": 1920,
-              "height": 1080,
-              "byte_size": 85141,
-              "sha256": "f781c63f8b004a1d24f414ee0d831859a50c8819fc08771d54217dfa28ff9053"
-            },
-            {
-              "path": "exercises-media/russian-twist/poster-1920.webp",
-              "mime_type": "image/webp",
-              "width": 1920,
-              "height": 1080,
-              "byte_size": 39286,
-              "sha256": "c7445993050cf1bd542da35ab7659ff24bb7aba726c86ce595bc47922971e300"
-            }
-          ]
+          "poster_source": null,
+          "poster_sources": []
         }
       ]
     },
@@ -13448,7 +13306,7 @@
       ]
     }
   },
-  "hq_poster_count": 75,
+  "hq_poster_count": 73,
   "hq_video_count": 2,
   "hq_video_total_bytes": 531115,
   "hd_source": {
@@ -13460,7 +13318,7 @@
   "hd_source_repository": "https://github.com/akajdid-mostafa/exercises-media",
   "hd_source_revision": "18742da40b0627c85925c5dd4441dc3eac0594d0",
   "hd_rights_basis": "owner_confirmed_hq_media_usage_and_derivatives_2026-10-16",
-  "poster_variant_count": 450,
+  "poster_variant_count": 438,
   "hd_baseline_asset_count": 334,
   "hd_baseline_total_bytes": 18352704
 }

@@ -387,9 +387,9 @@ def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
     assets = Path(__file__).resolve().parents[1] / "assets" / "exercise-guides"
     manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 3
-    assert manifest["asset_count"] == 717
-    assert manifest["derivative_count"] == 75
-    assert manifest["hq_poster_count"] == 75
+    assert manifest["asset_count"] == 707
+    assert manifest["derivative_count"] == 73
+    assert manifest["hq_poster_count"] == 73
     assert len(manifest["exercises"]) == 206
     assert manifest["counts"] == {
         "canonical_exercises": 206,
@@ -399,7 +399,7 @@ def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
         "static_only": 4,
         "remote_runtime_assets": 0,
         "approved_static": 4,
-        "hd_coverage_percent": 36.41,
+        "hd_coverage_percent": 35.44,
     }
     approved = [item for item in manifest["exercises"].values() if item["status"] == "approved"]
     blocked = [item for item in manifest["exercises"].values() if item["status"] == "blocked"]
@@ -795,8 +795,8 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "canonical_records": 206,
         "titles": 207,
         "cardio_records": 14,
-        "assets": 717,
-        "derivatives": 75,
+        "assets": 707,
+        "derivatives": 73,
         "coverage_decisions": 36,
         "guide_item_content_records": 49,
         "guide_profile_records": 206,

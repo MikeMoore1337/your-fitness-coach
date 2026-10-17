@@ -188,9 +188,20 @@ def _mapping_rows() -> list[dict[str, str]]:
         canonical = row["canonical_slug"]
         if not SAFE_SLUG.fullmatch(canonical) or canonical in seen:
             raise ValueError(f"Unsafe or duplicate canonical mapping: {canonical}")
-        if row["semantic_status"] != "VERIFIED_SEMANTIC" or row["confidence"] != "high":
-            raise ValueError(f"Only high-confidence verified mappings may be imported: {canonical}")
-        if row["import_action"] not in {"replace_hd", "add_static"}:
+        if row["semantic_status"] == "VERIFIED_SEMANTIC":
+            if row["confidence"] != "high" or row["import_action"] not in {
+                "replace_hd",
+                "add_static",
+            }:
+                raise ValueError(
+                    f"Only high-confidence verified mappings may be imported: {canonical}"
+                )
+        elif row["semantic_status"] == "REVIEW":
+            if row["import_action"] != "review_only":
+                raise ValueError(f"Review mappings must not be imported: {canonical}")
+        else:
+            raise ValueError(f"Unsupported semantic mapping status: {canonical}")
+        if row["import_action"] not in {"replace_hd", "add_static", "review_only"}:
             raise ValueError(f"Unsupported import action: {canonical}")
         if row["source_gender"] not in {"male", "female"} or not SAFE_SLUG.fullmatch(
             row["source_slug"]
@@ -223,6 +234,9 @@ def _plan(source_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict
     titles = _canonical_titles()
     old_status = _baseline_rows()
     mappings = _mapping_rows()
+    reviewed_by_slug = {
+        row["canonical_slug"]: row for row in mappings if row["import_action"] == "review_only"
+    }
     canonical_slugs = set(titles)
     if set(manifest.get("exercises", {})) != canonical_slugs:
         raise ValueError("Manifest/catalog canonical set mismatch")
@@ -234,6 +248,8 @@ def _plan(source_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict
     payloads: dict[str, bytes] = {}
     planned_by_slug: dict[str, dict[str, Any]] = {}
     for mapping in mappings:
+        if mapping["import_action"] == "review_only":
+            continue
         canonical = mapping["canonical_slug"]
         record = inventory.get((mapping["source_gender"], mapping["source_slug"], "poster"))
         if record is None or record["path"] != (
@@ -361,7 +377,9 @@ def _plan(source_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict
     new_manifest["asset_count"], new_manifest["total_bytes"] = _manifest_asset_counts(
         new_manifest, payloads
     )
-    matrix = _build_matrix(titles, old_status, manifest, new_manifest, planned_by_slug)
+    matrix = _build_matrix(
+        titles, old_status, manifest, new_manifest, planned_by_slug, reviewed_by_slug
+    )
     return new_manifest, matrix, payloads
 
 
@@ -371,6 +389,7 @@ def _build_matrix(
     old_manifest: dict[str, Any],
     new_manifest: dict[str, Any],
     planned: dict[str, dict[str, Any]],
+    reviewed: dict[str, dict[str, str]] | None = None,
 ) -> list[dict[str, str]]:
     fields = [
         "canonical_slug",
@@ -408,17 +427,21 @@ def _build_matrix(
         new_media = (new_item.get("media") or [None])[0] or {}
         old_row = old_status[canonical]
         plan = planned.get(canonical)
-        mapping = plan["mapping"] if plan else {}
+        mapping = plan["mapping"] if plan else (reviewed or {}).get(canonical, {})
         fallback = plan["fallback"] if plan else {}
         provenance = plan["provenance"] if plan else {}
-        reason = (
-            ""
-            if plan
-            else (
-                "Источник не подтверждён семантически; оставить текущий media/fallback"
-                if old_item.get("status") == "approved"
-                else "Подходящий HD-источник не подтверждён; blocked не снимать"
-            )
+        reason = ""
+        if not plan:
+            if mapping:
+                reason = f"REVIEW: {mapping.get('review_note', 'семантика не подтверждена')}"
+            elif old_item.get("status") == "approved":
+                reason = "Источник не подтверждён семантически; оставить текущий media/fallback"
+            else:
+                reason = "Подходящий HD-источник не подтверждён; blocked не снимать"
+        source_path = (
+            f"public/thumbnails/{mapping['source_gender']}/{mapping['source_slug']}.jpg"
+            if mapping
+            else ""
         )
         result.append(
             {
@@ -437,7 +460,7 @@ def _build_matrix(
                 "new_hd_source": provenance.get("url", "") if plan else "",
                 "source_gender": mapping.get("source_gender", ""),
                 "source_slug": mapping.get("source_slug", ""),
-                "source_path": provenance.get("source_path", "") if plan else "",
+                "source_path": provenance.get("source_path", "") if plan else source_path,
                 "exact_correspondence": mapping.get("review_note", "") if plan else "",
                 "semantic_status": mapping.get(
                     "semantic_status", old_row.get("status", "NO_MATCH")
@@ -449,7 +472,13 @@ def _build_matrix(
                 "sha256": fallback.get("sha256", "") if plan else "",
                 "import_status": "planned" if plan else "skipped",
                 "skip_reason": reason,
-                "source_revision": provenance.get("source_revision", "") if plan else "",
+                "source_revision": (
+                    provenance.get("source_revision", "")
+                    if plan
+                    else SOURCE_REVISION
+                    if mapping
+                    else ""
+                ),
                 "source_git_blob_sha1": provenance.get("git_blob_sha1", "") if plan else "",
                 "source_sha256": provenance.get("source_sha256", "") if plan else "",
             }
@@ -489,7 +518,7 @@ def _write_report(
         f"""# Issue #986 — полное HD-покрытие каталога
 
 Отчёт построен универсальным импортёром из закреплённой матрицы `986_HD_MAPPING.csv`.
-Импорт выполняется без сетевых запросов и принимает только `VERIFIED_SEMANTIC` / `high` сопоставления.
+Импорт выполняется без сетевых запросов и записывает только `VERIFIED_SEMANTIC` / `high` сопоставления; `REVIEW` остаются без импорта.
 
 ## Итог
 
