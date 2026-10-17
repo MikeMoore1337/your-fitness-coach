@@ -4552,8 +4552,12 @@ button.today-text-link {
 .active-session-summary {
   display: grid;
   gap: 0;
+  min-width: 0;
   margin-top: 2px;
-  padding: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
 }
 .active-session-summary__header,
 .active-session-summary__primary,
@@ -4629,11 +4633,8 @@ button.today-text-link {
 .active-session-summary__details {
   display: grid;
   gap: 12px;
+  min-width: 0;
   margin-top: 12px;
-  padding: 13px;
-  border: 1px solid var(--accent-line);
-  border-radius: var(--radius-control);
-  background: var(--bg-soft);
 }
 .active-session-summary__details[hidden] {
   display: none;
