@@ -604,6 +604,7 @@ _MIGRATION_PREFIXES = (
     "backend/fitminiapp_api/models/",
 )
 _MIGRATED_STACK_TEST_PATHS = frozenset({"frontend/tests/integration/migrated-stack.spec.ts"})
+_PYTHON_CI_SCRIPT_PATHS = frozenset({"scripts/run_pytest.py", "scripts/pytest_shard.py"})
 _ALL_ROUTABLE_GROUPS = tuple(sorted(COMMAND_GROUPS))
 
 
@@ -643,9 +644,9 @@ def _is_frontend_path(path: str) -> bool:
 
 
 def _is_backend_path(path: str) -> bool:
-    return path in {"backend", "bot", "pyproject.toml", "uv.lock"} or path.startswith(
-        ("backend/", "bot/", "tests/integration/")
-    )
+    return path in _PYTHON_CI_SCRIPT_PATHS or path in {
+        "backend", "bot", "pyproject.toml", "uv.lock"
+    } or path.startswith(("backend/", "bot/", "tests/integration/"))
 
 
 def _is_api_path(path: str) -> bool:
