@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -34,6 +35,10 @@ def test_selected_sources_are_animation_gifs_with_valid_source_hash() -> None:
 
 def test_local_encoder_preserves_gif_timing_and_creates_real_video(tmp_path: Path) -> None:
     module = _module()
+    try:
+        module.ffmpeg_executable()
+    except RuntimeError:
+        pytest.skip("Optional GIF-upscale encoder requires FFmpeg (not installed on CI runner)")
     frames = [
         Image.new("RGB", (32, 32), "#de3322"),
         Image.new("RGB", (32, 32), "#3288dd"),
