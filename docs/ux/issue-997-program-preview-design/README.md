@@ -168,6 +168,10 @@ Dark/Light, `320/360/393/430/1440 × 900`:
   [`text-size-125-light-393.png`](evidence/text-size-125-light-393.png) и
   [`confirmation-dark-393.png`](evidence/confirmation-dark-393.png) покрывают длинный заголовок,
   диагностическое увеличение размера текста 125% и явное подтверждение назначения;
+- [`own-dark-393.png`](evidence/own-dark-393.png), [`own-light-393.png`](evidence/own-light-393.png),
+  [`legacy-dark-393.png`](evidence/legacy-dark-393.png) и
+  [`legacy-light-393.png`](evidence/legacy-light-393.png) показывают неполные/устаревшие данные
+  без восстановления отсутствующих значений;
 - [`checks.json`](evidence/checks.json) содержит viewport-геометрию, `nowrap`, отсутствие
   горизонтального overflow/клиппинга, матрицу фикстур, различие действий и keyboard/focus.
 
