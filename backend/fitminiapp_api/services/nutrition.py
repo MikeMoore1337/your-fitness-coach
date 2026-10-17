@@ -105,7 +105,7 @@ CARDIO_INTENSITY_MULTIPLIERS = {
 LEGACY_CARDIO_INTENSITIES = {"low": "light", "moderate": "moderate", "high": "hard"}
 GOAL_MULTIPLIERS = {
     "fat_loss": 0.85,
-    "recomposition": 1.0,
+    "recomposition": 0.95,
     "maintenance": 1.0,
     "muscle_gain": 1.05,
 }
