@@ -439,9 +439,8 @@ function DailyTable({
   dayLink: ((date: string) => string) | null;
   report: NutritionReport;
 }) {
-  const [open, setOpen] = useState(
-    () => report.daily.length <= 30 && report.summary.logged_days > 0,
-  );
+  // A 30-day table is too long to expand automatically on a mobile screen.
+  const [open, setOpen] = useState(false);
   return (
     <details
       className="nutrition-report-days"

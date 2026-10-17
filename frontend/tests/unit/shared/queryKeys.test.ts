@@ -21,6 +21,8 @@ describe('domain query invalidation', () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.measurements.subject() });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.progress.summaries });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.nutrition.diary });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.nutrition.currentTarget });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['nutrition', 'targets', 'history'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.notifications.all });
   });
 

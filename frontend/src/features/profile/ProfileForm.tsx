@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
+import { queryKeys } from '../../shared/queryKeys';
 import type { ApiSchemas, User, UserProfileUpdate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, DisclosureIcon } from '../../shared/ui/common';
@@ -20,6 +21,7 @@ import { AvatarSettings } from './AvatarSettings';
 const emptyProfile: UserProfileUpdate = {
   full_name: '',
   birth_date: null,
+  sex: null,
   goal: null,
   level: null,
   height_cm: null,
@@ -37,6 +39,7 @@ function profileFormFromUser(user: User | null | undefined): UserProfileUpdate {
         ...emptyProfile,
         full_name: user.profile.full_name,
         birth_date: user.profile.birth_date,
+        sex: user.profile.sex === 'male' || user.profile.sex === 'female' ? user.profile.sex : null,
         goal: (user.profile.goal as UserProfileUpdate['goal']) ?? null,
         level: (user.profile.level as UserProfileUpdate['level']) ?? null,
         height_cm: user.profile.height_cm,
@@ -194,6 +197,10 @@ export function ProfileForm() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['workout'] }),
         queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.currentTarget }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.targetHistory() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.nutrition.diary }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.measurements.subject() }),
       ]);
       toast('Профиль сохранён');
     },
@@ -326,6 +333,21 @@ export function ProfileForm() {
                     Нужна для расчёта пульсовых зон по Танаки.
                   </small>
                 )}
+              </label>
+              <label className="field">
+                <span>Пол</span>
+                <select
+                  id="profile-sex"
+                  value={form.sex ?? ''}
+                  onChange={(event) =>
+                    updateField('sex', (event.target.value || null) as UserProfileUpdate['sex'])
+                  }
+                >
+                  <option value="">Не указан</option>
+                  <option value="male">Мужской</option>
+                  <option value="female">Женский</option>
+                </select>
+                <small className="field-hint">Используется в расчёте КБЖУ.</small>
               </label>
               <label className="field">
                 <span>Часовой пояс</span>

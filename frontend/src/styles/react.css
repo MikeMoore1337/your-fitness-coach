@@ -1181,8 +1181,37 @@ details:not([open]) > :not(summary) {
   color: var(--muted);
   font-size: 0.62rem;
   line-height: 1.15;
-  object-fit: cover;
+  object-fit: contain;
   text-align: center;
+}
+.exercise-media-picture {
+  display: block;
+  min-width: 0;
+}
+.exercise-media-picture > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.exercise-picker__option > .exercise-media-picture {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  min-width: 0;
+  place-items: center;
+}
+.exercise-picker__option > .exercise-media-picture > img,
+.exercise-catalog-item button.exercise-catalog-item__main > .exercise-media-picture > img {
+  width: 100%;
+  height: 100%;
 }
 .exercise-catalog-item__thumb {
   width: 58px;
@@ -3257,6 +3286,10 @@ details:not([open]) > :not(summary) {
     padding: 7px 8px;
   }
   .exercise-picker__option-thumb {
+    width: 46px;
+    height: 46px;
+  }
+  .exercise-picker__option > .exercise-media-picture {
     width: 46px;
     height: 46px;
   }
@@ -7413,17 +7446,50 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-muscle-workload {
   display: grid;
-  border-top: 1px solid var(--border);
+  gap: var(--v2-space-2);
 }
 
-.progress-muscle-workload .progress-exercise {
+.app-section--progress .progress-muscle-workload .progress-exercise {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  transition:
+    border-color var(--motion-state) var(--motion-ease),
+    background var(--motion-state) var(--motion-ease);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise:hover {
+  border-color: var(--accent-line);
+  background: var(--surface-hover);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary {
+  min-height: var(--touch-target);
+  padding: var(--v2-space-2) var(--v2-space-3);
+  color: var(--text);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary strong,
+.app-section--progress
+  .progress-subsection:has(.progress-muscle-workload)
+  .progress-subsection__head
+  h3 {
+  color: var(--text);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise > summary:active {
+  background: var(--surface-active);
+}
+
+.app-section--progress .progress-muscle-workload .progress-exercise[open] > summary {
   border-bottom: 1px solid var(--border);
 }
 
 .progress-workload__body {
   display: grid;
   gap: 12px;
-  padding: 0 4px 16px;
+  padding: var(--v2-space-3);
 }
 
 .progress-workload__comparison {
@@ -7472,7 +7538,6 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 
 .progress-workload__contributors li {
   padding-left: 10px;
-  border-left: 2px solid var(--accent);
   font-size: 0.75rem;
 }
 
@@ -8954,7 +9019,11 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   outline-offset: -3px;
 }
 .nutrition-target-settings__body {
-  padding: 0 16px 16px;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--border);
 }
 .nutrition-picker {
   align-items: center;

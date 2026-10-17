@@ -215,11 +215,11 @@ describe('NutritionPeriodReport', () => {
     expect(screen.getByText('Дни периода: 7')).toBeVisible();
     const days = document.querySelector('.nutrition-report-days');
     const daysSummary = days?.querySelector('summary');
-    expect(days).toHaveAttribute('open', '');
-    expect(daysSummary).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.click(daysSummary!);
     expect(days).not.toHaveAttribute('open');
-    await waitFor(() => expect(daysSummary).toHaveAttribute('aria-expanded', 'false'));
+    expect(daysSummary).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(daysSummary!);
+    expect(days).toHaveAttribute('open');
+    await waitFor(() => expect(daysSummary).toHaveAttribute('aria-expanded', 'true'));
     expect(
       screen.getByText('Средние значения рассчитаны только по заполненным дням.'),
     ).toBeVisible();
@@ -335,6 +335,8 @@ describe('NutritionReport optional fiber and evidence insights', () => {
 
     expect(await screen.findByText('Клетчатка')).toBeVisible();
     expect(screen.getByText('по 2 дн. с известными данными')).toBeVisible();
+    // The compact day card starts collapsed. Details remain available after opening it.
+    fireEvent.click(screen.getByText('Дни периода: 7'));
     expect(screen.getByText('Клетчатка: 10 г')).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Повторяющиеся отклонения' })).toBeVisible();
     expect(screen.getByText('В 3 из 4 подтверждённых дней белка было меньше цели.')).toBeVisible();

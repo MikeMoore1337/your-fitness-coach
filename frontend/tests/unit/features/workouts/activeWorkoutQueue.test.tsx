@@ -220,6 +220,22 @@ describe('active workout durable queue', () => {
     expect(loadActiveWorkoutQueue(7, 42).queue).toEqual([]);
   });
 
+  it('принимает durable completion, если сеть пропала во время flush', async () => {
+    setOnline(true);
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      setOnline(false);
+      throw new TypeError('Failed to fetch');
+    });
+    renderHarness();
+
+    act(() => screen.getByRole('button', { name: 'Изменить' }).click());
+
+    await waitFor(() => expect(screen.getByTestId('accepted')).toHaveTextContent('true'));
+    expect(screen.getByTestId('pending')).toHaveTextContent('1');
+    expect(screen.getByTestId('sync-state')).toHaveTextContent('offline');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('возвращает отказ API без удаления данных для явного повтора', async () => {
     setOnline(true);
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

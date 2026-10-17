@@ -203,6 +203,11 @@ def _build_user_response(db: Session, user) -> UserResponse:
     set_committed_value(user, "profile", profile)
     target = get_current_nutrition_target(db, user.id)
     kbju = build_nutrition_target_response_for_user(db, target, user)
+    # The current physical weight comes from the latest dated measurement.
+    # The profile field remains the fallback baseline if measurements are deleted.
+    from fitminiapp_api.services.measurements import latest_current_weight_measurement
+
+    latest_weight = latest_current_weight_measurement(db, user)
     trainer = get_current_trainer(db, user)
     heart_rates = calculate_profile_heart_rates(
         user.profile.birth_date if user.profile else None,
@@ -242,7 +247,13 @@ def _build_user_response(db: Session, user) -> UserResponse:
             goal=user.profile.goal if user.profile else None,
             level=user.profile.level if user.profile else None,
             height_cm=user.profile.height_cm if user.profile else None,
-            weight_kg=user.profile.weight_kg if user.profile else None,
+            weight_kg=(
+                latest_weight.weight_kg
+                if latest_weight is not None
+                else user.profile.weight_kg
+                if user.profile
+                else None
+            ),
             workouts_per_week=user.profile.workouts_per_week if user.profile else None,
             cardio_trainings_per_week=(
                 user.profile.cardio_trainings_per_week if user.profile else None

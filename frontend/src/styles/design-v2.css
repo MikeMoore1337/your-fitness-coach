@@ -148,7 +148,8 @@ body:has(.app-shell--design-v2) {
   gap: 4px;
   margin-block: 18px;
   padding: 12px 18px;
-  border-left: 3px solid var(--v2-lime);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
 }
 
@@ -360,7 +361,8 @@ body:has(.app-shell--design-v2) {
   gap: 4px;
   margin-block: 18px;
   padding: 14px 18px;
-  border-left: 3px solid var(--v2-lime);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
 }
 
@@ -2789,13 +2791,9 @@ body:has(.app-shell--design-v2) {
 .workout-completion__results,
 .workout-completion-context {
   border-color: var(--v2-border);
-  border-radius: var(--v2-card-radius);
+  border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
   box-shadow: none;
-}
-
-.workout-completion__hero {
-  border-left: 5px solid var(--v2-lime);
 }
 
 .workout-completion__check {
@@ -2804,7 +2802,12 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-on-lime);
 }
 
-.workout-completion__facts,
+.workout-completion__facts {
+  overflow: hidden;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+}
+
 .workout-completion__facts > div + div {
   border-color: var(--v2-border);
 }
@@ -7046,7 +7049,6 @@ button.notification-row__main:focus-visible {
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface-secondary);
-  box-shadow: inset 3px 0 var(--v2-lime);
 }
 
 .nutrition-report-coverage > div:first-child {
@@ -8124,7 +8126,6 @@ button.notification-row__main:focus-visible {
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
-  box-shadow: inset 3px 0 var(--v2-lime);
 }
 
 .app-section--progress .program-history-workout__header {
@@ -11755,7 +11756,6 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   margin-block: 28px;
   padding: 16px;
   border: 1px solid var(--v2-border);
-  border-left: 3px solid var(--v2-lime);
   background: var(--v2-surface-secondary);
 }
 

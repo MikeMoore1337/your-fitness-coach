@@ -359,14 +359,14 @@ def test_client_profile_weight_preserves_fractional_values_and_missing_state(cli
         json={"weight_kg": None},
     )
     assert missing_profile.status_code == 200, missing_profile.text
-    assert missing_profile.json()["weight_kg"] is None
+    assert missing_profile.json()["weight_kg"] == 78
     missing_roster = client.get("/api/v1/coach/clients", headers=coach_headers)
     assert missing_roster.status_code == 200, missing_roster.text
-    assert next(row for row in missing_roster.json() if row["id"] == client_id)["weight_kg"] is None
+    assert next(row for row in missing_roster.json() if row["id"] == client_id)["weight_kg"] == 78
 
     history = client.get(f"/api/v1/coach/clients/{client_id}/measurements", headers=coach_headers)
     assert history.status_code == 200, history.text
-    assert history.json()[0]["weight_kg"] == 78.4
+    assert history.json()[0]["weight_kg"] == 78
     assert history.json()[0]["waist_cm"] == 82.0
 
     assert (

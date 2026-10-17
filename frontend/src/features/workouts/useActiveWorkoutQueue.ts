@@ -312,9 +312,13 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
           return durable;
         }
         if (!immediate) return durable;
-        if (!(await flushNow())) return false;
+        const acceptDurableOffline = () =>
+          durable && !navigator.onLine && latestMutationForSet(readFresh(), setId) !== undefined;
+        if (!(await flushNow())) return acceptDurableOffline();
         // An existing flush can finish just before this enqueue acquires its write turn.
-        return latestMutationForSet(readFresh(), setId) ? await flushNow() : true;
+        return latestMutationForSet(readFresh(), setId)
+          ? (await flushNow()) || acceptDurableOffline()
+          : true;
       } catch (reason) {
         setSyncState('error');
         setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
