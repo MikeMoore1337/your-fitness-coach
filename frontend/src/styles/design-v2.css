@@ -148,7 +148,8 @@ body:has(.app-shell--design-v2) {
   gap: 4px;
   margin-block: 18px;
   padding: 12px 18px;
-  border-left: 3px solid var(--v2-lime);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
 }
 
@@ -360,7 +361,8 @@ body:has(.app-shell--design-v2) {
   gap: 4px;
   margin-block: 18px;
   padding: 14px 18px;
-  border-left: 3px solid var(--v2-lime);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
 }
 
@@ -7046,7 +7048,6 @@ button.notification-row__main:focus-visible {
   border: 1px solid var(--v2-border);
   border-radius: var(--v2-region-radius);
   background: var(--v2-surface-secondary);
-  box-shadow: inset 3px 0 var(--v2-lime);
 }
 
 .nutrition-report-coverage > div:first-child {

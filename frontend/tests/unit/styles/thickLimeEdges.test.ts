@@ -70,6 +70,15 @@ describe('thick lime edge safeguard', () => {
     expect(v2Styles).not.toMatch(
       /\.progress-report-confidence\s*\{[^}]*border-left\s*:\s*3px\s+solid\s+var\(--v2-lime\)/s,
     );
+    expect(v2Styles).not.toMatch(
+      /\.progress-report-tma-fallback\s*\{[^}]*border-left\s*:\s*3px\s+solid\s+var\(--v2-lime\)/s,
+    );
+    expect(v2Styles).not.toMatch(
+      /\.progress-report-handoff-banner\s*\{[^}]*border-left\s*:\s*3px\s+solid\s+var\(--v2-lime\)/s,
+    );
+    expect(v2Styles).not.toMatch(
+      /\.nutrition-report-coverage\s*\{[^}]*box-shadow\s*:\s*inset\s+3px\s+0\s+var\(--v2-lime\)/s,
+    );
     expect(systemStyles).toMatch(
       /\.data-confidence\s*\{[^}]*border\s*:\s*1px solid var\(--v2-border\)/s,
     );

@@ -1344,8 +1344,8 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
         : null,
     };
   });
-  expect(visualContract.sufficientBoundary).toBe(visualContract.lime);
-  expect(visualContract.limitedBoundary).toBe(visualContract.lime);
+  expect(visualContract.sufficientBoundary).not.toBe(visualContract.lime);
+  expect(visualContract.limitedBoundary).not.toBe(visualContract.lime);
   expect(visualContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
   for (const viewport of [

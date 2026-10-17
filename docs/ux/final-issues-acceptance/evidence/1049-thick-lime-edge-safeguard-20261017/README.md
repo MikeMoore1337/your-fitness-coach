@@ -31,6 +31,8 @@ production screenshots or personal user data.
 - Removed the decorative 3px lime `border-left` from the Progress “Что идёт хорошо” column in `ux-ia-redesign.css`.
 - Removed the decorative `inset 3px 0` lime rail from `.app-section--progress .program-history-workout`.
 - Removed the decorative 3px lime left edge from the report confidence container while retaining its thin uniform frame.
+- Replaced 3px lime one-sided edges on `.progress-report-tma-fallback` and `.progress-report-handoff-banner` with neutral 1px full frames, and removed the 3px inset lime stripe from `.nutrition-report-coverage`.
+- Updated the existing Mobile Web / mock TMA and Progress E2E expectations: the DataConfidence boundary must be neutral and thin, while unread notifications retain their own lime indicator.
 - Preserved `DataConfidence` message, status icons and actions while replacing its 3px one-sided lime rail with the same neutral 1px border as the other sides (throughout YFC). Active/current/selected states, keyboard focus and CTA treatments remain.
 
 ## Permanent safeguard
