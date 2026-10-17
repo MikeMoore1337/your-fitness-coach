@@ -1480,6 +1480,10 @@ export function RestTimer({
   const storageKey = activeWorkoutRestKey(userId, workoutId);
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
   const [deadline, setDeadline] = useState(() => {
+    // A crash between journaling the accepted set and writing the legacy
+    // deadline must not make a durable active rest invisible after reload.
+    const restored = activeRestJournalSession(userId, workoutId);
+    if (restored) return restored.deadline;
     const scoped = readStorage<number>(storageKey, 0);
     if (scoped) return scoped;
     const legacy = readStorage<number>(legacyStorageKey, 0);
