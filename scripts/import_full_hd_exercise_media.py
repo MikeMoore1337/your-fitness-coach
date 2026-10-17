@@ -166,8 +166,19 @@ def _canonical_titles() -> dict[str, tuple[str, dict[str, Any]]]:
     return result
 
 
-def _old_statuses() -> dict[str, dict[str, str]]:
-    return {row["canonical_slug"]: row for row in _read_csv(OLD_MATRIX_PATH)}
+def _baseline_rows() -> dict[str, dict[str, str]]:
+    """Read the pre-import ledger; the importer never rewrites this file."""
+    rows = _read_csv(OLD_MATRIX_PATH)
+    required = {"canonical_slug", "current_status", "current_media_source"}
+    if not rows or not required.issubset(rows[0]):
+        raise ValueError("Immutable coverage baseline is missing current status fields")
+    result: dict[str, dict[str, str]] = {}
+    for row in rows:
+        canonical = row["canonical_slug"]
+        if canonical in result:
+            raise ValueError(f"Duplicate canonical in immutable coverage baseline: {canonical}")
+        result[canonical] = row
+    return result
 
 
 def _mapping_rows() -> list[dict[str, str]]:
@@ -210,11 +221,13 @@ def _plan(source_root: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict
         (row["gender"], row["slug"], row["asset_type"]): row for row in _read_csv(INVENTORY_PATH)
     }
     titles = _canonical_titles()
-    old_status = _old_statuses()
+    old_status = _baseline_rows()
     mappings = _mapping_rows()
     canonical_slugs = set(titles)
     if set(manifest.get("exercises", {})) != canonical_slugs:
         raise ValueError("Manifest/catalog canonical set mismatch")
+    if set(old_status) != canonical_slugs:
+        raise ValueError("Immutable coverage baseline/catalog canonical set mismatch")
     new_manifest = copy.deepcopy(manifest)
     new_manifest.setdefault("hd_baseline_asset_count", BASELINE_ASSET_COUNT)
     new_manifest.setdefault("hd_baseline_total_bytes", BASELINE_TOTAL_BYTES)
@@ -369,6 +382,8 @@ def _build_matrix(
         "equipment",
         "previous_status",
         "previous_media_source",
+        "current_status",
+        "current_media_source",
         "new_hd_source",
         "source_gender",
         "source_slug",
@@ -390,9 +405,8 @@ def _build_matrix(
     for canonical, (title, metadata) in titles.items():
         old_item = old_manifest["exercises"][canonical]
         new_item = new_manifest["exercises"][canonical]
-        old_media = (old_item.get("media") or [None])[0] or {}
         new_media = (new_item.get("media") or [None])[0] or {}
-        old_row = old_status.get(canonical, {})
+        old_row = old_status[canonical]
         plan = planned.get(canonical)
         mapping = plan["mapping"] if plan else {}
         fallback = plan["fallback"] if plan else {}
@@ -415,8 +429,11 @@ def _build_matrix(
                 "primary_muscle": metadata["primary_muscle"],
                 "movement_pattern": metadata["movement_pattern"],
                 "equipment": metadata["equipment"],
-                "previous_status": old_item.get("status", ""),
-                "previous_media_source": old_media.get("path", ""),
+                "previous_status": old_row["current_status"],
+                "previous_media_source": old_row["current_media_source"],
+                "current_status": new_item.get("status", ""),
+                "current_media_source": new_media.get("path", "")
+                or ("blocked/no media" if new_item.get("status") == "blocked" else ""),
                 "new_hd_source": provenance.get("url", "") if plan else "",
                 "source_gender": mapping.get("source_gender", ""),
                 "source_slug": mapping.get("source_slug", ""),
@@ -490,6 +507,7 @@ def _write_report(
 ## Контракт обработки
 
 - Источник: `{SOURCE_URL}` at `{SOURCE_REVISION}`.
+- `previous_*` берутся из неизменяемой исходной матрицы до импорта; `current_*` — из текущего результата.
 - Проверены source path, размер, Git blob SHA-1, JPEG 1920×1080 и контрольная сумма SHA-256.
 - Производные: 640/1280/1920 px, WebP и JPEG fallback, RGB, без EXIF/GPS; пропорция 16:9 сохранена.
 - Для существующих GIF/H.264 сохранён текущий animated/video путь; HD-постер становится предпочтительным статическим fallback.

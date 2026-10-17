@@ -19,6 +19,7 @@
 ## Контракт обработки
 
 - Источник: `https://github.com/akajdid-mostafa/exercises-media` at `18742da40b0627c85925c5dd4441dc3eac0594d0`.
+- `previous_*` берутся из неизменяемой исходной матрицы до импорта; `current_*` — из текущего результата.
 - Проверены source path, размер, Git blob SHA-1, JPEG 1920×1080 и контрольная сумма SHA-256.
 - Производные: 640/1280/1920 px, WebP и JPEG fallback, RGB, без EXIF/GPS; пропорция 16:9 сохранена.
 - Для существующих GIF/H.264 сохранён текущий animated/video путь; HD-постер становится предпочтительным статическим fallback.
