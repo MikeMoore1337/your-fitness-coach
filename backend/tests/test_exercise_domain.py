@@ -387,49 +387,68 @@ def test_task_120e_human_visual_manifest_provenance_and_integrity() -> None:
     assets = Path(__file__).resolve().parents[1] / "assets" / "exercise-guides"
     manifest = json.loads((assets / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == 3
-    assert manifest["asset_count"] == 334
-    assert manifest["derivative_count"] == 13
-    assert manifest["hq_poster_count"] == 13
+    assert manifest["asset_count"] == 881
+    assert manifest["derivative_count"] == 77
+    assert manifest["hq_poster_count"] == 77
     assert len(manifest["exercises"]) == 206
     assert manifest["counts"] == {
         "canonical_exercises": 206,
         "approved_animated": 167,
-        "blocked": 39,
-        "approved_coverage_percent": 81.07,
-        "static_only": 0,
+        "blocked": 35,
+        "approved_coverage_percent": 83.01,
+        "static_only": 4,
         "remote_runtime_assets": 0,
+        "approved_static": 4,
+        "hd_coverage_percent": 37.38,
     }
     approved = [item for item in manifest["exercises"].values() if item["status"] == "approved"]
     blocked = [item for item in manifest["exercises"].values() if item["status"] == "blocked"]
-    assert len(approved) == 167
-    assert len(blocked) == 39
-    assert manifest["source"]["name"] == "Gym visual"
-    assert manifest["source"]["license"] == "Owner-purchased GymVisual license"
-    assert manifest["source"]["source_revision"] == ("7455efae41b330c265e7cd4b78dfa848e7ce5ebd")
+    assert len(approved) == 171
+    assert len(blocked) == 35
     for exercise in approved:
         source = exercise["source"]
-        assert source["url"] == "https://github.com/hasaneyldrm/exercises-dataset"
         assert len(exercise["media"]) == 1
         media = exercise["media"][0]
         path = assets / media["path"]
         poster = assets / media["poster_path"]
-        assert path.suffix == ".gif"
         assert poster.suffix == ".jpg"
         assert path.is_file() and poster.is_file()
-        assert media["type"] == "animation"
-        assert media["animated"] is True
-        assert media["frame_count"] > 1
-        assert hashlib.sha256(path.read_bytes()).hexdigest() == media["asset_sha256"]
         assert hashlib.sha256(poster.read_bytes()).hexdigest() == media["poster_sha256"]
-        assert media["sources"] == [
-            {
-                "path": media["path"],
-                "mime_type": "image/gif",
-                "width": media["width"],
-                "height": media["height"],
-                "byte_size": media["byte_size"],
-            }
-        ]
+        poster_sources = media.get("poster_sources") or []
+        if poster_sources:
+            assert media["poster_preferred"] is True
+            assert media["poster_dimensions"] == {"width": 1280, "height": 720}
+            for poster_source in poster_sources:
+                poster_asset = assets / poster_source["path"]
+                assert poster_asset.is_file()
+                assert poster_asset.stat().st_size == poster_source["byte_size"]
+                assert (
+                    hashlib.sha256(poster_asset.read_bytes()).hexdigest() == poster_source["sha256"]
+                )
+        if media["type"] == "animation":
+            assert source["url"] == "https://github.com/hasaneyldrm/exercises-dataset"
+            assert source["name"] == "Gym visual"
+            assert path.suffix == ".gif"
+            assert media["animated"] is True
+            assert media["frame_count"] > 1
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == media["asset_sha256"]
+            assert media["sources"] == [
+                {
+                    "path": media["path"],
+                    "mime_type": "image/gif",
+                    "width": media["width"],
+                    "height": media["height"],
+                    "byte_size": media["byte_size"],
+                }
+            ]
+        else:
+            assert media["type"] == "image"
+            assert source["url"] == "https://github.com/akajdid-mostafa/exercises-media"
+            assert source["name"] == "Exercises Media"
+            assert media["animated"] is False
+            assert media["frame_count"] == 1
+            assert media["duration_ms"] == 0
+            assert media["sources"] == media["poster_sources"]
     for exercise in blocked:
         assert exercise["source"] is None
         assert exercise["media"] == []
@@ -595,13 +614,24 @@ def test_task_120c_lower_body_machine_batch_contract_and_workout_integration(cli
         assert len(guide["technique_steps"]) == 3
         assert len(guide["common_mistakes"]) == 3
         assert guide["safety_notes"]
-        if item["media_state"] == "approved_animated":
-            assert guide["source_name"] == "Gym visual"
-            assert guide["source_license"] == "Owner-purchased GymVisual license"
+        if item["media_state"] in {"approved_animated", "approved_static"}:
             assert len(guide["media"]) == 1
-            assert guide["media"][0]["type"] == "animation"
-            assert guide["media"][0]["url"].endswith(".gif")
-            assert guide["media"][0]["poster"].endswith(".jpg")
+            media = guide["media"][0]
+            assert media["poster_sources"]
+            if item["media_state"] == "approved_animated":
+                assert guide["source_name"] == "Gym visual"
+                assert guide["source_license"] == "Owner-purchased GymVisual license"
+                assert media["type"] == "animation"
+                assert media["url"].endswith(".gif")
+                assert media["poster"].endswith(".jpg")
+                assert media["poster_preferred"] in {False, True}
+            else:
+                assert item["media_state"] == "approved_static"
+                assert guide["source_name"] == "Exercises Media"
+                assert media["type"] == "image"
+                assert media["url"].endswith(".jpg")
+                assert media["poster"] == media["url"]
+                assert media["poster_preferred"] is True
         else:
             assert item["media_state"] == "blocked"
             assert guide["media"] == []
@@ -687,12 +717,9 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         assert len(guide["technique_steps"]) == 3
         assert len(guide["common_mistakes"]) >= 3
         assert guide["breathing"]
-        if item["media_state"] == "approved_animated":
+        if item["media_state"] in {"approved_animated", "approved_static"}:
             assert guide["media"]
-            assert all(
-                media["type"] == "animation" and media["alt"] and media["sources"]
-                for media in guide["media"]
-            )
+            assert all(media["alt"] and media["sources"] for media in guide["media"])
         else:
             assert item["media_state"] == "blocked"
             assert guide["media"] == []
@@ -768,15 +795,15 @@ def test_task_120d_remaining_coverage_redirects_and_validator(client) -> None:
         "canonical_records": 206,
         "titles": 207,
         "cardio_records": 14,
-        "assets": 334,
-        "derivatives": 13,
+        "assets": 881,
+        "derivatives": 77,
         "coverage_decisions": 36,
         "guide_item_content_records": 49,
         "guide_profile_records": 206,
         "media_approved_animated": 167,
-        "media_blocked": 39,
+        "media_blocked": 35,
         "media_remote_runtime_assets": 0,
-        "media_static_only": 0,
+        "media_static_only": 4,
         "metadata_aliases_populated": 69,
         "metadata_aliases_reviewed_empty": 137,
         "metadata_execution_populated": 69,

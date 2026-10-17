@@ -87,9 +87,6 @@
   isolation: isolate;
   min-height: 0;
   padding: 24px;
-  border-color: color-mix(in srgb, var(--v2-lime) 48%, var(--v2-border));
-  border-left-width: 3px;
-  border-radius: var(--radius-control);
   background: var(--v2-surface);
   box-shadow: none;
 }

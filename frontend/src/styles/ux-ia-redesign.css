@@ -23,6 +23,177 @@
   cursor: pointer;
 }
 
+/* Issue #1052: completed cardio history uses standalone compact cards. */
+.app-section--progress .cardio-history .cardio-session-list {
+  gap: var(--v2-space-3);
+  border-top: 0;
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface);
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact.cardio-session-row--editing {
+  background: var(--v2-surface-secondary);
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact .cardio-session-row__main {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact .cardio-session-row__heading {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__heading
+  strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact .cardio-session-row__date {
+  color: var(--v2-text-secondary);
+  line-height: 1.45;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__facts--compact {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--v2-space-2) var(--v2-space-4);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__facts--compact
+  > div {
+  display: inline-flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--v2-space-1);
+  padding: 0;
+  border: 0;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__facts--compact
+  dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.75rem;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__facts--compact
+  dd {
+  margin: 0;
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact .cardio-session-row__secondary {
+  min-width: 0;
+  border-top: 1px solid var(--v2-border);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  > summary {
+  min-height: 44px;
+  padding-block: var(--v2-space-2);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  > dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2) var(--v2-space-4);
+  margin: 0;
+  padding-bottom: var(--v2-space-2);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  > dl
+  > div {
+  display: grid;
+  min-width: min(100%, 10rem);
+  gap: var(--v2-space-1);
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  dt {
+  color: var(--v2-text-secondary);
+  font-size: 0.75rem;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__secondary
+  .cardio-session-row__note {
+  margin: 0;
+  padding-bottom: var(--v2-space-2);
+  overflow-wrap: anywhere;
+}
+
+.app-section--progress .cardio-history .cardio-session-row--compact .cardio-session-row__actions {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.app-section--progress
+  .cardio-history
+  .cardio-session-row--compact
+  .cardio-session-row__menu
+  > summary {
+  min-height: 44px;
+  padding-inline: var(--v2-space-3);
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-control-radius);
+  background: var(--v2-surface-secondary);
+}
+
 .app-quick-add-trigger--floating:hover {
   border-color: var(--v2-lime-hover);
   background: var(--v2-lime-hover);
@@ -565,10 +736,6 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   padding: 14px 16px;
   border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
-}
-
-.app-section--progress .progress-insights__column--good {
-  border-left: 3px solid var(--v2-lime);
 }
 
 .app-section--progress .progress-insights__column--attention {
@@ -1812,15 +1979,23 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     font-size: 16px;
   }
   .nutrition-experience :is(.meal-planner, .grocery-list) {
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--v2-border);
-    border-radius: 0;
-    background: transparent;
+    margin-top: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    overflow: hidden;
   }
   .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) {
-    min-height: 56px;
-    padding: 8px 4px;
+    min-height: 46px;
+    padding: 14px 16px;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+  .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) strong {
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: inherit;
   }
   .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) .eyebrow {
     display: none;

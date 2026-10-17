@@ -809,8 +809,6 @@ h3 {
   min-width: 0;
   padding: var(--v2-space-3);
   border: 1px solid var(--v2-border);
-  border-inline-start-width: 3px;
-  border-inline-start-color: var(--v2-lime);
   border-radius: var(--v2-control-radius);
   background: var(--v2-surface-secondary);
   color: var(--v2-text-primary);

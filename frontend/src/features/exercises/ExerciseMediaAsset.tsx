@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
 
+type MediaSource = {
+  url: string;
+  mime_type: string;
+  width: number;
+};
+
+function responsiveSources(sources: MediaSource[], mimeType?: string) {
+  return sources
+    .filter((source) => !mimeType || source.mime_type === mimeType)
+    .slice()
+    .sort((left, right) => left.width - right.width)
+    .map((source) => `${source.url} ${source.width}w`)
+    .join(', ');
+}
+
 export function usePrefersReducedMotion(): boolean {
   const [reducedMotion, setReducedMotion] = useState(
     () =>
@@ -20,28 +35,40 @@ export function usePrefersReducedMotion(): boolean {
 
 export function ExerciseMediaAsset({
   animationUrl,
+  videoSources = [],
   alt,
   className,
   height,
   thumbnailUrl,
+  thumbnailSources = [],
+
   variant,
   width,
 }: {
   animationUrl?: string | null;
+  videoSources?: MediaSource[];
   alt: string;
   className?: string;
   height?: number;
   thumbnailUrl?: string | null;
+  thumbnailSources?: MediaSource[];
+  preferredMode?: 'static' | 'animation' | null;
   variant: 'thumbnail' | 'animation';
   width?: number;
 }) {
   const reducedMotion = usePrefersReducedMotion();
   const [failed, setFailed] = useState(false);
   const [usePosterFallback, setUsePosterFallback] = useState(false);
-  const animated = variant === 'animation' && !reducedMotion && Boolean(animationUrl);
-  const src = animated && !usePosterFallback ? animationUrl : thumbnailUrl;
+  const [videoFailed, setVideoFailed] = useState(false);
+  const video =
+    variant === 'animation' && !reducedMotion && !videoFailed && videoSources.length > 0;
+  // In the full exercise view, motion always takes precedence over an HD poster.
+  // When a video fails, preserve the licensed legacy GIF instead of freezing motion.
+  const animated =
+    variant === 'animation' && !reducedMotion && Boolean(animationUrl) && !usePosterFallback;
+  const src = animated ? animationUrl : thumbnailUrl;
 
-  if (!src || failed) {
+  if ((!src && !video) || failed) {
     return (
       <span
         className={
@@ -56,10 +83,33 @@ export function ExerciseMediaAsset({
     );
   }
 
-  return (
+  if (video) {
+    const selected = [...videoSources].sort((a, b) => a.width - b.width).at(-1);
+    return (
+      <video
+        className={className}
+        src={selected?.url}
+        poster={thumbnailUrl ?? undefined}
+        autoPlay
+        muted
+        playsInline
+        loop
+        controls={false}
+        preload="metadata"
+        aria-label={alt}
+        data-media-mode="video"
+        onError={() => setVideoFailed(true)}
+      />
+    );
+  }
+  const posterSources = responsiveSources(thumbnailSources, 'image/jpeg');
+  const webpSources = responsiveSources(thumbnailSources, 'image/webp');
+  const image = (
     <img
       className={className}
-      src={src}
+      src={src ?? undefined}
+      srcSet={!animated ? posterSources || undefined : undefined}
+      sizes={!animated ? '(max-width: 620px) 58px, 96px' : undefined}
       alt={alt}
       width={width}
       height={height}
@@ -67,12 +117,20 @@ export function ExerciseMediaAsset({
       decoding="async"
       data-media-mode={animated && !usePosterFallback ? 'animated' : 'static-poster'}
       onError={() => {
-        if (animated && !usePosterFallback && thumbnailUrl) {
+        if (animated && thumbnailUrl) {
           setUsePosterFallback(true);
           return;
         }
         setFailed(true);
       }}
     />
+  );
+  return !animated && webpSources ? (
+    <picture className="exercise-media-picture">
+      <source type="image/webp" srcSet={webpSources} sizes="(max-width: 620px) 58px, 96px" />
+      {image}
+    </picture>
+  ) : (
+    image
   );
 }

@@ -105,7 +105,7 @@ CARDIO_INTENSITY_MULTIPLIERS = {
 LEGACY_CARDIO_INTENSITIES = {"low": "light", "moderate": "moderate", "high": "hard"}
 GOAL_MULTIPLIERS = {
     "fat_loss": 0.85,
-    "recomposition": 1.0,
+    "recomposition": 0.95,
     "maintenance": 1.0,
     "muscle_gain": 1.05,
 }
@@ -154,6 +154,10 @@ class NutritionError(Exception):
     pass
 
 
+class NutritionMacroAllocationError(NutritionError):
+    """The usual weight-based macro targets cannot fit the chosen energy goal."""
+
+
 class NutritionConflictError(NutritionError):
     pass
 
@@ -191,10 +195,6 @@ def _round_number(value: float) -> int:
 
 def _round_to_ten(value: float) -> int:
     return max(0, math.floor(value / 10 + 0.5) * 10)
-
-
-def _round_up_to_ten(value: float) -> int:
-    return max(0, math.ceil(value / 10) * 10)
 
 
 def _target_calories(maintenance_calories: float, goal: str) -> int:
@@ -298,12 +298,15 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
     calories = _target_calories(maintenance_calories, goal)
     macros = calculate_macros(payload.weight_kg, calories, goal)
     if macros["macro_warning"]:
-        # A calorie target below its own protein/fat allocation is internally
-        # inconsistent and could previously become zero for accepted edge
-        # inputs. Raise it only as far as needed to make every macro nonnegative.
-        calories = _round_up_to_ten(macros["protein_g"] * 4 + macros["fat_g"] * 9)
-        macros = calculate_macros(payload.weight_kg, calories, goal)
-        macros["macro_warning"] = True
+        # Fail closed: increasing calories to fit weight-based macros can
+        # silently reverse a deficit or create an unapproved surplus.
+        # A different reference mass / macro allocation needs its own
+        # explicitly reviewed nutrition policy.
+        raise NutritionMacroAllocationError(
+            "Расчёт не сформирован: белки и жиры превышают целевую калорийность. "
+            "Стандартные нормы на текущий вес здесь неприменимы; "
+            "нужна индивидуальная настройка питания."
+        )
 
     return {
         "bmr": _round_number(bmr),
@@ -639,6 +642,26 @@ def recalculate_nutrition_target(
         return False
 
     context = nutrition_target_context(target)
+
+    # The profile stores total cardio sessions, while the calculator stores
+    # per-activity details. A single activity can be updated without guessing.
+    # With multiple activities, keep their explicit split intact.
+    requested_cardio = updates.get("cardio_trainings_per_week")
+    if isinstance(requested_cardio, int):
+        existing_cardio = context.get("cardio_trainings") or []
+        if isinstance(existing_cardio, list) and (
+            len(existing_cardio) == 1 or requested_cardio == 0
+        ):
+            if requested_cardio == 0:
+                updates = {**updates, "cardio_trainings": []}
+            elif len(existing_cardio) == 1:
+                updates = {
+                    **updates,
+                    "cardio_trainings": [
+                        {**existing_cardio[0], "trainings_per_week": requested_cardio}
+                    ],
+                }
+
     changed = False
     for field in NUTRITION_INPUT_FIELDS:
         value = updates.get(field)
@@ -655,7 +678,25 @@ def recalculate_nutrition_target(
         payload = _target_payload(candidate)
     except ValidationError as exc:
         raise NutritionError("Nutrition inputs are outside supported ranges") from exc
-    calculations = calculate_nutrition(payload)
+    try:
+        calculations = calculate_nutrition(payload)
+    except NutritionMacroAllocationError:
+        # A physical measurement/profile update must still be saved. Preserve
+        # the previous calculated target and warn the user instead of raising
+        # the energy target above its requested value.
+        queue_notification(
+            db,
+            target_user,
+            category="nutrition_update",
+            title="КБЖУ требуют уточнения",
+            body=(
+                "Замер или профиль обновлён, но новый расчёт КБЖУ не удалось "
+                "согласовать с выбранной целью. Прежние ориентиры сохранены. "
+                "Проверьте питание вместе со специалистом."
+            ),
+            action_url="/app?section=nutrition",
+        )
+        return False
     context.update(
         bmr=calculations["bmr"],
         tdee=calculations["tdee"],
@@ -731,6 +772,24 @@ def save_nutrition_target(
     )
     if created:
         _queue_nutrition_updated_notification(db, target_user, target, current_user)
+
+    if current_user.id == target_user.id:
+        # Explicitly saved calculator inputs become the shared profile facts.
+        # Trainer targets must never overwrite the client's personal profile.
+        profile = target_user.profile
+        if profile is not None:
+            profile.sex = payload.sex
+            profile.weight_kg = payload.weight_kg
+            profile.height_cm = round(payload.height_cm)
+            profile.goal = payload.goal
+            profile.workouts_per_week = payload.strength_trainings_per_week
+            profile.cardio_trainings_per_week = sum(
+                item.trainings_per_week for item in cardio_trainings
+            )
+            if payload.record_weight_measurement:
+                from fitminiapp_api.services.measurements import sync_current_weight_to_diary
+
+                sync_current_weight_to_diary(db, target_user, payload.weight_kg)
 
     db.commit()
     db.refresh(target)

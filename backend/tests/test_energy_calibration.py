@@ -169,6 +169,22 @@ def test_full_data_proposes_only_a_gradual_change_for_each_goal(goal: str) -> No
     assert result.proposed_target_calories == 1700
 
 
+def test_adaptive_calibration_does_not_raise_energy_to_fit_infeasible_macros() -> None:
+    today = date(2026, 8, 19)
+    target = _target(goal="fat_loss", calories=3000)
+    target.weight_kg = 350.0
+    result = evaluate_energy_calibration(
+        target=target,
+        day_totals=_days(today, calories=2600),
+        weights=_weights(today, start=350, end=350),
+        today=today,
+    )
+    assert result.status == "limited"
+    assert result.proposed_target_calories is None
+    assert result.proposed_target_protein_g is None
+    assert "macro_allocation_infeasible" in result.rationale_keys
+
+
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:
     response = client.post(
         "/api/v1/auth/dev-login",

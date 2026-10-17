@@ -302,7 +302,7 @@ export function GroceryList({
       onToggle={(event) => setOpen(event.currentTarget.open)}
       open={open}
     >
-      <summary className="grocery-list__summary yfc-disclosure-summary">
+      <summary aria-expanded={open} className="grocery-list__summary yfc-disclosure-summary">
         <span>
           <span className="eyebrow">Планирование питания</span>
           <strong>Список покупок</strong>

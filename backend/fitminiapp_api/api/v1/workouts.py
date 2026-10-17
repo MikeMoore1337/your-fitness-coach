@@ -5,6 +5,7 @@ from sqlalchemy import case, func
 from sqlalchemy.orm import Session, joinedload
 
 from fitminiapp_api.api.dependencies.auth import require_user
+from fitminiapp_api.api.v1.workout_rest import _as_response as serialize_rest_session
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import get_db
 from fitminiapp_api.models.feedback import WorkoutComment, WorkoutCommentRevision
@@ -17,6 +18,7 @@ from fitminiapp_api.models.program import (
     WorkoutAdaptation,
 )
 from fitminiapp_api.models.user import User
+from fitminiapp_api.models.workout_rest import WorkoutRestSession
 from fitminiapp_api.schemas.cardio import (
     CardioSessionCreate,
     CardioSessionResponse,
@@ -420,10 +422,16 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
     progression_guidance = build_progression_guidance(db, current_user, workout)
     metric_types = {item.id: workout_exercise_metric_type(item) for item in workout.exercises}
 
-    def media_preview(item: UserWorkoutExercise) -> dict[str, str | None]:
+    def media_preview(item: UserWorkoutExercise) -> dict[str, object]:
         exercise = visible_map.get(item.exercise_id) or item.exercise
         if exercise is None:
-            return {"state": "blocked", "thumbnail_url": None, "animation_url": None}
+            return {
+                "state": "blocked",
+                "thumbnail_url": None,
+                "thumbnail_sources": [],
+                "preferred_mode": None,
+                "animation_url": None,
+            }
         source_slug = _source_exercise_slug(exercise)
         return get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
 
@@ -473,7 +481,10 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                 ),
                 "media_state": media_previews[item.id]["state"],
                 "media_thumbnail_url": media_previews[item.id]["thumbnail_url"],
+                "media_thumbnail_sources": media_previews[item.id]["thumbnail_sources"],
+                "media_preferred_mode": media_previews[item.id]["preferred_mode"],
                 "media_animation_url": media_previews[item.id]["animation_url"],
+                "media_video_sources": media_previews[item.id]["video_sources"],
                 "progression_guidance": (
                     progression_guidance[item.id] if metric_types[item.id] == "strength" else None
                 ),
@@ -1508,6 +1519,18 @@ def workout_history(
         .all()
     )
 
+    rest_by_workout: dict[int, list] = {workout.id: [] for workout in workouts}
+    if rest_by_workout:
+        for rest_row in (
+            db.query(WorkoutRestSession)
+            .filter(
+                WorkoutRestSession.user_id == current_user.id,
+                WorkoutRestSession.workout_id.in_(rest_by_workout),
+            )
+            .order_by(WorkoutRestSession.started_at.asc(), WorkoutRestSession.id.asc())
+            .all()
+        ):
+            rest_by_workout[rest_row.workout_id].append(serialize_rest_session(rest_row))
     rows = []
     for item in workouts:
         sets = [set_row for exercise in item.exercises for set_row in exercise.sets]
@@ -1530,6 +1553,7 @@ def workout_history(
                 "volume_kg": round(volume_kg, 1),
                 "completion_feedback": item.completion_feedback,
                 "completion_note": item.completion_note,
+                "rest_sessions": rest_by_workout.get(item.id, []),
                 "exercises": [
                     {
                         "workout_exercise_id": exercise.id,

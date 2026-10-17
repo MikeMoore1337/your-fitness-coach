@@ -2,8 +2,14 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
-import { emptyHydrationDay } from './fixtures/platform-api';
+import { emptyHydrationDay, installPlatformApi } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
+import {
+  expectNoHorizontalOverflow,
+  expectNoOverlap,
+  expectTouchTargets,
+} from './fixtures/mobile-tma';
+import type { TrainingAnalytics } from '../../src/shared/api/types';
 
 const captureFeedbackAudit = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
@@ -36,6 +42,14 @@ type NutritionReportState = 'partial' | 'no-data' | 'long';
 const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
 const CAPTURE_970_AFTER = process.env.CAPTURE_970_AFTER === '1';
 const WORKTREE_ROOT = resolve(process.cwd(), '..');
+const CAPTURE_1050_PHASE = process.env.CAPTURE_1050_PHASE;
+const ISSUE_1050_EVIDENCE_DIR = resolve(
+  WORKTREE_ROOT,
+  'docs',
+  'ux',
+  'issue-1050-muscle-workload-cards',
+  'evidence',
+);
 const ISSUE_970_AFTER_DIR = resolve(
   WORKTREE_ROOT,
   'docs',
@@ -45,6 +59,9 @@ const ISSUE_970_AFTER_DIR = resolve(
   '970-report-mobile-20261013',
   'after',
 );
+const CAPTURE_1049_EVIDENCE = process.env.CAPTURE_1049_EVIDENCE === '1';
+const CAPTURE_1049_BEFORE_EVIDENCE = process.env.CAPTURE_1049_BEFORE_EVIDENCE === '1';
+const ISSUE_1049_EVIDENCE_DIR = resolve(WORKTREE_ROOT, '.artifacts', 'tasks', '1049', 'evidence');
 
 type DateVisualMetrics = {
   contentWidth: number;
@@ -441,7 +458,62 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
   };
 }
 
-async function mockProgress(page: Page, reportState: NutritionReportState = 'partial') {
+type ProgressMockOptions = {
+  muscleGroupWorkload?: TrainingAnalytics['muscle_group_workload'];
+};
+
+function issue1050Period(
+  completedSetCount: number,
+  completedSessionCount: number,
+  frequencyPerWeek: number,
+) {
+  return {
+    completed_set_count: completedSetCount,
+    primary_completed_set_count: completedSetCount,
+    secondary_completed_set_count: 0,
+    completed_session_count: completedSessionCount,
+    frequency_per_week: frequencyPerWeek,
+  };
+}
+
+const ISSUE_1050_MUSCLE_WORKLOAD: TrainingAnalytics['muscle_group_workload'] = [
+  {
+    muscle_id: 'chest',
+    muscle_name: 'Грудь',
+    current: issue1050Period(18, 6, 1.4),
+    previous: issue1050Period(12, 4, 0.93),
+    completed_set_count_change: 6,
+    frequency_per_week_change: 0.47,
+    trend: 'increased',
+    contributing_exercises: [],
+  },
+  {
+    muscle_id: 'front-deltoid',
+    muscle_name: 'Передняя дельта и стабилизаторы плечевого пояса',
+    current: issue1050Period(9, 3, 0.7),
+    previous: null,
+    completed_set_count_change: null,
+    frequency_per_week_change: null,
+    trend: 'no_comparable_data',
+    contributing_exercises: [],
+  },
+  {
+    muscle_id: 'core',
+    muscle_name: 'Кор',
+    current: issue1050Period(6, 2, 0.47),
+    previous: issue1050Period(6, 2, 0.47),
+    completed_set_count_change: 0,
+    frequency_per_week_change: 0,
+    trend: 'unchanged',
+    contributing_exercises: [],
+  },
+];
+
+async function mockProgress(
+  page: Page,
+  reportState: NutritionReportState = 'partial',
+  options: ProgressMockOptions = {},
+) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   const previousDate = shiftDate(today, -7);
   let measurements: Array<{
@@ -791,7 +863,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
           secondary_muscle_exposure: [
             { muscle_id: 'triceps', muscle_name: 'Трицепс', completed_set_count: 18 },
           ],
-          muscle_group_workload: [
+          muscle_group_workload: options.muscleGroupWorkload ?? [
             {
               muscle_id: 'chest',
               muscle_name: 'Грудные',
@@ -1093,6 +1165,336 @@ test('progress remains clear and free of horizontal overflow at supported widths
   expect(runtimeErrors).toEqual([]);
 });
 
+test('muscle workload groups use compact cards without changing analytics or drill-down', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockProgress(page, 'partial', { muscleGroupWorkload: ISSUE_1050_MUSCLE_WORKLOAD });
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тренировки/ })
+    .click();
+
+  const training = page.locator('#progress-training');
+  const workload = training.locator('.progress-muscle-workload');
+  const cards = workload.locator(':scope > details.progress-exercise');
+  await expect(cards).toHaveCount(3);
+  await expect(workload.getByText('Передняя дельта и стабилизаторы плечевого пояса')).toBeVisible();
+  await expect(workload.getByText('Нет сравнения')).toBeVisible();
+
+  const visualContract = await cards.first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    const summary = element.querySelector('summary');
+    const summaryStyle = summary ? getComputedStyle(summary) : null;
+    const parentStyle = element.parentElement ? getComputedStyle(element.parentElement) : null;
+    return {
+      borderWidths: [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ],
+      borderStyles: [
+        style.borderTopStyle,
+        style.borderRightStyle,
+        style.borderBottomStyle,
+        style.borderLeftStyle,
+      ],
+      borderColors: [
+        style.borderTopColor,
+        style.borderRightColor,
+        style.borderBottomColor,
+        style.borderLeftColor,
+      ],
+      borderRadius: style.borderRadius,
+      listGap: parentStyle?.rowGap ?? null,
+      summaryMinHeight: summaryStyle?.minHeight ?? null,
+    };
+  });
+  expect(visualContract.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+  expect(visualContract.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
+  expect(new Set(visualContract.borderColors).size).toBe(1);
+  expect(visualContract.borderRadius).not.toBe('0px');
+  expect(visualContract.listGap).not.toBe('0px');
+  expect(visualContract.summaryMinHeight).toBe('44px');
+
+  const firstCard = cards.first();
+  const firstSummary = firstCard.locator(':scope > summary');
+  await firstSummary.focus();
+  await expect(firstSummary).toBeFocused();
+  await firstSummary.press('Enter');
+  await expect(firstCard).toHaveAttribute('open', '');
+  await expect(firstCard).toContainText('18 подх. · 1,4 в неделю');
+  await expect(firstCard).toContainText('Текущий период');
+  expect(await firstCard.locator('button').count()).toBe(0);
+  await firstSummary.press('Enter');
+  await expect(firstCard).not.toHaveAttribute('open');
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    for (const viewport of [
+      { width: 320, height: 800 },
+      { width: 360, height: 800 },
+      { width: 393, height: 844 },
+      { width: 430, height: 932 },
+      { width: 1280, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        )
+        .toBe(true);
+      await expect(workload).toBeVisible();
+      const textColors = await workload.evaluate((element) => {
+        const title = element.querySelector<HTMLElement>('.progress-exercise > summary strong');
+        const value = element.querySelector<HTMLElement>('.progress-exercise__best');
+        const heading = element
+          .closest('.progress-subsection')
+          ?.querySelector<HTMLElement>('.progress-subsection__head h3');
+        return {
+          title: title ? getComputedStyle(title).color : null,
+          value: value ? getComputedStyle(value).color : null,
+          heading: heading ? getComputedStyle(heading).color : null,
+        };
+      });
+      expect(textColors.title).toBe(textColors.value);
+      expect(textColors.heading).toBe(textColors.value);
+    }
+  }
+
+  await page.setViewportSize({ width: 393, height: 844 });
+  await cards.last().scrollIntoViewIfNeeded();
+  const dockOverlap = await page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>(
+      '.progress-muscle-workload > details:last-child',
+    );
+    const dock = document.getElementById('appBottomNav');
+    if (!card || !dock) return null;
+    const cardBox = card.getBoundingClientRect();
+    const dockBox = dock.getBoundingClientRect();
+    return Math.max(
+      0,
+      Math.min(cardBox.bottom, dockBox.bottom) - Math.max(cardBox.top, dockBox.top),
+    );
+  });
+  expect(dockOverlap).toBe(0);
+});
+
+test('captures synthetic #1050 muscle workload before/after evidence', async ({ page }) => {
+  test.skip(!CAPTURE_1050_PHASE, 'evidence capture is opt-in');
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockProgress(page, 'partial', { muscleGroupWorkload: ISSUE_1050_MUSCLE_WORKLOAD });
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тренировки/ })
+    .click();
+
+  const section = page
+    .locator('#progress-training .progress-subsection')
+    .filter({ hasText: 'Распределение по мышечным группам' })
+    .first();
+  await expect(section).toBeVisible();
+  await mkdir(ISSUE_1050_EVIDENCE_DIR, { recursive: true });
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    for (const viewport of [
+      { name: 'mobile-393', width: 393, height: 844 },
+      { name: 'desktop-1280', width: 1280, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await section.screenshot({
+        path: resolve(
+          ISSUE_1050_EVIDENCE_DIR,
+          `${CAPTURE_1050_PHASE}-${viewport.name}-${colorScheme}.png`,
+        ),
+      });
+    }
+  }
+
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 393, height: 844 });
+  await section.locator('.progress-muscle-workload > details:first-child > summary').press('Enter');
+  await section.screenshot({
+    path: resolve(ISSUE_1050_EVIDENCE_DIR, `${CAPTURE_1050_PHASE}-mobile-393-light-open.png`),
+  });
+});
+
+test('Progress has no decorative one-sided lime rails across themes and widths', async ({
+  page,
+}) => {
+  await mockProgress(page);
+  const viewports = [
+    { width: 320, height: 780 },
+    { width: 360, height: 800 },
+    { width: 393, height: 852 },
+    { width: 430, height: 932 },
+    { width: 1440, height: 900 },
+  ];
+
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.goto('/app?section=progress');
+  await expect(page.getByRole('button', { name: 'Клиент' })).toBeVisible();
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    const detailBack = page.locator('.progress-detail-header__back');
+    if (await detailBack.isVisible()) {
+      await detailBack.click();
+    }
+    await expect(page.getByRole('heading', { name: 'Прогресс', exact: true })).toBeVisible();
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator('.progress-insights__column--good')).toBeVisible();
+      const contract = await page.evaluate(() => {
+        const root = document.querySelector<HTMLElement>('.progress-experience');
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--v2-lime)';
+        document.body.append(probe);
+        const lime = getComputedStyle(probe).color;
+        probe.remove();
+        const allowed = (element: HTMLElement) =>
+          Boolean(
+            element.closest(
+              '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta',
+            ),
+          );
+        const violations: string[] = [];
+        for (const element of Array.from(root?.querySelectorAll<HTMLElement>('*') ?? [])) {
+          const style = getComputedStyle(element);
+          const sides = [
+            ['left', style.borderLeftWidth, style.borderLeftColor],
+            ['right', style.borderRightWidth, style.borderRightColor],
+            ['top', style.borderTopWidth, style.borderTopColor],
+            ['bottom', style.borderBottomWidth, style.borderBottomColor],
+          ].filter(([, width, color]) => Number.parseFloat(width ?? '0') >= 3 && color === lime);
+          if (sides.length === 1 && !allowed(element)) {
+            violations.push(`${element.className}:border-${sides[0]?.[0]}`);
+          }
+          const shadow = style.boxShadow;
+          if (shadow.includes('inset') && shadow.includes(lime)) {
+            const edgeShadow = shadow.match(/inset\s+(-?\d+(?:\.\d+)?)px\s+(-?\d+(?:\.\d+)?)px/);
+            if (
+              edgeShadow &&
+              ((Math.abs(Number(edgeShadow[1] ?? 0)) >= 3 &&
+                Math.abs(Number(edgeShadow[2] ?? 0)) < 3) ||
+                (Math.abs(Number(edgeShadow[2] ?? 0)) >= 3 &&
+                  Math.abs(Number(edgeShadow[1] ?? 0)) < 3)) &&
+              !allowed(element)
+            ) {
+              violations.push(`${element.className}:inset-shadow`);
+            }
+          }
+        }
+        const good = root?.querySelector<HTMLElement>('.progress-insights__column--good');
+        const confidence = root?.querySelector<HTMLElement>('.data-confidence--sufficient');
+        return {
+          violations,
+          goodBorderLeftWidth: good ? getComputedStyle(good).borderLeftWidth : null,
+          confidenceBorderLeftWidth: confidence
+            ? getComputedStyle(confidence).borderLeftWidth
+            : null,
+          confidenceBorderLeftColor: confidence
+            ? getComputedStyle(confidence).borderLeftColor
+            : null,
+          confidenceBorderTopColor: confidence ? getComputedStyle(confidence).borderTopColor : null,
+          lime,
+        };
+      });
+      expect(contract.violations).toEqual([]);
+      expect(contract.goodBorderLeftWidth).not.toBe('3px');
+      expect(contract.confidenceBorderLeftWidth).toBe('1px');
+      expect(contract.confidenceBorderLeftColor).toBe(contract.confidenceBorderTopColor);
+      expect(contract.confidenceBorderLeftColor).not.toBe(contract.lime);
+
+      if (CAPTURE_1049_BEFORE_EVIDENCE && viewport.width >= 1440) {
+        const baselineStyle = await page.addStyleTag({
+          content:
+            '.app-section--progress .progress-insights__column--good { border-left: 3px solid var(--v2-lime) !important; }',
+        });
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        await page.locator('.progress-experience').screenshot({
+          path: resolve(
+            ISSUE_1049_EVIDENCE_DIR,
+            colorScheme + '-desktop-1440x900-before-origin-master.png',
+          ),
+        });
+        await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
+      }
+
+      if (CAPTURE_1049_EVIDENCE && viewport.width === 393) {
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        const goodCard = page.locator('.progress-insights__column--good');
+        const baselineStyle = await page.addStyleTag({
+          content:
+            '.app-section--progress .progress-insights__column--good { border-left: 3px solid var(--v2-lime) !important; }',
+        });
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-good.png'),
+        });
+        await baselineStyle.evaluate((element) => element.parentNode?.removeChild(element));
+        await goodCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-good.png'),
+        });
+
+        const confidenceCard = page.locator('.data-confidence--sufficient').first();
+        const historicalConfidenceRail = await page.addStyleTag({
+          content:
+            '.app-section--progress .data-confidence { border-inline-start-width: 3px !important; border-inline-start-color: var(--v2-lime) !important; }',
+        });
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-before-confidence.png'),
+        });
+        await historicalConfidenceRail.evaluate((element) =>
+          element.parentNode?.removeChild(element),
+        );
+        await confidenceCard.screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-mobile-393-after-confidence.png'),
+        });
+      }
+
+      if (CAPTURE_1049_EVIDENCE && viewport.width >= 1440) {
+        await mkdir(ISSUE_1049_EVIDENCE_DIR, { recursive: true });
+        await page.locator('.progress-experience').screenshot({
+          path: resolve(ISSUE_1049_EVIDENCE_DIR, colorScheme + '-desktop-1440x900-after.png'),
+        });
+      }
+    }
+
+    await page
+      .getByRole('navigation', { name: 'Разделы прогресса' })
+      .getByRole('tab', { name: /^Тренировки/ })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Тренировки', level: 2 })).toBeVisible();
+    const trainingContract = await page.locator('.progress-experience').evaluate((root) => {
+      const cards = Array.from(root.querySelectorAll<HTMLElement>('.program-history-workout'));
+      return cards.map((card) => getComputedStyle(card).boxShadow);
+    });
+    expect(trainingContract.every((shadow) => shadow === 'none')).toBe(true);
+  }
+});
+
 test('shared data confidence keeps analytics factual, responsive and explicit while refreshing', async ({
   page,
 }) => {
@@ -1180,8 +1582,8 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
         : null,
     };
   });
-  expect(visualContract.sufficientBoundary).toBe(visualContract.lime);
-  expect(visualContract.limitedBoundary).toBe(visualContract.lime);
+  expect(visualContract.sufficientBoundary).not.toBe(visualContract.lime);
+  expect(visualContract.limitedBoundary).not.toBe(visualContract.lime);
   expect(visualContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
   for (const viewport of [
@@ -1420,9 +1822,62 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     report.getByText('Средние значения рассчитаны только по заполненным дням.'),
   ).toBeVisible();
   await expect(report.getByRole('img', { name: /Калории по дням/ })).toBeVisible();
+  const targetHistory = report.locator('.nutrition-report-target-history');
+  const targetHistorySummary = targetHistory.locator(':scope > summary');
+  await expect(targetHistory).not.toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'false');
+  const days = report.locator('.nutrition-report-days');
+  const daysSummary = days.locator(':scope > summary');
+  const daysStyle = await days.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      borderWidths: [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ],
+      borderRadius: style.borderRadius,
+    };
+  });
+  expect(daysStyle.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+  expect(Number.parseFloat(daysStyle.borderRadius)).toBeGreaterThan(0);
+  await expect(days.locator('.nutrition-report-days__table-wrap')).toHaveCSS(
+    'border-left-width',
+    '0px',
+  );
+  await expect(daysSummary).toHaveText('Дни периода: 7');
+  await expect(days).not.toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'false');
+  if (process.env.CAPTURE_1051_EVIDENCE === '1') {
+    const dir = resolve('..', 'docs/ux/issue-1051-progress-nutrition-cards-20261017/after');
+    await mkdir(dir, { recursive: true });
+    const originalViewport = page.viewportSize();
+    await page.setViewportSize({ width: 393, height: 932 });
+    for (const colorScheme of ['dark', 'light'] as const) {
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await targetHistory.screenshot({
+        path: resolve(dir, `mobile-393-${colorScheme}-target-history-collapsed.png`),
+      });
+      await days.screenshot({
+        path: resolve(dir, `mobile-393-${colorScheme}-days-collapsed.png`),
+      });
+    }
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    if (originalViewport) await page.setViewportSize(originalViewport);
+  }
+  await daysSummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(days).toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'true');
   await expect(report.getByText('Изменения цели в периоде')).toBeHidden();
-  await report.getByText('История целей питания', { exact: true }).click();
+  await targetHistorySummary.focus();
+  await page.keyboard.press('Enter');
+  await expect(targetHistory).toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'true');
   await expect(report.getByText('Изменения цели в периоде')).toBeVisible();
+  await expect(days).toHaveAttribute('open', '');
+  await expect(daysSummary).toHaveAttribute('aria-expanded', 'true');
   await expect(
     report.getByRole('table', {
       name: 'Дневные КБЖУ, статус заполнения и действовавшая цель',
@@ -1453,6 +1908,23 @@ test('nutrition report preserves truthful period context, daily drill-down and r
     await expect
       .poll(async () => (await previousPointButton.boundingBox())?.height ?? 0)
       .toBeGreaterThanOrEqual(44);
+    await expect(report.locator('.nutrition-report-days > summary')).toContainText(
+      `Дни периода: ${period === '30 дней' ? '30' : '90'}`,
+    );
+    await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
+    if (process.env.CAPTURE_1051_EVIDENCE === '1' && period === '30 дней') {
+      const dir = resolve('..', 'docs/ux/issue-1051-progress-nutrition-cards-20261017/after');
+      const originalViewport = page.viewportSize();
+      await page.setViewportSize({ width: 393, height: 932 });
+      for (const colorScheme of ['dark', 'light'] as const) {
+        await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+        await report.locator('.nutrition-report-days').screenshot({
+          path: resolve(dir, `mobile-393-${colorScheme}-days30-collapsed.png`),
+        });
+      }
+      await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      if (originalViewport) await page.setViewportSize(originalViewport);
+    }
   }
   await expect(page).toHaveURL(/progress_period=days_90/);
   await expect(report.getByText(/Заполнено \d+ из 90 дней/)).toBeVisible();
@@ -1463,6 +1935,8 @@ test('nutrition report preserves truthful period context, daily drill-down and r
   await page.getByRole('button', { name: 'Показать период' }).click();
   await expect(page).toHaveURL(/progress_period=custom/);
   await expect(report.getByText(/Заполнено \d+ из 365 дней/)).toBeVisible();
+  await expect(report.locator('.nutrition-report-days > summary')).toHaveText('Дни периода: 365');
+  await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
   const longRangeNavigation = report.getByRole('group', {
     name: 'Навигация по точкам графика',
   });
@@ -1623,7 +2097,22 @@ for (const width of [320, 360, 390, 393, 430]) {
         .click();
 
       const report = page.locator('#nutrition-period-report');
-      await report.getByText('История целей питания', { exact: true }).click();
+      const history = report.locator('.nutrition-report-target-history');
+      const historyStyle = await history.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          borderRadius: style.borderRadius,
+        };
+      });
+      expect(historyStyle.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(Number.parseFloat(historyStyle.borderRadius)).toBeGreaterThan(0);
+      await history.locator(':scope > summary').press('Enter');
       const targetChanges = report
         .locator('.nutrition-report-targets')
         .filter({ hasText: 'Изменения цели в периоде' });
@@ -1681,6 +2170,13 @@ for (const width of [320, 360, 390, 393, 430]) {
               left: box.left,
               right: box.right,
               width: box.width,
+              borderWidths: [
+                getComputedStyle(cardElement).borderTopWidth,
+                getComputedStyle(cardElement).borderRightWidth,
+                getComputedStyle(cardElement).borderBottomWidth,
+                getComputedStyle(cardElement).borderLeftWidth,
+              ],
+              borderRadius: getComputedStyle(cardElement).borderRadius,
               descendants,
             };
           }),
@@ -1689,14 +2185,18 @@ for (const width of [320, 360, 390, 393, 430]) {
       expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewport);
       expect(geometry.rowGap).toBeGreaterThanOrEqual(12);
       expect(geometry.headingToFirstCard).toBeGreaterThanOrEqual(geometry.rowGap - 0.5);
-      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(12);
-      expect(geometry.cardRowGap).toBeGreaterThanOrEqual(12);
+      expect(geometry.firstToSecondCard).toBeGreaterThanOrEqual(0);
+      expect(geometry.cardRowGap).toBe(0);
       expect(geometry.firstToSecondCard).toBeCloseTo(geometry.cardRowGap, 1);
       expect(geometry.listBorderWidths).toEqual(['0px', '0px', '0px', '0px']);
-      for (const card of geometry.cards) {
+      for (const [index, card] of geometry.cards.entries()) {
         expect(card.width).toBeGreaterThan(0);
         expect(card.left).toBeGreaterThanOrEqual(-1);
         expect(card.right).toBeLessThanOrEqual(geometry.viewport + 1);
+        expect(card.borderWidths).toEqual(
+          index === 0 ? ['0px', '0px', '0px', '0px'] : ['1px', '0px', '0px', '0px'],
+        );
+        expect(card.borderRadius).toBe('0px');
         for (const child of card.descendants) {
           expect(child.left).toBeGreaterThanOrEqual(card.left - 1);
           expect(child.right).toBeLessThanOrEqual(card.right + 1);
@@ -1758,7 +2258,18 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   );
   await expect(report.getByRole('img')).not.toBeAttached();
   await expect(report.getByText('0 ккал', { exact: true })).not.toBeAttached();
-  await expect(report.locator('.nutrition-report-days')).not.toHaveAttribute('open', '');
+  const targetHistory = report.locator('.nutrition-report-target-history');
+  const targetHistorySummary = targetHistory.locator(':scope > summary');
+  await expect(targetHistory).not.toHaveAttribute('open', '');
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'false');
+  await targetHistorySummary.press('Enter');
+  await expect(
+    report.getByText('За выбранный период изменений целей питания не было.'),
+  ).toBeVisible();
+  await expect(targetHistorySummary).toHaveAttribute('aria-expanded', 'true');
+  const days = report.locator('.nutrition-report-days');
+  await expect(days).not.toHaveAttribute('open', '');
+  await expect(days.locator(':scope > summary')).toHaveAttribute('aria-expanded', 'false');
   await report.screenshot({
     path: '../.artifacts/screenshots/task-69b/sparse-insufficient-mobile-light.png',
   });
@@ -1890,6 +2401,79 @@ test('light progress keeps the compact overview readable', async ({ page }) => {
   await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'light');
   await expect(page.locator('.progress-bento__adherence')).toHaveCount(0);
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const width of [320, 360, 393, 430, 1440]) {
+    test(`#1052 compact cardio cards stay usable at ${width}px ${theme}`, async ({ page }) => {
+      await page.setViewportSize({
+        width,
+        height: width >= 1000 ? 900 : width === 430 ? 932 : 844,
+      });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((selectedTheme) => {
+        localStorage.setItem('app-theme', selectedTheme);
+      }, theme);
+      await installPlatformApi(page, {
+        browserSession: true,
+        cardioState: 'many',
+        fixedDate: '2030-01-30',
+      });
+      await page.goto('/app?section=progress&progress_period=days_30');
+
+      const cardioTab = page
+        .getByRole('navigation', { name: 'Разделы прогресса' })
+        .getByRole('tab', { name: /^Кардио/ });
+      await cardioTab.click();
+
+      const history = page.locator('#progress-cardio');
+      await expect(history).toBeVisible();
+      const rows = history.locator('.cardio-session-row');
+      await expect(rows).toHaveCount(3);
+      if (process.env.CAPTURE_1052_SCREENSHOTS === '1' && [393, 1440].includes(width)) {
+        const captureTarget = rows.first();
+        await captureTarget.scrollIntoViewIfNeeded();
+        await captureTarget.screenshot({
+          path: resolve(
+            WORKTREE_ROOT,
+            'docs',
+            'ux',
+            'issue-1052-compact-cardio-session-cards',
+            'evidence',
+            `${process.env.CAPTURE_1052_PHASE ?? 'capture'}-${theme}-${width}.png`,
+          ),
+        });
+      }
+
+      const cards = history.locator('.cardio-session-row--compact');
+      await expect(cards).toHaveCount(3);
+      await expect(cards.first()).toHaveCSS('border-top-width', '1px');
+      expect(
+        await cards.first().evaluate((element) => getComputedStyle(element).borderRadius),
+      ).not.toBe('0px');
+
+      const noMetrics = cards.filter({ hasText: 'Эллиптический тренажёр' });
+      await expect(noMetrics).toContainText('40 мин');
+      await expect(noMetrics.getByText(/Средний пульс/)).toHaveCount(0);
+      await expect(noMetrics.getByText(/уд\/мин/)).toHaveCount(0);
+
+      const withMetrics = cards.filter({ hasText: 'Велотренажёр / велоэргометр' });
+      await expect(withMetrics).toContainText('136 уд/мин');
+      await withMetrics.getByText('Дополнительные показатели').click();
+      await expect(withMetrics).toContainText('8,1 км');
+      await withMetrics.getByText('Действия с записью').click();
+      await expect(withMetrics.getByRole('button', { name: 'Изменить' })).toBeVisible();
+      await expectTouchTargets(withMetrics.locator('.cardio-session-row__menu > summary'));
+
+      await expectNoHorizontalOverflow(page);
+      if (width <= 430) {
+        await withMetrics.scrollIntoViewIfNeeded();
+        const dock = page.locator('#appBottomNav');
+        await expect(dock).toBeVisible();
+        await expectNoOverlap(withMetrics, dock);
+      }
+    });
+  }
+}
 
 test('canonical charts and icons remain operable in forced colors and reduced motion', async ({
   page,
