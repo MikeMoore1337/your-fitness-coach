@@ -754,6 +754,80 @@ def test_client_parameter_and_weight_changes_recalculate_kbju_and_notify(client)
     assert len(client.get("/api/v1/notifications", headers=headers).json()) == 3
 
 
+def test_calculated_recomposition_syncs_confirmed_profile_inputs_and_today_weight(client):
+    headers = auth(client, telegram_user_id=61_330, is_coach=False)
+    response = client.post(
+        "/api/v1/nutrition/targets",
+        json={
+            "sex": "female",
+            "weight_kg": 68.5,
+            "height_cm": 170,
+            "age": 33,
+            "strength_trainings_per_week": 3,
+            "cardio_trainings_per_week": 1,
+            "goal": "recomposition",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    target = response.json()
+    assert target["goal"] == "recomposition"
+    assert target["calories"] == int(target["tdee"] * 0.95 / 10 + 0.5) * 10
+
+    profile = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert profile["sex"] == "female"
+    assert profile["weight_kg"] == 68.5
+    assert profile["height_cm"] == 170
+    assert profile["goal"] == "recomposition"
+    assert profile["workouts_per_week"] == 3
+    assert profile["cardio_trainings_per_week"] == 1
+
+    measurements = client.get("/api/v1/workouts/diary", headers=headers).json()
+    assert measurements[0]["measured_on"] == today_msk().isoformat()
+    assert measurements[0]["weight_kg"] == 68.5
+
+
+def test_minor_weight_changes_update_current_weight_without_rewriting_calculated_kbju(client):
+    headers = auth(client, telegram_user_id=61_331, is_coach=False)
+    initial = client.post(
+        "/api/v1/nutrition/targets",
+        json={
+            "sex": "male",
+            "weight_kg": 80,
+            "height_cm": 180,
+            "age": 30,
+            "strength_trainings_per_week": 3,
+            "cardio_trainings_per_week": 0,
+            "goal": "recomposition",
+        },
+        headers=headers,
+    )
+    assert initial.status_code == 200
+    base_id = initial.json()["id"]
+
+    small = client.post(
+        "/api/v1/workouts/diary",
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 79.7},
+        headers=headers,
+    )
+    assert small.status_code == 200
+    updated = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert updated["weight_kg"] == 79.7
+    assert updated["kbju"]["id"] == base_id
+    assert updated["kbju"]["weight_kg"] == 80
+
+    substantial = client.post(
+        "/api/v1/workouts/diary",
+        json={"measured_on": today_msk().isoformat(), "weight_kg": 79.1},
+        headers=headers,
+    )
+    assert substantial.status_code == 200
+    recalculated = client.get("/api/v1/me", headers=headers).json()["profile"]
+    assert recalculated["weight_kg"] == 79.1
+    assert recalculated["kbju"]["weight_kg"] == 79.1
+    assert recalculated["kbju"]["id"] != base_id
+
+
 def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(client):
     coach_headers = auth(client, telegram_user_id=6104, is_coach=True)
     client_headers = auth(client, telegram_user_id=6105, is_coach=False)
