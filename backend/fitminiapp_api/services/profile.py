@@ -143,6 +143,14 @@ def update_profile(
                 value = DEFAULT_TIMEZONE
             elif not is_valid_timezone(value):
                 continue
+        if field == "weight_kg" and value is not None:
+            from fitminiapp_api.services.measurements import latest_current_weight_measurement
+
+            latest = latest_current_weight_measurement(db, user)
+            if latest is not None and latest.weight_kg == value:
+                # The profile form submits its full state. An unchanged weight
+                # projected from yesterday's diary is not a new weigh-in today.
+                continue
         if field in nutrition_field_map and value is not None and getattr(profile, field) != value:
             nutrition_updates[nutrition_field_map[field]] = value
         setattr(profile, field, value)
