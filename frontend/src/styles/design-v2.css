@@ -2791,13 +2791,9 @@ body:has(.app-shell--design-v2) {
 .workout-completion__results,
 .workout-completion-context {
   border-color: var(--v2-border);
-  border-radius: var(--v2-card-radius);
+  border-radius: var(--v2-region-radius);
   background: var(--v2-surface);
   box-shadow: none;
-}
-
-.workout-completion__hero {
-  border-left: 5px solid var(--v2-lime);
 }
 
 .workout-completion__check {
@@ -2806,7 +2802,12 @@ body:has(.app-shell--design-v2) {
   color: var(--v2-on-lime);
 }
 
-.workout-completion__facts,
+.workout-completion__facts {
+  overflow: hidden;
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+}
+
 .workout-completion__facts > div + div {
   border-color: var(--v2-border);
 }

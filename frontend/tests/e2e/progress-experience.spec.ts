@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { inflateSync } from 'node:zlib';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { progressOverview } from './fixtures/locators';
+import type { TrainingAnalytics } from '../../src/shared/api/types';
 
 const captureFeedbackAudit = Boolean(
   (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
@@ -36,6 +37,14 @@ type NutritionReportState = 'partial' | 'no-data' | 'long';
 const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
 const CAPTURE_970_AFTER = process.env.CAPTURE_970_AFTER === '1';
 const WORKTREE_ROOT = resolve(process.cwd(), '..');
+const CAPTURE_1050_PHASE = process.env.CAPTURE_1050_PHASE;
+const ISSUE_1050_EVIDENCE_DIR = resolve(
+  WORKTREE_ROOT,
+  'docs',
+  'ux',
+  'issue-1050-muscle-workload-cards',
+  'evidence',
+);
 const ISSUE_970_AFTER_DIR = resolve(
   WORKTREE_ROOT,
   'docs',
@@ -444,7 +453,62 @@ function nutritionReportFixture(url: URL, state: NutritionReportState) {
   };
 }
 
-async function mockProgress(page: Page, reportState: NutritionReportState = 'partial') {
+type ProgressMockOptions = {
+  muscleGroupWorkload?: TrainingAnalytics['muscle_group_workload'];
+};
+
+function issue1050Period(
+  completedSetCount: number,
+  completedSessionCount: number,
+  frequencyPerWeek: number,
+) {
+  return {
+    completed_set_count: completedSetCount,
+    primary_completed_set_count: completedSetCount,
+    secondary_completed_set_count: 0,
+    completed_session_count: completedSessionCount,
+    frequency_per_week: frequencyPerWeek,
+  };
+}
+
+const ISSUE_1050_MUSCLE_WORKLOAD: TrainingAnalytics['muscle_group_workload'] = [
+  {
+    muscle_id: 'chest',
+    muscle_name: 'Грудь',
+    current: issue1050Period(18, 6, 1.4),
+    previous: issue1050Period(12, 4, 0.93),
+    completed_set_count_change: 6,
+    frequency_per_week_change: 0.47,
+    trend: 'increased',
+    contributing_exercises: [],
+  },
+  {
+    muscle_id: 'front-deltoid',
+    muscle_name: 'Передняя дельта и стабилизаторы плечевого пояса',
+    current: issue1050Period(9, 3, 0.7),
+    previous: null,
+    completed_set_count_change: null,
+    frequency_per_week_change: null,
+    trend: 'no_comparable_data',
+    contributing_exercises: [],
+  },
+  {
+    muscle_id: 'core',
+    muscle_name: 'Кор',
+    current: issue1050Period(6, 2, 0.47),
+    previous: issue1050Period(6, 2, 0.47),
+    completed_set_count_change: 0,
+    frequency_per_week_change: 0,
+    trend: 'unchanged',
+    contributing_exercises: [],
+  },
+];
+
+async function mockProgress(
+  page: Page,
+  reportState: NutritionReportState = 'partial',
+  options: ProgressMockOptions = {},
+) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   const previousDate = shiftDate(today, -7);
   let measurements: Array<{
@@ -794,7 +858,7 @@ async function mockProgress(page: Page, reportState: NutritionReportState = 'par
           secondary_muscle_exposure: [
             { muscle_id: 'triceps', muscle_name: 'Трицепс', completed_set_count: 18 },
           ],
-          muscle_group_workload: [
+          muscle_group_workload: options.muscleGroupWorkload ?? [
             {
               muscle_id: 'chest',
               muscle_name: 'Грудные',
@@ -1094,6 +1158,175 @@ test('progress remains clear and free of horizontal overflow at supported widths
 
   expect(consoleErrors).toEqual([]);
   expect(runtimeErrors).toEqual([]);
+});
+
+test('muscle workload groups use compact cards without changing analytics or drill-down', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockProgress(page, 'partial', { muscleGroupWorkload: ISSUE_1050_MUSCLE_WORKLOAD });
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тренировки/ })
+    .click();
+
+  const training = page.locator('#progress-training');
+  const workload = training.locator('.progress-muscle-workload');
+  const cards = workload.locator(':scope > details.progress-exercise');
+  await expect(cards).toHaveCount(3);
+  await expect(workload.getByText('Передняя дельта и стабилизаторы плечевого пояса')).toBeVisible();
+  await expect(workload.getByText('Нет сравнения')).toBeVisible();
+
+  const visualContract = await cards.first().evaluate((element) => {
+    const style = getComputedStyle(element);
+    const summary = element.querySelector('summary');
+    const summaryStyle = summary ? getComputedStyle(summary) : null;
+    const parentStyle = element.parentElement ? getComputedStyle(element.parentElement) : null;
+    return {
+      borderWidths: [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ],
+      borderStyles: [
+        style.borderTopStyle,
+        style.borderRightStyle,
+        style.borderBottomStyle,
+        style.borderLeftStyle,
+      ],
+      borderColors: [
+        style.borderTopColor,
+        style.borderRightColor,
+        style.borderBottomColor,
+        style.borderLeftColor,
+      ],
+      borderRadius: style.borderRadius,
+      listGap: parentStyle?.rowGap ?? null,
+      summaryMinHeight: summaryStyle?.minHeight ?? null,
+    };
+  });
+  expect(visualContract.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+  expect(visualContract.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
+  expect(new Set(visualContract.borderColors).size).toBe(1);
+  expect(visualContract.borderRadius).not.toBe('0px');
+  expect(visualContract.listGap).not.toBe('0px');
+  expect(visualContract.summaryMinHeight).toBe('44px');
+
+  const firstCard = cards.first();
+  const firstSummary = firstCard.locator(':scope > summary');
+  await firstSummary.focus();
+  await expect(firstSummary).toBeFocused();
+  await firstSummary.press('Enter');
+  await expect(firstCard).toHaveAttribute('open', '');
+  await expect(firstCard).toContainText('18 подх. · 1,4 в неделю');
+  await expect(firstCard).toContainText('Текущий период');
+  expect(await firstCard.locator('button').count()).toBe(0);
+  await firstSummary.press('Enter');
+  await expect(firstCard).not.toHaveAttribute('open');
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    for (const viewport of [
+      { width: 320, height: 800 },
+      { width: 360, height: 800 },
+      { width: 393, height: 844 },
+      { width: 430, height: 932 },
+      { width: 1280, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+          ),
+        )
+        .toBe(true);
+      await expect(workload).toBeVisible();
+      const textColors = await workload.evaluate((element) => {
+        const title = element.querySelector<HTMLElement>('.progress-exercise > summary strong');
+        const value = element.querySelector<HTMLElement>('.progress-exercise__best');
+        const heading = element
+          .closest('.progress-subsection')
+          ?.querySelector<HTMLElement>('.progress-subsection__head h3');
+        return {
+          title: title ? getComputedStyle(title).color : null,
+          value: value ? getComputedStyle(value).color : null,
+          heading: heading ? getComputedStyle(heading).color : null,
+        };
+      });
+      expect(textColors.title).toBe(textColors.value);
+      expect(textColors.heading).toBe(textColors.value);
+    }
+  }
+
+  await page.setViewportSize({ width: 393, height: 844 });
+  await cards.last().scrollIntoViewIfNeeded();
+  const dockOverlap = await page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>(
+      '.progress-muscle-workload > details:last-child',
+    );
+    const dock = document.getElementById('appBottomNav');
+    if (!card || !dock) return null;
+    const cardBox = card.getBoundingClientRect();
+    const dockBox = dock.getBoundingClientRect();
+    return Math.max(
+      0,
+      Math.min(cardBox.bottom, dockBox.bottom) - Math.max(cardBox.top, dockBox.top),
+    );
+  });
+  expect(dockOverlap).toBe(0);
+});
+
+test('captures synthetic #1050 muscle workload before/after evidence', async ({ page }) => {
+  test.skip(!CAPTURE_1050_PHASE, 'evidence capture is opt-in');
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockProgress(page, 'partial', { muscleGroupWorkload: ISSUE_1050_MUSCLE_WORKLOAD });
+  await page.goto('/app?section=progress');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Тренировки/ })
+    .click();
+
+  const section = page
+    .locator('#progress-training .progress-subsection')
+    .filter({ hasText: 'Распределение по мышечным группам' })
+    .first();
+  await expect(section).toBeVisible();
+  await mkdir(ISSUE_1050_EVIDENCE_DIR, { recursive: true });
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    for (const viewport of [
+      { name: 'mobile-393', width: 393, height: 844 },
+      { name: 'desktop-1280', width: 1280, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await section.screenshot({
+        path: resolve(
+          ISSUE_1050_EVIDENCE_DIR,
+          `${CAPTURE_1050_PHASE}-${viewport.name}-${colorScheme}.png`,
+        ),
+      });
+    }
+  }
+
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await page.setViewportSize({ width: 393, height: 844 });
+  await section.locator('.progress-muscle-workload > details:first-child > summary').press('Enter');
+  await section.screenshot({
+    path: resolve(ISSUE_1050_EVIDENCE_DIR, `${CAPTURE_1050_PHASE}-mobile-393-light-open.png`),
+  });
 });
 
 test('Progress has no decorative one-sided lime rails across themes and widths', async ({
