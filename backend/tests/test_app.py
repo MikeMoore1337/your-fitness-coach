@@ -839,6 +839,33 @@ def test_minor_weight_changes_update_current_weight_without_rewriting_calculated
     assert recalculated["kbju"]["id"] != base_id
 
 
+def test_calculated_kbju_api_rejects_infeasible_macros_without_saving(client):
+    headers = auth(client, telegram_user_id=61_371, is_coach=False)
+    invalid = {
+        "sex": "female",
+        "weight_kg": 350,
+        "height_cm": 100,
+        "age": 100,
+        "daily_routine": "mostly_sitting",
+        "steps_range": "up_to_4000",
+        "strength_trainings_per_week": 0,
+        "cardio_trainings": [],
+        "goal": "fat_loss",
+    }
+    response = client.post("/api/v1/nutrition/targets", json=invalid, headers=headers)
+    assert response.status_code == 400
+    assert "превышают целевую калорийность" in response.json()["detail"]
+
+    current = client.get("/api/v1/me", headers=headers)
+    assert current.status_code == 200
+    assert current.json()["profile"]["kbju"] is None
+
+    valid = {**invalid, "sex": "male", "weight_kg": 80, "height_cm": 180, "age": 30}
+    created = client.post("/api/v1/nutrition/targets", json=valid, headers=headers)
+    assert created.status_code == 200
+    assert created.json()["calories"] < created.json()["tdee"]
+
+
 def test_coach_profile_and_measurement_changes_preserve_explicit_trainer_target(client):
     coach_headers = auth(client, telegram_user_id=6104, is_coach=True)
     client_headers = auth(client, telegram_user_id=6105, is_coach=False)
