@@ -4,7 +4,9 @@ import {
   activeRestJournalSession,
   beginMeasuredRest,
   loadRestJournal,
-  restHardCutoffMs,
+  markRestBackground,
+  recoverRestAfterAbsence,
+  REST_ABSENCE_REVIEW_MS,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
 
@@ -47,14 +49,46 @@ describe('measured rest journal #960', () => {
     expect(loadRestJournal(11, 56)[0]?.pending).toHaveLength(1);
   });
 
-  it('never marks a forgotten stop after the hard cutoff as measured', () => {
+  it('does not prompt while actively using the workout, even if rest is long', () => {
     const startedAt = 2_500_000;
     beginMeasuredRest(11, 56, 1005, 90, startedAt);
-    const elapsed = restHardCutoffMs(90) + 1000;
-    const recovered = updateMeasuredRest(11, 56, 1005, 'complete', startedAt + elapsed);
-    expect(recovered?.status).toBe('unknown');
-    expect(recovered?.source).toBeUndefined();
-    expect(recovered?.pending.at(-1)?.action).toBe('unknown');
+    const returned = recoverRestAfterAbsence(11, 56, startedAt + REST_ABSENCE_REVIEW_MS * 5);
+    expect(returned?.needs_review).toBeUndefined();
+    const confirmed = updateMeasuredRest(11, 56, 1005, 'complete', startedAt + REST_ABSENCE_REVIEW_MS * 5);
+    expect(confirmed?.status).toBe('completed');
+    expect(confirmed?.source).toBe('USER_CONFIRMED');
+  });
+
+  it('offers correction only after fifteen minutes away beyond the plan', () => {
+    const start = 3_000_000;
+    beginMeasuredRest(11, 56, 1006, 90, start);
+    markRestBackground(11, 56, start + 90_000);
+    const early = recoverRestAfterAbsence(11, 56, start + 90_000 + REST_ABSENCE_REVIEW_MS - 1000);
+    expect(early?.needs_review).toBeUndefined();
+    markRestBackground(11, 56, start + 90_000);
+    const overdue = recoverRestAfterAbsence(11, 56, start + 90_000 + REST_ABSENCE_REVIEW_MS + 1);
+    expect(overdue?.needs_review).toBe(true);
+    expect(loadRestJournal(11, 56)[0]?.needs_review).toBe(true);
+    expect(updateMeasuredRest(11, 56, 1006, 'complete')).toBeNull();
+    expect(updateMeasuredRest(11, 56, 1006, 'add60')).toBeNull();
+    const corrected = updateMeasuredRest(11, 56, 1006, 'complete', start + 25 * 60_000, 150);
+    expect(corrected?.status).toBe('completed');
+    expect(corrected?.source).toBe('USER_CORRECTED');
+    expect(corrected?.pending.at(-1)).toMatchObject({
+      action: 'complete',
+      corrected: true,
+      corrected_seconds: 150,
+    });
+  });
+
+  it('allows discarding untrusted rest without inventing a measurement', () => {
+    const start = 4_000_000;
+    beginMeasuredRest(11, 56, 1007, 60, start);
+    markRestBackground(11, 56, start + 60_000);
+    expect(recoverRestAfterAbsence(11, 56, start + 60_000 + REST_ABSENCE_REVIEW_MS + 1)?.needs_review).toBe(true);
+    const skipped = updateMeasuredRest(11, 56, 1007, 'skip');
+    expect(skipped?.status).toBe('skipped');
+    expect(skipped?.source).toBeUndefined();
   });
 
   it('does not invent a duration for skipped or unknown intervals', () => {
@@ -63,7 +97,6 @@ describe('measured rest journal #960', () => {
     expect(activeRestJournalSession(11, 56)).toBeNull();
     beginMeasuredRest(11, 56, 1004, 60, 300_000);
     expect(updateMeasuredRest(11, 56, 1004, 'unknown')?.status).toBe('unknown');
-    expect(restHardCutoffMs(90)).toBe(12 * 3600 * 1000);
-    expect(restHardCutoffMs(24 * 3600)).toBe(24 * 3600 * 1000);
+    expect(REST_ABSENCE_REVIEW_MS).toBe(15 * 60 * 1000);
   });
 });
