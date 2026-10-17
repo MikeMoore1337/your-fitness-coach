@@ -2268,6 +2268,31 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await expect(tmaPage.getByText('1 ч')).toBeVisible();
   await expect(tmaPage.getByText(/максимальный вес 40 кг/)).toBeVisible();
   await expect(tmaPage.getByText(/Следующая тренировка/)).toBeVisible();
+  const completionCardStyles = await tmaPage.locator('.workout-completion').evaluate((root) => {
+    const expectedRadius = getComputedStyle(root).getPropertyValue('--v2-region-radius').trim();
+    const selectors = [
+      '.workout-completion__hero',
+      '.workout-completion__facts',
+      '.workout-completion__results',
+      '.workout-completion__records',
+      '.workout-completion__feedback',
+      '.workout-completion__next',
+    ];
+    return {
+      expectedRadius,
+      cards: selectors.map((selector) => {
+        const node = root.querySelector(selector);
+        if (!node) throw new Error(`Missing completion card: ${selector}`);
+        const style = getComputedStyle(node);
+        return { selector, radius: style.borderTopLeftRadius, borderWidth: style.borderTopWidth };
+      }),
+    };
+  });
+  expect(completionCardStyles.expectedRadius).toBe('20px');
+  for (const card of completionCardStyles.cards) {
+    expect(card.radius, card.selector).toBe(completionCardStyles.expectedRadius);
+    expect(card.borderWidth, card.selector).toBe('1px');
+  }
   const completionOrderCorrect = await tmaPage.locator('.workout-completion').evaluate((root) => {
     const selectors = [
       '.workout-completion__facts',
