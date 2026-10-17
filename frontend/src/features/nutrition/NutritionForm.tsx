@@ -34,17 +34,18 @@ function fromInitial(
   targetTelegramId: number | null | undefined,
   profile: UserProfile | null | undefined,
 ): NutritionCalculatorInput {
+  const birthDate = profile?.birth_date ? new Date(`${profile.birth_date}T12:00:00`) : null;
+  const now = new Date();
+  const profileAge = birthDate
+    ? now.getFullYear() -
+      birthDate.getFullYear() -
+      (now.getMonth() < birthDate.getMonth() ||
+      (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
+        ? 1
+        : 0)
+    : null;
+  const validProfileAge = profileAge != null && profileAge >= 18 && profileAge <= 100;
   if (!initial) {
-    const birthDate = profile?.birth_date ? new Date(`${profile.birth_date}T12:00:00`) : null;
-    const now = new Date();
-    const age = birthDate
-      ? now.getFullYear() -
-        birthDate.getFullYear() -
-        (now.getMonth() < birthDate.getMonth() ||
-        (now.getMonth() === birthDate.getMonth() && now.getDate() < birthDate.getDate())
-          ? 1
-          : 0)
-      : null;
     const profileGoal =
       profile?.goal && Object.hasOwn(goalOptions, profile.goal)
         ? (profile.goal as NutritionCalculatorInput['goal'])
@@ -56,7 +57,7 @@ function fromInitial(
       sex: profile?.sex ?? defaults.sex,
       height_cm: profile?.height_cm ?? defaults.height_cm,
       weight_kg: profile?.weight_kg ?? defaults.weight_kg,
-      age: age && age >= 18 && age <= 100 ? age : defaults.age,
+      age: validProfileAge ? profileAge : defaults.age,
     };
   }
   return {
@@ -64,7 +65,7 @@ function fromInitial(
     sex: (profile?.sex || initial.sex || defaults.sex) as NutritionCalculatorInput['sex'],
     weight_kg: profile?.weight_kg ?? initial.weight_kg ?? defaults.weight_kg,
     height_cm: profile?.height_cm ?? initial.height_cm ?? defaults.height_cm,
-    age: initial.age ?? defaults.age,
+    age: validProfileAge ? profileAge : (initial.age ?? defaults.age),
     daily_routine: (initial.daily_routine ||
       defaults.daily_routine) as NutritionCalculatorInput['daily_routine'],
     steps_range: (initial.steps_range ||
