@@ -316,6 +316,7 @@ class WorkoutExerciseItem(BaseModel):
     media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
     media_preferred_mode: Literal["static", "animation"] | None = None
     media_animation_url: str | None = None
+    media_video_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
     progression_guidance: ProgressionGuidance | None = None
     sets: list[LoggedSetItem]
 

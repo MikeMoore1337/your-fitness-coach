@@ -314,15 +314,24 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                 check_source(descriptor, slug, "poster_source", require_image=True)
             video_sources = media.get("video_sources", [])
             if video_sources:
+                _require(len(video_sources) == 2, f"Unexpected HD video profile count: {slug}")
+                provenance = media.get("video_provenance") or {}
                 _require(
-                    slug in {"barbell-curl", "burpee"} and len(video_sources) == 2,
-                    f"Unexpected H.264 pilot scope: {slug}",
-                )
-                _require(
-                    media.get("video_provenance", {}).get("source_revision")
-                    == "18742da40b0627c85925c5dd4441dc3eac0594d0",
+                    provenance.get("source_revision") == "18742da40b0627c85925c5dd4441dc3eac0594d0",
                     f"Unpinned H.264 source: {slug}",
                 )
+                if slug not in {"barbell-curl", "burpee"}:
+                    poster_provenance = media.get("poster_source") or {}
+                    _require(
+                        bool(poster_provenance)
+                        and provenance.get("source_path")
+                        == "public/videos/"
+                        + poster_provenance["source_gender"]
+                        + "/"
+                        + poster_provenance["source_slug"]
+                        + ".mp4",
+                        f"Video does not match verified poster: {slug}",
+                    )
                 for video, (width, height) in zip(
                     video_sources, [(854, 480), (1280, 720)], strict=True
                 ):
@@ -347,20 +356,20 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                         and hashlib.sha256(data).hexdigest() == video.get("sha256"),
                         f"Invalid video file checksum/size: {slug}",
                     )
-    pilot_videos = [
+    approved_videos = [
         media
         for item in exercises.values()
         for media in item.get("media", [])
         if media.get("video_sources")
     ]
     _require(
-        len(pilot_videos) == manifest.get("hq_video_count") == 2,
-        "H.264 pilot exercise count drift",
+        len(approved_videos) == manifest.get("hq_video_count"),
+        "Verified H.264 exercise count drift",
     )
     _require(
-        sum(video["byte_size"] for media in pilot_videos for video in media["video_sources"])
+        sum(video["byte_size"] for media in approved_videos for video in media["video_sources"])
         == manifest.get("hq_video_total_bytes"),
-        "H.264 pilot total size drift",
+        "Verified H.264 total size drift",
     )
     # Some approved canonical variants intentionally point to the same source
     # record. The manifest keeps the source asset identity explicit instead of

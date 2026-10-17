@@ -35,16 +35,18 @@ export function usePrefersReducedMotion(): boolean {
 
 export function ExerciseMediaAsset({
   animationUrl,
+  videoSources = [],
   alt,
   className,
   height,
   thumbnailUrl,
   thumbnailSources = [],
-  preferredMode,
+
   variant,
   width,
 }: {
   animationUrl?: string | null;
+  videoSources?: MediaSource[];
   alt: string;
   className?: string;
   height?: number;
@@ -57,16 +59,16 @@ export function ExerciseMediaAsset({
   const reducedMotion = usePrefersReducedMotion();
   const [failed, setFailed] = useState(false);
   const [usePosterFallback, setUsePosterFallback] = useState(false);
-  const [useAnimationFallback, setUseAnimationFallback] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
+  const video =
+    variant === 'animation' && !reducedMotion && !videoFailed && videoSources.length > 0;
+  // In the full exercise view, motion always takes precedence over an HD poster.
+  // When a video fails, preserve the licensed legacy GIF instead of freezing motion.
   const animated =
-    variant === 'animation' &&
-    !reducedMotion &&
-    Boolean(animationUrl) &&
-    !usePosterFallback &&
-    (preferredMode !== 'static' || useAnimationFallback);
+    variant === 'animation' && !reducedMotion && Boolean(animationUrl) && !usePosterFallback;
   const src = animated ? animationUrl : thumbnailUrl;
 
-  if (!src || failed) {
+  if ((!src && !video) || failed) {
     return (
       <span
         className={
@@ -81,6 +83,25 @@ export function ExerciseMediaAsset({
     );
   }
 
+  if (video) {
+    const selected = [...videoSources].sort((a, b) => a.width - b.width).at(-1);
+    return (
+      <video
+        className={className}
+        src={selected?.url}
+        poster={thumbnailUrl ?? undefined}
+        autoPlay
+        muted
+        playsInline
+        loop
+        controls={false}
+        preload="metadata"
+        aria-label={alt}
+        data-media-mode="video"
+        onError={() => setVideoFailed(true)}
+      />
+    );
+  }
   const posterSources = responsiveSources(thumbnailSources, 'image/jpeg');
   const webpSources = responsiveSources(thumbnailSources, 'image/webp');
   const image = (
@@ -98,10 +119,6 @@ export function ExerciseMediaAsset({
       onError={() => {
         if (animated && thumbnailUrl) {
           setUsePosterFallback(true);
-          return;
-        }
-        if (!animated && animationUrl && preferredMode === 'static' && !reducedMotion) {
-          setUseAnimationFallback(true);
           return;
         }
         setFailed(true);
