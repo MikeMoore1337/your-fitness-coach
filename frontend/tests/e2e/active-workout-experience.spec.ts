@@ -1805,10 +1805,31 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
     .locator('.active-workout-exercise')
     .filter({ hasText: 'Жим штанги лёжа' })
     .first();
-  await expect(
-    exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }),
-  ).toBeVisible();
-  await exercise.getByRole('button', { name: 'Заменить только в этой тренировке' }).click();
+  const replacement = exercise.getByRole('button', {
+    name: 'Заменить только в этой тренировке',
+  });
+  await expect(replacement).toBeVisible();
+  for (const mobileWidth of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width: mobileWidth, height: 844 });
+    const { triggerWidth, actionsWidth, pageWidth } = await replacement.evaluate((button) => {
+      const trigger = button.getBoundingClientRect();
+      const actions = button.closest('.active-workout-exercise__head-actions');
+      return {
+        triggerWidth: trigger.width,
+        actionsWidth: actions?.getBoundingClientRect().width ?? 0,
+        pageWidth: document.documentElement.scrollWidth,
+      };
+    });
+    expect(actionsWidth).toBeGreaterThan(0);
+    expect(triggerWidth, `Replacement button width at ${mobileWidth}px`).toBeGreaterThanOrEqual(
+      actionsWidth - 1,
+    );
+    expect(pageWidth, `Horizontal overflow at ${mobileWidth}px`).toBeLessThanOrEqual(
+      mobileWidth + 1,
+    );
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await replacement.click();
   await expect(
     page.getByRole('heading', { name: 'Заменить только в этой тренировке' }),
   ).toBeVisible();
