@@ -92,4 +92,35 @@ describe('ExerciseMediaAsset', () => {
       expect.stringContaining('poster-1280.webp 1280w'),
     );
   });
+
+  it('plays an owner-reviewed 720px AI video and falls back to the original GIF on error', () => {
+    const { container } = render(
+      <ExerciseMediaAsset
+        alt="Становая тяга: техника"
+        animationUrl="/static/exercise-guides/gymvisual/deadlift-0032-ila4NZS.gif"
+        thumbnailUrl="/static/exercise-guides/gymvisual/deadlift-0032-ila4NZS.jpg"
+        videoSources={[
+          {
+            url: '/static/exercise-guides/gymvisual/ai-reviewed/deadlift-x4plus-720.mp4',
+            mime_type: 'video/mp4',
+            width: 720,
+          },
+        ]}
+        variant="animation"
+      />,
+    );
+    const video = container.querySelector('video');
+    expect(video).toHaveAttribute('data-media-mode', 'video');
+    expect(video).toHaveAttribute(
+      'src',
+      '/static/exercise-guides/gymvisual/ai-reviewed/deadlift-x4plus-720.mp4',
+    );
+    fireEvent.error(video!);
+    const fallback = screen.getByAltText('Становая тяга: техника');
+    expect(fallback).toHaveAttribute('data-media-mode', 'animated');
+    expect(fallback).toHaveAttribute(
+      'src',
+      '/static/exercise-guides/gymvisual/deadlift-0032-ila4NZS.gif',
+    );
+  });
 });

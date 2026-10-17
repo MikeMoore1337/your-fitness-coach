@@ -17,7 +17,10 @@ def test_verified_animated_hd_video_coverage() -> None:
     animated = [
         (slug, entry["media"][0])
         for slug, entry in entries.items()
-        if entry.get("media") and entry["media"][0].get("video_sources")
+        if entry.get("media")
+        and entry["media"][0].get("video_sources")
+        and entry["media"][0].get("video_provenance", {}).get("source_kind")
+        != "ai_upscaled_gymvisual"
     ]
     assert len(animated) == MANIFEST["hq_video_count"] == 77
     assert sum(len(media["video_sources"]) for _, media in animated) == 154
