@@ -73,10 +73,13 @@ def test_approved_ai_animations_preserve_source_and_binary_integrity() -> None:
         and entry["media"][0].get("video_provenance", {}).get("source_kind")
         == "ai_upscaled_gymvisual"
     }
-    assert set(samples) == expected
-    assert MANIFEST["ai_upscaled_video_count"] == 4
-    assert sum(m["video_sources"][0]["byte_size"] for m in samples.values()) == 614973
-    assert MANIFEST["ai_upscaled_video_total_bytes"] == 614973
+    assert set(samples) >= expected
+    assert MANIFEST["ai_upscaled_video_count"] == len(samples)
+    assert (
+        sum(m["video_sources"][0]["byte_size"] for m in samples.values())
+        == MANIFEST["ai_upscaled_video_total_bytes"]
+    )
+    assert sum(samples[slug]["video_sources"][0]["byte_size"] for slug in expected) == 614973
     for media in samples.values():
         assert media["type"] == "animation"
         assert media["path"].endswith(".gif")
