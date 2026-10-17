@@ -760,6 +760,7 @@ def test_calculated_recomposition_syncs_confirmed_profile_inputs_and_today_weigh
         "/api/v1/nutrition/targets",
         json={
             "sex": "female",
+            "record_weight_measurement": True,
             "weight_kg": 68.5,
             "height_cm": 170,
             "age": 33,
