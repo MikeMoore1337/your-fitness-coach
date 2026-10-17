@@ -17,7 +17,10 @@ def test_verified_animated_hd_video_coverage() -> None:
     animated = [
         (slug, entry["media"][0])
         for slug, entry in entries.items()
-        if entry.get("media") and entry["media"][0].get("video_sources")
+        if entry.get("media")
+        and entry["media"][0].get("video_sources")
+        and entry["media"][0].get("video_provenance", {}).get("source_kind")
+        != "ai_upscaled_gymvisual"
     ]
     assert len(animated) == MANIFEST["hq_video_count"] == 77
     assert sum(len(media["video_sources"]) for _, media in animated) == 154
@@ -59,3 +62,34 @@ def test_unverified_exercises_keep_legacy_media_untouched() -> None:
         assert not media[0].get("poster_source"), slug
         assert media[0]["type"] == "animation", slug
         assert media[0]["path"].endswith(".gif"), slug
+
+
+def test_approved_ai_animations_preserve_source_and_binary_integrity() -> None:
+    expected = {"deadlift", "machine-chest-press", "russian-twist", "walking-lunge"}
+    samples = {
+        slug: entry["media"][0]
+        for slug, entry in MANIFEST["exercises"].items()
+        if entry.get("media")
+        and entry["media"][0].get("video_provenance", {}).get("source_kind")
+        == "ai_upscaled_gymvisual"
+    }
+    assert set(samples) == expected
+    assert MANIFEST["ai_upscaled_video_count"] == 4
+    assert sum(m["video_sources"][0]["byte_size"] for m in samples.values()) == 614973
+    assert MANIFEST["ai_upscaled_video_total_bytes"] == 614973
+    for media in samples.values():
+        assert media["type"] == "animation"
+        assert media["path"].endswith(".gif")
+        original = ASSET_ROOT / media["path"]
+        assert hashlib.sha256(original.read_bytes()).hexdigest() == media["asset_sha256"]
+        assert len(media["video_sources"]) == 1
+        source = media["video_sources"][0]
+        assert (source["width"], source["height"]) == (720, 720)
+        data = (ASSET_ROOT / source["path"]).read_bytes()
+        assert data[4:8] == b"ftyp"
+        assert len(data) == source["byte_size"]
+        assert hashlib.sha256(data).hexdigest() == source["sha256"]
+        provenance = media["video_provenance"]
+        assert provenance["native_hd"] is False
+        assert provenance["model"] == "RealESRGAN_x4plus"
+        assert provenance["source_sha256"] == media["asset_sha256"]
