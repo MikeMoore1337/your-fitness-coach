@@ -146,7 +146,9 @@ def _client_entry_from_user(
         "weight_kg": (
             latest_weight.weight_kg
             if latest_weight is not None
-            else profile.weight_kg if profile else None
+            else profile.weight_kg
+            if profile
+            else None
         ),
         "workouts_per_week": profile.workouts_per_week if profile else None,
         "cardio_trainings_per_week": (profile.cardio_trainings_per_week if profile else None),
