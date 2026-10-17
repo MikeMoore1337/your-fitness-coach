@@ -765,9 +765,10 @@ def save_nutrition_target(
             profile.cardio_trainings_per_week = sum(
                 item.trainings_per_week for item in cardio_trainings
             )
-            from fitminiapp_api.services.measurements import sync_current_weight_to_diary
+            if payload.record_weight_measurement:
+                from fitminiapp_api.services.measurements import sync_current_weight_to_diary
 
-            sync_current_weight_to_diary(db, target_user, payload.weight_kg)
+                sync_current_weight_to_diary(db, target_user, payload.weight_kg)
 
     db.commit()
     db.refresh(target)
