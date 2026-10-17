@@ -7471,7 +7471,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
 }
 
 .app-section--progress .progress-muscle-workload .progress-exercise > summary strong,
-.app-section--progress .progress-subsection:has(.progress-muscle-workload) .progress-subsection__head h3 {
+.app-section--progress
+  .progress-subsection:has(.progress-muscle-workload)
+  .progress-subsection__head
+  h3 {
   color: var(--text);
 }
 
