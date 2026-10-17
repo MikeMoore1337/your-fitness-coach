@@ -256,6 +256,7 @@ def test_rest_history_and_progress_exclude_unknown_intervals(client):
     assert report.status_code == 200, report.text
     assert report.json()["training"]["rest"]["observation_count"] >= 1
 
+
 def test_delayed_offline_rest_can_sync_after_workout_finish(client):
     """Finishing a workout must not silently discard an earlier accepted offline rest."""
     headers = _auth(client, 996006)
@@ -286,3 +287,56 @@ def test_delayed_offline_rest_can_sync_after_workout_finish(client):
     )
     assert queued.status_code == 200, queued.text
     assert queued.json()["status"] == "running"
+
+
+def test_owner_corrects_forgotten_rest_duration(client):
+    """A confirmed manual value must not use wall clock elapsed in statistics."""
+    owner = _auth(client, 996007)
+    stranger = _auth(client, 996008)
+    workout = _new_workout(client, owner)
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    wid = workout["id"]
+    assert client.patch(
+        f"/api/v1/workouts/sets/{sid}",
+        headers=owner,
+        json={"actual_reps": 8, "is_completed": True},
+    ).status_code == 200
+    started_at = datetime.now(UTC) - timedelta(minutes=20)
+    response = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=owner,
+        json={
+            "source_set_id": sid,
+            "started_at": started_at.isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert response.status_code == 200, response.text
+    url = f"/api/v1/workouts/rest-sessions/{response.json()['id']}/actions"
+    corrected = {
+        "action": "complete",
+        "mutation_id": str(uuid4()),
+        "expected_version": 1,
+        "ended_at": datetime.now(UTC).isoformat(),
+        "corrected": True,
+        "corrected_seconds": 150,
+    }
+    assert client.post(url, headers=stranger, json=corrected).status_code == 404
+    assert client.post(url, headers=owner, json={
+        **corrected,
+        "corrected_seconds": None,
+    }).status_code == 422
+    assert client.post(url, headers=owner, json={
+        **corrected,
+        "corrected": False,
+    }).status_code == 422
+    saved = client.post(url, headers=owner, json=corrected)
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["measured_seconds"] == 150
+    assert saved.json()["source"] == "USER_CORRECTED"
+    retried = client.post(url, headers=owner, json=corrected)
+    assert retried.status_code == 200
+    assert retried.json()["version"] == saved.json()["version"]
+    assert client.post(url, headers=owner, json={
+        **corrected, "mutation_id": str(uuid4()),
+    }).status_code == 409
