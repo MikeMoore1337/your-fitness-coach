@@ -87,6 +87,7 @@ export function NutritionForm({
   timeZone,
   onSaved,
   readOnly = false,
+  embedded = false,
 }: {
   clientId?: number;
   targetTelegramId?: number | null;
@@ -94,6 +95,7 @@ export function NutritionForm({
   timeZone?: string | null;
   onSaved?: () => void | Promise<void>;
   readOnly?: boolean;
+  embedded?: boolean;
 }) {
   const { toast } = useFeedback();
   const { user } = useAuth();
@@ -160,8 +162,8 @@ export function NutritionForm({
       ),
     });
 
-  return (
-    <Card title="КБЖУ" description="Рассчитайте ориентир и отслеживайте его рядом с дневником.">
+  const formContent = (
+    <>
       {readOnly && (
         <p className="muted demo-capability-notice" role="status">
           Изменение ориентиров КБЖУ доступно после входа. В демо можно только посмотреть расчёт.
@@ -624,6 +626,14 @@ export function NutritionForm({
         )}
       </fieldset>
       <NutritionTargetHistory targetTelegramId={targetTelegramId} />
+    </>
+  );
+
+  return embedded ? (
+    formContent
+  ) : (
+    <Card title="КБЖУ" description="Рассчитайте ориентир и отслеживайте его рядом с дневником.">
+      {formContent}
     </Card>
   );
 }

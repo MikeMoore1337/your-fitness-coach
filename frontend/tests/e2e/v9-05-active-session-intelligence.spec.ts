@@ -7,7 +7,10 @@ import {
 } from './fixtures/mobile-tma';
 import { installPlatformApi } from './fixtures/platform-api';
 
-test.use({ serviceWorkers: 'block', video: 'on' });
+test.use({
+  serviceWorkers: 'block',
+  video: process.env.ALLURE_RESULTS_DIR ? 'retain-on-failure' : 'on',
+});
 
 async function openActiveWorkout(
   page: Parameters<typeof installPlatformApi>[0],

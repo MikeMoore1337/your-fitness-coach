@@ -250,3 +250,89 @@ describe('ExerciseGuideMedia', () => {
     ).toHaveTextContent('Изображение недоступно');
   });
 });
+
+const h264Pilot: ExerciseGuide['media'] = [
+  {
+    type: 'animation',
+    url: '/static/exercise-guides/gymvisual/barbell-curl.gif',
+    poster: '/static/exercise-guides/exercises-media/barbell-curl-hq720.jpg',
+    phase_id: 'movement',
+    phase: 'Движение',
+    alt: 'Сгибание рук со штангой',
+    source_name: 'Gym visual',
+    source_url: 'https://gymvisual.com',
+    source_license: 'Owner-purchased GymVisual license',
+    source_license_url: null,
+    width: 180,
+    height: 180,
+    byte_size: 106020,
+    sort_order: 0,
+    sources: [
+      {
+        url: '/static/exercise-guides/gymvisual/barbell-curl.gif',
+        mime_type: 'image/gif',
+        width: 180,
+        height: 180,
+        byte_size: 106020,
+      },
+    ],
+    video_sources: [
+      {
+        url: '/static/exercise-guides/exercises-media/videos/barbell-curl-480p-h264.mp4',
+        mime_type: 'video/mp4',
+        width: 854,
+        height: 480,
+        byte_size: 80755,
+      },
+      {
+        url: '/static/exercise-guides/exercises-media/videos/barbell-curl-720p-h264.mp4',
+        mime_type: 'video/mp4',
+        width: 1280,
+        height: 720,
+        byte_size: 140896,
+      },
+    ],
+  },
+];
+
+describe('ExerciseGuideMedia H.264 delivery', () => {
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('uses 480p in card, 720p in expanded view and original GIF on video error', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={h264Pilot} />);
+    const video = document.querySelector('.exercise-guide-image__frame video');
+    expect(video).not.toBeNull();
+    expect(video).toHaveAttribute('src', h264Pilot[0]!.video_sources?.[0]?.url);
+    expect(video).toHaveAttribute('poster', h264Pilot[0]!.poster);
+    fireEvent.click(screen.getByRole('button', { name: 'Увеличить: Движение' }));
+    const enlarged = document.querySelector('.exercise-lightbox video');
+    expect(enlarged).toHaveAttribute('src', h264Pilot[0]!.video_sources?.[1]?.url);
+    if (video) fireEvent.error(video);
+    expect(screen.getAllByAltText('Сгибание рук со штангой')[0]).toHaveAttribute(
+      'src',
+      h264Pilot[0]!.url,
+    );
+  });
+
+  it('never constructs video element with reduced-motion preference', () => {
+    vi.stubGlobal('matchMedia', () => ({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    render(<ExerciseGuideMedia items={h264Pilot} />);
+    expect(document.querySelector('video')).toBeNull();
+    expect(screen.getByAltText('Сгибание рук со штангой')).toHaveAttribute(
+      'src',
+      h264Pilot[0]!.poster,
+    );
+  });
+});

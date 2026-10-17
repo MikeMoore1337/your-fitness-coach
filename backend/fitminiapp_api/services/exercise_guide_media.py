@@ -32,6 +32,35 @@ def _image_mime_type(path: str) -> str:
     return "image/svg+xml"
 
 
+def _source_payload(source: dict) -> dict[str, object]:
+    return {
+        "url": _public_url(str(source["path"])),
+        "mime_type": source["mime_type"],
+        "width": source["width"],
+        "height": source["height"],
+        "byte_size": source["byte_size"],
+    }
+
+
+def _poster_sources(media: dict) -> list[dict]:
+    sources = media.get("poster_sources") or []
+    if not sources:
+        dimensions = media.get("poster_dimensions") or {
+            "width": media["width"],
+            "height": media["height"],
+        }
+        sources = [
+            {
+                "path": media["poster_path"],
+                "mime_type": _image_mime_type(media["poster_path"]),
+                "width": dimensions["width"],
+                "height": dimensions["height"],
+                "byte_size": media.get("poster_byte_size", 1),
+            }
+        ]
+    return sorted(sources, key=lambda value: (value["width"], value["mime_type"]))
+
+
 def resolve_guide_source(
     slug: str,
     *,
@@ -51,19 +80,24 @@ def resolve_guide_source(
     )
 
 
-def get_guide_media_preview(slug: str) -> dict[str, str | None]:
+def get_guide_media_preview(slug: str) -> dict[str, object]:
     item = _manifest().get("exercises", {}).get(slug) or {}
     media = (item.get("media") or [None])[0]
     if item.get("status") != "approved" or not media:
         return {
             "state": "blocked",
             "thumbnail_url": None,
+            "thumbnail_sources": [],
+            "preferred_mode": None,
             "animation_url": None,
         }
+    posters = _poster_sources(media)
     return {
-        "state": "approved_animated",
+        "state": "approved_static" if media["type"] == "image" else "approved_animated",
         "thumbnail_url": _public_url(str(media["poster_path"])),
-        "animation_url": _public_url(str(media["path"])),
+        "thumbnail_sources": [_source_payload(source) for source in posters],
+        "preferred_mode": "static" if media.get("poster_preferred") else "animation",
+        "animation_url": _public_url(str(media["path"])) if media["type"] == "animation" else None,
     }
 
 
@@ -91,6 +125,11 @@ def get_guide_media(
                 "byte_size": media["byte_size"],
             }
         ]
+        posters = _poster_sources(media)
+        poster_dimensions = media.get("poster_dimensions") or {
+            "width": posters[-1]["width"],
+            "height": posters[-1]["height"],
+        }
         media_source = media.get("source") or manifest_source
         result.append(
             {
@@ -120,6 +159,22 @@ def get_guide_media(
                         "byte_size": source["byte_size"],
                     }
                     for source in sorted(sources, key=lambda value: value["width"])
+                ],
+                "poster_sources": [_source_payload(source) for source in posters],
+                "poster_width": poster_dimensions["width"],
+                "poster_height": poster_dimensions["height"],
+                "poster_preferred": bool(media.get("poster_preferred")),
+                "video_sources": [
+                    {
+                        "url": _public_url(source["path"]),
+                        "mime_type": source["mime_type"],
+                        "width": source["width"],
+                        "height": source["height"],
+                        "byte_size": source["byte_size"],
+                    }
+                    for source in sorted(
+                        media.get("video_sources", []), key=lambda value: value["width"]
+                    )
                 ],
             }
         )

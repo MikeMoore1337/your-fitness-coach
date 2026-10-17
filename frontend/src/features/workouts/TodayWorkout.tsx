@@ -2386,6 +2386,8 @@ export function TodayWorkout({
                           animationUrl={exercise.media_animation_url}
                           alt={`${exercise.exercise_title}: техника движения`}
                           thumbnailUrl={exercise.media_thumbnail_url}
+                          thumbnailSources={exercise.media_thumbnail_sources}
+                          preferredMode={exercise.media_preferred_mode}
                           variant="animation"
                         />
                       )}
