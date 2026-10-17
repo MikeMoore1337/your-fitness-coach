@@ -9,6 +9,7 @@ type CardioTraining = NonNullable<NutritionTargetSave['cardio_trainings']>[numbe
 export type NutritionCalculatorInput = Omit<
   NutritionTargetSave,
   | 'daily_activity_level'
+  | 'record_weight_measurement'
   | 'cardio_trainings_per_week'
   | 'cardio_training_duration_minutes'
   | 'cardio_intensity'
