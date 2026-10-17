@@ -154,6 +154,10 @@ class NutritionError(Exception):
     pass
 
 
+class NutritionMacroAllocationError(NutritionError):
+    """The usual weight-based macro targets cannot fit the chosen energy goal."""
+
+
 class NutritionConflictError(NutritionError):
     pass
 
@@ -298,7 +302,7 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
         # silently reverse a deficit or create an unapproved surplus.
         # A different reference mass / macro allocation needs its own
         # explicitly reviewed nutrition policy.
-        raise NutritionError(
+        raise NutritionMacroAllocationError(
             "Расчёт не сформирован: белки и жиры превышают целевую калорийность. "
             "Стандартные нормы на текущий вес здесь неприменимы; "
             "нужна индивидуальная настройка питания."
@@ -674,7 +678,25 @@ def recalculate_nutrition_target(
         payload = _target_payload(candidate)
     except ValidationError as exc:
         raise NutritionError("Nutrition inputs are outside supported ranges") from exc
-    calculations = calculate_nutrition(payload)
+    try:
+        calculations = calculate_nutrition(payload)
+    except NutritionMacroAllocationError:
+        # A physical measurement/profile update must still be saved. Preserve
+        # the previous calculated target and warn the user instead of raising
+        # the energy target above its requested value.
+        queue_notification(
+            db,
+            target_user,
+            category="nutrition_update",
+            title="КБЖУ требуют уточнения",
+            body=(
+                "Замер или профиль обновлён, но новый расчёт КБЖУ не удалось "
+                "согласовать с выбранной целью. Прежние ориентиры сохранены. "
+                "Проверьте питание вместе со специалистом."
+            ),
+            action_url="/app?section=nutrition",
+        )
+        return False
     context.update(
         bmr=calculations["bmr"],
         tdee=calculations["tdee"],
