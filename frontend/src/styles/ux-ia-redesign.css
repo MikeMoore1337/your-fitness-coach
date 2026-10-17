@@ -1812,11 +1812,10 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
     font-size: 16px;
   }
   .nutrition-experience :is(.meal-planner, .grocery-list) {
-    padding: 0;
-    border: 0;
-    border-bottom: 1px solid var(--v2-border);
-    border-radius: 0;
-    background: transparent;
+    border: 1px solid var(--glass-edge);
+    border-radius: var(--radius-panel);
+    background: var(--v2-surface);
+    overflow: hidden;
   }
   .nutrition-experience :is(.meal-planner__summary, .grocery-list__summary) {
     min-height: 56px;

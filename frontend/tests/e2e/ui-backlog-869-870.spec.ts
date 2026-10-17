@@ -27,13 +27,49 @@ for (const theme of themes) {
         '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
       );
       await expect(planningDetails).toHaveCount(2);
+      if (phase === 'after') {
+        const cardStyles = await planningDetails.evaluateAll((elements) =>
+          elements.map((element) => {
+            const styles = getComputedStyle(element);
+            return {
+              backgroundColor: styles.backgroundColor,
+              borderWidths: [
+                styles.borderTopWidth,
+                styles.borderRightWidth,
+                styles.borderBottomWidth,
+                styles.borderLeftWidth,
+              ],
+              borderRadius: styles.borderTopLeftRadius,
+            };
+          }),
+        );
+        for (const style of cardStyles) {
+          expect(style.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+          expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+          expect(style.borderRadius).not.toBe('0px');
+        }
+      }
       for (const detail of await planningDetails.all()) {
         const summary = detail.locator(':scope > summary');
-        await expect(summary.locator('svg[data-icon="disclosure-closed"]')).toHaveCount(1);
+        const disclosure = summary.locator('svg[data-icon="disclosure-closed"]');
+        await expect(disclosure).toHaveCount(1);
+        await expect(disclosure).toBeVisible();
+        const closedTransform =
+          phase === 'after'
+            ? await disclosure.evaluate((element) => getComputedStyle(element).transform)
+            : null;
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'false');
         await summary.press('Enter');
         await expect(detail).toHaveAttribute('open', '');
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'true');
+        if (phase === 'after') {
+          await expect
+            .poll(() => disclosure.evaluate((element) => getComputedStyle(element).transform))
+            .not.toBe(closedTransform);
+        }
         await summary.press('Space');
         await expect(detail).not.toHaveAttribute('open', '');
+        if (phase === 'after') await expect(summary).toHaveAttribute('aria-expanded', 'false');
       }
       await hydration.scrollIntoViewIfNeeded();
       await hydration.screenshot({
@@ -181,4 +217,41 @@ for (const theme of themes) {
       ).toBe(true);
     });
   }
+}
+
+for (const theme of themes) {
+  test(`#1047 desktop keeps nutrition section cards intact - ${theme}`, async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-10T12:00:00+03:00'));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+    await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+    await installPlatformApi(page, { browserSession: true, fixedDate: '2026-10-10' });
+    await page.goto('/app?section=nutrition&date=2026-10-10');
+
+    const planningDetails = page.locator(
+      '.nutrition-experience > .meal-planner, .nutrition-experience > .grocery-list',
+    );
+    await expect(planningDetails).toHaveCount(2);
+    const cardStyles = await planningDetails.evaluateAll((elements) =>
+      elements.map((element) => {
+        const styles = getComputedStyle(element);
+        return {
+          borderWidths: [
+            styles.borderTopWidth,
+            styles.borderRightWidth,
+            styles.borderBottomWidth,
+            styles.borderLeftWidth,
+          ],
+          borderRadius: styles.borderTopLeftRadius,
+        };
+      }),
+    );
+    for (const style of cardStyles) {
+      expect(style.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(style.borderRadius).not.toBe('0px');
+    }
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
+  });
 }
