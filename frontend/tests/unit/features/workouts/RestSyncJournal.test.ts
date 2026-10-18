@@ -1,14 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockApi = vi.hoisted(() => vi.fn());
+const MockApiError = vi.hoisted(
+  () =>
+    class MockApiError extends Error {
+      constructor(public status: number) {
+        super('Mock API error');
+      }
+    },
+);
 
 vi.mock('../../../../src/shared/api/client', () => ({
   api: mockApi,
-  ApiError: class ApiError extends Error {
-    constructor(public status: number) {
-      super('Mock API error');
-    }
-  },
+  ApiError: MockApiError,
 }));
 vi.mock('../../../../src/shared/browser/crossContextLock', () => ({
   crossContextCoordinator: {
@@ -19,6 +23,7 @@ vi.mock('../../../../src/shared/browser/crossContextLock', () => ({
 import {
   beginMeasuredRest,
   loadRestJournal,
+  restJournalStorageKey,
   syncRestJournal,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
@@ -32,6 +37,7 @@ describe('rest journal concurrent mutation preservation #960', () => {
   it('does not overwrite a new local event while an earlier REST POST is awaiting', async () => {
     const start = new Date('2026-10-17T08:00:00Z').getTime();
     beginMeasuredRest(31, 44, 55, 90, start);
+    const startMutationId = loadRestJournal(31, 44)[0]!.start_mutation_id;
     updateMeasuredRest(31, 44, 55, 'add30', start + 10_000);
     mockApi.mockResolvedValueOnce({
       id: 66,
@@ -56,5 +62,208 @@ describe('rest journal concurrent mutation preservation #960', () => {
     expect(journal[0]?.server_id).toBe(66);
     expect(journal[0]?.pending.map((item) => item.action)).toContain('skip');
     expect(journal[0]?.pending.map((item) => item.action)).not.toContain('add30');
+    const startRecovery = JSON.parse(
+      localStorage.getItem(`${restJournalStorageKey(31, 44)}:op:${startMutationId}`) ?? '{}',
+    );
+    expect(startRecovery.start).toMatchObject({ server_id: 66, server_version: 2 });
+  });
+
+  it.each([
+    ['complete', 'completed'],
+    ['skip', 'skipped'],
+    ['interrupt', 'interrupted'],
+  ] as const)(
+    'recovers an ACKed start before reconnecting %s after a stale snapshot',
+    async (action, status) => {
+      const start = new Date('2026-10-18T08:00:00Z').getTime();
+      const key = restJournalStorageKey(31, 44);
+      const staleSnapshot = localStorage.getItem(key) ?? '[]';
+      beginMeasuredRest(31, 44, 57, 90, start);
+
+      mockApi.mockResolvedValueOnce({
+        id: 68,
+        workout_id: 44,
+        source_set_id: 57,
+        started_at: new Date(start).toISOString(),
+        planned_seconds: 90,
+        adjusted_seconds: 90,
+        version: 1,
+        status: 'running',
+      });
+      await syncRestJournal(31, 44);
+      const startMutationId = loadRestJournal(31, 44)[0]?.start_mutation_id;
+      expect(startMutationId).toEqual(expect.any(String));
+      expect(localStorage.getItem(`${key}:op:${startMutationId}`)).not.toBeNull();
+
+      const stopped = updateMeasuredRest(31, 44, 57, action, start + 30_000);
+      const mutationId = stopped?.pending[0]?.mutation_id;
+      expect(mutationId).toEqual(expect.any(String));
+      localStorage.setItem(key, staleSnapshot);
+
+      const restored = loadRestJournal(31, 44)[0];
+      expect(restored).toMatchObject({ source_set_id: 57, server_id: 68, server_version: 1 });
+      expect(restored?.pending).toMatchObject([{ action, mutation_id: mutationId }]);
+      expect(restored?.status).toBe(status);
+
+      mockApi.mockResolvedValueOnce({
+        id: 68,
+        workout_id: 44,
+        source_set_id: 57,
+        started_at: new Date(start).toISOString(),
+        planned_seconds: 90,
+        adjusted_seconds: 90,
+        version: 2,
+        status,
+      });
+      await syncRestJournal(31, 44);
+
+      expect(mockApi).toHaveBeenCalledTimes(2);
+      expect(mockApi.mock.calls[1]?.[1]?.body?.mutation_id).toBe(mutationId);
+      expect(loadRestJournal(31, 44)[0]?.pending).toHaveLength(0);
+      expect(localStorage.getItem(`${key}:op:${startMutationId}`)).toBeNull();
+
+      await syncRestJournal(31, 44);
+      expect(mockApi).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it('replays the same terminal mutation after the server saved it but the ACK was lost', async () => {
+    const start = new Date('2026-10-18T08:00:00Z').getTime();
+    const key = restJournalStorageKey(31, 44);
+    const staleSnapshot = localStorage.getItem(key) ?? '[]';
+    beginMeasuredRest(31, 44, 58, 90, start);
+    mockApi.mockResolvedValueOnce({
+      id: 69,
+      workout_id: 44,
+      source_set_id: 58,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 90,
+      version: 1,
+      status: 'running',
+    });
+    await syncRestJournal(31, 44);
+
+    const stopped = updateMeasuredRest(31, 44, 58, 'complete', start + 30_000);
+    const mutationId = stopped?.pending[0]?.mutation_id;
+    localStorage.setItem(key, staleSnapshot);
+    mockApi.mockRejectedValueOnce(new Error('connection lost after server commit'));
+
+    await expect(syncRestJournal(31, 44)).rejects.toThrow('connection lost after server commit');
+    expect(loadRestJournal(31, 44)[0]?.pending).toMatchObject([{ mutation_id: mutationId }]);
+
+    mockApi.mockResolvedValueOnce({
+      id: 69,
+      workout_id: 44,
+      source_set_id: 58,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 90,
+      version: 2,
+      status: 'completed',
+    });
+    await syncRestJournal(31, 44);
+
+    expect(mockApi).toHaveBeenCalledTimes(3);
+    expect(mockApi.mock.calls[2]?.[1]?.body?.mutation_id).toBe(mutationId);
+    expect(loadRestJournal(31, 44)[0]?.pending).toHaveLength(0);
+    await syncRestJournal(31, 44);
+    expect(mockApi).toHaveBeenCalledTimes(3);
+  });
+
+  it('merges a durable server version before ordering multiple pending actions', async () => {
+    const start = new Date('2026-10-18T08:00:00Z').getTime();
+    const key = restJournalStorageKey(31, 44);
+    beginMeasuredRest(31, 44, 59, 90, start);
+    mockApi.mockResolvedValueOnce({
+      id: 70,
+      workout_id: 44,
+      source_set_id: 59,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 90,
+      version: 1,
+      status: 'running',
+    });
+    await syncRestJournal(31, 44);
+    const staleServerSnapshot = localStorage.getItem(key);
+
+    updateMeasuredRest(31, 44, 59, 'add30', start + 10_000);
+    mockApi.mockResolvedValueOnce({
+      id: 70,
+      workout_id: 44,
+      source_set_id: 59,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 120,
+      version: 2,
+      status: 'running',
+    });
+    await syncRestJournal(31, 44);
+
+    updateMeasuredRest(31, 44, 59, 'add60', start + 20_000);
+    const completed = updateMeasuredRest(31, 44, 59, 'complete', start + 30_000);
+    const terminalMutationId = completed?.pending.at(-1)?.mutation_id;
+    localStorage.setItem(key, staleServerSnapshot!);
+
+    const restored = loadRestJournal(31, 44)[0];
+    expect(restored).toMatchObject({ server_id: 70, server_version: 2, adjusted_seconds: 120 });
+    expect(restored?.pending.map((item) => item.action)).toEqual(['add60', 'complete']);
+
+    mockApi.mockResolvedValueOnce({
+      id: 70,
+      workout_id: 44,
+      source_set_id: 59,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 180,
+      version: 3,
+      status: 'running',
+    });
+    mockApi.mockResolvedValueOnce({
+      id: 70,
+      workout_id: 44,
+      source_set_id: 59,
+      started_at: new Date(start).toISOString(),
+      planned_seconds: 90,
+      adjusted_seconds: 180,
+      version: 4,
+      status: 'completed',
+    });
+    await syncRestJournal(31, 44);
+
+    expect(mockApi.mock.calls[2]?.[1]?.body).toMatchObject({
+      mutation_id: restored?.pending[0]?.mutation_id,
+      expected_version: 2,
+    });
+    expect(mockApi.mock.calls[3]?.[1]?.body).toMatchObject({
+      mutation_id: terminalMutationId,
+      expected_version: 3,
+    });
+    expect(loadRestJournal(31, 44)[0]?.pending).toHaveLength(0);
+    expect(
+      localStorage.getItem(`${key}:op:${loadRestJournal(31, 44)[0]?.start_mutation_id}`),
+    ).toBeNull();
+  });
+
+  it('retains a terminal local action after a server conflict for explicit reconciliation', async () => {
+    const start = new Date('2026-10-17T08:00:00Z').getTime();
+    beginMeasuredRest(31, 44, 56, 90, start);
+    updateMeasuredRest(31, 44, 56, 'complete', start + 30_000);
+    mockApi.mockResolvedValueOnce({
+      id: 67,
+      workout_id: 44,
+      source_set_id: 56,
+      version: 1,
+      status: 'running',
+    });
+    mockApi.mockRejectedValueOnce(new MockApiError(409));
+
+    await syncRestJournal(31, 44);
+
+    const row = loadRestJournal(31, 44)[0];
+    expect(row).toMatchObject({ server_id: 67, status: 'completed' });
+    expect(row?.pending).toHaveLength(1);
+    expect(row?.pending[0]?.action).toBe('complete');
   });
 });

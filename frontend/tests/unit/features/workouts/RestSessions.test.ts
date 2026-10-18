@@ -26,6 +26,22 @@ describe('measured rest journal #960', () => {
     expect(loadRestJournal(12, 56)).toHaveLength(0);
   });
 
+  it('rehydrates a new start and its interruption after a stale journal snapshot', () => {
+    const start = 150_000;
+    beginMeasuredRest(11, 56, 1009, 90, start);
+    const key = restJournalStorageKey(11, 56);
+    const staleSnapshot = localStorage.getItem(key);
+    beginMeasuredRest(11, 56, 1010, 90, start + 1000);
+
+    localStorage.setItem(key, staleSnapshot!);
+    const restored = loadRestJournal(11, 56);
+
+    expect(restored.map((row) => row.source_set_id)).toEqual([1009, 1010]);
+    expect(restored[0]).toMatchObject({ status: 'interrupted' });
+    expect(restored[0]?.pending.map((entry) => entry.action)).toEqual(['interrupt']);
+    expect(restored[1]).toMatchObject({ status: 'running', start_mutation_id: expect.any(String) });
+  });
+
   it('only extends target, never rewrites elapsed start', () => {
     const base = 1_900_000;
     beginMeasuredRest(11, 56, 1001, 90, base);
@@ -104,6 +120,21 @@ describe('measured rest journal #960', () => {
       corrected: true,
       corrected_seconds: 150,
     });
+  });
+
+  it('uses the inclusive Policy C boundary and rejects a pre-start correction timestamp', () => {
+    const start = 3_500_000;
+    beginMeasuredRest(11, 56, 1011, 90, start);
+    markRestBackground(11, 56, start + 90_000);
+
+    const boundary = recoverRestAfterAbsence(11, 56, start + 90_000 + REST_ABSENCE_REVIEW_MS);
+    expect(boundary?.needs_review).toBe(true);
+
+    beginMeasuredRest(11, 56, 1012, 90, start + 1000);
+    expect(updateMeasuredRest(11, 56, 1012, 'complete', start, 150)).toBeNull();
+    expect(loadRestJournal(11, 56).find((row) => row.source_set_id === 1012)?.status).toBe(
+      'running',
+    );
   });
 
   it('allows discarding untrusted rest without inventing a measurement', () => {

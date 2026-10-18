@@ -341,6 +341,17 @@ def test_owner_corrects_forgotten_rest_duration(client):
         ).status_code
         == 422
     )
+    assert (
+        client.post(
+            url,
+            headers=owner,
+            json={
+                **corrected,
+                "ended_at": (started_at - timedelta(seconds=1)).isoformat(),
+            },
+        ).status_code
+        == 422
+    )
     saved = client.post(url, headers=owner, json=corrected)
     assert saved.status_code == 200, saved.text
     assert saved.json()["measured_seconds"] == 150

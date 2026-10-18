@@ -209,13 +209,13 @@ def mutate_rest_session(
             ended = _utc_naive(payload.ended_at)
             if ended > _now() + timedelta(minutes=1):
                 raise HTTPException(status_code=422, detail="Недопустимое время окончания")
+            if ended < row.started_at:
+                raise HTTPException(status_code=422, detail="Недопустимое время окончания")
             if payload.corrected:
                 # The owner explicitly reports the duration after returning from background.
                 # Do not derive a fictitious interval from wall clock time while absent.
                 row.measured_seconds = payload.corrected_seconds
             else:
-                if ended < row.started_at:
-                    raise HTTPException(status_code=422, detail="Недопустимое время окончания")
                 row.measured_seconds = max(0, int((ended - row.started_at).total_seconds()))
             row.ended_at = ended
             row.status = "completed"
