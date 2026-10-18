@@ -56,6 +56,7 @@ describe('thick lime edge safeguard', () => {
       path.join(frontendRoot, 'src', 'styles', 'design-v2.css'),
       'utf8',
     );
+    const reactStyles = readFileSync(path.join(frontendRoot, 'src', 'styles', 'react.css'), 'utf8');
     const systemStyles = readFileSync(
       path.join(frontendRoot, 'src', 'styles', 'design-system.css'),
       'utf8',
@@ -79,6 +80,9 @@ describe('thick lime edge safeguard', () => {
     expect(v2Styles).not.toMatch(
       /\.nutrition-report-coverage\s*\{[^}]*box-shadow\s*:\s*inset\s+3px\s+0\s+var\(--v2-lime\)/s,
     );
+    expect(reactStyles).not.toContain('border-left: 3px solid var(--weekly-review-lime)');
+    expect(reactStyles).not.toContain('box-shadow: inset 3px 0 var(--weekly-review-lime)');
+    expect(reactStyles).not.toContain('box-shadow: inset 0 3px var(--weekly-review-lime)');
     expect(systemStyles).toMatch(
       /\.data-confidence\s*\{[^}]*border\s*:\s*1px solid var\(--v2-border\)/s,
     );

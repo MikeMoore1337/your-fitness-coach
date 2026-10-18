@@ -82,6 +82,7 @@ function renderHistory(
     React.ComponentProps<typeof WorkoutHistory>,
     'focusedWorkoutId' | 'focusedCommentId' | 'focusedExerciseId'
   > = {},
+  compact = false,
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -89,7 +90,7 @@ function renderHistory(
   render(
     <QueryClientProvider client={queryClient}>
       <FeedbackProvider>
-        <WorkoutHistory onWorkoutSelect={onWorkoutSelect} {...focus} />
+        <WorkoutHistory compact={compact} onWorkoutSelect={onWorkoutSelect} {...focus} />
       </FeedbackProvider>
     </QueryClientProvider>,
   );
@@ -217,5 +218,17 @@ describe('WorkoutHistory', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Открыть deep-link истории' }));
 
     expect(document.querySelector('.workout-history-card')).toHaveAttribute('open', '');
+  });
+
+  it('сворачивает контекст недели, но оставляет историю фактов доступной', async () => {
+    renderHistory(vi.fn(), {}, true);
+
+    const weekSummary = await screen.findByText('План и навигация');
+    const weekDisclosure = weekSummary.closest('details');
+    expect(weekDisclosure).not.toHaveAttribute('open', '');
+    expect(screen.getByRole('heading', { name: 'История' }).closest('details')).toBeNull();
+
+    fireEvent.click(weekSummary);
+    expect(weekDisclosure).toHaveAttribute('open', '');
   });
 });

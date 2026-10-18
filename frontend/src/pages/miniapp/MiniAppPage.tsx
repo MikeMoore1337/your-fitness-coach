@@ -14,7 +14,7 @@ import { TelegramLinkPrompt } from '../../features/account/TelegramLinkPrompt';
 import { TodayDashboard } from '../../features/dashboard/TodayDashboard';
 import type { WorkoutNavigationTarget } from '../../features/workouts/WorkoutHistory';
 import { AppLink, focusedContextReturn, useNavigation } from '../../shared/navigation/router';
-import { Badge, Card } from '../../shared/ui/common';
+import { Badge, Card, DisclosureIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { AiCoachSettingsCard, useAiCoachStatus } from '../../features/ai/AiCoachExperience';
 import { AiCoachContextualEntry } from '../../features/ai/AiCoachContextualEntry';
@@ -486,13 +486,21 @@ export default function MiniAppPage({
                         >
                           <WeeklyCheckInCard
                             autoFocus={focusWeeklyReview}
+                            compact
                             userId={user?.id ?? 'anonymous'}
                           />
-                          <AssignedCheckInTemplates readOnly={!capabilities.canMutateProgress} />
+                          <details className="progress-secondary-disclosure">
+                            <summary className="yfc-disclosure-summary">
+                              Дополнительные проверки
+                              <DisclosureIcon />
+                            </summary>
+                            <AssignedCheckInTemplates readOnly={!capabilities.canMutateProgress} />
+                          </details>
                         </fieldset>
                       </>
                     ) : progressView === 'history' ? (
                       <WorkoutHistory
+                        compact
                         readOnly={!capabilities.canMutateProgress}
                         timeZone={user?.profile?.timezone}
                         focusedWorkoutId={historicalProgramWorkout ? null : historyFocusId}
