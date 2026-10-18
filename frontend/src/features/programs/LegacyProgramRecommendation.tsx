@@ -561,7 +561,8 @@ export function ProgramRecommendation({
                     <div className="program-wizard__result-actions">
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={(event) => {
+                          event.currentTarget.focus();
                           close();
                           onPreview(result.recommendation!.template);
                         }}
@@ -628,7 +629,8 @@ export function ProgramRecommendation({
                         <button
                           type="button"
                           className="secondary"
-                          onClick={() => {
+                          onClick={(event) => {
+                            event.currentTarget.focus();
                             close();
                             onPreview(alternative.template);
                           }}
