@@ -88,10 +88,25 @@
   border-radius: var(--radius-control);
   color: var(--text);
 }
+.program-example-modal__panel:focus-visible {
+  /* The program-preview surface must not gain a thick one-sided lime stripe. */
+  outline: none;
+}
 @media (min-width: 900px) {
+  .program-example-modal {
+    align-items: stretch;
+    justify-content: flex-end;
+    padding: 0;
+  }
   .program-example-modal__panel {
-    width: min(660px, 100%);
-    max-width: 660px;
+    width: min(650px, 100%);
+    max-width: 650px;
+    max-height: 100dvh;
+    height: 100dvh;
+    margin: 0;
+    border-top: 0;
+    border-bottom: 0;
+    border-radius: 0;
   }
 }
 @media (max-width: 600px) {
