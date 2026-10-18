@@ -1,6 +1,6 @@
 # Make Feature: Issue #997 implementation
 
-- Stage: final visual fixes implemented; exact-head CI is green on `a9ca11db0380b82384d32c1d144c6bff0a027b12`. The PR is ready for final visual acceptance; release, merge and deploy remain blocked.
+- Stage: final visual fixes implemented; exact-head CI is green on `73e7ec410c7804cef3fa092e0efeeda11715ab55`. The PR is ready for final visual acceptance; release, merge and deploy remain blocked.
 - Depth: normal — one approved preview flow across frontend data mapping, assignment freshness, accessibility, tests and browser evidence; no new backend contract, migration, dependency or production action.
 - Base: exact current `origin/master` SHA `afc9a3e918f4085e506b711c5cacfe4b5c5a0f5c`.
 - Approved design: Issue #997 package, design SHA `f17930417257814633b5178d6141662342dfff66`.
@@ -14,4 +14,4 @@
 - C2: unknown/incomplete fields remain explicit `Нет данных`; trainer-owned plans remain read-only; actions stay distinct.
 - C3: fresh source comparison prevents assignment after a changed revision/title and preserves the preview.
 - C4: frontend unit/lint/typecheck/build and Chromium/WebKit browser evidence pass; final local regression is 940 tests.
-- C5: exact-head GitHub aggregate `checks` and all applicable CI jobs are green in run [39114617796](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39114617796); owner visual acceptance, release approval, merge and deploy remain separate gates.
+- C5: exact-head GitHub aggregate `checks` and all applicable CI jobs are green in run [39115192293](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39115192293); owner visual acceptance, release approval, merge and deploy remain separate gates.
