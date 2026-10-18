@@ -24,9 +24,9 @@
     "approved_static": 4,
     "hd_coverage_percent": 37.38
   },
-  "asset_count": 881,
+  "asset_count": 971,
   "derivative_count": 77,
-  "total_bytes": 49658088,
+  "total_bytes": 60421366,
   "exercises": {
     "ab-wheel": {
       "status": "approved",
@@ -68,7 +68,36 @@
               "height": 180,
               "byte_size": 56454
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/ab-wheel-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 88701,
+              "sha256": "9bc7981531bded51c077ac4ae97958e9f27dfec22f9fbd30fb18fcf8a1321d1b"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/ab-wheel-0857-NAgVB3t.gif",
+            "source_sha256": "e12b3649a3e5a1d09cc0fe78607c6670997f58af47aa3adfeb76350760f9a310",
+            "source_asset_id": "gymvisual:0857:NAgVB3t",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -259,7 +288,36 @@
               "height": 180,
               "byte_size": 163534
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/assault-bike-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 312031,
+              "sha256": "c948fca3f6ca29ce4de371337819f1d2e0ce0c10113d15797f1591063535b2c3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/assault-bike-0003-1ZFqTDN.gif",
+            "source_sha256": "3c053f02919ee51adca7ccea1320aff379e1e78a62334757cf8e3ea6f3af6fc8",
+            "source_asset_id": "gymvisual:0003:1ZFqTDN",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -450,7 +508,36 @@
               "height": 180,
               "byte_size": 98466
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/assisted-pull-ups-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 131611,
+              "sha256": "a1ead65498ccc3a5f6eb008ac60fca9a825041b3191a704d936410e8113d14e9"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/assisted-pull-ups-0017-kiJ4Z2K.gif",
+            "source_sha256": "0414630be013645b9909f9c4fdc779da29b186a1a9a82a9f7af56d6bde23341c",
+            "source_asset_id": "gymvisual:0017:kiJ4Z2K",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -642,7 +729,36 @@
               "height": 180,
               "byte_size": 118724
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/barbell-glute-bridge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 152837,
+              "sha256": "c34aef65233567b8b8ae41b900ad0d4077997c7112ccee398c373a83ae6e1cf2"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/barbell-glute-bridge-1409-qKBpF7I.gif",
+            "source_sha256": "f6792b8cfd188c4e5c3cd4c1a13429950c1334335dd9b56192b17e9793e9133c",
+            "source_asset_id": "gymvisual:1409:qKBpF7I",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -686,7 +802,36 @@
               "height": 180,
               "byte_size": 100913
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/barbell-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 105237,
+              "sha256": "3ed0fda7c8031ef028c88169ac0229aa640f0e3d8e47c7d4b60643378273eb30"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/barbell-row-0027-eZyBC3j.gif",
+            "source_sha256": "2ccb875b892860bb7997505cbaf5a6c96f93f7d9793cfe822f5895a1f93d2bfa",
+            "source_asset_id": "gymvisual:0027:eZyBC3j",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -1358,7 +1503,36 @@
               "height": 180,
               "byte_size": 80894
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/bear-crawl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 161590,
+              "sha256": "4e0a4fe68a2139f91014821c9b9838ffea8c4fe5d7d6260882759d1215d9e8ce"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/bear-crawl-3360-0Yz8WdV.gif",
+            "source_sha256": "50556bfeab14f5d9d40eefca230d05ff65b1f379c92041ecde665a107fc8166b",
+            "source_asset_id": "gymvisual:3360:0Yz8WdV",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 18,
+            "source_animation_duration_ms": 4500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -1408,7 +1582,36 @@
               "height": 180,
               "byte_size": 85074
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/bench-dip-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 100730,
+              "sha256": "568c636b6557847e5c4a33d272a71aefcc9429d4a649e7be9c47af686c9c8763"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/bench-dip-0129-RrLske5.gif",
+            "source_sha256": "08a276ef39d9af5ef4a9668af79b766bb9bbc3f8e953c312c6ba007d20a40004",
+            "source_asset_id": "gymvisual:0129:RrLske5",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -1605,7 +1808,36 @@
               "height": 180,
               "byte_size": 86092
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/bodyweight-glute-bridge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 109394,
+              "sha256": "d7c6f7743d503c2ffbb549f7112ef553be220c7a60667a4787a6b7f29d714c96"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/bodyweight-glute-bridge-3013-u0cNiij.gif",
+            "source_sha256": "0488f6ef2f876420c071a2d4243f1f1574d25bba5b5eb72246da4f130d58ad91",
+            "source_asset_id": "gymvisual:3013:u0cNiij",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -1802,7 +2034,36 @@
               "height": 180,
               "byte_size": 99446
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/bulgarian-split-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111408,
+              "sha256": "08c92d700412a6754ed478a86cb0677cf48ee31c7929db326e988566a0e796db"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/bulgarian-split-squat-0410-qx4fgX7.gif",
+            "source_sha256": "1682a1f9bab145a90e74a8539b75525ce18f5e835251ba43057df896e7655ba7",
+            "source_asset_id": "gymvisual:0410:qx4fgX7",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2135,7 +2396,36 @@
               "height": 180,
               "byte_size": 81744
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/cable-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 86512,
+              "sha256": "4dc3f7aecee7105fc65979bb34e6d150156e584a708e1b182712c7318fa6cb17"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/cable-curl-0868-G08RZcQ.gif",
+            "source_sha256": "9354387664d7651b39c38389d8af22b5568287de9bf17493eae6a314eddfee3c",
+            "source_asset_id": "gymvisual:0868:G08RZcQ",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2179,7 +2469,36 @@
               "height": 180,
               "byte_size": 72693
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/cable-external-rotation-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 72725,
+              "sha256": "07f569f161c9652cff5fe4a972d4d78e482c182cff97d6b4326d6c8e74b1d179"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/cable-external-rotation-0235-FWdVhcW.gif",
+            "source_sha256": "abb329c029bd96777f55b4d9b8437da40467a505a461c2ff9764954a7b0987bb",
+            "source_asset_id": "gymvisual:0235:FWdVhcW",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2370,7 +2689,36 @@
               "height": 180,
               "byte_size": 75060
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/cable-kickback-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 103117,
+              "sha256": "d9f820a9af2975d81a4e0e84fb6ae1e5f6503f3fe79e24ab7c366edcd0d9e237"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/cable-kickback-0228-Kpajagk.gif",
+            "source_sha256": "ac3314e6ad42aba596f7e6c28af8eb6a9f2efc52d135a8e4b4266a1b875025b2",
+            "source_asset_id": "gymvisual:0228:Kpajagk",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2561,7 +2909,36 @@
               "height": 180,
               "byte_size": 71607
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/cable-pull-through-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 108933,
+              "sha256": "e4b22523607795d3afdf183e81a9f07c9045bc5e1f40cfbe20b2eb0dd5bdb44c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/cable-pull-through-0196-OM46QHm.gif",
+            "source_sha256": "ab812b1ad7755c568d77f0a2ad7127d0038d30cef4d60dea6ac59740a939b949",
+            "source_asset_id": "gymvisual:0196:OM46QHm",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2752,7 +3129,36 @@
               "height": 180,
               "byte_size": 118764
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/cable-row-one-arm-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 96337,
+              "sha256": "cd01a4447d795f9515b0ddb1f8fc8502f2122717e9e7a1614542f31f90f22e7c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/cable-row-one-arm-0189-EIsE3u8.gif",
+            "source_sha256": "4ab65c8390aea80403bf061068c83282c3b0ba23bbe8a19d61aec85dc48fd59d",
+            "source_asset_id": "gymvisual:0189:EIsE3u8",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2943,7 +3349,36 @@
               "height": 180,
               "byte_size": 94623
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/captain-chair-leg-raise-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 105631,
+              "sha256": "7fe6cc3dbcc4bb89b6a40c9118cdfaa87999babf5929dc5ebd23fa912fd6019d"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/captain-chair-leg-raise-2963-weoDEpH.gif",
+            "source_sha256": "c0a434fae1fa8541d54c2a56754cb9ebc31a10dad2ee428f71a48b36589c7bfe",
+            "source_asset_id": "gymvisual:2963:weoDEpH",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -2987,7 +3422,36 @@
               "height": 180,
               "byte_size": 87629
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/chest-dip-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 98689,
+              "sha256": "fc823a9abed321002d3f4699f2bde95b077a012b490d5bbd95bb0ab6104f7ec0"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/chest-dip-0251-9WTm7dq.gif",
+            "source_sha256": "62b705a87e49606f4a04a13a1c1d4e76bd7e8e67ea9118916f13f8a8e30c2dc4",
+            "source_asset_id": "gymvisual:0251:9WTm7dq",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -3031,7 +3495,36 @@
               "height": 180,
               "byte_size": 109642
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/chest-supported-dumbbell-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 112521,
+              "sha256": "7f383b32952ccf8eb41cef92135dceac522358c5a1d1edfd97283d5f90959ca7"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/chest-supported-dumbbell-row-0327-7vG5o25.gif",
+            "source_sha256": "086a832915dafd960893376e299a2bf852f89f7081a97b23dc20155a88f7c272",
+            "source_asset_id": "gymvisual:0327:7vG5o25",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -3675,7 +4168,36 @@
               "height": 180,
               "byte_size": 95123
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/crunch-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 134761,
+              "sha256": "1b84c8e503413759be08865233468da58f0332304d2043396e7e3116dd5504c2"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/crunch-0274-TFqbd8t.gif",
+            "source_sha256": "b2caf9e3ebea2d5cf7f434f16aee481d529a57b8b5fc3c5de9e913b447eb1b57",
+            "source_asset_id": "gymvisual:0274:TFqbd8t",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -3866,7 +4388,36 @@
               "height": 180,
               "byte_size": 74568
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/dead-bug-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 90769,
+              "sha256": "0bab5297058157207e861d927cbd332ca6c69199f7d6ff3dabf62cb7b931abc2"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/dead-bug-0276-iny3m5y.gif",
+            "source_sha256": "c3dde2bfa860d8a141861ee94259e9fafee2096c74cb0553c87a05bae9544b21",
+            "source_asset_id": "gymvisual:0276:iny3m5y",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -4136,7 +4687,36 @@
               "height": 180,
               "byte_size": 83754
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/decline-crunch-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 89552,
+              "sha256": "fe703e639933613879dfbd7d1d445bbf9964598836628fc5b55d30522127be22"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/decline-crunch-0277-9Ap7miY.gif",
+            "source_sha256": "984a277001ba49c5ee64ff3e7f8fdd3026e1fb063b067bb844a6c23fc55f6128",
+            "source_asset_id": "gymvisual:0277:9Ap7miY",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -4474,7 +5054,36 @@
               "height": 180,
               "byte_size": 64771
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/dragon-flag-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 53313,
+              "sha256": "df2f8655020c4b6ef5480b9b812e8a56ecc9518d5f7abb97b4c7d4b56bb72ca6"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/dragon-flag-3303-pQ0Mx1Z.gif",
+            "source_sha256": "2a29b07f36af6d305925748f09e7d638b2563a4e4125121e47204760e714bb5d",
+            "source_asset_id": "gymvisual:3303:pQ0Mx1Z",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 2100,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -4518,7 +5127,36 @@
               "height": 180,
               "byte_size": 100673
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/dumbbell-bench-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 115283,
+              "sha256": "30531da146955c95abce15a6e7e806ecfbfbdb8c3847c1de160005964e46c40d"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/dumbbell-bench-press-0289-SpYC0Kp.gif",
+            "source_sha256": "3ba98c47d102bab77510300ba64c9e0c28668fcae9bb5b95b37482aae9f43e8e",
+            "source_asset_id": "gymvisual:0289:SpYC0Kp",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -5150,7 +5788,36 @@
               "height": 180,
               "byte_size": 82183
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/dumbbell-overhead-extension-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 69686,
+              "sha256": "7e00d04c53b1d32c8d531cdb6f40f0415a1160c4bc633ffdafebffcd8fdd6372"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/dumbbell-overhead-extension-1738-5fKX7wi.gif",
+            "source_sha256": "35d2dfb49878fe9bc75d04c36c3b8346d5804ed04909ca32f2281a00465c393b",
+            "source_asset_id": "gymvisual:1738:5fKX7wi",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -5194,7 +5861,36 @@
               "height": 180,
               "byte_size": 112614
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/dumbbell-pullover-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 108065,
+              "sha256": "02a82be8c53c1f406d5426978a2220b6e807d4addd5077bcaf1c707198cee14f"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/dumbbell-pullover-0375-9XjtHvS.gif",
+            "source_sha256": "12efed2a1d8a02b3d5542dde719d4437cd11cd188fc848ece2d33ab8041947fc",
+            "source_asset_id": "gymvisual:0375:9XjtHvS",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -5685,7 +6381,36 @@
               "height": 180,
               "byte_size": 136068
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/farmer-walk-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 188576,
+              "sha256": "68ad6bff08e45875a9db0da1d9760b803e1f52895e6db739636735b17d9d162c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/farmer-walk-2133-qPEzJjA.gif",
+            "source_sha256": "5c6ab66c33ba6361df648f851c1083f3169ec89e750b3bea764de5ca46527298",
+            "source_asset_id": "gymvisual:2133:qPEzJjA",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -5882,7 +6607,36 @@
               "height": 180,
               "byte_size": 75589
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/glute-ham-raise-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 81301,
+              "sha256": "ceab8fc6d107501e90a43734faf12cda37fa73a5a86d7b0241e0205ed87a3a75"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/glute-ham-raise-3193-Vvwjz6N.gif",
+            "source_sha256": "c084edd198afb5db2d3000317380711b59c40363de68c3d43284cc401c7f015f",
+            "source_asset_id": "gymvisual:3193:Vvwjz6N",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -6073,7 +6827,36 @@
               "height": 180,
               "byte_size": 85825
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/good-morning-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 107168,
+              "sha256": "e7617eabb1042238092c0de92e55bdaa99a05e9503a9b4ca84765957578542b6"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/good-morning-0044-XlZ4lAC.gif",
+            "source_sha256": "7d01b04b09e80504323e66295f757b2f0328dab7a3d71d637a2916d391634a1f",
+            "source_asset_id": "gymvisual:0044:XlZ4lAC",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -6264,7 +7047,36 @@
               "height": 180,
               "byte_size": 78291
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/hammer-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 75410,
+              "sha256": "619890b733429e5e923acec081679aab836ae18b2f4d8684004bfc1235826606"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/hammer-curl-0313-slDvUAU.gif",
+            "source_sha256": "4f2a6046f7acbb99b55c64316156dbcb19fda5ff4989f8ebfac85ae2480d2342",
+            "source_asset_id": "gymvisual:0313:slDvUAU",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -6314,7 +7126,36 @@
               "height": 180,
               "byte_size": 109751
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/hanging-knee-raise-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111789,
+              "sha256": "3c1547466efe777c956a4ce9fc07a9ffbf8c612753338ea33151caf143d08db7"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/hanging-knee-raise-0011-03lzqwk.gif",
+            "source_sha256": "a0e42d8d0c155b0af2dbda5ab087855dcf4f85c80ab2ad4c4c03a81c733d8daa",
+            "source_asset_id": "gymvisual:0011:03lzqwk",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -6799,7 +7640,36 @@
               "height": 180,
               "byte_size": 97191
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/hip-thrust-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 135581,
+              "sha256": "034ef05fc0ff2930a48f27f317f01eca5b6ef98c34c8be1f649377a6f91babb1"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/hip-thrust-3562-qg2PGl6.gif",
+            "source_sha256": "be7a04368ae4df8890f9fcaf27ebe15e88ab1e0e4a0077fb63253a24cfed2a36",
+            "source_asset_id": "gymvisual:3562:qg2PGl6",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -7584,7 +8454,36 @@
               "height": 180,
               "byte_size": 115475
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/independent-lever-chest-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 121229,
+              "sha256": "81756224cec172341734001c19300e786964d56ee5d7c3449ed45b3f1c5fc858"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/independent-lever-chest-press-0576-DOoWcnA.gif",
+            "source_sha256": "aa2b979c98bb26ffcf992bee97987af3ece27d8783563e4b601626f477664ea0",
+            "source_asset_id": "gymvisual:0576:DOoWcnA",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -7634,7 +8533,36 @@
               "height": 180,
               "byte_size": 79033
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/independent-lever-shoulder-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 69959,
+              "sha256": "44cb8734ddd237bda7bf535034f618ffd9f53d72d60fbf44ee0c398185b16ee9"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/independent-lever-shoulder-press-0590-2KGnL6M.gif",
+            "source_sha256": "520e1faa305a6ba59bab3c776f16f98aef11fa52d7fcb6dd75294568ff5d72d4",
+            "source_asset_id": "gymvisual:0590:2KGnL6M",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -7678,7 +8606,36 @@
               "height": 180,
               "byte_size": 115920
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/inverted-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 128872,
+              "sha256": "4bb9ddee5b93711acf0cb73ff214c7cd9822863d0446519e33ee425e36766d39"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/inverted-row-0499-bZGHsAZ.gif",
+            "source_sha256": "79fdab3501a07241aa33a2ac934a4b5e069cb955cce479389223ca6f66b9fca6",
+            "source_asset_id": "gymvisual:0499:bZGHsAZ",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8016,7 +8973,36 @@
               "height": 180,
               "byte_size": 80553
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/kettlebell-clean-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111716,
+              "sha256": "8d1d5303da2b8be7a7a8ad2126ddf7cb0423c9ec0a07c7c3f8cb0f36b6f7124c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/kettlebell-clean-0552-7Ba7bQ2.gif",
+            "source_sha256": "330d74116ec8359c03a5d79e776cf691bcd509c3141c6cd8c0301b396e6b85bd",
+            "source_asset_id": "gymvisual:0552:7Ba7bQ2",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8066,7 +9052,36 @@
               "height": 180,
               "byte_size": 87953
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/kettlebell-snatch-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 133407,
+              "sha256": "cf6133e2026e3ca222c7548142de54c1412ced016dd693eee23afe07cc58c6ef"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/kettlebell-snatch-0542-aXcUyKb.gif",
+            "source_sha256": "94a25ee330c603e6d8f01cc7047796d21abd31d57db2f7d8e4d73ce1aa2b8743",
+            "source_asset_id": "gymvisual:0542:aXcUyKb",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 18,
+            "source_animation_duration_ms": 4500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8110,7 +9125,36 @@
               "height": 180,
               "byte_size": 62828
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/kettlebell-swing-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 74842,
+              "sha256": "60b53859c126a4163d47eca3aca622cac1bd1aa203907f797a28a7fb0133d13b"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/kettlebell-swing-0549-UHJlbu3.gif",
+            "source_sha256": "a84dd0bca7f494f9806390e3e028f385c4a7dc5afd9852980c4f3e4f67936756",
+            "source_asset_id": "gymvisual:0549:UHJlbu3",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8154,7 +9198,36 @@
               "height": 180,
               "byte_size": 110115
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/l-sit-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 166843,
+              "sha256": "50f9a356fc15ceda2f2bb12df57b915bfada4b8588f2878c9aec4ce4dd2c1527"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/l-sit-3419-UpWmA5E.gif",
+            "source_sha256": "f7bbed651f6bf4ced6645f9cf6bd8e98f8a4c352fea1cb61cbe1d6ab671d0d0c",
+            "source_asset_id": "gymvisual:3419:UpWmA5E",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 7000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8645,7 +9718,36 @@
               "height": 180,
               "byte_size": 115136
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/leg-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 120473,
+              "sha256": "916ef18fe6b2ef614ae60ddd8f30a24902e2cf633d95af844414de5694369ce9"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/leg-press-0739-10Z2DXU.gif",
+            "source_sha256": "4e4afb16a87ff94ecebf835cd56358e3ac3bbdf66f5743f211651400137ddec3",
+            "source_asset_id": "gymvisual:0739:10Z2DXU",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8842,7 +9944,36 @@
               "height": 180,
               "byte_size": 92202
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/low-to-high-cable-fly-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 128749,
+              "sha256": "5cb2d6778803a26a45a0905c29e511a529dd6dc9073de90807bac0a89c0d2556"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/low-to-high-cable-fly-0179-FVmZVhk.gif",
+            "source_sha256": "c98d91cdf3205ed56d99372263fe8ad3de6b7117508a684f3a305528c0506301",
+            "source_asset_id": "gymvisual:0179:FVmZVhk",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -8886,7 +10017,36 @@
               "height": 180,
               "byte_size": 82763
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/lunge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 89334,
+              "sha256": "00ac9a8376f69f0e3a478d99ab596cbe9797e4bf973c531ceca6e67cb8484e25"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/lunge-0054-t8iSghb.gif",
+            "source_sha256": "c40681e37e8d9e64a24104223f3d73a73d8415f4bbf3f9bcfb0a098a663a8382",
+            "source_asset_id": "gymvisual:0054:t8iSghb",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -9077,7 +10237,36 @@
               "height": 180,
               "byte_size": 142830
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-biceps-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 112921,
+              "sha256": "3321b65a7e4efcd23268864411c45acb269e607ce85626cb495c47cd420c14ed"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-biceps-curl-0592-b6hQYMb.gif",
+            "source_sha256": "121b5c6398ce40fc6a2a375c62af100c3be69796cb2df2d89820426f8696e8df",
+            "source_asset_id": "gymvisual:0592:b6hQYMb",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -9194,7 +10383,36 @@
               "height": 180,
               "byte_size": 153641
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-decline-chest-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 130505,
+              "sha256": "8d72af8dce7657893f103c353c0366df6b894171491196f2ba55a86e049d9566"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-decline-chest-press-1300-vsVoPHt.gif",
+            "source_sha256": "e6a2bbc3d3624dc6949e3adc510af5ad755784514b219c8ed8abf8a6c7f158a3",
+            "source_asset_id": "gymvisual:1300:vsVoPHt",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -9238,7 +10456,36 @@
               "height": 180,
               "byte_size": 154186
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-dip-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 147925,
+              "sha256": "553c4bf0db079924aa378d332deb4073f9262f02f75fd81b78505d99c98a7761"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-dip-1451-BRImeP8.gif",
+            "source_sha256": "380c0d1764465796124c7bb5795d9de9957bdd0963295de7da91ee03d5b7ad79",
+            "source_asset_id": "gymvisual:1451:BRImeP8",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -9769,7 +11016,36 @@
               "height": 180,
               "byte_size": 140670
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-pullover-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 142619,
+              "sha256": "5a5912bd6ad635068fd67fab0a3f225bcc06f07b30ddfaa580df2c6613fd1c87"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-pullover-2285-4U7iLb5.gif",
+            "source_sha256": "6bc7680487df31aaac6db569a8af095a4512ebf45d2386d136e83621a85a2a36",
+            "source_asset_id": "gymvisual:2285:4U7iLb5",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -9813,7 +11089,36 @@
               "height": 180,
               "byte_size": 136785
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 151181,
+              "sha256": "1b3e76a246e91c2bbbf1c73fd9834046cc664c3a39128e47b46d51d8015b6438"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-row-1350-7I6LNUG.gif",
+            "source_sha256": "96000790878fe1238847466d0f3b81fbcaf6586e9555df38aad41727759c7cbd",
+            "source_asset_id": "gymvisual:1350:7I6LNUG",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10004,7 +11309,36 @@
               "height": 180,
               "byte_size": 81313
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/machine-shoulder-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 128802,
+              "sha256": "eacba6a8452adfca44875d5f93529db7b13e61a689793abfd52341f1f6795b8e"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/machine-shoulder-press-0603-67n3r98.gif",
+            "source_sha256": "aa5331f4e4dde2be73f1ef88cb1da0749840eb8e6cf6bd57416a4c6076f7e69c",
+            "source_asset_id": "gymvisual:0603:67n3r98",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10201,7 +11535,36 @@
               "height": 180,
               "byte_size": 65305
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/medicine-ball-slam-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 81098,
+              "sha256": "0969f4f0d1ce835b25e2c3876b902fee521b64cf81d83d200dc6e483e5ea1338"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/medicine-ball-slam-1354-oHg8eop.gif",
+            "source_sha256": "8d77a10735c30837fc17f7fa053468d354b0ebb7306fde21dbd8e587a0a45be6",
+            "source_asset_id": "gymvisual:1354:oHg8eop",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10245,7 +11608,36 @@
               "height": 180,
               "byte_size": 137047
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/mountain-climber-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 206703,
+              "sha256": "14478aa529841e52bac9d8eff9f0f8a39e4eed55be0f5c6cb83f9c5363f6b893"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/mountain-climber-0630-RJgzwny.gif",
+            "source_sha256": "99f2367ac41ca7c88b391cfffb02951a74093d16a13c8eacbe399153f111cf7f",
+            "source_asset_id": "gymvisual:0630:RJgzwny",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10289,7 +11681,36 @@
               "height": 180,
               "byte_size": 62014
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/muscle-ups-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 106372,
+              "sha256": "31d4bbcf072f94fe67612d65d618372da381806c512db8e668343f2c20bc3747"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/muscle-ups-1401-Af0EW2I.gif",
+            "source_sha256": "68c6e6e816487b8317ef2b483c0a8e5395909e1dd53dd4145250ce9ebf03e2ff",
+            "source_asset_id": "gymvisual:1401:Af0EW2I",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 18,
+            "source_animation_duration_ms": 4500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10339,7 +11760,36 @@
               "height": 180,
               "byte_size": 99645
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/nordic-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 115600,
+              "sha256": "ac8076303ba6185c91e2931044860023b9fba1e2598345d30d1a2d4cfedf0aa3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/nordic-curl-0696-E4PwJqI.gif",
+            "source_sha256": "80d7721c1e9019c13e0549a3b0816abb7ea8f2931cfabe887918b0c3572e0710",
+            "source_asset_id": "gymvisual:0696:E4PwJqI",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10383,7 +11833,36 @@
               "height": 180,
               "byte_size": 95696
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/one-arm-dumbbell-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 125914,
+              "sha256": "0463f55eb0727b7894891260182519210d48da3c09b8893846f4e7930fc46530"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/one-arm-dumbbell-row-0292-C0MA9bC.gif",
+            "source_sha256": "c53241038bc290424e72086a7fecf1c367ac53a42f4b5844a4b5314abe56dc44",
+            "source_asset_id": "gymvisual:0292:C0MA9bC",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10433,7 +11912,36 @@
               "height": 180,
               "byte_size": 67064
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/outdoor-run-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 96779,
+              "sha256": "c1f2d93eed61fb943b57772cb5a97a8a6ab92c6918edada14be763a06df0bb56"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/outdoor-run-0685-oLrKqDH.gif",
+            "source_sha256": "a67051b906f02e070d09418cd30a95ac7150244d87aee2a6a489f27b62d708c5",
+            "source_asset_id": "gymvisual:0685:oLrKqDH",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10483,7 +11991,36 @@
               "height": 180,
               "byte_size": 95708
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/overhead-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 80583,
+              "sha256": "41f4eab501faec05147622804d3d7dc5bc135846e249da1c5a1773782b44e067"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/overhead-press-0091-kTbSH9h.gif",
+            "source_sha256": "a3ed062a69d59ce8e6a79bef74f9d893140660fbf49cafafc82a10e17025885f",
+            "source_asset_id": "gymvisual:0091:kTbSH9h",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10527,7 +12064,36 @@
               "height": 180,
               "byte_size": 77031
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/overhead-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 130626,
+              "sha256": "daef491421c26f791430c03c7aeea91e7e1f816b9565015ad29678f70b1d3f26"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/overhead-squat-0069-gfk9kD4.gif",
+            "source_sha256": "eef351aaf4e51e100a13207f36b89685961b34f954d0c501f219adf4bd979dbc",
+            "source_asset_id": "gymvisual:0069:gfk9kD4",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10871,7 +12437,36 @@
               "height": 180,
               "byte_size": 113744
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/pendlay-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 151287,
+              "sha256": "406b1dac0e1b93a01e3e0d274880b6f79a6b3552df7918f0599982ccbc6411dc"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/pendlay-row-3017-r0z6xzQ.gif",
+            "source_sha256": "a9fc2b8e8615606a8f562440f2a1ee8b2e0acf24175f46790b0d5ea4b4b2e25e",
+            "source_asset_id": "gymvisual:3017:r0z6xzQ",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -10921,7 +12516,36 @@
               "height": 180,
               "byte_size": 84625
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/pistol-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 142083,
+              "sha256": "6d7d1380dac18ad846723edf5f301dfb324f3e8ec911e741076bcd9037560895"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/pistol-squat-1759-nqs5HGV.gif",
+            "source_sha256": "c3523be60f7c9c8bcd32caddb001a484ab08169d2a0430e3dc0b59a988da0524",
+            "source_asset_id": "gymvisual:1759:nqs5HGV",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -11112,7 +12736,36 @@
               "height": 180,
               "byte_size": 115136
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/plate-loaded-leg-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 120473,
+              "sha256": "916ef18fe6b2ef614ae60ddd8f30a24902e2cf633d95af844414de5694369ce9"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/plate-loaded-leg-press-0739-10Z2DXU.gif",
+            "source_sha256": "4e4afb16a87ff94ecebf835cd56358e3ac3bbdf66f5743f211651400137ddec3",
+            "source_asset_id": "gymvisual:0739:10Z2DXU",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -11603,7 +13256,36 @@
               "height": 180,
               "byte_size": 94746
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/rack-pull-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 70367,
+              "sha256": "db3d1559f7f36af5a101883356b33708d635e8f21121b65455c4effc523d6401"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/rack-pull-0074-za9Ni4z.gif",
+            "source_sha256": "45fdc387861a0baeebb62a07ae606e3d279ec2623059e21a874792eac6a60d30",
+            "source_asset_id": "gymvisual:0074:za9Ni4z",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -11647,7 +13329,36 @@
               "height": 180,
               "byte_size": 106350
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/rear-delt-fly-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 98229,
+              "sha256": "85a5659a146893b6b1363a8eaac9e8355cd69191a45fa7233972631d42415952"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/rear-delt-fly-2470-Ion0XWz.gif",
+            "source_sha256": "5d0b851e74e3618a74b0ff5970e810d51b64e8bf0330fa1690a1a1a94dc1f335",
+            "source_asset_id": "gymvisual:2470:Ion0XWz",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -11697,7 +13408,36 @@
               "height": 180,
               "byte_size": 121034
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/renegade-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 135333,
+              "sha256": "d450bd59f3334a9ceaa66a278fcc15d47af712b014147b24c24357ec8bc8e0c3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/renegade-row-0521-b9kqlBy.gif",
+            "source_sha256": "696065305068ad150271493b2e93086305ead54e0c84fdfed2b062baba14baf1",
+            "source_asset_id": "gymvisual:0521:b9kqlBy",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -11888,7 +13628,36 @@
               "height": 180,
               "byte_size": 97278
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/reverse-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 81506,
+              "sha256": "8906f5730d0d11eb470f1e5489c2533de98893e32c0d58a1f3d233ba2d2d6252"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/reverse-curl-0080-xNrS20v.gif",
+            "source_sha256": "fafedfec56f75b754b78d734c830723307acde320313495f8c4ce1a4fafd99fb",
+            "source_asset_id": "gymvisual:0080:xNrS20v",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -12226,7 +13995,36 @@
               "height": 180,
               "byte_size": 103315
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/reverse-lunge-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 128300,
+              "sha256": "b363b80fa3dfdfa1fd73765a903f5dc28ebb438ce69bdec6aa81f81c7a323236"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/reverse-lunge-0078-VaP75jl.gif",
+            "source_sha256": "aeea88e3a095dabf378415b9b8b9ac3835c7d2fd9c4cba2e6418954e808097e2",
+            "source_asset_id": "gymvisual:0078:VaP75jl",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -12417,7 +14215,36 @@
               "height": 180,
               "byte_size": 88713
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/romanian-deadlift-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 103845,
+              "sha256": "f976f2ff27b373f10d112e90a27439236771f94ce734793e4fc0d44ff1ffefea"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/romanian-deadlift-0085-wQ2c4XD.gif",
+            "source_sha256": "32d2f54834207624b965db5f4f5b875589d608990c3f85d3732062f30c3916b1",
+            "source_asset_id": "gymvisual:0085:wQ2c4XD",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -12461,7 +14288,36 @@
               "height": 180,
               "byte_size": 46144
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/rope-climb-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 58482,
+              "sha256": "331c19e9cd94e7fd7fb7f08288d3f67b8bef41d4b6ab466ac76470d515e3090c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/rope-climb-0680-yaAxcQr.gif",
+            "source_sha256": "4db63abbbcab3305804295553be154abd1e72604f84f4bbd12493f162dfda1db",
+            "source_asset_id": "gymvisual:0680:yaAxcQr",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -12739,7 +14595,36 @@
               "height": 180,
               "byte_size": 71384
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/scapular-pull-ups-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 88016,
+              "sha256": "1163f1dfa880dbce2d59856ed7f5ceef21de60fc55e3515bc1df1809aa1612a9"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/scapular-pull-ups-0688-uTBt1HV.gif",
+            "source_sha256": "c09f39d380d32d1f453b72ea01b4aea36cc21eb6749a87efc9d341b51758627e",
+            "source_asset_id": "gymvisual:0688:uTBt1HV",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -12783,7 +14668,36 @@
               "height": 180,
               "byte_size": 103011
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/seated-cable-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 130706,
+              "sha256": "f2dd084e12e0a3cef38b658220b14ed9fab4317f5b5cdc989a2cf08d405835e8"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/seated-cable-row-0861-fUBheHs.gif",
+            "source_sha256": "cfefafdfee2141a4a57968924acc6b2e8060e88f741f899aabea08c57c8ca11c",
+            "source_asset_id": "gymvisual:0861:fUBheHs",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13602,7 +15516,36 @@
               "height": 180,
               "byte_size": 70083
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/single-leg-calf-raise-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 103481,
+              "sha256": "dcda39f0c276453b31777636d336bf07cca042621560feb987e2202f9ea01c64"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/single-leg-calf-raise-1387-0jp9Rlz.gif",
+            "source_sha256": "04091319f7d2417fe4af9bbdb4802f4a0a5234713b76f315cf2fd7bc62b2d15d",
+            "source_asset_id": "gymvisual:1387:0jp9Rlz",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13652,7 +15595,36 @@
               "height": 180,
               "byte_size": 94080
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/single-leg-rdl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 103165,
+              "sha256": "5f7ef7ffd13d603bd0c4e0414ecae3c47d6637f0230562cd46a99eade197c95a"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/single-leg-rdl-1757-gKozT8X.gif",
+            "source_sha256": "73628e18227ca0d85f01ef4297586a91f00a9ceeea97026a4030102498594104",
+            "source_asset_id": "gymvisual:1757:gKozT8X",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13696,7 +15668,36 @@
               "height": 180,
               "byte_size": 99377
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/sissy-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 128671,
+              "sha256": "5fc4a7e7d5400290fd5cc0440157ec23af22118d62d66bafecdb5cb69336f8e3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/sissy-squat-1489-xdYPUtE.gif",
+            "source_sha256": "40ca6d31a3cd4b4c042a305094c538f6d2c47f9eeaa90cb5d83bd9f918dee3cb",
+            "source_asset_id": "gymvisual:1489:xdYPUtE",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13740,7 +15741,36 @@
               "height": 180,
               "byte_size": 122880
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/ski-erg-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 184474,
+              "sha256": "9dbca29a641a9fd61ed8f78b9e0e484af39b23c3cb4775c13c5467590a4d83d3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/ski-erg-2142-vpQaQkH.gif",
+            "source_sha256": "af0b90634d19426e33226dc22451f02c4e253e665c2058bc116e6543f99328fa",
+            "source_asset_id": "gymvisual:2142:vpQaQkH",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 18,
+            "source_animation_duration_ms": 4500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13784,7 +15814,36 @@
               "height": 180,
               "byte_size": 102203
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/skull-crusher-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 104914,
+              "sha256": "3f28d54db99a66019f894f1ef7b88f2920bc7995326585ca878460bdbba7d68a"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/skull-crusher-1748-6CKUx7o.gif",
+            "source_sha256": "e1350d08d63dd4a4fd24b37e4d2dbecd0732acdbf8454da67a8239fc1d1dd9df",
+            "source_asset_id": "gymvisual:1748:6CKUx7o",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -13840,7 +15899,36 @@
               "height": 180,
               "byte_size": 110639
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/smith-bench-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 95727,
+              "sha256": "3a5fdce392149b8fd952afdcfa152f24252a6b3f6237ae35a946e65db1fba2c3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/smith-bench-press-0748-trqKQv2.gif",
+            "source_sha256": "2b8ce557bd1d27fea19e286672d2ea1f5f887b13c36fd8cfd5be4ee33a8fe1a3",
+            "source_asset_id": "gymvisual:0748:trqKQv2",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14031,7 +16119,36 @@
               "height": 180,
               "byte_size": 129281
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/smith-split-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 114980,
+              "sha256": "0e3fa13e5ad83206af5bc74939593585dca039fbba1c1dffb466eeb865f68b4f"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/smith-split-squat-0768-wWFspEi.gif",
+            "source_sha256": "ec9e1d3c0014fa12ae947210172d3ed259518da20e87ef9b3b69a62b02f97b68",
+            "source_asset_id": "gymvisual:0768:wWFspEi",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14075,7 +16192,36 @@
               "height": 180,
               "byte_size": 108073
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/smith-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 122357,
+              "sha256": "83eb7af38d0c43c6e70dbbc90b0daff1273fd1b71febb0c5edf128071fd5767c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/smith-squat-0770-jFtipLl.gif",
+            "source_sha256": "851ef579e05633cb8240c90d87800cd3fbdb5e3f27c9736ef88143c737635c02",
+            "source_asset_id": "gymvisual:0770:jFtipLl",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14119,7 +16265,36 @@
               "height": 180,
               "byte_size": 117386
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/spider-curl-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 105942,
+              "sha256": "b21f31d05ae3cd35ba638603e77c4c567dba97dd0521f5df2ab312d4b962da89"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/spider-curl-0454-Ye5Qxb0.gif",
+            "source_sha256": "e6c41a76dc2635e7d6617872a371513137b3b73e972f3a2d89d7ed040fdf060e",
+            "source_asset_id": "gymvisual:0454:Ye5Qxb0",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14163,7 +16338,36 @@
               "height": 180,
               "byte_size": 79451
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/split-squat-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 105111,
+              "sha256": "d125668a77da497bd8820b99455f917cb520f4d597f4bae53425106687edbc85"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/split-squat-2368-9E25EOx.gif",
+            "source_sha256": "86fa4061b352353773ed46f59cbb84216ca7eb833459d4eb5aba95def83ad67d",
+            "source_asset_id": "gymvisual:2368:9E25EOx",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14354,7 +16558,36 @@
               "height": 180,
               "byte_size": 91245
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/stair-climber-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 140193,
+              "sha256": "9604573b9de48d44a1038bc63b042d3b9ae8011df8eb9e58186077fd7f9be9d2"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/stair-climber-2311-j9Q5crt.gif",
+            "source_sha256": "ba7b42c2d10f4cc452d81219ee2911d1daed6b8240b4b91442be1827720cdbbc",
+            "source_asset_id": "gymvisual:2311:j9Q5crt",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -14698,7 +16931,36 @@
               "height": 180,
               "byte_size": 53966
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/step-up-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 54063,
+              "sha256": "c698e98438e78a9cd1de99a1147f84b2c8fcb3174fec0214b2b788896961d0a3"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/step-up-0431-aXtJhlg.gif",
+            "source_sha256": "a1b6f1c3c11db9513a59a49954f66b7ef9cbb4999f5da4e74c8e074a5402587a",
+            "source_asset_id": "gymvisual:0431:aXtJhlg",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15042,7 +17304,36 @@
               "height": 180,
               "byte_size": 97900
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/sumo-deadlift-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 111037,
+              "sha256": "6408204e56fab000cda8a5ff59856767cf1dc14d4260cb7bfb79f8b43cfc2eda"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/sumo-deadlift-0117-KgI0tqW.gif",
+            "source_sha256": "6b2e13bbfee69a799a934c807e301f202e299f69936260b3a6fab69602edc8ba",
+            "source_asset_id": "gymvisual:0117:KgI0tqW",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15239,7 +17530,36 @@
               "height": 180,
               "byte_size": 96776
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/thruster-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 133057,
+              "sha256": "e0cd46f46e846e8d93528f75b0bd9fa984e35521a0e107776ff1a7e4b57d772a"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/thruster-3305-f7Y9eDZ.gif",
+            "source_sha256": "b4bacf1437684442b6957b522312d5c33393e5b6a5d400536c23099828d37869",
+            "source_asset_id": "gymvisual:3305:f7Y9eDZ",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 18,
+            "source_animation_duration_ms": 4500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15283,7 +17603,36 @@
               "height": 180,
               "byte_size": 94940
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/trap-bar-deadlift-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 127860,
+              "sha256": "f2963f38e77bd46f7836370de484d8b3cd914b0039144eabd023c0b52bfbe216"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/trap-bar-deadlift-0811-jQGwmxN.gif",
+            "source_sha256": "a0815bf0787c1cc1f2039d3ecb7f8d85b00640edb49c2f403a9631808391ebfe",
+            "source_asset_id": "gymvisual:0811:jQGwmxN",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15327,7 +17676,36 @@
               "height": 180,
               "byte_size": 82683
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/treadmill-run-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 117791,
+              "sha256": "1fa8beeda8eb0e893537aa0d8ec3e14bf389de072775fb3641579df9311056ff"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/treadmill-run-0684-y5p0H8a.gif",
+            "source_sha256": "ccbc4a9339b51a3cab6b599e7852152945786944ca0d2f7305bd9648a30e8d38",
+            "source_asset_id": "gymvisual:0684:y5p0H8a",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15371,7 +17749,36 @@
               "height": 180,
               "byte_size": 199540
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/treadmill-walk-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 291202,
+              "sha256": "3c5a55474e44d4e7bacb4c27cbd3cc038c708abc97c761a83633bc08be79eead"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/treadmill-walk-3666-rjiM4L3.gif",
+            "source_sha256": "e57e8ade4fff7ad586f0de6dea582a776838e76069923f8bd31ad206b4d33f90",
+            "source_asset_id": "gymvisual:3666:rjiM4L3",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 24,
+            "source_animation_duration_ms": 5000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15415,7 +17822,36 @@
               "height": 180,
               "byte_size": 107261
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/triceps-kickback-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 97383,
+              "sha256": "42a480994d88af5633acd1a0d9273700ba13d460979457ec6a68cc404261df35"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/triceps-kickback-0333-W6PxUkg.gif",
+            "source_sha256": "036388728fe5a65c6b8a94e59b7e5e39721800f20295dd59d4b465e4ec4155d4",
+            "source_asset_id": "gymvisual:0333:W6PxUkg",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15459,7 +17895,36 @@
               "height": 180,
               "byte_size": 232578
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/turkish-get-up-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 420735,
+              "sha256": "99b96cb0f777913446daeb0be0905281628a24871d26c8bffbf200d25ead630c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/turkish-get-up-0551-Ha7SZ3y.gif",
+            "source_sha256": "e5f108c9419323ee91b34f8beea655350e11620ec79c0a6ed09a06e5418e27be",
+            "source_asset_id": "gymvisual:0551:Ha7SZ3y",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 54,
+            "source_animation_duration_ms": 9500,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15503,7 +17968,36 @@
               "height": 180,
               "byte_size": 129614
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/unilateral-leg-press-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 150054,
+              "sha256": "63759225c0a2a58908539d2e334fd7a0ddceed0fdfe01e3689c1551ea3ad87ce"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/unilateral-leg-press-2611-9KU9TYF.gif",
+            "source_sha256": "32c3d5515f6ae9775ac74fb2cb78d5d6351ca68ca512d235dc7a471ec7034372",
+            "source_asset_id": "gymvisual:2611:9KU9TYF",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15547,7 +18041,36 @@
               "height": 180,
               "byte_size": 78778
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/upright-row-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 64477,
+              "sha256": "0018613ba7ddd19f80e4e7a5c5cd5379292878d9b49cf11b52871ed984540268"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/upright-row-0120-UDlhcO8.gif",
+            "source_sha256": "79f8c5ce28903e1dae01114d93c7b0b68f0ef1ae166532f569691907f2b9734d",
+            "source_asset_id": "gymvisual:0120:UDlhcO8",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15682,7 +18205,36 @@
               "height": 180,
               "byte_size": 69957
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/weighted-dip-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 79697,
+              "sha256": "0b6f4ff797fc98aec5d716de253d37ec40660b60f7199ff3369038c82236ef5e"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/weighted-dip-3313-Ff18ItA.gif",
+            "source_sha256": "86df305a7353799201a6c350b4d98429afdd9d26043a5146b20bad71d5c2eab5",
+            "source_asset_id": "gymvisual:3313:Ff18ItA",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15913,7 +18465,36 @@
               "height": 180,
               "byte_size": 85870
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/wrist-roller-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 81197,
+              "sha256": "551f6dae12f8136699632d5853223e986d03229d476cda115d743c630e4f0f76"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/wrist-roller-0859-bd5b860.gif",
+            "source_sha256": "490b4b54de770ed9fafcac8be22effced0f834d8d553a1df1696a402654fa80b",
+            "source_asset_id": "gymvisual:0859:bd5b860",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     },
@@ -15957,7 +18538,36 @@
               "height": 180,
               "byte_size": 93719
             }
-          ]
+          ],
+          "video_sources": [
+            {
+              "path": "gymvisual/ai-reviewed/y-raise-x4plus-720.mp4",
+              "mime_type": "video/mp4",
+              "width": 720,
+              "height": 720,
+              "byte_size": 94773,
+              "sha256": "f181005698322449a783c28e9c9d65d3a06ae2692fa38182557fda084dc61b6c"
+            }
+          ],
+          "video_provenance": {
+            "source_kind": "ai_upscaled_gymvisual",
+            "source_name": "GymVisual",
+            "source_path": "gymvisual/y-raise-3541-PbzNu7c.gif",
+            "source_sha256": "fd44935a29041be79a5b4a076ca453d4e9bf53cd9899dca3bea25d9e24dfb717",
+            "source_asset_id": "gymvisual:3541:PbzNu7c",
+            "source_dimensions": {
+              "width": 180,
+              "height": 180
+            },
+            "source_animation_frames": 12,
+            "source_animation_duration_ms": 3000,
+            "model": "RealESRGAN_x4plus",
+            "scale": 4,
+            "native_hd": false,
+            "owner_visual_approval": "2026-10-18 #986 owner bulk approval; per-movement QA post-release",
+            "transformation": "RealESRGAN-x4plus-720x720-H264",
+            "rights_basis": "owner_confirmed_GymVisual_usage_and_derivatives"
+          }
         }
       ]
     }
@@ -15977,6 +18587,6 @@
   "poster_variant_count": 462,
   "hd_baseline_asset_count": 334,
   "hd_baseline_total_bytes": 18352704,
-  "ai_upscaled_video_count": 4,
-  "ai_upscaled_video_total_bytes": 614973
+  "ai_upscaled_video_count": 94,
+  "ai_upscaled_video_total_bytes": 11378251
 }
