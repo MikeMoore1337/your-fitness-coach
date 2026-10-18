@@ -82,10 +82,12 @@ function renderList(mode: 'full' | 'summary' = 'full') {
 describe('TemplatesList editing', () => {
   let activeProgram = true;
   let deleteResponse: (() => Promise<Response>) | null = null;
+  let previewDetailChanged = false;
 
   beforeEach(() => {
     activeProgram = true;
     deleteResponse = null;
+    previewDetailChanged = false;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const path = String(input);
       const method = init?.method?.toUpperCase() ?? 'GET';
@@ -122,6 +124,18 @@ describe('TemplatesList editing', () => {
               assigned_program_id: 42,
             },
           ]),
+          { status: 200 },
+        );
+      }
+      if (path === '/api/v1/programs/templates/10' && method === 'GET') {
+        return new Response(
+          JSON.stringify({
+            ...templateBase,
+            id: 10,
+            title: previewDetailChanged ? 'Готовый шаблон обновлён' : 'Готовый шаблон',
+            is_example: true,
+            can_edit: false,
+          }),
           { status: 200 },
         );
       }
@@ -197,6 +211,28 @@ describe('TemplatesList editing', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Настроить копию' }));
 
     expect(screen.getByText('copy:Готовый шаблон')).toBeInTheDocument();
+  });
+
+  it('keeps a stale preview out of the assignment flow', async () => {
+    renderList();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Посмотреть шаблон «Готовый шаблон»' }),
+    );
+    previewDetailChanged = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Настроить расписание и запустить' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Готовый шаблон обновлён' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText('Данные обновились. Проверьте сведения выше и повторите назначение.'),
+    ).toBeInTheDocument();
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.some(([input]) => String(input).includes('/assign-to-me')),
+    ).toBe(false);
   });
 
   it('updates an owned template directly', async () => {
@@ -414,8 +450,7 @@ describe('TemplatesList editing', () => {
     );
     expect(screen.getByRole('dialog', { name: /Фуллбади по правилам/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Настроить расписание и запустить' }));
-    expect(screen.getByRole('dialog', { name: /Фуллбади по правилам/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Назначить по расписанию' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Назначить по расписанию' }));
     expect(
       await screen.findByRole('dialog', { name: 'Заменить активную программу?' }),
     ).toBeInTheDocument();

@@ -62,6 +62,17 @@ function defaultWeekdays(template: ProgramTemplate, startDate: string): number[]
   return template.days.map((_, index) => (firstWeekday + index) % 7);
 }
 
+function weeksLabel(value: number): string {
+  const remainder = value % 10;
+  const suffix =
+    remainder === 1 && value % 100 !== 11
+      ? 'неделя'
+      : remainder >= 2 && remainder <= 4 && (value % 100 < 10 || value % 100 >= 20)
+        ? 'недели'
+        : 'недель';
+  return `${value} ${suffix}`;
+}
+
 function programMeta(item: ProgramTemplate) {
   const remainder = item.days.length % 10;
   const suffix =
@@ -73,7 +84,7 @@ function programMeta(item: ProgramTemplate) {
         ? 'тренировки'
         : 'тренировок';
   const duration =
-    item.default_duration_weeks > 1 ? ` · ${item.default_duration_weeks} недель` : '';
+    item.default_duration_weeks > 1 ? ` · ${weeksLabel(item.default_duration_weeks)}` : '';
   return `${goalLabels[item.goal] ?? 'Цель не указана'} · ${levelLabels[item.level] ?? 'Уровень не указан'} · ${item.days.length} ${suffix} в цикле${duration}`;
 }
 
@@ -82,6 +93,19 @@ function programKind(item: ProgramTemplate, currentUserId?: number): string {
   if (item.is_example) return 'Готовый шаблон';
   if (item.owner_user_id === currentUserId || item.can_edit) return 'Моя программа';
   return 'Шаблон';
+}
+
+function previewOwnership(item: ProgramTemplate, currentUserId?: number): string {
+  if (item.assigned_by_user_id && item.assigned_by_user_id !== currentUserId) {
+    return `Назначил тренер${item.assigned_by_full_name ? ` ${item.assigned_by_full_name}` : ''}. Изменения доступны только по разрешённым правам.`;
+  }
+  if (item.owner_user_id === currentUserId) {
+    return 'Владелец: вы. Вы можете редактировать свою программу.';
+  }
+  if (item.owner_full_name) return `Владелец: ${item.owner_full_name}.`;
+  return item.can_edit
+    ? 'Вы можете редактировать свою программу.'
+    : 'Изменения исходного шаблона недоступны. Можно создать личную копию.';
 }
 
 export function TemplatesList({
@@ -346,7 +370,9 @@ export function TemplatesList({
         type="button"
         className="text-button program-template-card__main"
         aria-label={`Посмотреть ${item.is_example ? 'шаблон' : 'программу'} «${item.title}»`}
-        onClick={() => {
+        onClick={(event) => {
+          // WebKit does not focus mouse-clicked buttons consistently; keep the preview opener for Escape return.
+          event.currentTarget.focus();
           setPreviewStale(false);
           setSelectedExample(item);
         }}
@@ -474,7 +500,8 @@ export function TemplatesList({
                   <button
                     type="button"
                     className="secondary"
-                    onClick={() => {
+                    onClick={(event) => {
+                      event.currentTarget.focus();
                       setPreviewStale(false);
                       setSelectedExample(activeTemplate);
                     }}
@@ -713,12 +740,7 @@ export function TemplatesList({
                 ))}
               </dl>
               <p className="program-example-modal__owner">
-                {selectedExample.assigned_by_user_id &&
-                selectedExample.assigned_by_user_id !== user?.id
-                  ? `Назначил тренер${selectedExample.assigned_by_full_name ? ` ${selectedExample.assigned_by_full_name}` : ''}. Изменения доступны только по разрешённым правам.`
-                  : selectedExample.can_edit
-                    ? 'Вы можете редактировать свою программу.'
-                    : 'Изменения исходного шаблона недоступны. Можно создать личную копию.'}
+                {previewOwnership(selectedExample, user?.id)}
               </p>
               {selectedExample.assigned_program_revision_number != null && (
                 <p className="program-example-modal__owner">
@@ -732,53 +754,60 @@ export function TemplatesList({
                 Все дни из исходного шаблона. Первый день раскрыт для примера.
               </p>
               <div className="program-example-days">
-                {selectedExample.days.map((day, dayIndex) => (
-                  <details className="program-example-day" key={day.id} open={dayIndex === 0}>
-                    <summary className="yfc-disclosure-summary">
-                      <span>
-                        <strong>
-                          День {day.day_number}. {day.title}
-                        </strong>
-                        <span className="muted"> · {day.exercises.length} упражнений</span>
-                      </span>
-                      <DisclosureIcon />
-                    </summary>
-                    <h3 className="sr-only">
-                      День {day.day_number}. {day.title}
-                    </h3>
-                    <ol>
-                      {day.exercises.map((exercise) => (
-                        <li key={exercise.id}>
-                          <strong>{exercise.exercise_title}</strong>
-                          <span>
-                            {exercise.metric_type === 'cardio'
-                              ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
-                              : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
-                          </span>
-                          {exercise.superset_group && (
-                            <small>
-                              Суперсет {exercise.superset_group} · упражнение{' '}
-                              {exercise.superset_order} из 2
-                            </small>
-                          )}
-                          {exercise.notes && <small>{exercise.notes}</small>}
-                          <button
-                            type="button"
-                            className="text-button"
-                            onClick={() =>
-                              setGuide({
-                                id: exercise.exercise_id,
-                                title: exercise.exercise_title,
-                              })
-                            }
-                          >
-                            {exercise.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                ))}
+                {selectedExample.days.map((day, dayIndex) => {
+                  return (
+                    <details className="program-example-day" key={day.id} open={dayIndex === 0}>
+                      <summary className="yfc-disclosure-summary">
+                        <span>
+                          <strong>
+                            День {day.day_number}. {day.title}
+                          </strong>
+                          <span className="muted"> · {day.exercises.length} упражнений</span>
+                        </span>
+                        <DisclosureIcon />
+                      </summary>
+                      <h3 className="sr-only">
+                        День {day.day_number}. {day.title}
+                      </h3>
+                      <ol>
+                        {day.exercises.map((exercise) => {
+                          const isCardio = exercise.metric_type === 'cardio';
+                          return (
+                            <li key={exercise.id}>
+                              <strong>{exercise.exercise_title}</strong>
+                              <span>
+                                {isCardio
+                                  ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
+                                  : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
+                              </span>
+                              {exercise.superset_group && (
+                                <small>
+                                  Суперсет {exercise.superset_group} · упражнение{' '}
+                                  {exercise.superset_order} из 2
+                                </small>
+                              )}
+                              {exercise.notes && <small>{exercise.notes}</small>}
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() =>
+                                  setGuide({
+                                    id: exercise.exercise_id,
+                                    title: exercise.exercise_title,
+                                  })
+                                }
+                              >
+                                {exercise.has_guide
+                                  ? 'Техника и детали'
+                                  : 'Подробнее об упражнении'}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </details>
+                  );
+                })}
               </div>
             </section>
             <p className="program-preview-source">

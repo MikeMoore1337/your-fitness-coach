@@ -87,7 +87,24 @@ describe('program preview factual mapping', () => {
     const facts = programPreviewFacts(value);
     expect(facts.find((fact) => fact.label === 'Частота')?.value).toBe('3 в неделю');
     expect(facts.find((fact) => fact.label === 'Оборудование')?.value).toBe('Гантели · Скамья');
-    expect(facts.find((fact) => fact.label === 'Недель в источнике')?.value).toBe('12');
+    expect(facts.find((fact) => fact.label === 'Недель в источнике')?.value).toBe('12 недель');
+  });
+
+  it('uses explicit assignment schedule and duration, with metadata as a level fallback', () => {
+    const facts = programPreviewFacts(
+      template({
+        level: 'legacy',
+        program_metadata: { level: 'advanced' },
+        assigned_program_duration_weeks: 4,
+        assigned_program_schedule_weekdays: [0, 2, 4],
+      }),
+    );
+    expect(facts.find((fact) => fact.label === 'Частота')).toMatchObject({
+      value: '3 в неделю',
+      source: 'Расписание назначения',
+    });
+    expect(facts.find((fact) => fact.label === 'Уровень')?.value).toBe('Продвинутый');
+    expect(facts.find((fact) => fact.label === 'Срок назначения')?.value).toBe('4 недели');
   });
 
   it('detects changed content and revision before assignment', () => {
