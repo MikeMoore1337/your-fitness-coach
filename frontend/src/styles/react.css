@@ -5726,7 +5726,7 @@ button.today-text-link {
   text-transform: uppercase;
 }
 .active-workout-rest__time strong {
-  font: 700 1.5rem/1 var(--font-body);
+  font: 700 var(--rest-clock-font-size, 1.5rem)/1 var(--font-body);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -5786,13 +5786,21 @@ button.today-text-link {
 
 /* #960 - additive elapsed counter in the existing RestTimer top row. */
 .active-workout-rest:has(.active-workout-rest__actual) {
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 108px);
+  /* Both clocks keep one type scale. The middle label yields to real time values. */
+  --rest-clock-font-size: 1.5rem;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 8px;
+}
+.active-workout-rest:has(.active-workout-rest__actual) .active-workout-rest__next span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .active-workout-rest__actual {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--touch-target, 44px);
+  grid-template-columns: max-content var(--touch-target, 44px);
   align-items: center;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
 }
 .active-workout-rest__actual-value {
@@ -5804,12 +5812,11 @@ button.today-text-link {
   color: var(--v2-text-primary);
   font-size: 0.65rem;
   font-weight: 800;
+  text-transform: uppercase;
 }
 .active-workout-rest__actual-value strong {
-  overflow: hidden;
-  font: 700 0.96rem/1 var(--font-body);
+  font: 700 var(--rest-clock-font-size, 1.5rem)/1 var(--font-body);
   font-variant-numeric: tabular-nums;
-  text-overflow: clip;
   white-space: nowrap;
 }
 .active-workout-rest__stop {
@@ -5833,6 +5840,15 @@ button.today-text-link {
 }
 .active-workout-rest:has(.active-workout-rest__actual) .active-workout-rest__actions {
   grid-column: 1 / -1;
+}
+@media (max-width: 360px) {
+  .active-workout-rest:has(.active-workout-rest__actual) {
+    --rest-clock-font-size: 1.25rem;
+    column-gap: 6px;
+  }
+  .active-workout-rest__actual {
+    gap: 4px;
+  }
 }
 
 /* #960 Variant C: one inline recovery panel, using existing YFC tokens. */
