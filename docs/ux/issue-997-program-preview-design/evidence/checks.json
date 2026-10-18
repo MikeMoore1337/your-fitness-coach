@@ -1837,6 +1837,253 @@
       }
     }
   ],
+  "contrast": {
+    "standard": "WCAG 2.2 AA normal text",
+    "threshold": 4.5,
+    "pass": true,
+    "checks": [
+      {
+        "state": "light-default",
+        "name": "close",
+        "selector": "#closePreview",
+        "label": "Закрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(255, 255, 255)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-default",
+        "name": "theme",
+        "selector": "#themeToggle",
+        "label": "Тёмная тема",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(255, 255, 255)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-default",
+        "name": "day-0",
+        "selector": ".day-toggle:nth-of-type(1) .day-toggle__state",
+        "label": "Скрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-default",
+        "name": "day-1",
+        "selector": ".day-toggle:nth-of-type(2) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-default",
+        "name": "day-2",
+        "selector": ".day-toggle:nth-of-type(3) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-default",
+        "name": "day-3",
+        "selector": ".day-toggle:nth-of-type(4) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(255, 255, 255)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.54,
+        "pass": true
+      },
+      {
+        "state": "light-close-hover",
+        "name": "close",
+        "selector": "#closePreview",
+        "label": "Закрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(254, 254, 254)",
+        "effectiveBackgroundColor": "rgb(254, 254, 254)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.39,
+        "pass": true
+      },
+      {
+        "state": "light-close-focus",
+        "name": "close",
+        "selector": "#closePreview",
+        "label": "Закрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(252, 252, 251)",
+        "effectiveBackgroundColor": "rgb(252, 252, 251)",
+        "outlineColor": "rgb(178, 245, 32)",
+        "contrastRatio": 17.08,
+        "pass": true
+      },
+      {
+        "state": "light-day-0-hover",
+        "name": "day-0",
+        "selector": ".day-toggle:nth-of-type(1) .day-toggle__state",
+        "label": "Скрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(254, 254, 254)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.39,
+        "pass": true
+      },
+      {
+        "state": "light-day-0-focus",
+        "name": "day-0",
+        "selector": ".day-toggle:nth-of-type(1) .day-toggle__state",
+        "label": "Скрыть",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(252, 252, 251)",
+        "outlineColor": "rgb(178, 245, 32)",
+        "contrastRatio": 17.09,
+        "pass": true
+      },
+      {
+        "state": "light-day-1-hover",
+        "name": "day-1",
+        "selector": ".day-toggle:nth-of-type(2) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(254, 254, 254)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.39,
+        "pass": true
+      },
+      {
+        "state": "light-day-1-focus",
+        "name": "day-1",
+        "selector": ".day-toggle:nth-of-type(2) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(252, 252, 251)",
+        "outlineColor": "rgb(178, 245, 32)",
+        "contrastRatio": 17.09,
+        "pass": true
+      },
+      {
+        "state": "light-theme-hover",
+        "name": "theme",
+        "selector": "#themeToggle",
+        "label": "Тёмная тема",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(254, 254, 254)",
+        "effectiveBackgroundColor": "rgb(254, 254, 254)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.39,
+        "pass": true
+      },
+      {
+        "state": "light-theme-focus",
+        "name": "theme",
+        "selector": "#themeToggle",
+        "label": "Тёмная тема",
+        "computedColor": "rgb(23, 26, 24)",
+        "computedBackgroundColor": "rgb(252, 252, 251)",
+        "effectiveBackgroundColor": "rgb(252, 252, 251)",
+        "outlineColor": "rgb(23, 26, 24)",
+        "contrastRatio": 17.08,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "close",
+        "selector": "#closePreview",
+        "label": "Закрыть",
+        "computedColor": "rgb(242, 244, 239)",
+        "computedBackgroundColor": "rgb(29, 34, 32)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 14.56,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "theme",
+        "selector": "#themeToggle",
+        "label": "Светлая тема",
+        "computedColor": "rgb(242, 244, 239)",
+        "computedBackgroundColor": "rgb(29, 34, 32)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 14.56,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "day-0",
+        "selector": ".day-toggle:nth-of-type(1) .day-toggle__state",
+        "label": "Скрыть",
+        "computedColor": "rgb(178, 245, 32)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 12.27,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "day-1",
+        "selector": ".day-toggle:nth-of-type(2) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(178, 245, 32)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 12.27,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "day-2",
+        "selector": ".day-toggle:nth-of-type(3) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(178, 245, 32)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 12.27,
+        "pass": true
+      },
+      {
+        "state": "dark-default",
+        "name": "day-3",
+        "selector": ".day-toggle:nth-of-type(4) .day-toggle__state",
+        "label": "Показать",
+        "computedColor": "rgb(178, 245, 32)",
+        "computedBackgroundColor": "rgba(0, 0, 0, 0)",
+        "effectiveBackgroundColor": "rgb(29, 34, 32)",
+        "outlineColor": "rgb(242, 244, 239)",
+        "contrastRatio": 12.27,
+        "pass": true
+      }
+    ]
+  },
   "keyboard": {
     "closeFocused": true,
     "afterCloseTab": "day-toggle",
@@ -1966,5 +2213,5 @@
     "125% — диагностическое увеличение текста через CSS, не системная настройка доступности ОС.",
     "Все значения фикстур синтетические; API-запросы не отправляются."
   ],
-  "generatedAt": "2026-10-17T23:14:55.590Z"
+  "generatedAt": "2026-10-18T05:40:31.866Z"
 }

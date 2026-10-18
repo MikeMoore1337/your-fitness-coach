@@ -206,6 +206,20 @@
       .theme-toggle {
         white-space: nowrap;
       }
+      body[data-theme='light'] .close-button,
+      body[data-theme='light'] .theme-toggle,
+      body[data-theme='light'] .button-secondary {
+        border-color: var(--border);
+        background: var(--surface-raised);
+        color: var(--text);
+      }
+      body[data-theme='light'] .close-button:hover:not(:disabled),
+      body[data-theme='light'] .theme-toggle:hover:not(:disabled),
+      body[data-theme='light'] .button-secondary:hover:not(:disabled) {
+        border-color: var(--border-strong);
+        background: var(--surface-muted);
+        color: var(--text);
+      }
       .app-view {
         display: grid;
         grid-template-columns: minmax(240px, 0.84fr) minmax(340px, 1.16fr);
@@ -488,6 +502,13 @@
         color: var(--accent);
         font-size: 12px;
         font-weight: 800;
+      }
+      body[data-theme='light'] .day-toggle__state {
+        color: var(--text);
+        text-decoration: underline;
+        text-decoration-color: var(--accent);
+        text-decoration-thickness: 2px;
+        text-underline-offset: 3px;
       }
       .exercise-list {
         display: grid;
