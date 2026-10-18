@@ -39,7 +39,13 @@ Windows runner принимает только архивы, перечисле�
 Manifest содержит имя, размер и SHA-256 архива, UTC timestamps, PostgreSQL major, Alembic
 revision, coverage persistent state и application identity. Если release SHA или image
 digests не переданы доверенным окружением, identity получает статус `not_provided`; это не
-становится доказательством конкретной версии приложения.
+становится доказательством конкретной версии приложения. Index entry повторяет также
+`published_at_utc`, чтобы проверка не теряла второй timestamp при передаче.
+
+Для всех timestamp применяется UTC и фиксированная tolerance clock skew в 5 минут. Значение
+дальше текущего времени более чем на 5 минут считается повреждённой metadata; timestamp в
+пределах tolerance не превращает отрицательный возраст в `HEALTHY` — такой архив остаётся
+`STALE` до наступления его времени.
 
 `verification_status=format_verified_pg_restore_list` означает только читаемый custom-format
 архив. `restore_status=not_run` остаётся до Phase C. `pg_restore --list` не является
@@ -75,10 +81,17 @@ digests не переданы доверенным окружением, identit
 
 Runner:
 
-- скачивает во временный `.incoming`, проверяет manifest, размер и SHA-256;
+- после успешного lock создаёт собственный временный `.incoming-<GUID>`, проверяет manifest,
+  размер и SHA-256; другой процесс не создаёт, не очищает и не изменяет эту папку;
+- при отказе в lock не пишет общий status/log и не выполняет cleanup; аварийно оставшийся
+  temporary directory не является основанием удалять ранее подтверждённые копии;
 - не перезаписывает существующую копию с другим digest;
 - публикует архив, затем manifest; при ошибке удаляет только незавершённый новый archive;
 - держит Windows file lock, поэтому параллельный Pull получает `LOCKED`;
+- разделяет в status локальное состояние verified backups, `freshness_state`, последнюю
+  попытку SSH pull, `last_sync_result` и время последнего получения новой независимой копии;
+- сохраняет последнюю ошибку передачи в sanitized status и failure sidecar; сетевой сбой не
+  превращает существующую валидную копию в `CORRUPTED`, но и не скрывается под `HEALTHY`;
 - пишет только sanitized status/log: UTC, код и безопасное имя архива;
 - считает локальный snapshot по фактическим файлам, а не по одному status-файлу;
 - хранит минимум `minimum_valid_backups` валидных копий и не удаляет последнюю валидную;
@@ -113,17 +126,34 @@ pwsh -NoProfile -File scripts/windows_backup_pull_selftest.ps1
 
 Проверяются: успешный Pull, повторная идемпотентность, checksum mismatch с сохранением
 валидной копии, восстановление orphan archive после сбоя между rename, отсутствующий manifest,
-отказ pinned host key, stale status и блокировка до owner approval шифрования. Python-тесты
-дополнительно проверяют schema/manifest, duplicate
-index, повторную верификацию архива публикатором и отказ от ротации при повреждённой старой
-записи. Отдельно проверяются authentication failure, network timeout, low-disk margin,
-concurrent lock и malformed config.
+отказ pinned host key, stale status и блокировка до owner approval шифрования. Отдельная
+concurrency regression удерживает первый Pull на незавершённом temporary download, запускает
+второй Pull с `LOCKED`, сверяет неизменность temporary/status файлов и затем проверяет
+успешное продолжение первого Pull. Дополнительно проверяются failed pull при свежей и stale
+копии, восстановление после сбоя, отсутствие копий, повреждённая локальная копия и отказ
+записи status. Python-тесты проверяют schema/manifest, fixed-time future timestamps,
+`published_at_utc` в index, duplicate/path-safe index entries, повторную верификацию архива
+публикатором и отказ от ротации при повреждённой старой записи. Отдельно проверяются
+authentication failure, network timeout, low-disk margin, concurrent lock и malformed config.
 
 Синтетический прогон не доказывает физический BitLocker/file encryption, реальную SFTP
 аутентификацию, сетевой timeout, заполнение диска, VPS filesystem permissions, Task Scheduler,
-production credentials, clean-host restore или production smoke.
+production credentials, clean-host restore или production smoke. `encryption_at_rest.approved`
+является только конфигурационным gate и никогда не заменяет проверку BitLocker/file encryption
+и recovery key на физическом Windows-ПК. Проверка Task Scheduler вне интерактивного сеанса
+также остаётся отдельным owner-approved Phase B тестом.
 
-## 6. Runbook clean-host restore (Phase C, не выполнен)
+## 6. CI routing для Python backup-контракта
+
+Текущая routing policy относила изменённые `scripts/` и root `tests/` к
+`workflow-platform`, поэтому Python tests были skipped несмотря на изменение backup Python
+implementation и tests. Узкое правило в `scripts/ci_contract.py` распознаёт backup Python
+paths как Python surface; для текущего PR консервативный профиль — `cross-stack`, а
+authoritative `python-tests` дополнительно собирает `tests/test_backup_manifest.py` и
+`tests/test_db_maintenance.py`. Это исправление scope routing относится к общей задаче
+детерминизма CI из открытого Issue #821; отдельный CI refactoring в рамках #849 не добавляется.
+
+## 7. Runbook clean-host restore (Phase C, не выполнен)
 
 Выполнять только по отдельному owner approval на непубличном чистом хосте. До восстановления
 DNS и фоновые writer processes должны быть остановлены.
@@ -153,7 +183,7 @@ DNS и фоновые writer processes должны быть остановле�
 10. DNS/traffic cutover и rollback — отдельная owner-authorized операция после успешных
     smoke checks. Она не входит в этот Phase A PR.
 
-## 7. Гейты
+## 8. Гейты
 
 | Фаза | Требование | Состояние в этом PR |
 | --- | --- | --- |

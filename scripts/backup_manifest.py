@@ -13,7 +13,7 @@ import re
 import tempfile
 from collections.abc import Mapping
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +22,7 @@ MANIFEST_KIND = "yfc-backup-manifest"
 INDEX_KIND = "yfc-backup-index"
 INDEX_FILENAME = "index.json"
 FORMAT_VERIFIED_STATUS = "format_verified_pg_restore_list"
+CLOCK_SKEW_TOLERANCE = timedelta(minutes=5)
 _SAFE_FILENAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _DATABASE_MAJOR = re.compile(r"^[0-9]{1,3}$")
@@ -64,7 +65,12 @@ def format_utc(value: datetime) -> str:
     )
 
 
-def parse_utc(value: object, *, field: str) -> datetime:
+def parse_utc(
+    value: object,
+    *,
+    field: str,
+    now: datetime | None = None,
+) -> datetime:
     if not isinstance(value, str) or not value.strip():
         raise BackupManifestError(f"{field} must be an ISO-8601 timestamp")
     try:
@@ -73,7 +79,15 @@ def parse_utc(value: object, *, field: str) -> datetime:
         raise BackupManifestError(f"{field} must be an ISO-8601 timestamp") from exc
     if parsed.tzinfo is None:
         raise BackupManifestError(f"{field} must include a timezone")
-    return parsed.astimezone(timezone.utc)  # noqa: UP017 - deployment hosts can still run Python 3.10.
+    parsed_utc = parsed.astimezone(timezone.utc)  # noqa: UP017 - deployment hosts can still run Python 3.10.
+    if now is not None:
+        reference = now.astimezone(timezone.utc)  # noqa: UP017 - deployment hosts can still run Python 3.10.
+        if parsed_utc > reference + CLOCK_SKEW_TOLERANCE:
+            raise BackupManifestError(
+                f"{field} is too far in the future; clock skew tolerance is "
+                f"{int(CLOCK_SKEW_TOLERANCE.total_seconds())} seconds"
+            )
+    return parsed_utc
 
 
 def sha256_file(path: Path) -> str:
@@ -140,8 +154,13 @@ def build_manifest(
     size = archive.stat().st_size
     if size <= 0:
         raise BackupManifestError("backup archive must not be empty")
-    created = created_at or utc_now()
-    published = published_at or utc_now()
+    reference = utc_now()
+    created = created_at or reference
+    published = published_at or reference
+    created_text = format_utc(created)
+    published_text = format_utc(published)
+    parse_utc(created_text, field="created_at_utc", now=reference)
+    parse_utc(published_text, field="published_at_utc", now=reference)
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "kind": MANIFEST_KIND,
@@ -150,8 +169,8 @@ def build_manifest(
         "manifest_name": manifest_name_for(archive.name),
         "archive_size_bytes": size,
         "archive_sha256": sha256_file(archive),
-        "created_at_utc": format_utc(created),
-        "published_at_utc": format_utc(published),
+        "created_at_utc": created_text,
+        "published_at_utc": published_text,
         "database_major": _require_database_major(database_major),
         "schema_revision": _require_schema_revision(schema_revision),
         "verification_status": FORMAT_VERIFIED_STATUS,
@@ -167,8 +186,9 @@ def _as_object(value: object, *, description: str) -> dict[str, Any]:
     return value
 
 
-def validate_manifest(value: Mapping[str, Any]) -> dict[str, Any]:
+def validate_manifest(value: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
     manifest = dict(value)
+    reference = now or utc_now()
     if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise BackupManifestError("unsupported backup manifest schema")
     if manifest.get("kind") != MANIFEST_KIND:
@@ -182,8 +202,8 @@ def validate_manifest(value: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
         raise BackupManifestError("archive_size_bytes must be a positive integer")
     _require_hash(manifest.get("archive_sha256"), field="archive_sha256")
-    parse_utc(manifest.get("created_at_utc"), field="created_at_utc")
-    parse_utc(manifest.get("published_at_utc"), field="published_at_utc")
+    parse_utc(manifest.get("created_at_utc"), field="created_at_utc", now=reference)
+    parse_utc(manifest.get("published_at_utc"), field="published_at_utc", now=reference)
     _require_database_major(manifest.get("database_major"))
     _require_schema_revision(manifest.get("schema_revision"))
     if manifest.get("verification_status") != FORMAT_VERIFIED_STATUS:
@@ -208,12 +228,12 @@ def read_json(path: Path) -> dict[str, Any]:
     return _as_object(value, description=path.name)
 
 
-def read_manifest(path: Path) -> dict[str, Any]:
-    return validate_manifest(read_json(path))
+def read_manifest(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
+    return validate_manifest(read_json(path), now=now)
 
 
-def index_entry(manifest: Mapping[str, Any]) -> dict[str, Any]:
-    checked = validate_manifest(manifest)
+def index_entry(manifest: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
+    checked = validate_manifest(manifest, now=now)
     return {
         key: checked[key]
         for key in (
@@ -222,12 +242,15 @@ def index_entry(manifest: Mapping[str, Any]) -> dict[str, Any]:
             "archive_size_bytes",
             "archive_sha256",
             "created_at_utc",
+            "published_at_utc",
             "verification_status",
         )
     }
 
 
-def _validate_index_entry(value: Mapping[str, Any]) -> dict[str, Any]:
+def _validate_index_entry(
+    value: Mapping[str, Any], *, now: datetime | None = None
+) -> dict[str, Any]:
     entry = dict(value)
     _require_filename(entry.get("manifest_name"), field="manifest_name")
     archive_name = _require_filename(entry.get("archive_name"), field="archive_name")
@@ -237,17 +260,25 @@ def _validate_index_entry(value: Mapping[str, Any]) -> dict[str, Any]:
     if isinstance(size, bool) or not isinstance(size, int) or size <= 0:
         raise BackupManifestError("index archive_size_bytes must be a positive integer")
     _require_hash(entry.get("archive_sha256"), field="archive_sha256")
-    parse_utc(entry.get("created_at_utc"), field="created_at_utc")
+    reference = now or utc_now()
+    parse_utc(entry.get("created_at_utc"), field="created_at_utc", now=reference)
+    parse_utc(entry.get("published_at_utc"), field="published_at_utc", now=reference)
     if entry.get("verification_status") != FORMAT_VERIFIED_STATUS:
         raise BackupManifestError("index contains an unverified backup")
     return entry
 
 
 def build_index(
-    entries: list[Mapping[str, Any]], *, generated_at: datetime | None = None
+    entries: list[Mapping[str, Any]],
+    *,
+    generated_at: datetime | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
+    reference = now or utc_now()
     normalized = [
-        index_entry(entry) if entry.get("kind") == MANIFEST_KIND else _validate_index_entry(entry)
+        index_entry(entry, now=reference)
+        if entry.get("kind") == MANIFEST_KIND
+        else _validate_index_entry(entry, now=reference)
         for entry in entries
     ]
     normalized.sort(
@@ -256,31 +287,38 @@ def build_index(
     names = [item["archive_name"] for item in normalized]
     if len(names) != len(set(names)):
         raise BackupManifestError("backup index contains duplicate archive names")
+    generated_text = format_utc(generated_at or reference)
+    parse_utc(generated_text, field="generated_at_utc", now=reference)
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "kind": INDEX_KIND,
-        "generated_at_utc": format_utc(generated_at or utc_now()),
+        "generated_at_utc": generated_text,
         "backups": normalized,
     }
 
 
-def validate_index(value: Mapping[str, Any]) -> dict[str, Any]:
+def validate_index(value: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
     index = dict(value)
+    reference = now or utc_now()
     if index.get("schema_version") != MANIFEST_SCHEMA_VERSION:
         raise BackupManifestError("unsupported backup index schema")
     if index.get("kind") != INDEX_KIND:
         raise BackupManifestError("unexpected backup index kind")
-    parse_utc(index.get("generated_at_utc"), field="generated_at_utc")
+    parse_utc(index.get("generated_at_utc"), field="generated_at_utc", now=reference)
     backups = index.get("backups")
     if not isinstance(backups, list) or len(backups) > 10_000:
         raise BackupManifestError("backups must be a bounded list")
+    names: list[str] = []
     for entry in backups:
-        _validate_index_entry(entry)
+        checked = _validate_index_entry(entry, now=reference)
+        names.append(str(checked["archive_name"]))
+    if len(names) != len(set(names)):
+        raise BackupManifestError("backup index contains duplicate archive names")
     return index
 
 
-def read_index(path: Path) -> dict[str, Any]:
-    return validate_index(read_json(path))
+def read_index(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
+    return validate_index(read_json(path), now=now)
 
 
 def write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:

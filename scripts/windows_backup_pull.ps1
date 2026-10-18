@@ -9,6 +9,7 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+$ClockSkewTolerance = [TimeSpan]::FromMinutes(5)
 
 $ExitCodes = @{
     HEALTHY = 0
@@ -58,24 +59,38 @@ function Resolve-ConfiguredPath {
     return [IO.Path]::GetFullPath((Join-Path $BasePath $Value))
 }
 
+function Get-NowUtc {
+    return [DateTimeOffset]::UtcNow
+}
+
 function Get-UtcString {
-    return [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+    return (Get-NowUtc).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
 }
 
 function ConvertTo-UtcDate {
-    param([object]$Value, [string]$FieldName = "timestamp")
+    param(
+        [object]$Value,
+        [string]$FieldName = "timestamp",
+        [object]$NowUtc = $null
+    )
     try {
         if ($Value -is [DateTime]) {
             if ($Value.Kind -ne [DateTimeKind]::Utc) {
                 Throw-BackupPullError "CORRUPTED" "$FieldName must be UTC"
             }
-            return ([DateTimeOffset]$Value).ToUniversalTime()
+            $parsed = ([DateTimeOffset]$Value).ToUniversalTime()
         }
-        $text = [string]$Value
-        if (-not $text.EndsWith("Z")) {
-            Throw-BackupPullError "CORRUPTED" "$FieldName must be UTC"
+        else {
+            $text = [string]$Value
+            if (-not $text.EndsWith("Z")) {
+                Throw-BackupPullError "CORRUPTED" "$FieldName must be UTC"
+            }
+            $parsed = [DateTimeOffset]::Parse($text).ToUniversalTime()
         }
-        return [DateTimeOffset]::Parse($text).ToUniversalTime()
+        if ($null -ne $NowUtc -and $parsed -gt ([DateTimeOffset]$NowUtc).Add($ClockSkewTolerance)) {
+            Throw-BackupPullError "CORRUPTED" "$FieldName is too far in the future"
+        }
+        return $parsed
     }
     catch {
         if ($_.Exception.Data.Contains("BackupCode")) {
@@ -130,7 +145,10 @@ function Read-JsonObject {
 }
 
 function Assert-ManifestEntry {
-    param([Parameter(Mandatory = $true)][object]$Manifest)
+    param(
+        [Parameter(Mandatory = $true)][object]$Manifest,
+        [object]$NowUtc = $null
+    )
     if ((Get-PropertyValue $Manifest "schema_version") -ne 1) {
         Throw-BackupPullError "CORRUPTED" "unsupported backup manifest schema"
     }
@@ -150,8 +168,8 @@ function Assert-ManifestEntry {
         Throw-BackupPullError "CORRUPTED" "archive_size_bytes must be positive"
     }
     [void](Assert-Sha256 (Get-PropertyValue $Manifest "archive_sha256") "archive_sha256")
-    [void](ConvertTo-UtcDate (Get-PropertyValue $Manifest "created_at_utc") "created_at_utc")
-    [void](ConvertTo-UtcDate (Get-PropertyValue $Manifest "published_at_utc") "published_at_utc")
+    [void](ConvertTo-UtcDate (Get-PropertyValue $Manifest "created_at_utc") "created_at_utc" $NowUtc)
+    [void](ConvertTo-UtcDate (Get-PropertyValue $Manifest "published_at_utc") "published_at_utc" $NowUtc)
     if (-not [regex]::IsMatch([string](Get-PropertyValue $Manifest "database_major"), "^[0-9]{1,3}$")) {
         Throw-BackupPullError "CORRUPTED" "database_major is invalid"
     }
@@ -180,7 +198,10 @@ function Assert-ManifestEntry {
 }
 
 function Assert-IndexEntry {
-    param([Parameter(Mandatory = $true)][object]$Entry)
+    param(
+        [Parameter(Mandatory = $true)][object]$Entry,
+        [object]$NowUtc = $null
+    )
     $archiveName = Assert-SafeFileName (Get-PropertyValue $Entry "archive_name") "archive_name"
     $manifestName = Assert-SafeFileName (Get-PropertyValue $Entry "manifest_name") "manifest_name"
     if ($manifestName -ne "$archiveName.manifest.json") {
@@ -190,7 +211,8 @@ function Assert-IndexEntry {
         Throw-BackupPullError "CORRUPTED" "index archive_size_bytes must be positive"
     }
     [void](Assert-Sha256 (Get-PropertyValue $Entry "archive_sha256") "archive_sha256")
-    [void](ConvertTo-UtcDate (Get-PropertyValue $Entry "created_at_utc") "created_at_utc")
+    [void](ConvertTo-UtcDate (Get-PropertyValue $Entry "created_at_utc") "created_at_utc" $NowUtc)
+    [void](ConvertTo-UtcDate (Get-PropertyValue $Entry "published_at_utc") "published_at_utc" $NowUtc)
     if ((Get-PropertyValue $Entry "verification_status") -ne "format_verified_pg_restore_list") {
         Throw-BackupPullError "CORRUPTED" "index contains an unverified backup"
     }
@@ -198,21 +220,24 @@ function Assert-IndexEntry {
 }
 
 function Assert-BackupIndex {
-    param([Parameter(Mandatory = $true)][object]$Index)
+    param(
+        [Parameter(Mandatory = $true)][object]$Index,
+        [object]$NowUtc = $null
+    )
     if ((Get-PropertyValue $Index "schema_version") -ne 1) {
         Throw-BackupPullError "CORRUPTED" "unsupported backup index schema"
     }
     if ((Get-PropertyValue $Index "kind") -ne "yfc-backup-index") {
         Throw-BackupPullError "CORRUPTED" "unexpected backup index kind"
     }
-    [void](ConvertTo-UtcDate (Get-PropertyValue $Index "generated_at_utc") "generated_at_utc")
+    [void](ConvertTo-UtcDate (Get-PropertyValue $Index "generated_at_utc") "generated_at_utc" $NowUtc)
     $entries = @((Get-PropertyValue $Index "backups"))
     if ($entries.Count -gt 10000) {
         Throw-BackupPullError "CORRUPTED" "backup index is too large"
     }
     $seen = @{}
     foreach ($entry in $entries) {
-        [void](Assert-IndexEntry $entry)
+        [void](Assert-IndexEntry $entry $NowUtc)
         $name = [string](Get-PropertyValue $entry "archive_name")
         if ($seen.ContainsKey($name)) {
             Throw-BackupPullError "CORRUPTED" "backup index contains duplicate archive names"
@@ -262,7 +287,6 @@ function Read-Config {
         Throw-BackupPullError "CONFIG_INVALID" "local_root is required"
     }
     $localRoot = Resolve-ConfiguredPath $localValue $configDir
-    [void](New-Item -ItemType Directory -Force -Path $localRoot)
     $hostName = [string](Get-PropertyValue $ssh "host")
     $userName = [string](Get-PropertyValue $ssh "user")
     $remoteRoot = ([string](Get-PropertyValue $ssh "remote_root")).TrimEnd("/")
@@ -427,21 +451,24 @@ function Invoke-SftpGet {
     }
 }
 
-function Write-AtomicStatus {
-    param([Parameter(Mandatory = $true)][object]$Config, [Parameter(Mandatory = $true)][object]$Status)
-    $parent = Split-Path -Parent $Config.StatusFile
+function Write-AtomicJsonFile {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][object]$Value
+    )
+    $parent = Split-Path -Parent $Path
     [void](New-Item -ItemType Directory -Force -Path $parent)
-    $temporary = "$($Config.StatusFile).$([guid]::NewGuid().ToString('N')).partial"
-    $json = $Status | ConvertTo-Json -Depth 12
+    $temporary = "$Path.$([guid]::NewGuid().ToString('N')).partial"
+    $json = $Value | ConvertTo-Json -Depth 12
     [IO.File]::WriteAllText($temporary, $json, (New-Object Text.UTF8Encoding($false)))
-    $replacementBackup = "$($Config.StatusFile).$([guid]::NewGuid().ToString('N')).backup"
+    $replacementBackup = "$Path.$([guid]::NewGuid().ToString('N')).backup"
     try {
         # File.Replace is available in Windows PowerShell 5.1 and keeps a complete status file.
-        if (Test-Path -LiteralPath $Config.StatusFile -PathType Leaf) {
-            [IO.File]::Replace($temporary, $Config.StatusFile, $replacementBackup, $true)
+        if (Test-Path -LiteralPath $Path -PathType Leaf) {
+            [IO.File]::Replace($temporary, $Path, $replacementBackup, $true)
         }
         else {
-            [IO.File]::Move($temporary, $Config.StatusFile)
+            [IO.File]::Move($temporary, $Path)
         }
     }
     finally {
@@ -450,15 +477,53 @@ function Write-AtomicStatus {
     }
 }
 
+function Write-AtomicStatus {
+    param([Parameter(Mandatory = $true)][object]$Config, [Parameter(Mandatory = $true)][object]$Status)
+    Write-AtomicJsonFile $Config.StatusFile $Status
+}
+
+function Write-AtomicFailureRecord {
+    param([Parameter(Mandatory = $true)][object]$Config, [Parameter(Mandatory = $true)][object]$Status)
+    $record = [ordered]@{
+        schema_version = 1
+        kind = "yfc-backup-failure"
+        last_pull_attempt_at_utc = $Status.last_pull_attempt_at_utc
+        last_failure_at_utc = $Status.last_failure_at_utc
+        last_failure_code = $Status.last_failure_code
+        last_run_result = "FAILED"
+    }
+    Write-AtomicJsonFile "$($Config.StatusFile).failure" $record
+}
+
+function Read-StatusRecord {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
+        return $null
+    }
+    try {
+        $record = Read-JsonObject $Path
+        if ((Get-PropertyValue $record "kind") -notin @("yfc-backup-status", "yfc-backup-failure")) {
+            return $null
+        }
+        return $record
+    }
+    catch {
+        return $null
+    }
+}
+
 function Get-LocalSnapshot {
-    param([Parameter(Mandatory = $true)][object]$Config)
+    param(
+        [Parameter(Mandatory = $true)][object]$Config,
+        [object]$NowUtc = $null
+    )
     $valid = New-Object Collections.ArrayList
     $invalid = New-Object Collections.ArrayList
     $files = @(Get-ChildItem -LiteralPath $Config.LocalRoot -Filter "*.manifest.json" -File -ErrorAction SilentlyContinue)
     foreach ($file in $files) {
         try {
             $manifest = Read-JsonObject $file.FullName
-            [void](Assert-ManifestEntry $manifest)
+            [void](Assert-ManifestEntry $manifest $NowUtc)
             $archiveName = [string](Get-PropertyValue $manifest "archive_name")
             $archivePath = Join-Path $Config.LocalRoot $archiveName
             if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
@@ -473,7 +538,7 @@ function Get-LocalSnapshot {
                     ManifestPath = $file.FullName
                     ArchivePath = $archivePath
                     ArchiveName = $archiveName
-                    CreatedAt = ConvertTo-UtcDate (Get-PropertyValue $manifest "created_at_utc") "created_at_utc"
+                    CreatedAt = ConvertTo-UtcDate (Get-PropertyValue $manifest "created_at_utc") "created_at_utc" $NowUtc
                 })
         }
         catch {
@@ -483,33 +548,86 @@ function Get-LocalSnapshot {
     return [pscustomobject]@{ Valid = @($valid); Invalid = @($invalid) }
 }
 
+function Get-RecordUtc {
+    param(
+        [object]$Record,
+        [Parameter(Mandatory = $true)][string]$FieldName
+    )
+    $value = Get-PropertyValue $Record $FieldName
+    if ([string]::IsNullOrWhiteSpace([string]$value)) {
+        return $null
+    }
+    try {
+        return ConvertTo-UtcDate $value $FieldName
+    }
+    catch {
+        return $null
+    }
+}
+
 function Get-StatusObject {
-    param([Parameter(Mandatory = $true)][object]$Config)
-    $snapshot = Get-LocalSnapshot $Config
+    param(
+        [Parameter(Mandatory = $true)][object]$Config,
+        [object]$NowUtc = $null
+    )
+    $reference = if ($null -eq $NowUtc) { Get-NowUtc } else { [DateTimeOffset]$NowUtc }
+    $snapshot = Get-LocalSnapshot $Config $reference
     $valid = @($snapshot.Valid | Sort-Object CreatedAt -Descending)
     $invalid = @($snapshot.Invalid)
-    $state = "MISSING"
+    $verificationState = "MISSING"
+    $freshnessState = "MISSING"
     $newest = $null
     if ($valid.Count -gt 0) {
         $newest = $valid[0]
-        $ageHours = ([DateTimeOffset]::UtcNow - $newest.CreatedAt).TotalHours
-        $state = if ($ageHours -gt $Config.StaleAfterHours) { "STALE" } else { "HEALTHY" }
-        if ($invalid.Count -gt 0) { $state = "CORRUPTED" }
+        $ageHours = ($reference - $newest.CreatedAt).TotalHours
+        $freshnessState = if ($ageHours -lt 0 -or $ageHours -gt $Config.StaleAfterHours) { "STALE" } else { "HEALTHY" }
+        $verificationState = if ($invalid.Count -gt 0) { "CORRUPTED" } else { "HEALTHY" }
     }
     elseif ($invalid.Count -gt 0) {
-        $state = "CORRUPTED"
+        $verificationState = "CORRUPTED"
+        $freshnessState = "CORRUPTED"
+    }
+    $localState = if ($verificationState -eq "CORRUPTED") { "CORRUPTED" } elseif ($freshnessState -eq "STALE") { "STALE" } else { $verificationState }
+    $previous = Read-StatusRecord $Config.StatusFile
+    $failureRecord = Read-StatusRecord "$($Config.StatusFile).failure"
+    $lastRunResult = [string](Get-PropertyValue $previous "last_run_result")
+    $lastAttempt = [string](Get-PropertyValue $previous "last_pull_attempt_at_utc")
+    $lastFailureAt = [string](Get-PropertyValue $previous "last_failure_at_utc")
+    $lastFailureCode = [string](Get-PropertyValue $previous "last_failure_code")
+    $failureAttempt = Get-RecordUtc $failureRecord "last_pull_attempt_at_utc"
+    $previousAttempt = Get-RecordUtc $previous "last_pull_attempt_at_utc"
+    if ($null -ne $failureAttempt -and ($null -eq $previousAttempt -or $failureAttempt -gt $previousAttempt)) {
+        $lastRunResult = "FAILED"
+        $lastAttempt = [string](Get-PropertyValue $failureRecord "last_pull_attempt_at_utc")
+        $lastFailureAt = [string](Get-PropertyValue $failureRecord "last_failure_at_utc")
+        $lastFailureCode = [string](Get-PropertyValue $failureRecord "last_failure_code")
+    }
+    $state = $localState
+    if ($lastRunResult -eq "FAILED") {
+        $state = if ($ExitCodes.ContainsKey($lastFailureCode)) { $lastFailureCode } else { "UNEXPECTED" }
     }
     $invalidNames = @($invalid | ForEach-Object { $_.Name })
     return [ordered]@{
         schema_version = 1
         kind = "yfc-backup-status"
-        checked_at_utc = Get-UtcString
+        checked_at_utc = $reference.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
         state = $state
+        local_backup_state = $verificationState
+        freshness_state = $freshnessState
         valid_backup_count = $valid.Count
         invalid_backup_count = $invalid.Count
         last_successful_backup_utc = if ($null -eq $newest) { $null } else { $newest.Manifest.created_at_utc }
         newest_archive_name = if ($null -eq $newest) { $null } else { $newest.ArchiveName }
         invalid_files = $invalidNames
+        last_pull_attempt_at_utc = if ([string]::IsNullOrWhiteSpace($lastAttempt)) { $null } else { $lastAttempt }
+        last_pull_result = if ([string]::IsNullOrWhiteSpace($lastRunResult)) { $null } else { $lastRunResult }
+        last_run_result = if ([string]::IsNullOrWhiteSpace($lastRunResult)) { $null } else { $lastRunResult }
+        last_sync_result = if ([string]::IsNullOrWhiteSpace([string](Get-PropertyValue $previous "last_sync_result"))) { $lastRunResult } else { Get-PropertyValue $previous "last_sync_result" }
+        last_run_at_utc = Get-PropertyValue $previous "last_run_at_utc"
+        last_successful_sync_at_utc = Get-PropertyValue $previous "last_successful_sync_at_utc"
+        last_successful_copy_received_at_utc = Get-PropertyValue $previous "last_successful_copy_received_at_utc"
+        last_failure_at_utc = if ([string]::IsNullOrWhiteSpace($lastFailureAt)) { $null } else { $lastFailureAt }
+        last_failure_code = if ([string]::IsNullOrWhiteSpace($lastFailureCode)) { $null } else { $lastFailureCode }
     }
 }
 
@@ -539,8 +657,8 @@ function Invoke-Rotation {
             continue
         }
         try {
-            Remove-Item -LiteralPath $item.ArchivePath -Force
             Remove-Item -LiteralPath $item.ManifestPath -Force
+            Remove-Item -LiteralPath $item.ArchivePath -Force
             $removed++
         }
         catch {
@@ -554,20 +672,25 @@ function Invoke-Rotation {
 function Invoke-Pull {
     param([Parameter(Mandatory = $true)][object]$Config)
     $lock = $null
-    $incoming = Join-Path $Config.LocalRoot ".incoming"
+    $lockAcquired = $false
+    $incoming = $null
     $downloaded = 0
+    $attemptAt = Get-UtcString
     try {
         if (-not $Config.EncryptionAtRestApproved -or $Config.EncryptionAtRestMode -eq "OWNER_APPROVAL_REQUIRED") {
             Throw-BackupPullError "CONFIG_INVALID" "encryption-at-rest owner approval is not complete"
         }
         Assert-SshFiles $Config
         $lock = Acquire-BackupLock $Config.LockFile
+        $lockAcquired = $true
+        $incoming = Join-Path $Config.LocalRoot (".incoming-" + [guid]::NewGuid().ToString("N"))
         [void](New-Item -ItemType Directory -Force -Path $incoming)
+        $nowUtc = Get-NowUtc
         $indexTemp = Join-Path $incoming ("index-" + [guid]::NewGuid().ToString("N") + ".json.partial")
         Invoke-SftpGet $Config $Config.RemoteIndex $indexTemp $incoming
         $index = Read-JsonObject $indexTemp
-        $entries = @(Assert-BackupIndex $index | Sort-Object { ConvertTo-UtcDate (Get-PropertyValue $_ "created_at_utc") "created_at_utc" } -Descending)
-        $local = Get-LocalSnapshot $Config
+        $entries = @(Assert-BackupIndex $index $nowUtc | Sort-Object { ConvertTo-UtcDate (Get-PropertyValue $_ "created_at_utc") "created_at_utc" $nowUtc } -Descending)
+        $local = Get-LocalSnapshot $Config $nowUtc
         $localByName = @{}
         foreach ($item in @($local.Valid)) { $localByName[$item.ArchiveName] = $item }
         foreach ($entry in $entries) {
@@ -580,8 +703,8 @@ function Invoke-Pull {
             $archiveTemp = Join-Path $incoming ("$archiveName.$([guid]::NewGuid().ToString('N')).partial")
             Invoke-SftpGet $Config $manifestName $manifestTemp $incoming
             $manifest = Read-JsonObject $manifestTemp
-            [void](Assert-ManifestEntry $manifest)
-            foreach ($field in @("archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "verification_status")) {
+            [void](Assert-ManifestEntry $manifest $nowUtc)
+            foreach ($field in @("archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "published_at_utc", "verification_status")) {
                 if ([string](Get-PropertyValue $manifest $field) -ne [string](Get-PropertyValue $entry $field)) {
                     Throw-BackupPullError "CORRUPTED" "manifest and index disagree"
                 }
@@ -623,28 +746,57 @@ function Invoke-Pull {
         Remove-Item -LiteralPath $indexTemp -Force -ErrorAction SilentlyContinue
         $removed = Invoke-Rotation $Config
         $status = Get-StatusObject $Config
+        $runAt = Get-UtcString
+        $status.state = if ($status.local_backup_state -eq "CORRUPTED") { "CORRUPTED" } elseif ($status.freshness_state -eq "STALE") { "STALE" } else { $status.local_backup_state }
+        $status.last_pull_attempt_at_utc = $attemptAt
+        $status.last_pull_result = "SUCCESS"
         $status.last_run_result = "SUCCESS"
-        $status.last_run_at_utc = Get-UtcString
+        $status.last_sync_result = "SUCCESS"
+        $status.last_run_at_utc = $runAt
+        $status.last_successful_sync_at_utc = $runAt
+        if ($downloaded -gt 0) { $status.last_successful_copy_received_at_utc = $runAt }
+        $status.status_write_result = "PENDING"
         $status.downloaded_count = $downloaded
         $status.rotated_count = $removed
-        Write-AtomicStatus $Config $status
+        try {
+            Write-AtomicStatus $Config $status
+            $status.status_write_result = "SUCCESS"
+        }
+        catch {
+            $status.status_write_result = "FAILED"
+            $status.state = "UNEXPECTED"
+            return $status
+        }
         Write-SanitizedLog $Config "SUCCESS"
         return $status
     }
     catch {
         $code = if ($null -ne $_.Exception.Data -and $_.Exception.Data.Contains("BackupCode")) { [string]$_.Exception.Data["BackupCode"] } else { "UNEXPECTED" }
         $status = Get-StatusObject $Config
+        $status.state = $code
+        $status.last_pull_attempt_at_utc = $attemptAt
+        $status.last_pull_result = "FAILED"
         $status.last_run_result = "FAILED"
+        $status.last_sync_result = "FAILED"
         $status.last_run_at_utc = Get-UtcString
         $status.last_failure_code = $code
+        $status.last_failure_at_utc = $status.last_run_at_utc
         $status.downloaded_count = $downloaded
-        try { Write-AtomicStatus $Config $status } catch {
+        $status.status_write_result = if ($lockAcquired) { "PENDING" } else { "NOT_ATTEMPTED_LOCK_NOT_HELD" }
+        if ($lockAcquired) {
+            try { Write-AtomicFailureRecord $Config $status } catch {
+            }
+            try { Write-AtomicStatus $Config $status; $status.status_write_result = "SUCCESS" } catch {
+                $status.status_write_result = "FAILED"
+            }
+            Write-SanitizedLog $Config $code
         }
-        Write-SanitizedLog $Config $code
         return $status
     }
     finally {
-        Remove-Item -LiteralPath $incoming -Recurse -Force -ErrorAction SilentlyContinue
+        if ($null -ne $incoming) {
+            Remove-Item -LiteralPath $incoming -Recurse -Force -ErrorAction SilentlyContinue
+        }
         if ($null -ne $lock) { $lock.Dispose() }
     }
 }
