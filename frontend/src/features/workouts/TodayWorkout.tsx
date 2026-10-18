@@ -446,11 +446,13 @@ function WorkoutSetRow({
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
   const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
+  const [prefillDismissed, setPrefillDismissed] = useState(false);
   const canPrefill =
     isCurrent &&
     !disabled &&
     !completed &&
     previousResult !== null &&
+    !prefillDismissed &&
     (canPrefillReps || canPrefillWeight);
   const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
@@ -740,6 +742,7 @@ function WorkoutSetRow({
             disabled={completing}
             type="button"
             onClick={() => {
+              setPrefillDismissed(true);
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
               editing.current = true;
@@ -758,6 +761,7 @@ function WorkoutSetRow({
             disabled={completing}
             type="button"
             onClick={() => {
+              setPrefillDismissed(true);
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
               editing.current = true;
@@ -809,6 +813,7 @@ function WorkoutSetRow({
             min="0"
             step="0.5"
             value={weight}
+            onFocus={() => setPrefillDismissed(true)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
@@ -835,6 +840,7 @@ function WorkoutSetRow({
             min="0"
             step="1"
             value={reps}
+            onFocus={() => setPrefillDismissed(true)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
                 event.preventDefault();
@@ -2126,7 +2132,8 @@ export function TodayWorkout({
         const target = box.height <= bottom - safeTop ? box : input.getBoundingClientRect();
         const delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
-        if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+        // Ignore subpixel observer noise; visible displacement still gets corrected.
+        if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' });
       });
     };
     const pointerDown = () => {

@@ -809,6 +809,25 @@ async function activeWorkoutQueueLength(page: Page) {
   });
 }
 
+async function settleViewport(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}
+
+async function stableScrollY(page: Page) {
+  await settleViewport(page);
+  return page.evaluate(() => window.scrollY);
+}
+
+async function expectScrollYStable(page: Page, before: number) {
+  const after = await stableScrollY(page);
+  expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
+}
+
 test.describe('#1001 keyboard input stability', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
@@ -876,18 +895,22 @@ test.describe('#1001 keyboard input stability', () => {
         for (let index = 0; index < 3; index++) {
           await weight.focus();
           await weight.fill('');
+          const weightScrollY = await stableScrollY(page);
           await weight.pressSequentially(index === 1 ? '6.5' : '5.5');
           await expect.poll(() => server.readSet(202).actual_weight).toBe(index === 1 ? 6.5 : 5.5);
           await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
           await expect(weight).toBeFocused();
           await assertFields();
+          await expectScrollYStable(page, weightScrollY);
           await reps.focus();
           await reps.fill('');
+          const repsScrollY = await stableScrollY(page);
           await reps.pressSequentially(index === 1 ? '11' : '12');
           await expect.poll(() => server.readSet(202).actual_reps).toBe(index === 1 ? 11 : 12);
           await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
           await expect(reps).toBeFocused();
           await assertFields();
+          await expectScrollYStable(page, repsScrollY);
           await page.evaluate(
             (height) => {
               Object.assign(window.visualViewport!, { height });
@@ -939,6 +962,83 @@ test.describe('#1001 keyboard input stability', () => {
       });
     }
   }
+});
+
+test('#1099 keeps scroll stable after keyboard input and server ACK', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const viewport = new EventTarget() as EventTarget & {
+      height: number;
+      width: number;
+      offsetTop: number;
+    };
+    Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+    const calls: Array<{ method: string; top: number }> = [];
+    Object.defineProperty(window, '__yfc1099ScrollCalls', {
+      configurable: true,
+      value: calls,
+    });
+    for (const method of ['scrollBy', 'scrollTo'] as const) {
+      const original = window[method].bind(window);
+      window[method] = (options?: ScrollToOptions | number, y?: number) => {
+        const top = typeof options === 'number' ? (y ?? 0) : (options?.top ?? window.scrollY);
+        calls.push({ method, top });
+        if (typeof options === 'number') original(options, y ?? 0);
+        else original(options);
+      };
+    }
+  });
+  const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('40');
+  await first.getByLabel(/^Повторы,/).fill('10');
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  const row = page.locator('[data-workout-set-id="202"]');
+  const weight = row.getByLabel(/^Вес,/);
+  const reps = row.getByLabel(/^Повторы,/);
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as EventTarget & { height: number };
+    viewport.height = 420;
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  await weight.focus();
+  const initialScrollY = await stableScrollY(page);
+  await page.evaluate(() => {
+    (window as Window & { __yfc1099ScrollCalls?: Array<unknown> }).__yfc1099ScrollCalls!.length = 0;
+  });
+  await weight.pressSequentially('50');
+  await expect.poll(() => server.readSet(202).actual_weight).toBe(50);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  await expect(weight).toBeFocused();
+  await expectScrollYStable(page, initialScrollY);
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __yfc1099ScrollCalls?: Array<unknown> }).__yfc1099ScrollCalls,
+    ),
+  ).toEqual([]);
+
+  await reps.focus();
+  const repsScrollY = await stableScrollY(page);
+  await page.evaluate(() => {
+    (window as Window & { __yfc1099ScrollCalls?: Array<unknown> }).__yfc1099ScrollCalls!.length = 0;
+  });
+  await reps.pressSequentially('12');
+  await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  await expect(reps).toBeFocused();
+  await expectScrollYStable(page, repsScrollY);
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __yfc1099ScrollCalls?: Array<unknown> }).__yfc1099ScrollCalls,
+    ),
+  ).toEqual([]);
 });
 
 test.describe('#1001 completion navigation', () => {
