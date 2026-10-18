@@ -880,9 +880,9 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
         expect(result.actions).toHaveLength(3);
         expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
-        await test.info().attach(`rest-clock-${theme}-${width}`, {
-          body: await panel.screenshot({ animations: 'disabled' }),
-          contentType: 'image/png',
+        await panel.screenshot({
+          path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
+          animations: 'disabled',
         });
       }
     });
