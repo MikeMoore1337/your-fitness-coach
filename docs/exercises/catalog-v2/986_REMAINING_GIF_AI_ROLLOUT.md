@@ -8,7 +8,7 @@ RealESRGAN_x4plus pilot animations, and authorized improving the remaining GIFs.
 - 206 canonical exercises; 167 have approved animated media.
 - 77 native HD videos: retain them byte-identical.
 - Four pilot AI 720x720 H.264 clips: retain them byte-identical.
-- **86 approved animated exercises still have only 180x180 GIFs**.
+- **90 approved animated exercises still have only 180x180 GIFs**.
 - 35 blocked and four static-only entries must not be counted as AI candidates.
 
 AI upscaling improves rendering without adding genuine source resolution. Never
@@ -26,7 +26,7 @@ is resumable, writes only untracked artifacts, and does not change production.
 From the YFC repo root, with Python environment, FFmpeg, FFprobe and Vulkan GPU:
 
 ~~~powershell
-# List all pending exercise slugs (expected 86 at baseline).
+# List all pending exercise slugs (expected 90 on the current master baseline).
 python -m scripts.import_ai_upscaled_exercise_gifs
 
 # Windows example: process all pending movements using the portable GPU engine.
@@ -59,6 +59,6 @@ The catalog validator authenticates per-exercise provenance and hashes.
    exact SHA/smoke and confirmed source provenance.
 4. Keep issue #986 open for 35 blocked / four static-only and source-quality gaps.
 
-The missing 86 MP4 binaries are NOT present in this preparation change.
+The missing 90 MP4 binaries are NOT present in this preparation change.
 Creating them requires the separately installed GPU engine; never substitute
 plain image enlargement or misstate production status.

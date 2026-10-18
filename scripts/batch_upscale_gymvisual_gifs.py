@@ -57,9 +57,7 @@ def main() -> None:
         help="Render all approved 180x180 source animations still lacking HD/AI video",
     )
     args = parser.parse_args()
-    pending = pending_exercises(
-        json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    )
+    pending = pending_exercises(json.loads(MANIFEST_PATH.read_text(encoding="utf-8")))
     if args.all_pending == bool(args.slugs):
         parser.error("Choose exactly one of --all-pending or --slugs")
     slugs = sorted(pending) if args.all_pending else args.slugs

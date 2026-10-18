@@ -325,8 +325,7 @@ def _validate_media(catalog_slugs: set[str]) -> tuple[int, int, int, int, int]:
                     }
                     pilot_approval = "2026-10-17 #1073 four-sample review"
                     batch_approval = (
-                        "2026-10-18 #986 owner bulk approval; "
-                        "per-movement QA post-release"
+                        "2026-10-18 #986 owner bulk approval; per-movement QA post-release"
                     )
                     approval = provenance.get("owner_visual_approval")
                     _require(

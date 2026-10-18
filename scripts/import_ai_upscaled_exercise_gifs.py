@@ -51,12 +51,13 @@ def inspect_h264(video: Path, *, ffprobe: str, original_duration_ms: int) -> Non
     probe = subprocess.run(
         [
             ffprobe,
-            "-v", "error",
+            "-v",
+            "error",
             "-count_frames",
             "-show_entries",
-            "stream=codec_type,codec_name,width,height,pix_fmt,nb_read_frames:"
-            "format=duration",
-            "-of", "json",
+            "stream=codec_type,codec_name,width,height,pix_fmt,nb_read_frames:format=duration",
+            "-of",
+            "json",
             str(video),
         ],
         capture_output=True,
@@ -180,13 +181,10 @@ def apply(manifest: dict, checked: list[tuple[str, dict, Path, bytes]]) -> None:
     changed["asset_count"] += len(checked)
     changed["total_bytes"] += sum(len(data) for _, _, _, data in checked)
     changed["ai_upscaled_video_count"] += len(checked)
-    changed["ai_upscaled_video_total_bytes"] += sum(
-        len(data) for _, _, _, data in checked
-    )
+    changed["ai_upscaled_video_total_bytes"] += sum(len(data) for _, _, _, data in checked)
     # Each target was checked as absent at planning time: refuse overwrites.
     targets = [
-        MEDIA_ROOT / f"gymvisual/ai-reviewed/{slug}-x4plus-720.mp4"
-        for slug, _, _, _ in checked
+        MEDIA_ROOT / f"gymvisual/ai-reviewed/{slug}-x4plus-720.mp4" for slug, _, _, _ in checked
     ]
     if any(target.exists() for target in targets):
         raise FileExistsError("Existing AI video target; no overwrite allowed")

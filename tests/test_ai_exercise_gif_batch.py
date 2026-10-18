@@ -8,7 +8,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from scripts import import_ai_upscaled_exercise_gifs as batch
 
 
@@ -61,7 +60,7 @@ def fixture_manifest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[d
 
 
 def make_report(directory: Path, manifest: dict, *, model: str = "realesrgan-x4plus") -> bytes:
-    directory.mkdir(parents=True)
+    directory.mkdir(parents=True, exist_ok=True)
     payload = b"\x00\x00\x00\x18ftyp" + (b"animated-source-h264" * 80)
     (directory / "ab-wheel-general-720.mp4").write_bytes(payload)
     media = manifest["exercises"]["ab-wheel"]["media"][0]
@@ -100,9 +99,7 @@ def test_rollout_requires_model_source_identity_and_integrity(
     data = make_report(output, manifest)
     monkeypatch.setattr(batch, "inspect_h264", lambda *args, **kwargs: None)
 
-    verified = batch.make_derivatives(
-        manifest, source_dir=output, slugs=["ab-wheel"]
-    )
+    verified = batch.make_derivatives(manifest, source_dir=output, slugs=["ab-wheel"])
     assert len(verified) == 1
     batch.apply(manifest, verified)
     fresh = json.loads(batch.MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -154,7 +151,8 @@ def test_ffprobe_gate_rejects_static_audio_and_wrong_codec(
 
     def mock_probe(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(
-            args=[], returncode=0,
+            args=[],
+            returncode=0,
             stdout=json.dumps({"streams": [stream], "format": {"duration": "3.25"}}),
             stderr="",
         )
@@ -166,5 +164,5 @@ def test_ffprobe_gate_rejects_static_audio_and_wrong_codec(
         batch.inspect_h264(video, ffprobe="ffprobe", original_duration_ms=3000)
     stream["nb_read_frames"] = "12"
     stream["codec_name"] = "hevc"
-    with pytest.raises(ValueError, match="Not H.264"):
+    with pytest.raises(ValueError, match=r"Not H\.264"):
         batch.inspect_h264(video, ffprobe="ffprobe", original_duration_ms=3000)
