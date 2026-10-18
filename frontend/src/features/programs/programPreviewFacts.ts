@@ -15,7 +15,7 @@ const levels: Record<string, string> = {
 function metadata(template: ProgramTemplate): Record<string, unknown> {
   const value = template.program_metadata;
   return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
+    ? (value as Record<string, unknown>)
     : {};
 }
 
@@ -38,20 +38,23 @@ export function programPreviewFacts(template: ProgramTemplate): ProgramPreviewFa
   const meta = metadata(template);
   const frequency = knownFrequency(meta.days_per_week);
   const equipment = equipmentLabel(meta.equipment);
-  const level = typeof template.level === 'string'
-    ? levels[template.level] ?? 'Нет данных'
-    : 'Нет данных';
+  const level =
+    typeof template.level === 'string' ? (levels[template.level] ?? 'Нет данных') : 'Нет данных';
   const weeks = template.days.flatMap((day) =>
     day.exercises.flatMap((exercise) =>
       (exercise.weekly_prescriptions ?? []).map((week) => week.week_number),
     ),
   );
-  const maxExplicitWeek = Math.max(0, ...weeks.filter((week) => Number.isInteger(week) && week >= 1));
-  const knownSourceWeeks = maxExplicitWeek > 1
-    ? maxExplicitWeek
-    : template.default_duration_weeks > 1
-      ? template.default_duration_weeks
-      : null;
+  const maxExplicitWeek = Math.max(
+    0,
+    ...weeks.filter((week) => Number.isInteger(week) && week >= 1),
+  );
+  const knownSourceWeeks =
+    maxExplicitWeek > 1
+      ? maxExplicitWeek
+      : template.default_duration_weeks > 1
+        ? template.default_duration_weeks
+        : null;
 
   return [
     {
@@ -82,9 +85,10 @@ export function programPreviewFacts(template: ProgramTemplate): ProgramPreviewFa
     {
       label: 'Недель в источнике',
       value: knownSourceWeeks == null ? 'Нет данных' : String(knownSourceWeeks),
-      source: knownSourceWeeks == null
-        ? 'Цикл и продолжительность не указаны'
-        : 'Исходные данные, не автоматический повтор',
+      source:
+        knownSourceWeeks == null
+          ? 'Цикл и продолжительность не указаны'
+          : 'Исходные данные, не автоматический повтор',
     },
   ];
 }

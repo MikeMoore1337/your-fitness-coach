@@ -357,7 +357,9 @@ export function TemplatesList({
         <strong>{item.title}</strong>
         <span className="muted">{programMeta(item)}</span>
         <span className="program-example-trigger__hint">
-          {previewSelectionId === item.id ? 'Выбрана для назначения · Посмотреть состав' : 'Посмотреть состав'}
+          {previewSelectionId === item.id
+            ? 'Выбрана для назначения · Посмотреть состав'
+            : 'Посмотреть состав'}
         </span>
       </button>
       <div className="program-template-card__actions">
@@ -473,9 +475,9 @@ export function TemplatesList({
                     type="button"
                     className="secondary"
                     onClick={() => {
-                    setPreviewStale(false);
-                    setSelectedExample(activeTemplate);
-                  }}
+                      setPreviewStale(false);
+                      setSelectedExample(activeTemplate);
+                    }}
                   >
                     Посмотреть план
                   </button>
@@ -682,9 +684,7 @@ export function TemplatesList({
           >
             <div className="program-example-modal__head">
               <div>
-                <span className="eyebrow">
-                  {programKind(selectedExample, user?.id)}
-                </span>
+                <span className="eyebrow">{programKind(selectedExample, user?.id)}</span>
                 <h2 id="program-example-title">{selectedExample.title}</h2>
                 <p className="muted">{programMeta(selectedExample)}</p>
               </div>
@@ -697,7 +697,10 @@ export function TemplatesList({
                 <CloseIcon />
               </button>
             </div>
-            <section className="program-preview-section" aria-label="Известные сведения о программе">
+            <section
+              className="program-preview-section"
+              aria-label="Известные сведения о программе"
+            >
               <h3>Что известно</h3>
               <p className="muted">Только сведения из программы без предположений о нагрузке.</p>
               <dl className="program-preview-facts">
@@ -710,7 +713,8 @@ export function TemplatesList({
                 ))}
               </dl>
               <p className="program-example-modal__owner">
-                {selectedExample.assigned_by_user_id && selectedExample.assigned_by_user_id !== user?.id
+                {selectedExample.assigned_by_user_id &&
+                selectedExample.assigned_by_user_id !== user?.id
                   ? `Назначил тренер${selectedExample.assigned_by_full_name ? ` ${selectedExample.assigned_by_full_name}` : ''}. Изменения доступны только по разрешённым правам.`
                   : selectedExample.can_edit
                     ? 'Вы можете редактировать свою программу.'
@@ -724,55 +728,57 @@ export function TemplatesList({
             </section>
             <section className="program-preview-section" aria-label="Состав недели">
               <h3>Состав недели</h3>
-              <p className="muted">Все дни из исходного шаблона. Первый день раскрыт для примера.</p>
+              <p className="muted">
+                Все дни из исходного шаблона. Первый день раскрыт для примера.
+              </p>
               <div className="program-example-days">
-              {selectedExample.days.map((day, dayIndex) => (
-                <details className="program-example-day" key={day.id} open={dayIndex === 0}>
-                  <summary className="yfc-disclosure-summary">
-                    <span>
-                      <strong>
-                        День {day.day_number}. {day.title}
-                      </strong>
-                      <span className="muted"> · {day.exercises.length} упражнений</span>
-                    </span>
-                    <DisclosureIcon />
-                  </summary>
-                  <h3 className="sr-only">
-                    День {day.day_number}. {day.title}
-                  </h3>
-                  <ol>
-                    {day.exercises.map((exercise) => (
-                      <li key={exercise.id}>
-                        <strong>{exercise.exercise_title}</strong>
-                        <span>
-                          {exercise.metric_type === 'cardio'
-                            ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
-                            : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
-                        </span>
-                        {exercise.superset_group && (
-                          <small>
-                            Суперсет {exercise.superset_group} · упражнение{' '}
-                            {exercise.superset_order} из 2
-                          </small>
-                        )}
-                        {exercise.notes && <small>{exercise.notes}</small>}
-                        <button
-                          type="button"
-                          className="text-button"
-                          onClick={() =>
-                            setGuide({
-                              id: exercise.exercise_id,
-                              title: exercise.exercise_title,
-                            })
-                          }
-                        >
-                          {exercise.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
-                        </button>
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              ))}
+                {selectedExample.days.map((day, dayIndex) => (
+                  <details className="program-example-day" key={day.id} open={dayIndex === 0}>
+                    <summary className="yfc-disclosure-summary">
+                      <span>
+                        <strong>
+                          День {day.day_number}. {day.title}
+                        </strong>
+                        <span className="muted"> · {day.exercises.length} упражнений</span>
+                      </span>
+                      <DisclosureIcon />
+                    </summary>
+                    <h3 className="sr-only">
+                      День {day.day_number}. {day.title}
+                    </h3>
+                    <ol>
+                      {day.exercises.map((exercise) => (
+                        <li key={exercise.id}>
+                          <strong>{exercise.exercise_title}</strong>
+                          <span>
+                            {exercise.metric_type === 'cardio'
+                              ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
+                              : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
+                          </span>
+                          {exercise.superset_group && (
+                            <small>
+                              Суперсет {exercise.superset_group} · упражнение{' '}
+                              {exercise.superset_order} из 2
+                            </small>
+                          )}
+                          {exercise.notes && <small>{exercise.notes}</small>}
+                          <button
+                            type="button"
+                            className="text-button"
+                            onClick={() =>
+                              setGuide({
+                                id: exercise.exercise_id,
+                                title: exercise.exercise_title,
+                              })
+                            }
+                          >
+                            {exercise.has_guide ? 'Техника и детали' : 'Подробнее об упражнении'}
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                ))}
               </div>
             </section>
             <p className="program-preview-source">

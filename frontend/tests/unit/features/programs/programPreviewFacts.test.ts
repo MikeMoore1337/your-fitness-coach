@@ -17,19 +17,21 @@ function template(override: Partial<ProgramTemplate> = {}): ProgramTemplate {
         id: 1,
         title: 'Всё тело',
         day_number: 1,
-        exercises: [{
-          id: 4,
-          exercise_id: 15,
-          exercise_title: 'Жим',
-          metric_type: 'strength',
-          prescribed_sets: 3,
-          prescribed_reps: '8-10',
-          prescribed_duration_minutes: null,
-          rest_seconds: 90,
-          weekly_prescriptions: [],
-          notes: null,
-          has_guide: false,
-        }],
+        exercises: [
+          {
+            id: 4,
+            exercise_id: 15,
+            exercise_title: 'Жим',
+            metric_type: 'strength',
+            prescribed_sets: 3,
+            prescribed_reps: '8-10',
+            prescribed_duration_minutes: null,
+            rest_seconds: 90,
+            weekly_prescriptions: [],
+            notes: null,
+            has_guide: false,
+          },
+        ],
       },
     ],
     ...override,
@@ -58,23 +60,27 @@ describe('program preview factual mapping', () => {
           id: 1,
           title: 'День A',
           day_number: 1,
-          exercises: [{
-            id: 5,
-            exercise_id: 20,
-            exercise_title: 'Жим',
-            metric_type: 'strength',
-            prescribed_sets: 3,
-            prescribed_reps: '8',
-            rest_seconds: 90,
-            has_guide: false,
-            weekly_prescriptions: [{
+          exercises: [
+            {
+              id: 5,
               exercise_id: 20,
-              week_number: 12,
+              exercise_title: 'Жим',
+              metric_type: 'strength',
               prescribed_sets: 3,
               prescribed_reps: '8',
               rest_seconds: 90,
-            }],
-          }],
+              has_guide: false,
+              weekly_prescriptions: [
+                {
+                  exercise_id: 20,
+                  week_number: 12,
+                  prescribed_sets: 3,
+                  prescribed_reps: '8',
+                  rest_seconds: 90,
+                },
+              ],
+            },
+          ],
         },
       ],
     });
@@ -96,9 +102,11 @@ describe('program preview factual mapping', () => {
   });
 
   it('rejects incomplete equipment and non-numeric frequency', () => {
-    const facts = programPreviewFacts(template({
-      program_metadata: { days_per_week: '4', equipment: ['Гантели', null] },
-    }));
+    const facts = programPreviewFacts(
+      template({
+        program_metadata: { days_per_week: '4', equipment: ['Гантели', null] },
+      }),
+    );
     expect(facts.find((fact) => fact.label === 'Частота')?.value).toBe('Нет данных');
     expect(facts.find((fact) => fact.label === 'Оборудование')?.value).toBe('Нет данных');
   });
