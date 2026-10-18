@@ -121,6 +121,8 @@ class WorkoutAlternativeItem(BaseModel):
     equipment_ids: list[str]
     score: int | None = None
     reason_keys: list[str] = Field(default_factory=list)
+    media_thumbnail_url: str | None = None
+    media_thumbnail_sources: list[ExerciseGuideMediaSource] = Field(default_factory=list)
 
 
 class WorkoutSetCreate(BaseModel):
