@@ -32,6 +32,8 @@
 | Migration, setup/seed, backup и прочие DB consumers | должны войти в фазу без двойного счёта |
 | Current sessions и attribution YFC/non-YFC | current YFC sessions нельзя складывать поверх projected YFC cap; неатрибутированные сессии блокируют решение |
 | Safety headroom | значение не фиксируется в коде; требуется owner-approved source и число |
+| Snapshot provenance/freshness | production preflight требует environment=`production`, non-synthetic source, capture timestamp и положительный max age |
+| Effective topology inventory | process groups и применимые rollout phases должны быть перечислены явно; отсутствующие варианты отмечаются `false` |
 
 В этой ветке нет production SSH/DB запроса, контейнеры не перезапускались, параметры PostgreSQL не менялись, secrets/connection strings/дампы не записывались.
 
@@ -43,7 +45,12 @@
 process_ceiling = pool_size + max_overflow
 ```
 
-Для `NullPool`/специального процесса используется только явно подтверждённый `connection_ceiling`. Missing pool fields не дают дефолт.
+Для каждого процесса сначала указывается эффективный тип pool:
+
+- `pool_type=queue`: только `pool_size + max_overflow`; `connection_ceiling` одновременно запрещён;
+- `pool_type=null` или `pool_type=special`: QueuePool-поля запрещены, нужен положительный явно подтверждённый `connection_ceiling` и его `connection_ceiling_source`.
+
+Противоречивый QueuePool с меньшим `connection_ceiling` не может занизить расчёт — он получает `BLOCKED`. Missing pool type/fields не дают дефолт.
 
 Для PostgreSQL:
 
@@ -63,7 +70,9 @@ phase_required = observed_non_yfc + app_connections + phase_other_connections
 PASS iff phase_required + safety_headroom <= usable for every phase
 ```
 
-`observed_yfc` используется для проверки attribution, но не добавляется к `app_connections`: projected process caps уже описывают YFC worst case. `observed_non_yfc` и фазовые `other_connections` добавляются один раз. Если pooler известен, фаза должна содержать отдельно подтверждённый PostgreSQL backend cap; иначе verdict `UNKNOWN`.
+`observed_yfc` используется для проверки attribution, но не добавляется к `app_connections`: projected process caps уже описывают YFC worst case. `observed_non_yfc` и фазовые `other_connections` добавляются один раз. Если pooler известен, фаза должна содержать положительный отдельно подтверждённый PostgreSQL backend cap и источник этого cap. Для `session` cap не может быть ниже raw session demand; для `transaction` cap — это именно максимальная PostgreSQL backend capacity, а не число занятых сейчас соединений. Raw client ceiling и backend cap не складываются повторно.
+
+До расчёта preflight проверяет inventory contract. `topology.process_groups` содержит каждую возможную process group с `true`/`false`, а `topology.rollout_phases` — каждую применимую фазу с `true`/`false`. Все группы с `true` должны присутствовать в `processes` каждой применимой фазы; неактивная группа записывается с репликами `0`. Отсутствие ключа не означает нулевую нагрузку. Применимая, но отсутствующая фаза, пустой process inventory и незадекларированная группа дают `UNKNOWN`/`BLOCKED`. Фиксированный список backend/worker/migration/setup в модели не зашит: collector должен описать фактический вариант topology и явно отметить отсутствующие элементы.
 
 Синтетический пример для repository defaults (`C=30`, только для тестов):
 
@@ -83,7 +92,7 @@ PASS iff phase_required + safety_headroom <= usable for every phase
 
 Модуль: `scripts/connection_budget_preflight.py`.
 
-Он принимает только обезличенный JSON с разделами `postgres`, `pools`, `phases`, `pooler`, `safety_headroom_connections` и `safety_headroom_source`. CLI печатает только статус, числовые результаты, имена фаз/process groups и безопасные диагностические коды. `DATABASE_URL`, password и другие секреты не читаются и не печатаются. `read_postgres_snapshot(connection)` выполняет только один `SELECT` по `current_setting(...)` и `pg_stat_activity`; attribution передаётся отдельными numeric fields.
+Он принимает только обезличенный JSON с разделами `postgres`, `pools`, `phases`, `topology`, `pooler`, `safety_headroom_connections`, `safety_headroom_source` и `evidence`. В `evidence` для production нужны `environment=production`, `synthetic=false`, `source`, timezone-aware `captured_at` и положительный `max_age_seconds`. CLI печатает только статус, числовые результаты, имена фаз/process groups и безопасные диагностические коды. `DATABASE_URL`, password и другие секреты не читаются и не печатаются. `read_postgres_snapshot(connection)` выполняет только один `SELECT` по `current_setting(...)` и `pg_stat_activity`; attribution и provenance передаются отдельными sanitized fields.
 
 Пример запуска в изолированном окружении:
 
@@ -108,25 +117,43 @@ Exit codes: `0=PASS`, `1=BLOCKED`, `2=UNKNOWN`. У CLI нет `--bypass`/`--igno
   },
   "pooler": {"mode": "none"},
   "pools": {
-    "backend": {"pool_size": 10, "max_overflow": 20, "pool_timeout_seconds": 30},
-    "worker": {"pool_size": 10, "max_overflow": 20, "pool_timeout_seconds": 30},
-    "migration": {"connection_ceiling": 1},
-    "setup": {"connection_ceiling": 30}
+    "backend": {"pool_type": "queue", "pool_size": 10, "max_overflow": 20, "pool_timeout_seconds": 30},
+    "worker": {"pool_type": "queue", "pool_size": 10, "max_overflow": 20, "pool_timeout_seconds": 30},
+    "migration": {"pool_type": "null", "connection_ceiling": 1, "connection_ceiling_source": "backend/alembic/env.py"},
+    "setup": {"pool_type": "special", "connection_ceiling": 30, "connection_ceiling_source": "backend/setup-entrypoint.sh"}
+  },
+  "topology": {
+    "process_groups": {"backend": true, "worker": true, "migration": true, "setup": true},
+    "rollout_phases": {
+      "steady-state": true,
+      "candidate-overlap": true,
+      "unexpected-all-slots": true,
+      "migration": true,
+      "setup-seed": true,
+      "rollback": true
+    }
   },
   "phases": [
-    {"name": "steady-state", "processes": {"backend": 1, "worker": 1}, "other_connections": 0},
-    {"name": "candidate-overlap", "processes": {"backend": 2, "worker": 1}, "other_connections": 0},
-    {"name": "unexpected-all-slots", "processes": {"backend": 2, "worker": 2}, "other_connections": 0},
-    {"name": "migration", "processes": {"backend": 1, "worker": 1, "migration": 1}, "other_connections": 0},
-    {"name": "setup-seed", "processes": {"backend": 1, "worker": 1, "setup": 1}, "other_connections": 0},
-    {"name": "rollback", "processes": {"backend": 2, "worker": 1}, "other_connections": 0}
+    {"name": "steady-state", "processes": {"backend": 1, "worker": 1, "migration": 0, "setup": 0}, "other_connections": 0},
+    {"name": "candidate-overlap", "processes": {"backend": 2, "worker": 1, "migration": 0, "setup": 0}, "other_connections": 0},
+    {"name": "unexpected-all-slots", "processes": {"backend": 2, "worker": 2, "migration": 0, "setup": 0}, "other_connections": 0},
+    {"name": "migration", "processes": {"backend": 1, "worker": 1, "migration": 1, "setup": 0}, "other_connections": 0},
+    {"name": "setup-seed", "processes": {"backend": 1, "worker": 1, "migration": 0, "setup": 1}, "other_connections": 0},
+    {"name": "rollback", "processes": {"backend": 2, "worker": 1, "migration": 0, "setup": 0}, "other_connections": 0}
   ],
   "safety_headroom_connections": 10,
-  "safety_headroom_source": "synthetic-test-input"
+  "safety_headroom_source": "synthetic-test-input",
+  "evidence": {
+    "environment": "test",
+    "source": "synthetic-test-fixture",
+    "captured_at": "2026-10-19T00:00:00+00:00",
+    "max_age_seconds": 86400,
+    "synthetic": true
+  }
 }
 ```
 
-The `10` above is test data, not an approved production threshold.
+The `10` and the full topology above are test data, not an approved production threshold or production evidence. `evaluate(..., require_runtime_evidence=False)` can be used in unit tests for the mathematical calculation; the CLI/default production path rejects synthetic, stale, missing or non-production evidence.
 
 ## Подготовка read-only evidence
 
@@ -150,7 +177,7 @@ The `10` above is test data, not an approved production threshold.
 
 4. Для attribution получить только counts по заранее owner-approved allowlist role/application identifiers. Нельзя угадывать владельца соединения по похожему имени или складывать весь `pg_stat_activity` поверх projected YFC cap. Любая неразрешённая/неатрибутированная сессия остаётся в `UNKNOWN`.
 
-Операционный collector должен записать в sanitized JSON только числа: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены.
+Операционный collector должен записать в sanitized JSON только числовые значения и фиксированные метаданные: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps, topology applicability, snapshot provenance/freshness и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены. Поля `synthetic=false` и `source` — декларация collector-а, а не доказательство без owner-approved происхождения; поэтому отдельное принятие evidence остаётся обязательным.
 
 ## Точка подключения rollout gate
 

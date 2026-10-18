@@ -19,13 +19,15 @@ Chosen path: standard-library standalone `scripts/connection_budget_preflight.py
 ## Contract
 
 1. `PostgresCapacity` contains numeric server/reserved/current-session facts. PostgreSQL <16 uses an explicit version-aware `reserved_connections=0` fallback; PostgreSQL >=16 requires the setting.
-2. `PoolSpec` requires `pool_size + max_overflow` and `pool_timeout_seconds` for pooled backend/worker processes, or an explicit connection ceiling for NullPool/setup/migration processes.
-3. Each `PhaseDemand` names process counts and explicit `other_connections`. Phases are mutually exclusive worst-case snapshots; sequential migration and setup are separate phases, so current YFC sessions are not added on top of their configured process ceilings.
-4. For no pooler, `phase_app_connections = sum(process_count * pool_ceiling)`. For a known pooler, each phase must provide a verified PostgreSQL backend connection cap; unknown pooler behavior returns `UNKNOWN`.
-5. `usable = max_connections - superuser_reserved_connections - reserved_connections`.
-6. `required(phase) = observed_non_yfc_connections + phase_app_connections + phase_other_connections`; `PASS` requires every phase to satisfy `required + safety_headroom <= usable`.
-7. Missing/unreadable attribution or headroom is `UNKNOWN`; invalid values or insufficient known headroom are `BLOCKED`. Only `PASS` exits zero. There is no bypass flag.
-8. A future deployment adapter must run the preflight before backup, migration, candidate launch and rollback. This branch does not call it from production deployment code.
+2. `PoolSpec` has an explicit `pool_type`: QueuePool uses only `pool_size + max_overflow` and rejects a contradictory `connection_ceiling`; NullPool/special processes require a positive ceiling and its provenance source.
+3. `TopologyInventory` explicitly declares process groups and applicable rollout phases with booleans. Every declared-present group is enumerated in every applicable phase (zero means inactive); missing keys and missing applicable phases are `UNKNOWN`. No fixed backend/worker/migration/setup set is required.
+4. Each `PhaseDemand` names process counts and explicit `other_connections`. Phases are mutually exclusive worst-case snapshots; sequential migration and setup are separate phases, so current YFC sessions are not added on top of their configured process ceilings.
+5. For no pooler, `phase_app_connections = sum(process_count * pool_ceiling)`. For a known session/transaction pooler, each phase must provide a positive verified PostgreSQL backend cap and the pooler must provide its provenance source. Backend cap is used once, never as current occupancy.
+6. `usable = max_connections - superuser_reserved_connections - reserved_connections`.
+7. `required(phase) = observed_non_yfc_connections + phase_app_connections + phase_other_connections`; `PASS` requires every phase to satisfy `required + safety_headroom <= usable`.
+8. The default/CLI path also requires non-synthetic, fresh, production-labelled evidence; a synthetic calculation can be exercised only with an explicit test-only opt-out.
+9. Missing/unreadable attribution, topology, evidence or headroom is `UNKNOWN`; invalid values or insufficient known headroom are `BLOCKED`. Only `PASS` exits zero. There is no bypass flag.
+10. A future deployment adapter must run the preflight before backup, migration, candidate launch and rollback. This branch does not call it from production deployment code.
 
 ## Plan
 

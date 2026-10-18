@@ -12,6 +12,7 @@ import re
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Final, TypeGuard, cast
@@ -38,13 +39,17 @@ class PoolSpec:
     max_overflow: int | None = None
     pool_timeout_seconds: int | None = None
     connection_ceiling: int | None = None
+    pool_type: str | None = None
+    connection_ceiling_source: str | None = None
 
     def static_ceiling(self) -> int | None:
-        if self.connection_ceiling is not None:
+        if self.pool_type == "queue":
+            if self.pool_size is None or self.max_overflow is None:
+                return None
+            return self.pool_size + self.max_overflow
+        if self.pool_type in {"null", "special"}:
             return self.connection_ceiling
-        if self.pool_size is None or self.max_overflow is None:
-            return None
-        return self.pool_size + self.max_overflow
+        return None
 
 
 @dataclass(frozen=True)
@@ -69,6 +74,26 @@ class PostgresCapacity:
 @dataclass(frozen=True)
 class PoolerTopology:
     mode: str | None = None
+    backend_capacity_source: str | None = None
+
+
+@dataclass(frozen=True)
+class TopologyInventory:
+    """Explicit effective process and rollout-phase applicability inventory."""
+
+    process_groups: Mapping[str, bool] | None = None
+    rollout_phases: Mapping[str, bool] | None = None
+
+
+@dataclass(frozen=True)
+class EvidenceMetadata:
+    """Provenance required before a model can be used as production evidence."""
+
+    environment: str | None = None
+    source: str | None = None
+    captured_at: str | None = None
+    max_age_seconds: int | None = None
+    synthetic: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -79,6 +104,8 @@ class BudgetModel:
     pooler: PoolerTopology
     safety_headroom_connections: int | None
     safety_headroom_source: str | None
+    topology: TopologyInventory | None = None
+    evidence: EvidenceMetadata | None = None
 
 
 @dataclass(frozen=True)
@@ -135,6 +162,7 @@ SELECT
     (SELECT count(*)::int FROM pg_stat_activity)
 """
 _ALLOWED_POOLER_MODES: Final = {"none", "session", "transaction"}
+_ALLOWED_POOL_TYPES: Final = {"queue", "null", "special"}
 _PRE_PROTECTED_STAGES: Final = ("backup", "migration", "candidate_start", "rollback")
 
 
@@ -164,6 +192,28 @@ def _optional_str(value: object, *, field: str) -> str | None:
     if not isinstance(value, str):
         raise ConfigurationError(f"{field} must be text")
     return value
+
+
+def _optional_bool(value: object, *, field: str) -> bool | None:
+    if value is None:
+        return None
+    if not isinstance(value, bool):
+        raise ConfigurationError(f"{field} must be a boolean")
+    return value
+
+
+def _optional_bool_mapping(value: object, *, field: str) -> dict[str, bool] | None:
+    if value is None:
+        return None
+    data = _mapping(value, field=field)
+    result: dict[str, bool] = {}
+    for name, present in data.items():
+        if not isinstance(name, str) or not name.strip():
+            raise ConfigurationError(f"{field} names must be non-empty text")
+        if not isinstance(present, bool):
+            raise ConfigurationError(f"{field}.{name} must be a boolean")
+        result[name] = present
+    return result
 
 
 def model_from_mapping(payload: Mapping[str, object]) -> BudgetModel:
@@ -218,6 +268,11 @@ def model_from_mapping(payload: Mapping[str, object]) -> BudgetModel:
                 pool.get("connection_ceiling"),
                 field=f"pools.{name}.connection_ceiling",
             ),
+            pool_type=_optional_str(pool.get("pool_type"), field=f"pools.{name}.pool_type"),
+            connection_ceiling_source=_optional_str(
+                pool.get("connection_ceiling_source"),
+                field=f"pools.{name}.connection_ceiling_source",
+            ),
         )
 
     phases_value = payload.get("phases")
@@ -262,12 +317,19 @@ def model_from_mapping(payload: Mapping[str, object]) -> BudgetModel:
         )
 
     pooler = _mapping(payload.get("pooler"), field="pooler")
+    topology = _mapping(payload.get("topology"), field="topology")
+    evidence_value = payload.get("evidence")
+    evidence_data = _mapping(evidence_value, field="evidence")
     return BudgetModel(
         postgres=postgres_capacity,
         pools=pools,
         phases=tuple(phases),
         pooler=PoolerTopology(
             mode=_optional_str(pooler.get("mode"), field="pooler.mode"),
+            backend_capacity_source=_optional_str(
+                pooler.get("backend_capacity_source"),
+                field="pooler.backend_capacity_source",
+            ),
         ),
         safety_headroom_connections=_optional_int(
             payload.get("safety_headroom_connections"),
@@ -275,6 +337,33 @@ def model_from_mapping(payload: Mapping[str, object]) -> BudgetModel:
         ),
         safety_headroom_source=_optional_str(
             payload.get("safety_headroom_source"), field="safety_headroom_source"
+        ),
+        topology=TopologyInventory(
+            process_groups=_optional_bool_mapping(
+                topology.get("process_groups"), field="topology.process_groups"
+            ),
+            rollout_phases=_optional_bool_mapping(
+                topology.get("rollout_phases"), field="topology.rollout_phases"
+            ),
+        ),
+        evidence=(
+            EvidenceMetadata(
+                environment=_optional_str(
+                    evidence_data.get("environment"), field="evidence.environment"
+                ),
+                source=_optional_str(evidence_data.get("source"), field="evidence.source"),
+                captured_at=_optional_str(
+                    evidence_data.get("captured_at"), field="evidence.captured_at"
+                ),
+                max_age_seconds=_optional_int(
+                    evidence_data.get("max_age_seconds"), field="evidence.max_age_seconds"
+                ),
+                synthetic=_optional_bool(
+                    evidence_data.get("synthetic"), field="evidence.synthetic"
+                ),
+            )
+            if evidence_value is not None
+            else None
         ),
     )
 
@@ -363,10 +452,394 @@ def _issue(issues: list[Diagnostic], status: Verdict, code: str, message: str) -
     issues.append(Diagnostic(code=code, status=status, message=message))
 
 
-def evaluate(model: BudgetModel) -> PreflightResult:
+def _looks_synthetic(value: str | None) -> bool:
+    if not value:
+        return False
+    lowered = value.casefold()
+    return any(token in lowered for token in ("synthetic", "fixture", "test", "example"))
+
+
+def _validate_runtime_evidence(
+    model: BudgetModel,
+    issues: list[Diagnostic],
+    *,
+    now: datetime | None,
+) -> None:
+    evidence = model.evidence
+    if evidence is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "runtime_evidence_unknown",
+            "Production preflight requires provenance for the effective runtime snapshot",
+        )
+        return
+    if evidence.environment is None or not evidence.environment.strip():
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "evidence_environment_unknown",
+            "Runtime snapshot environment is unknown",
+        )
+    elif evidence.environment != "production":
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "evidence_environment_invalid",
+            "The supplied snapshot is not identified as production evidence",
+        )
+    if evidence.source is None or not evidence.source.strip():
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "evidence_source_unknown",
+            "Runtime snapshot source is unknown",
+        )
+    if evidence.synthetic is not False:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "synthetic_evidence_not_allowed",
+            "Synthetic or undeclared evidence cannot authorize production preflight",
+        )
+    if evidence.captured_at is None or evidence.max_age_seconds is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "snapshot_freshness_unknown",
+            "Snapshot capture time and freshness bound are required",
+        )
+        return
+    if not _is_int(evidence.max_age_seconds) or evidence.max_age_seconds <= 0:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "snapshot_freshness_invalid",
+            "Snapshot max_age_seconds must be a positive integer",
+        )
+        return
+    try:
+        captured_at = datetime.fromisoformat(evidence.captured_at)
+    except ValueError:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "snapshot_timestamp_invalid",
+            "Snapshot captured_at is not a valid timestamp",
+        )
+        return
+    if captured_at.tzinfo is None:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "snapshot_timestamp_invalid",
+            "Snapshot captured_at must include a timezone",
+        )
+        return
+    current_time = (now or datetime.now(UTC)).astimezone(UTC)
+    age_seconds = (current_time - captured_at.astimezone(UTC)).total_seconds()
+    if age_seconds < 0:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "snapshot_timestamp_in_future",
+            "Snapshot capture time is later than the preflight clock",
+        )
+    elif age_seconds > evidence.max_age_seconds:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "snapshot_stale",
+            "The effective runtime snapshot is older than its declared freshness bound",
+        )
+
+
+def _validate_topology(
+    model: BudgetModel,
+    issues: list[Diagnostic],
+) -> tuple[Mapping[str, bool] | None, Mapping[str, bool] | None]:
+    topology = model.topology
+    if topology is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "topology_inventory_unknown",
+            "Effective process and rollout-phase inventory is missing",
+        )
+        return None, None
+
+    process_groups = topology.process_groups
+    if process_groups is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "process_inventory_unknown",
+            "Effective process-group inventory is missing",
+        )
+    elif not process_groups:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "process_inventory_unknown",
+            "An empty process-group inventory does not prove zero deployment load",
+        )
+    elif not any(present is True for present in process_groups.values()):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "process_inventory_unknown",
+            "No effective process group is declared present",
+        )
+
+    rollout_phases = topology.rollout_phases
+    if rollout_phases is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "phase_inventory_unknown",
+            "Effective rollout-phase inventory is missing",
+        )
+    elif not rollout_phases or not any(phase is True for phase in rollout_phases.values()):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "phase_inventory_unknown",
+            "No applicable rollout phase is explicitly declared",
+        )
+
+    if process_groups is None or rollout_phases is None:
+        return process_groups, rollout_phases
+
+    for pool_name, pool_spec in model.pools.items():
+        if not isinstance(pool_name, str) or not pool_name.strip():
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "process_inventory_invalid",
+                "Process-group names must be non-empty text",
+            )
+            continue
+        if pool_name not in process_groups:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "process_inventory_incomplete",
+                "A configured process pool is absent from the effective process inventory",
+            )
+        if pool_spec.name != pool_name:
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "pool_name_mismatch",
+                "A process pool name does not match its inventory key",
+            )
+
+    for process_name, present in process_groups.items():
+        if (
+            not isinstance(process_name, str)
+            or not process_name.strip()
+            or not isinstance(present, bool)
+        ):
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "process_inventory_invalid",
+                "Process inventory entries must be non-empty names and booleans",
+            )
+            continue
+        if present and process_name not in model.pools:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "process_pool_unknown",
+                "A declared process group has no effective pool settings",
+            )
+
+    supplied_phase_names = [phase.name for phase in model.phases]
+    supplied_phase_set = set(supplied_phase_names)
+    for phase_name, applicable in rollout_phases.items():
+        if (
+            not isinstance(phase_name, str)
+            or not phase_name.strip()
+            or not isinstance(applicable, bool)
+        ):
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "phase_inventory_invalid",
+                "Rollout phase inventory entries must be non-empty names and booleans",
+            )
+            continue
+        if applicable and phase_name not in supplied_phase_set:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "rollout_phase_missing",
+                "An applicable rollout phase is missing from phase demand data",
+            )
+        elif not applicable and phase_name in supplied_phase_set:
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "rollout_phase_not_applicable",
+                "A phase supplied in demand data is explicitly marked not applicable",
+            )
+    for phase_name in supplied_phase_set:
+        if phase_name not in rollout_phases:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "phase_inventory_incomplete",
+                "A supplied rollout phase is absent from the effective phase inventory",
+            )
+
+    for phase in model.phases:
+        if phase.processes is None:
+            continue
+        for process_name, replicas in phase.processes.items():
+            if process_name not in process_groups:
+                _issue(
+                    issues,
+                    Verdict.UNKNOWN,
+                    "process_inventory_incomplete",
+                    "A phase references a process absent from the effective inventory",
+                )
+            elif process_groups[process_name] is False and _is_int(replicas) and replicas > 0:
+                _issue(
+                    issues,
+                    Verdict.BLOCKED,
+                    "process_not_applicable",
+                    "A phase assigns replicas to a process explicitly marked absent",
+                )
+        for process_name, present in process_groups.items():
+            if present and process_name not in phase.processes:
+                _issue(
+                    issues,
+                    Verdict.UNKNOWN,
+                    "phase_process_inventory_incomplete",
+                    "A phase does not enumerate every declared process group; use zero for inactive groups",
+                )
+
+    return process_groups, rollout_phases
+
+
+def _pool_cap(pool_name: str, pool_spec: PoolSpec, issues: list[Diagnostic]) -> int | None:
+    if pool_spec.pool_type is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "pool_type_unknown",
+            "A process pool is missing its effective pool type",
+        )
+        if pool_spec.pool_size is None or pool_spec.max_overflow is None:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "pool_settings_unknown",
+                "A pooled process is missing pool_size or max_overflow",
+            )
+        return None
+    if pool_spec.pool_type not in _ALLOWED_POOL_TYPES:
+        _issue(issues, Verdict.BLOCKED, "pool_type_invalid", "A process pool type is invalid")
+        return None
+    if pool_spec.pool_type == "queue":
+        if pool_spec.connection_ceiling is not None:
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "queue_ceiling_conflict",
+                f"QueuePool {pool_name} cannot override pool_size + max_overflow with connection_ceiling",
+            )
+        if pool_spec.pool_size is None or pool_spec.max_overflow is None:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "pool_settings_unknown",
+                "A QueuePool is missing pool_size or max_overflow",
+            )
+            return None
+        if not _is_int(pool_spec.pool_size) or pool_spec.pool_size < 1:
+            _issue(issues, Verdict.BLOCKED, "pool_size_invalid", "A pool_size is invalid")
+        if not _is_int(pool_spec.max_overflow) or pool_spec.max_overflow < 0:
+            _issue(issues, Verdict.BLOCKED, "max_overflow_invalid", "A max_overflow is invalid")
+        if pool_spec.pool_timeout_seconds is None:
+            _issue(
+                issues,
+                Verdict.UNKNOWN,
+                "pool_timeout_unknown",
+                "A QueuePool is missing pool_timeout_seconds",
+            )
+        elif not _is_int(pool_spec.pool_timeout_seconds) or pool_spec.pool_timeout_seconds < 1:
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "pool_timeout_invalid",
+                "A pool_timeout_seconds value is invalid",
+            )
+        if (
+            _is_int(pool_spec.pool_size)
+            and pool_spec.pool_size >= 1
+            and _is_int(pool_spec.max_overflow)
+            and pool_spec.max_overflow >= 0
+        ):
+            return pool_spec.pool_size + pool_spec.max_overflow
+        return None
+
+    if any(
+        value is not None
+        for value in (
+            pool_spec.pool_size,
+            pool_spec.max_overflow,
+            pool_spec.pool_timeout_seconds,
+        )
+    ):
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "special_pool_settings_conflict",
+            "NullPool or a special process cannot also declare QueuePool settings",
+        )
+    if pool_spec.connection_ceiling is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "pool_ceiling_unknown",
+            "NullPool or a special process requires an explicit connection ceiling",
+        )
+        return None
+    if not _is_int(pool_spec.connection_ceiling) or pool_spec.connection_ceiling <= 0:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "pool_ceiling_invalid",
+            "A NullPool or special-process connection ceiling must be positive",
+        )
+        return None
+    if (
+        pool_spec.connection_ceiling_source is None
+        or not pool_spec.connection_ceiling_source.strip()
+    ):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "pool_ceiling_source_unknown",
+            "An explicit connection ceiling requires a provenance source",
+        )
+    return pool_spec.connection_ceiling
+
+
+def evaluate(
+    model: BudgetModel,
+    *,
+    require_runtime_evidence: bool = True,
+    now: datetime | None = None,
+) -> PreflightResult:
     """Evaluate every phase without inventing missing capacity inputs."""
 
     issues: list[Diagnostic] = []
+    if require_runtime_evidence:
+        _validate_runtime_evidence(model, issues, now=now)
+    _validate_topology(model, issues)
     postgres = model.postgres
 
     max_connections = postgres.max_connections
@@ -551,52 +1024,33 @@ def evaluate(model: BudgetModel) -> PreflightResult:
             "safety_headroom_invalid",
             "Safety headroom must be a positive integer",
         )
+    elif require_runtime_evidence and _looks_synthetic(model.safety_headroom_source):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "safety_headroom_source_not_production",
+            "Synthetic or test safety-headroom provenance cannot authorize production preflight",
+        )
 
     pooler_mode = model.pooler.mode
     if pooler_mode is None:
         _issue(issues, Verdict.UNKNOWN, "pooler_topology_unknown", "Pooler topology is unknown")
     elif pooler_mode not in _ALLOWED_POOLER_MODES:
         _issue(issues, Verdict.BLOCKED, "pooler_topology_invalid", "Pooler topology is invalid")
+    elif pooler_mode in {"session", "transaction"} and (
+        model.pooler.backend_capacity_source is None
+        or not model.pooler.backend_capacity_source.strip()
+    ):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "pooler_backend_source_unknown",
+            "A pooler backend capacity requires a provenance source",
+        )
 
     pool_caps: dict[str, int | None] = {}
     for pool_name, pool_spec in model.pools.items():
-        cap = pool_spec.static_ceiling()
-        pool_caps[pool_name] = cap
-        if pool_spec.connection_ceiling is not None:
-            if not _is_int(pool_spec.connection_ceiling) or pool_spec.connection_ceiling < 0:
-                _issue(
-                    issues,
-                    Verdict.BLOCKED,
-                    "pool_ceiling_invalid",
-                    "A process connection ceiling is invalid",
-                )
-            continue
-        if pool_spec.pool_size is None or pool_spec.max_overflow is None:
-            _issue(
-                issues,
-                Verdict.UNKNOWN,
-                "pool_settings_unknown",
-                "A pooled process is missing pool_size or max_overflow",
-            )
-            continue
-        if not _is_int(pool_spec.pool_size) or pool_spec.pool_size < 1:
-            _issue(issues, Verdict.BLOCKED, "pool_size_invalid", "A pool_size is invalid")
-        if not _is_int(pool_spec.max_overflow) or pool_spec.max_overflow < 0:
-            _issue(issues, Verdict.BLOCKED, "max_overflow_invalid", "A max_overflow is invalid")
-        if pool_spec.pool_timeout_seconds is None:
-            _issue(
-                issues,
-                Verdict.UNKNOWN,
-                "pool_timeout_unknown",
-                "A pooled process is missing pool_timeout_seconds",
-            )
-        elif not _is_int(pool_spec.pool_timeout_seconds) or pool_spec.pool_timeout_seconds < 1:
-            _issue(
-                issues,
-                Verdict.BLOCKED,
-                "pool_timeout_invalid",
-                "A pool_timeout_seconds value is invalid",
-            )
+        pool_caps[pool_name] = _pool_cap(pool_name, pool_spec, issues)
 
     phase_reports: list[Mapping[str, object]] = []
     seen_phase_names: set[str] = set()
@@ -692,17 +1146,35 @@ def evaluate(model: BudgetModel) -> PreflightResult:
                 app_connections = None
             elif (
                 not _is_int(phase.pooler_backend_connections)
-                or phase.pooler_backend_connections < 0
+                or phase.pooler_backend_connections <= 0
             ):
                 _issue(
                     issues,
                     Verdict.BLOCKED,
                     "pooler_backend_limit_invalid",
-                    "A pooler backend connection cap is invalid",
+                    "A pooler backend connection cap must be positive",
                 )
                 app_connections = None
             else:
                 app_connections = phase.pooler_backend_connections
+                if (
+                    pooler_mode == "session"
+                    and process_total is not None
+                    and phase.pooler_backend_connections < process_total
+                ):
+                    _issue(
+                        issues,
+                        Verdict.BLOCKED,
+                        "pooler_backend_limit_below_demand",
+                        "A session pooler backend cap is below the phase session demand",
+                    )
+        elif phase.pooler_backend_connections is not None:
+            _issue(
+                issues,
+                Verdict.BLOCKED,
+                "pooler_backend_limit_unexpected",
+                "A PostgreSQL backend cap is supplied while pooler mode is none",
+            )
 
         projected: int | None = None
         headroom_after: int | None = None

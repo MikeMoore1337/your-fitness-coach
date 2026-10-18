@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 from scripts.connection_budget_preflight import (
     BudgetModel,
     ConfigurationError,
+    EvidenceMetadata,
     PhaseDemand,
     PoolerTopology,
     PoolSpec,
     PostgresCapacity,
     PostgresSnapshotError,
+    TopologyInventory,
     Verdict,
     evaluate,
     main,
@@ -21,6 +25,12 @@ from scripts.connection_budget_preflight import (
     read_safe_pool_environment,
     validate_rollout_stage_order,
 )
+
+
+def _evaluate(model: BudgetModel):
+    """Exercise the mathematical model without treating fixtures as production evidence."""
+
+    return evaluate(model, require_runtime_evidence=False)
 
 
 def _model(
@@ -38,16 +48,23 @@ def _model(
         pool_size=10,
         max_overflow=20,
         pool_timeout_seconds=30,
+        pool_type="queue",
     )
     default_phases = (
-        PhaseDemand("steady-state", {"backend": 1, "worker": 1}, 0),
-        PhaseDemand("candidate-overlap", {"backend": 2, "worker": 1}, 0),
-        PhaseDemand("unexpected-all-slots", {"backend": 2, "worker": 2}, 0),
-        PhaseDemand("backup", {"backend": 1, "worker": 1}, 1),
-        PhaseDemand("migration", {"backend": 1, "worker": 1, "migration": 1}, 0),
-        PhaseDemand("setup-seed", {"backend": 1, "worker": 1, "setup": 1}, 0),
-        PhaseDemand("rollback", {"backend": 2, "worker": 1}, 0),
+        PhaseDemand("steady-state", {"backend": 1, "worker": 1, "migration": 0, "setup": 0}, 0),
+        PhaseDemand(
+            "candidate-overlap", {"backend": 2, "worker": 1, "migration": 0, "setup": 0}, 0
+        ),
+        PhaseDemand(
+            "unexpected-all-slots", {"backend": 2, "worker": 2, "migration": 0, "setup": 0}, 0
+        ),
+        PhaseDemand("backup", {"backend": 1, "worker": 1, "migration": 0, "setup": 0}, 1),
+        PhaseDemand("migration", {"backend": 1, "worker": 1, "migration": 1, "setup": 0}, 0),
+        PhaseDemand("setup-seed", {"backend": 1, "worker": 1, "migration": 0, "setup": 1}, 0),
+        PhaseDemand("rollback", {"backend": 2, "worker": 1, "migration": 0, "setup": 0}, 0),
     )
+    effective_phases = phases or default_phases
+    active_processes = {name for phase in effective_phases for name in (phase.processes or {})}
     return BudgetModel(
         postgres=PostgresCapacity(
             server_version_major=16,
@@ -64,19 +81,43 @@ def _model(
         ),
         pools={
             "backend": backend,
-            "worker": PoolSpec("worker", 10, 20, 30),
-            "migration": PoolSpec("migration", connection_ceiling=1),
-            "setup": PoolSpec("setup", connection_ceiling=30),
+            "worker": PoolSpec("worker", 10, 20, 30, pool_type="queue"),
+            "migration": PoolSpec(
+                "migration",
+                connection_ceiling=1,
+                pool_type="null",
+                connection_ceiling_source="backend/alembic/env.py",
+            ),
+            "setup": PoolSpec(
+                "setup",
+                connection_ceiling=30,
+                pool_type="special",
+                connection_ceiling_source="backend/setup-entrypoint.sh",
+            ),
         },
-        phases=phases or default_phases,
+        phases=effective_phases,
         pooler=PoolerTopology("none"),
         safety_headroom_connections=10,
         safety_headroom_source="synthetic-test-input",
+        topology=TopologyInventory(
+            process_groups={
+                name: name in active_processes
+                for name in ("backend", "worker", "migration", "setup")
+            },
+            rollout_phases={phase.name: True for phase in effective_phases},
+        ),
+        evidence=EvidenceMetadata(
+            environment="test",
+            source="synthetic-test-fixture",
+            captured_at="2026-10-19T00:00:00+00:00",
+            max_age_seconds=86_400,
+            synthetic=True,
+        ),
     )
 
 
 def test_default_2c_3c_4c_and_setup_phases_pass_with_explicit_headroom() -> None:
-    result = evaluate(_model())
+    result = _evaluate(_model())
 
     assert result.status == Verdict.PASS
     assert result.pool_caps == {"backend": 30, "worker": 30, "migration": 1, "setup": 30}
@@ -92,28 +133,28 @@ def test_default_2c_3c_4c_and_setup_phases_pass_with_explicit_headroom() -> None
 
 
 def test_insufficient_budget_is_blocked() -> None:
-    result = evaluate(_model(max_connections=135))
+    result = _evaluate(_model(max_connections=135))
 
     assert result.status == Verdict.BLOCKED
     assert any(item.code == "insufficient_headroom" for item in result.diagnostics)
 
 
 def test_unknown_max_connections_is_not_pass() -> None:
-    result = evaluate(_model(max_connections=None))
+    result = _evaluate(_model(max_connections=None))
 
     assert result.status == Verdict.UNKNOWN
     assert any(item.code == "max_connections_unknown" for item in result.diagnostics)
 
 
 def test_postgres_16_requires_reserved_connections() -> None:
-    result = evaluate(_model(reserved_connections=None))
+    result = _evaluate(_model(reserved_connections=None))
 
     assert result.status == Verdict.UNKNOWN
     assert any(item.code == "reserved_connections_unknown" for item in result.diagnostics)
 
 
 def test_missing_pool_settings_are_unknown() -> None:
-    result = evaluate(_model(backend_pool=PoolSpec("backend", pool_timeout_seconds=30)))
+    result = _evaluate(_model(backend_pool=PoolSpec("backend", pool_timeout_seconds=30)))
 
     assert result.status == Verdict.UNKNOWN
     assert any(item.code == "pool_settings_unknown" for item in result.diagnostics)
@@ -124,7 +165,7 @@ def test_multiple_replicas_and_rollback_are_counted() -> None:
         PhaseDemand("scaled", {"backend": 3, "worker": 2}, 0),
         PhaseDemand("rollback", {"backend": 2, "worker": 2}, 0),
     )
-    result = evaluate(_model(phases=phases))
+    result = _evaluate(_model(phases=phases))
 
     assert result.status == Verdict.PASS
     assert result.worst_case_connections == 162
@@ -134,7 +175,8 @@ def test_multiple_replicas_and_rollback_are_counted() -> None:
 
 def test_postgres_15_uses_zero_reserved_connections_fallback() -> None:
     model = _model()
-    model = BudgetModel(
+    model = replace(
+        model,
         postgres=PostgresCapacity(
             server_version_major=15,
             max_connections=200,
@@ -144,14 +186,9 @@ def test_postgres_15_uses_zero_reserved_connections_fallback() -> None:
             observed_non_yfc_connections=12,
             observed_yfc_connections=8,
         ),
-        pools=model.pools,
-        phases=model.phases,
-        pooler=model.pooler,
-        safety_headroom_connections=model.safety_headroom_connections,
-        safety_headroom_source=model.safety_headroom_source,
     )
 
-    result = evaluate(model)
+    result = _evaluate(model)
 
     assert result.status == Verdict.PASS
     assert result.reserved_connections_effective == 0
@@ -161,16 +198,9 @@ def test_pooler_requires_verified_backend_cap_per_phase() -> None:
     model = _model(
         phases=(PhaseDemand("steady", {"backend": 1, "worker": 1}, 0),),
     )
-    model = BudgetModel(
-        postgres=model.postgres,
-        pools=model.pools,
-        phases=model.phases,
-        pooler=PoolerTopology("transaction"),
-        safety_headroom_connections=model.safety_headroom_connections,
-        safety_headroom_source=model.safety_headroom_source,
-    )
+    model = replace(model, pooler=PoolerTopology("transaction"))
 
-    result = evaluate(model)
+    result = _evaluate(model)
 
     assert result.status == Verdict.UNKNOWN
     assert any(item.code == "pooler_backend_limit_unknown" for item in result.diagnostics)
@@ -212,7 +242,7 @@ def test_postgres_connection_failure_is_fail_closed() -> None:
 
 
 def test_invalid_values_are_blocked() -> None:
-    result = evaluate(
+    result = _evaluate(
         _model(
             phases=(PhaseDemand("invalid", {"backend": -1, "worker": 1}, 0),),
         )
@@ -223,17 +253,148 @@ def test_invalid_values_are_blocked() -> None:
 
 
 def test_missing_attribution_is_unknown_even_when_capacity_is_large() -> None:
-    result = evaluate(_model(observed_non_yfc=None, observed_yfc=None))
+    result = _evaluate(_model(observed_non_yfc=None, observed_yfc=None))
 
     assert result.status == Verdict.UNKNOWN
     assert any(item.code == "connection_attribution_unknown" for item in result.diagnostics)
 
 
 def test_inconsistent_attribution_is_blocked() -> None:
-    result = evaluate(_model(current_connections=21))
+    result = _evaluate(_model(current_connections=21))
 
     assert result.status == Verdict.BLOCKED
     assert any(item.code == "connection_attribution_inconsistent" for item in result.diagnostics)
+
+
+def test_empty_process_inventory_is_not_proven_zero_load() -> None:
+    model = _model(phases=(PhaseDemand("steady-state", {}, 0),))
+    model = replace(
+        model,
+        topology=TopologyInventory(
+            process_groups={"backend": True, "worker": True, "migration": False, "setup": False},
+            rollout_phases={"steady-state": True},
+        ),
+    )
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.UNKNOWN
+    assert any(item.code == "phase_process_inventory_incomplete" for item in result.diagnostics)
+
+
+def test_missing_applicable_rollout_phase_is_unknown() -> None:
+    model = _model()
+    model = replace(model, phases=(model.phases[0],))
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.UNKNOWN
+    assert any(item.code == "rollout_phase_missing" for item in result.diagnostics)
+
+
+def test_phase_process_inventory_must_include_required_worker() -> None:
+    model = _model(phases=(PhaseDemand("steady", {"backend": 1}, 0),))
+    model = replace(
+        model,
+        topology=TopologyInventory(
+            process_groups={"backend": True, "worker": True, "migration": False, "setup": False},
+            rollout_phases={"steady": True},
+        ),
+    )
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.UNKNOWN
+    assert any(item.code == "phase_process_inventory_incomplete" for item in result.diagnostics)
+
+
+def test_explicitly_absent_worker_variant_can_pass() -> None:
+    model = _model(phases=(PhaseDemand("steady", {"backend": 1}, 0),))
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.PASS
+    assert result.worst_case_connections == 42
+
+
+def test_queue_pool_cannot_be_lowered_by_connection_ceiling() -> None:
+    result = _evaluate(
+        _model(
+            backend_pool=PoolSpec(
+                "backend",
+                10,
+                20,
+                30,
+                1,
+                pool_type="queue",
+            )
+        )
+    )
+
+    assert result.status == Verdict.BLOCKED
+    assert any(item.code == "queue_ceiling_conflict" for item in result.diagnostics)
+
+
+@pytest.mark.parametrize("mode", ["session", "transaction"])
+def test_pooler_modes_use_verified_positive_backend_capacity(mode: str) -> None:
+    model = _model(
+        phases=(PhaseDemand("steady", {"backend": 1, "worker": 1}, 0, 60),),
+    )
+    model = replace(model, pooler=PoolerTopology(mode, "sanitized-pooler-config"))
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.PASS
+    report = result.phase_reports[0]
+    assert report["process_connections"] == {"backend": 30, "worker": 30}
+    assert report["app_connections"] == 60
+    assert report["projected_connections"] == 72
+
+
+@pytest.mark.parametrize("mode", ["session", "transaction"])
+def test_pooler_zero_backend_capacity_is_blocked(mode: str) -> None:
+    model = _model(
+        phases=(PhaseDemand("steady", {"backend": 1, "worker": 1}, 0, 0),),
+    )
+    model = replace(model, pooler=PoolerTopology(mode, "sanitized-pooler-config"))
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.BLOCKED
+    assert any(item.code == "pooler_backend_limit_invalid" for item in result.diagnostics)
+
+
+def test_malformed_process_topology_is_blocked_at_mapping_boundary() -> None:
+    with pytest.raises(ConfigurationError):
+        model_from_mapping(
+            {"topology": {"process_groups": {"backend": "present"}}},
+        )
+
+
+def test_synthetic_input_cannot_be_used_as_production_evidence() -> None:
+    result = evaluate(_model())
+
+    assert result.status != Verdict.PASS
+    assert any(item.code == "synthetic_evidence_not_allowed" for item in result.diagnostics)
+
+
+def test_stale_runtime_snapshot_is_blocked() -> None:
+    model = replace(
+        _model(),
+        safety_headroom_source="owner-approved-headroom-record",
+        evidence=EvidenceMetadata(
+            environment="production",
+            source="sanitized-runtime-snapshot",
+            captured_at="2026-10-18T00:00:00+00:00",
+            max_age_seconds=60,
+            synthetic=False,
+        ),
+    )
+
+    result = evaluate(model, now=datetime(2026, 10, 19, tzinfo=UTC))
+
+    assert result.status == Verdict.BLOCKED
+    assert any(item.code == "snapshot_stale" for item in result.diagnostics)
 
 
 def test_no_bypass_flag_is_accepted(tmp_path: Path) -> None:
