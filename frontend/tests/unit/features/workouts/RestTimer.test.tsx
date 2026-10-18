@@ -44,6 +44,26 @@ afterEach(() => {
 });
 
 describe('RestTimer', () => {
+  it('uses an uppercase FACT label with a real, explicitly stoppable measured clock', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    const panel = screen.getByRole('complementary', { name: 'Отдых между подходами' });
+    expect(panel.querySelector('.active-workout-rest__actual-value span')).toHaveTextContent(
+      'ФАКТ',
+    );
+    expect(panel.querySelector('.active-workout-rest__actual-value strong')).toHaveTextContent(
+      '0:00',
+    );
+    expect(screen.getByRole('timer', { name: 'Отдых' })).toHaveTextContent('1:30');
+    expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  });
+
   it('settles an already-expired stored deadline without a user event', () => {
     localStorage.setItem(key, JSON.stringify(initialTime - 1));
 
