@@ -1,12 +1,71 @@
-# Your Fitness Coach
+<p align="center">
+  <a href="https://your-fitness-coach.ru/" title="Your Fitness Coach - официальный сайт">
+    <img src="frontend/public/assets/brand/yfc-social-preview.png" width="960" alt="Your Fitness Coach - тренировки, питание и прогресс" />
+  </a>
+</p>
 
-Your Fitness Coach — единый продукт для самостоятельных пользователей и тренеров. Он доступен как
-адаптивное Web-приложение и Telegram Mini App, использует общий FastAPI backend и PostgreSQL, а
-Aiogram-бот отвечает за Telegram-вход, поддержку и разрешённые уведомления.
+<h1 align="center">Your Fitness Coach</h1>
 
-Публичный репозиторий содержит production-код, миграции, автоматические проверки и безопасные
-инструкции для разработчиков. Marketing-описание продукта живёт на публичном Landing; внутренние
-operator runbooks хранятся отдельно и доступны только владельцу/release operators.
+<p align="center">
+  <strong>Сила в действии.</strong><br />
+  Тренируйтесь по плану. Сопоставляйте питание, результаты и самочувствие,<br />
+  чтобы выбрать следующий шаг.
+</p>
+
+<p align="center">
+  <a href="https://app.your-fitness-coach.ru/"><strong>Открыть приложение</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/">О проекте</a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/for-trainers">Для тренеров</a>
+  &nbsp;·&nbsp;
+  <a href="https://your-fitness-coach.ru/knowledge">База знаний</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/MikeMoore1337/your-fitness-coach/actions/workflows/ci.yml"><img src="https://github.com/MikeMoore1337/your-fitness-coach/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI master" /></a>
+  <img src="https://img.shields.io/badge/Python-3.14-1E221E?logo=python&logoColor=A8E83A" alt="Python 3.14" />
+  <img src="https://img.shields.io/badge/React-19-1E221E?logo=react&logoColor=A8E83A" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-1E221E?logo=typescript&logoColor=A8E83A" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/FastAPI-1E221E?logo=fastapi&logoColor=A8E83A" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/PostgreSQL-16-1E221E?logo=postgresql&logoColor=A8E83A" alt="PostgreSQL 16" />
+</p>
+
+---
+
+## Продукт
+
+**Your Fitness Coach** - единое приложение для самостоятельных занятий и работы с тренером.
+Веб-версия и Telegram Mini App используют один аккаунт и общие данные.
+
+| Направление | Возможности |
+| :--- | :--- |
+| **[Тренировки](https://your-fitness-coach.ru/training)** | Готовые и собственные программы, план занятия, запись фактических подходов и история тренировок. |
+| **[Питание](https://your-fitness-coach.ru/nutrition)** | Расчёт ориентиров калорий и БЖУ с учётом цели и активности; данные для наблюдения за динамикой. |
+| **[Прогресс](https://your-fitness-coach.ru/progress)** | История занятий, рабочие веса, результаты подходов и дневник замеров без выдуманных данных. |
+| **[Кабинет тренера](https://your-fitness-coach.ru/for-trainers)** | Назначение программ, работа со связанными клиентами и просмотр доступных тренеру результатов. |
+| **[База знаний](https://your-fitness-coach.ru/knowledge)** | Материалы о тренировках и питании с проверяемыми источниками. |
+| **[Упражнения](https://your-fitness-coach.ru/exercises)** | Публичные карточки с техникой и основными рекомендациями. |
+
+Калькулятор питания даёт **стартовую оценку**, а не гарантированный результат или
+индивидуальное медицинское назначение. Выводы о прогрессе опираются на фактические записи.
+
+## Для разработчиков
+
+Открытый репозиторий содержит код приложения, миграции, тесты и публичные
+технические контракты. Продукт построен вокруг общего **FastAPI API** и **PostgreSQL**:
+React-интерфейс работает в браузере и Telegram Mini App, Aiogram-бот отвечает
+за Telegram-интеграцию и разрешённые уведомления.
+
+**Быстрая навигация**
+
+- [Архитектура и структура каталогов](#архитектура-репозитория)
+- [Системные требования](#требования) и [безопасная настройка](#безопасная-локальная-настройка)
+- [Запуск через Docker Compose](#быстрый-запуск-через-docker) и [разработка с hot reload](#разработка-с-hot-reload)
+- [Тесты и проверки](#проверки), [Mobile Web / TMA](#mobile-web-и-telegram-mini-app)
+- [Техническая документация](#документация) и [production delivery](#production-и-deployment)
+
+---
 
 ## Архитектура репозитория
 
