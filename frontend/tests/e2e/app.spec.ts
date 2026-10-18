@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { mkdirSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
@@ -2624,6 +2625,33 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(example).not.toContainText('beginner');
   await example.click();
   await expect(page.getByRole('dialog')).toBeVisible();
+
+  // Real-browser evidence of the implementation (API fixtures, not production data).
+  const previewEvidenceDir = path.resolve(
+    '..',
+    '.artifacts/runtime/tests/playwright/redesign-visual-issue-997',
+  );
+  mkdirSync(previewEvidenceDir, { recursive: true });
+  const originalViewport = page.viewportSize();
+  const originalTheme = await page.locator('html').getAttribute('data-color-scheme');
+  for (const width of [393, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ['dark', 'light'] as const) {
+      await page.locator('html').evaluate((element, colorScheme) => {
+        element.setAttribute('data-color-scheme', colorScheme);
+      }, theme);
+      await page.screenshot({
+        path: path.join(previewEvidenceDir, `preview-${theme}-${width}.png`),
+        animations: 'disabled',
+      });
+    }
+  }
+  if (originalViewport) await page.setViewportSize(originalViewport);
+  await page.locator('html').evaluate((element, colorScheme) => {
+    if (colorScheme == null) element.removeAttribute('data-color-scheme');
+    else element.setAttribute('data-color-scheme', colorScheme);
+  }, originalTheme);
+
   await expect(page.getByRole('heading', { name: 'День 1. Всё тело' })).toBeVisible();
   await expect(page.getByRole('dialog').getByText('Тяга блока')).toBeVisible();
   await expect(page.getByRole('dialog').getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
