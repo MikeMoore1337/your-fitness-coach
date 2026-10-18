@@ -1274,11 +1274,11 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               </small>
             </div>
             <div>
-              <span>Дни с подтверждённым статусом</span>
-              <strong>{confirmedDays} дней</strong>
+              <span>Дни с данными для средних</span>
+              <strong>{nutrition.logged_days} дней</strong>
               <small>
-                {nutrition.incomplete_days} частичных · {nutrition.unlogged_days} без записей;
-                средние считаются только по дням с данными
+                {confirmedDays} подтверждённых статуса · {nutrition.incomplete_days} частичных ·{' '}
+                {nutrition.unlogged_days} без записей
               </small>
             </div>
           </div>

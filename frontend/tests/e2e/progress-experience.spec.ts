@@ -616,8 +616,8 @@ async function mockProgress(
           },
           nutrition: {
             visible: true,
-            logged_days: 20,
-            adherence_evaluated_days: 18,
+            logged_days: 9,
+            adherence_evaluated_days: 9,
             complete_days: 18,
             incomplete_days: 2,
             fasted_days: 0,
@@ -708,16 +708,16 @@ async function mockProgress(
             },
             calories: {
               status: 'available',
-              percent: 83.3,
-              achieved: 15,
-              evaluated: 18,
+              percent: 77.8,
+              achieved: 7,
+              evaluated: 9,
               weight: 0.2,
             },
             protein: {
               status: 'available',
-              percent: 72.2,
-              achieved: 13,
-              evaluated: 18,
+              percent: 66.7,
+              achieved: 6,
+              evaluated: 9,
               weight: 0.2,
             },
           },
@@ -743,10 +743,10 @@ async function mockProgress(
               required_coverage_percent: 50,
             }),
             nutrition_coverage: signal('sufficient', {
-              logged_day_count: 20,
-              eligible_day_count: 29,
+              logged_day_count: 9,
+              eligible_day_count: 30,
               required_logged_day_count: 7,
-              coverage_percent: 69,
+              coverage_percent: 30,
             }),
             weight_trend: signal('sufficient', {
               point_count: 4,
@@ -2555,7 +2555,8 @@ test('nutrition separates confirmed day statuses from filled report days', async
   await expect(
     nutrition.getByText('18 из 30 дней отмечены завершёнными или без приёмов пищи'),
   ).toBeVisible();
-  await expect(nutrition.getByText(/средние считаются только по дням с данными/)).toBeVisible();
+  await expect(nutrition.getByText('Дни с данными для средних')).toBeVisible();
+  await expect(nutrition.getByText('9 дней', { exact: true })).toBeVisible();
   await expect(
     page.locator('#nutrition-period-report').getByText('Заполнено 9 из 30 дней'),
   ).toBeVisible();
@@ -3445,10 +3446,13 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
     width: number,
     state: 'default' | 'expanded' | 'action-add-measurement',
   ) => {
-    const details = page.locator('.progress-details').first();
-    await expect(details).toBeVisible();
+    const region =
+      section === 'overview'
+        ? page.locator('.progress-summary').first()
+        : page.locator('.progress-details').first();
+    await expect(region).toBeVisible();
     await settleCapture();
-    const metrics = await details.evaluate((element) => {
+    const metrics = await region.evaluate((element) => {
       const visible = (candidate: Element) => {
         const box = candidate.getBoundingClientRect();
         const style = getComputedStyle(candidate);
@@ -3483,7 +3487,7 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
     });
     const file = `${theme}-${section}-${width}-${state}.jpg`;
     const path = resolve(outputDir, file);
-    await details.screenshot({
+    await region.screenshot({
       path,
       type: 'jpeg',
       quality: 88,
@@ -3512,7 +3516,11 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
   ) => {
     await page.goto(`/app?section=progress&progress_view=${section}&capture_theme=${theme}`);
     await ensureClient();
-    await expect(page.locator('.progress-details').first()).toBeVisible();
+    await expect(
+      section === 'overview'
+        ? page.locator('.progress-summary').first()
+        : page.locator('.progress-details').first(),
+    ).toBeVisible();
   };
 
   for (const theme of ['light', 'dark'] as const) {
@@ -3530,9 +3538,12 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
       await page.setViewportSize({ width, height: width < 900 ? 844 : 1000 });
       for (const section of ISSUE_873_CAPTURE_SECTIONS) {
         await openSection(theme, section);
-        const details = page.locator('.progress-details').first();
-        await expect(details).toBeVisible();
-        await details.locator('details').evaluateAll((elements) => {
+        const region =
+          section === 'overview'
+            ? page.locator('.progress-summary').first()
+            : page.locator('.progress-details').first();
+        await expect(region).toBeVisible();
+        await region.locator('details').evaluateAll((elements) => {
           for (const element of elements) (element as HTMLDetailsElement).open = true;
         });
         await capture(theme, section, width, 'expanded');
@@ -3564,7 +3575,7 @@ test('Issue #873 paired browser evidence capture', async ({ page }) => {
           width,
           height: width < 900 ? 844 : 1000,
         })),
-        region: '.progress-details',
+        region: '.progress-summary for overview; .progress-details for detail views',
         scrollState:
           'window.scrollY=0; region screenshot after two animation frames and document.fonts.ready',
         captures,
