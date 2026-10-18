@@ -1784,7 +1784,7 @@ export function RestTimer({
       {measuredRest && !compact && (
         <div className="active-workout-rest__actual">
           <div className="active-workout-rest__actual-value">
-            <span>Факт</span>
+            <span>ФАКТ</span>
             <strong aria-label="Время по отметке пользователя" aria-live="off">
               {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
             </strong>
