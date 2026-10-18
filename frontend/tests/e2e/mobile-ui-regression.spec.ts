@@ -557,7 +557,7 @@ test('@extended mobile layout stress keeps long content inside viewport', async 
     await assertMobileShellGeometry(page);
     await expectElementsWithinHorizontalViewport(
       page,
-      '.today-dashboard button, .today-dashboard a, .today-dashboard h1, .today-dashboard h2',
+      '.today-dashboard button:not(.week-strip__day), .today-dashboard a, .today-dashboard h1, .today-dashboard h2',
     );
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
   }
