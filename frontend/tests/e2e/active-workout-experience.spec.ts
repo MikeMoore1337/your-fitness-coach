@@ -860,7 +860,8 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
             stopRight: stop.getBoundingClientRect().right,
             panelRight: element.getBoundingClientRect().right,
             panelWidth: element.getBoundingClientRect().width,
-            documentOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            documentOverflow:
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
             actions: Array.from(
               element.querySelectorAll<HTMLElement>('.active-workout-rest__actions button'),
             ).map((button) => button.getBoundingClientRect().width),
