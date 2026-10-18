@@ -1041,6 +1041,57 @@ async function mockProgress(
         ],
       });
     }
+    if (path.endsWith('/workouts/cardio')) {
+      const dateTo = url.searchParams.get('date_to') ?? '2030-01-30';
+      const cardioSessions = [
+        {
+          activity_type: 'walking',
+          duration_minutes: 30,
+          distance_km: 3,
+          average_heart_rate_bpm: 118,
+          heart_rate_zone: 2,
+          note: 'Утреннее кардио',
+          scheduled_at: `${shiftDate(dateTo, -12)}T08:00:00+03:00`,
+          status: 'completed',
+          id: 101,
+          source: 'manual',
+          completed_at: `${shiftDate(dateTo, -12)}T08:30:00+03:00`,
+          created_at: `${shiftDate(dateTo, -12)}T08:00:00+03:00`,
+          updated_at: `${shiftDate(dateTo, -12)}T08:30:00+03:00`,
+        },
+        {
+          activity_type: 'running',
+          duration_minutes: 45,
+          distance_km: 4,
+          average_heart_rate_bpm: 136,
+          heart_rate_zone: 3,
+          note: null,
+          scheduled_at: `${shiftDate(dateTo, -6)}T18:30:00+03:00`,
+          status: 'completed',
+          id: 102,
+          source: 'manual',
+          completed_at: `${shiftDate(dateTo, -6)}T19:15:00+03:00`,
+          created_at: `${shiftDate(dateTo, -6)}T18:30:00+03:00`,
+          updated_at: `${shiftDate(dateTo, -6)}T19:15:00+03:00`,
+        },
+        {
+          activity_type: 'cycling',
+          duration_minutes: 45,
+          distance_km: 5,
+          average_heart_rate_bpm: null,
+          heart_rate_zone: null,
+          note: 'Спокойный темп',
+          scheduled_at: `${dateTo}T07:30:00+03:00`,
+          status: 'completed',
+          id: 103,
+          source: 'manual',
+          completed_at: `${dateTo}T08:15:00+03:00`,
+          created_at: `${dateTo}T07:30:00+03:00`,
+          updated_at: `${dateTo}T08:15:00+03:00`,
+        },
+      ];
+      return route.fulfill({ json: cardioSessions });
+    }
     if (path.endsWith('/workouts/history')) {
       return route.fulfill({
         json: [
@@ -1061,6 +1112,28 @@ async function mockProgress(
                 title: 'Присед со штангой',
                 prescribed_sets: 4,
                 prescribed_reps: '8',
+                sort_order: 1,
+              },
+            ],
+            adaptations: [],
+          },
+          {
+            id: 44,
+            scheduled_date: '2030-01-22',
+            scheduled_time: '07:30:00',
+            title: 'Грудь и спина',
+            status: 'completed',
+            started_at: '2030-01-22T07:30:00',
+            completed_at: '2030-01-22T08:25:00',
+            completed_sets: 5,
+            volume_kg: 1730,
+            exercises: [
+              {
+                workout_exercise_id: 66,
+                exercise_id: 17,
+                title: 'Жим гантелей лёжа',
+                prescribed_sets: 3,
+                prescribed_reps: '10',
                 sort_order: 1,
               },
             ],
@@ -1089,7 +1162,7 @@ async function mockProgress(
     }
     if (path.endsWith('/workouts/history/summary')) {
       return route.fulfill({
-        json: { workouts_completed: 1, completed_sets: 4, volume_kg: 1480 },
+        json: { workouts_completed: 2, completed_sets: 9, volume_kg: 3210 },
       });
     }
     return route.fulfill({ json: [] });
@@ -1733,7 +1806,9 @@ test('shared data confidence keeps analytics factual, responsive and explicit wh
     .getByRole('tab', { name: /^Тело/ })
     .click();
   await expect(page.getByRole('heading', { name: 'Тело' })).toBeVisible();
-  const limitedConfidence = page.getByLabel('Достаточно ли данных: Вывод пока предварительный');
+  const limitedConfidence = page.getByLabel(
+    'Достаточно ли данных: Окружности — Вывод пока предварительный',
+  );
   await expect(limitedConfidence).toContainText(
     'В самой заполненной окружности — 2 замера; для оценки одной окружности нужно минимум 3 замера',
   );
@@ -2459,6 +2534,107 @@ test('nutrition report no-data state keeps missing days distinct from zero', asy
   await report.screenshot({
     path: '../.artifacts/screenshots/task-69b/sparse-insufficient-mobile-light.png',
   });
+});
+
+test('nutrition separates confirmed day statuses from filled report days', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_view=nutrition');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Питание/ })
+    .click();
+
+  const nutrition = page.locator('#progress-nutrition');
+  await expect(
+    nutrition.getByText('18 из 30 дней отмечены завершёнными или без приёмов пищи'),
+  ).toBeVisible();
+  await expect(nutrition.getByText(/средние считаются только по дням с данными/)).toBeVisible();
+  await expect(
+    page.locator('#nutrition-period-report').getByText('Заполнено 9 из 30 дней'),
+  ).toBeVisible();
+});
+
+test('cardio rows match the requested period source and summary count', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_view=overview');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+
+  const cardioRequest = page.waitForRequest(
+    (request) => request.url().includes('/workouts/cardio?') && request.method() === 'GET',
+  );
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^Кардио/ })
+    .click();
+  const request = await cardioRequest;
+  const cardioUrl = new URL(request.url());
+  expect(cardioUrl.searchParams.get('date_from')).toBeTruthy();
+  expect(cardioUrl.searchParams.get('date_to')).toBeTruthy();
+
+  const cardio = page.locator('#progress-cardio');
+  await expect(cardio.getByText('3 завершено', { exact: true })).toBeVisible();
+  await expect(cardio.locator('.cardio-session-row')).toHaveCount(3);
+  await expect(cardio.getByText('Кардио пока не записано')).toHaveCount(0);
+  await expect(cardio.getByText('Ходьба')).toBeVisible();
+  await expect(cardio.getByText('Бег')).toBeVisible();
+  await expect(cardio.getByText('Велосипед')).toBeVisible();
+});
+
+test('history keeps two workout records, totals and navigation separate', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_view=history');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page
+    .getByRole('navigation', { name: 'Основная навигация' })
+    .getByRole('link', { name: 'Прогресс' })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Разделы прогресса' })
+    .getByRole('tab', { name: /^История/ })
+    .click();
+
+  const history = page.locator('.workout-history-card');
+  await expect(history.getByText('2', { exact: true }).first()).toBeVisible();
+  await expect(history.getByText('9', { exact: true }).first()).toBeVisible();
+  await expect(history.getByText('3210 кг', { exact: true })).toBeVisible();
+  const first = page.locator('#workout-history-43');
+  const second = page.locator('#workout-history-44');
+  await expect(first).toContainText('Ноги и корпус');
+  await expect(first).toContainText('Присед со штангой');
+  await expect(first).not.toContainText('Грудь и спина');
+  await expect(second).toContainText('Грудь и спина');
+  await expect(second).toContainText('Жим гантелей лёжа');
+  await expect(second).not.toContainText('Присед со штангой');
+
+  const week = page.locator('.progress-history-week');
+  await week.locator(':scope > summary').press('Enter');
+  await week.getByRole('link', { name: /Открыть тренировочный день: Ноги и корпус/ }).click();
+  await expect(page).toHaveURL(/#workout-history-43$/);
+  await page.goBack();
+  await expect(first).toBeVisible();
+  await expect(second).toBeVisible();
+
+  const clearHistory = history.getByRole('button', { name: 'Очистить историю' });
+  await expect(clearHistory).toHaveClass(/secondary/);
+  await clearHistory.click();
+  await expect(page.getByRole('dialog', { name: 'Очистить историю?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Отмена' }).click();
+  await expect(first).toBeVisible();
 });
 
 test('notification deep-link opens exact workout feedback and preserves back navigation', async ({
@@ -3233,6 +3409,7 @@ test('progress header keeps expanded help and custom period in normal flow', asy
 });
 
 const ISSUE_873_CAPTURE_SECTIONS = [
+  'overview',
   'body',
   'training',
   'nutrition',
@@ -3240,7 +3417,7 @@ const ISSUE_873_CAPTURE_SECTIONS = [
   'wellbeing',
   'history',
 ] as const;
-const ISSUE_873_CAPTURE_VIEWPORTS = [320, 360, 393, 430, 1440] as const;
+const ISSUE_873_CAPTURE_VIEWPORTS = [320, 360, 393, 430, 1024, 1280, 1440, 1920] as const;
 
 test('Issue #873 paired browser evidence capture', async ({ page }) => {
   test.skip(process.env.CAPTURE_ISSUE_873 !== '1', 'Evidence-only capture');

@@ -1049,11 +1049,13 @@ function BodySection({
             <div className="progress-confidence-grid">
               <DataConfidence
                 isStale={isStale}
+                label="Масса"
                 kind="weight"
                 signal={summary.data_sufficiency.weight_trend}
               />
               <DataConfidence
                 isStale={isStale}
+                label="Окружности"
                 kind="anthropometry"
                 signal={summary.data_sufficiency.anthropometry}
               />
@@ -1176,11 +1178,11 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
       <div className="progress-nutrition-overview">
         <article className="progress-detail-card progress-nutrition-coverage">
           <div>
-            <span className="progress-section__eyebrow">Покрытие периода</span>
+            <span className="progress-section__eyebrow">Статус дней</span>
             <h3>{coverageLabel}</h3>
             <p>
               {nutrition.visible
-                ? `${confirmedDays} из ${summary.period_days} дней подтверждены`
+                ? `${confirmedDays} из ${summary.period_days} дней отмечены завершёнными или без приёмов пищи`
                 : 'Эти данные недоступны для текущей роли'}
             </p>
           </div>
@@ -1272,10 +1274,11 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               </small>
             </div>
             <div>
-              <span>Подтверждено</span>
+              <span>Дни с подтверждённым статусом</span>
               <strong>{confirmedDays} дней</strong>
               <small>
-                {nutrition.incomplete_days} частичных · {nutrition.unlogged_days} без записей
+                {nutrition.incomplete_days} частичных · {nutrition.unlogged_days} без записей;
+                средние считаются только по дням с данными
               </small>
             </div>
           </div>

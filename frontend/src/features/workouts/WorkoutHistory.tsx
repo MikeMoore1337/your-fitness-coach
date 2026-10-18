@@ -315,7 +315,7 @@ export function WorkoutHistory({
             )}
             <div className="workout-history__footer-actions">
               <button
-                className="btn-danger"
+                className="secondary"
                 disabled={readOnly || clearHistory.isPending}
                 onClick={async () => {
                   if (

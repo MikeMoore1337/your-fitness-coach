@@ -2341,6 +2341,18 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   min-height: 44px;
 }
 
+.app-section--progress
+  .progress-experience--approved
+  :is(
+    .progress-body-secondary > details > summary > span,
+    .progress-nutrition-goals > summary > span,
+    .progress-history-week > summary > span
+  ) {
+  display: grid;
+  gap: var(--v2-space-1);
+  min-width: 0;
+}
+
 .app-section--progress .progress-experience--approved .data-confidence {
   border: 1px solid var(--v2-border);
   border-left-width: 1px;
