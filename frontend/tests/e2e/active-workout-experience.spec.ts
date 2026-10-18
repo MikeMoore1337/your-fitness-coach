@@ -13,6 +13,8 @@ import {
 
 const mediaThumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const mediaAnimationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
+const replacementMediaThumbnailUrl =
+  '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg';
 
 test.use({
   serviceWorkers: 'block',
@@ -29,6 +31,10 @@ const ISSUE_980_AFTER_DIR = resolve(
   'evidence',
   '980-completed-set-20261013',
   'after',
+);
+const ISSUE_996_AFTER_DIR = resolve(
+  process.env.YFC_ISSUE_996_AFTER_DIR ??
+    resolve(process.cwd(), '..', '.artifacts', 'tasks', '996', 'evidence', 'after'),
 );
 
 const captureLandingProductProofs =
@@ -490,8 +496,46 @@ async function mockActiveWorkout(
             exercise_id: 13,
             title: 'Жим гантелей лёжа',
             equipment_ids: ['dumbbell', 'bench'],
+            media_thumbnail_url:
+              '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+            media_thumbnail_sources: [
+              {
+                url: '/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+                mime_type: 'image/jpeg',
+                width: 180,
+                height: 180,
+                byte_size: 8103,
+              },
+            ],
             score: 0.96,
             reason_keys: ['same_movement_pattern', 'same_primary_muscle'],
+          },
+          {
+            exercise_id: 14,
+            title: 'Жим в тренажёре от груди',
+            equipment_ids: ['machine'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.8,
+            reason_keys: ['same_movement_pattern'],
+          },
+          {
+            exercise_id: 15,
+            title: 'Отжимания от пола',
+            equipment_ids: ['bodyweight'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.7,
+            reason_keys: ['same_primary_muscle'],
+          },
+          {
+            exercise_id: 16,
+            title: 'Жим в тренажёре Смита',
+            equipment_ids: ['machine', 'bench'],
+            media_thumbnail_url: null,
+            media_thumbnail_sources: [],
+            score: 0.6,
+            reason_keys: ['same_movement_pattern'],
           },
         ],
       });
@@ -1794,6 +1838,171 @@ async function installMockedTelegram(page: Page) {
   });
 }
 
+async function openIssue996Replacement(
+  page: Page,
+  options: {
+    width?: number;
+    theme?: 'dark' | 'light';
+    candidateMedia?: 'catalog' | 'broken';
+  } = {},
+) {
+  const { width = 393, theme = 'dark', candidateMedia = 'catalog' } = options;
+  await page.setViewportSize({ width, height: 844 });
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((selectedTheme) => {
+    localStorage.setItem('app-theme', selectedTheme);
+  }, theme);
+  await page.addInitScript(() => {
+    const viewport = new EventTarget() as EventTarget & {
+      height: number;
+      width: number;
+      offsetTop: number;
+      setHeight: (height: number) => void;
+    };
+    let height = 844;
+    Object.defineProperties(viewport, {
+      height: { configurable: true, get: () => height },
+      width: { configurable: true, get: () => innerWidth },
+      offsetTop: { configurable: true, get: () => 0 },
+      setHeight: {
+        configurable: true,
+        value: (nextHeight: number) => {
+          height = nextHeight;
+        },
+      },
+    });
+    Object.defineProperty(window, 'visualViewport', {
+      configurable: true,
+      value: viewport,
+    });
+  });
+  await mockActiveWorkout(page);
+  if (candidateMedia === 'catalog') {
+    await page.route(
+      new RegExp(`${replacementMediaThumbnailUrl.replaceAll('.', '\\.')}(?:\\?.*)?$`),
+      (route) =>
+        route.fulfill({
+          path: '../backend/assets/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg',
+          contentType: 'image/jpeg',
+        }),
+    );
+  } else {
+    await page.route(
+      new RegExp(`${replacementMediaThumbnailUrl.replaceAll('.', '\\.')}(?:\\?.*)?$`),
+      (route) => route.abort(),
+    );
+  }
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  await page
+    .locator('.active-workout-exercise')
+    .filter({ hasText: 'Жим штанги лёжа' })
+    .first()
+    .getByRole('button', { name: 'Заменить только в этой тренировке' })
+    .click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Заменить только в этой тренировке',
+    exact: true,
+  });
+  await dialog.getByRole('checkbox', { name: 'Гантели', exact: true }).check();
+  await dialog.getByRole('checkbox', { name: 'Скамья', exact: true }).check();
+  await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toBeVisible();
+  return dialog;
+}
+
+async function readIssue996FooterGeometry(dialog: Locator) {
+  return dialog.evaluate((element) => {
+    const footer = element.querySelector<HTMLElement>('.workout-adaptation-dialog__footer')!;
+    const choiceRow = footer.querySelector<HTMLElement>('.workout-adaptation-dialog__choice-row')!;
+    const getRect = (node: Element | null) => {
+      if (!(node instanceof HTMLElement)) return null;
+      const rect = node.getBoundingClientRect();
+      const style = getComputedStyle(node);
+      return {
+        left: rect.left,
+        top: rect.top,
+        right: rect.right,
+        bottom: rect.bottom,
+        width: rect.width,
+        height: rect.height,
+        clientWidth: node.clientWidth,
+        scrollWidth: node.scrollWidth,
+        minHeight: Number.parseFloat(style.minHeight) || 0,
+        whiteSpace: style.whiteSpace,
+      };
+    };
+    const footerChildren = [...footer.children].map((child) => ({
+      tag: child.tagName,
+      buttons:
+        child instanceof HTMLButtonElement
+          ? [child.textContent?.trim()]
+          : [...child.querySelectorAll('button')].map((button) => button.textContent?.trim()),
+    }));
+    return {
+      footer: getRect(footer)!,
+      choiceRow: getRect(choiceRow)!,
+      choiceButtons: [...choiceRow.querySelectorAll('button')].map(getRect),
+      applyButton: getRect(
+        [...footer.children].find(
+          (child) => child instanceof HTMLButtonElement && child.classList.contains('ui-button'),
+        ) ?? null,
+      ),
+      footerChildren,
+      documentWidth: {
+        client: document.documentElement.clientWidth,
+        scroll: document.documentElement.scrollWidth,
+      },
+      viewportHeight: window.innerHeight,
+      footerPaddingBottom: Number.parseFloat(getComputedStyle(footer).paddingBottom) || 0,
+    };
+  });
+}
+
+async function assertIssue996FooterGeometry(dialog: Locator, afterPreview = false) {
+  const geometry = await readIssue996FooterGeometry(dialog);
+  const [previewButton, cancelButton] = geometry.choiceButtons;
+  expect(geometry.choiceButtons).toHaveLength(2);
+  expect(previewButton).not.toBeNull();
+  expect(cancelButton).not.toBeNull();
+  expect(Math.abs(previewButton!.top - cancelButton!.top)).toBeLessThanOrEqual(1);
+  expect(Math.abs(previewButton!.bottom - cancelButton!.bottom)).toBeLessThanOrEqual(1);
+  expect(previewButton!.left).toBeLessThan(cancelButton!.left);
+  expect(Math.abs(previewButton!.width - cancelButton!.width)).toBeLessThanOrEqual(1);
+  expect(previewButton!.height).toBeGreaterThanOrEqual(44);
+  expect(cancelButton!.height).toBeGreaterThanOrEqual(44);
+  expect(previewButton!.whiteSpace).toBe('nowrap');
+  expect(cancelButton!.whiteSpace).toBe('nowrap');
+  expect(previewButton!.scrollWidth).toBeLessThanOrEqual(previewButton!.clientWidth + 1);
+  expect(cancelButton!.scrollWidth).toBeLessThanOrEqual(cancelButton!.clientWidth + 1);
+  expect(previewButton!.right).toBeLessThanOrEqual(cancelButton!.left + 1);
+  expect(geometry.choiceRow.scrollWidth).toBeLessThanOrEqual(geometry.choiceRow.clientWidth + 1);
+  expect(geometry.footer.scrollWidth).toBeLessThanOrEqual(geometry.footer.clientWidth + 1);
+  expect(geometry.documentWidth.scroll).toBeLessThanOrEqual(geometry.documentWidth.client + 1);
+  expect(geometry.footerPaddingBottom).toBeGreaterThan(0);
+  expect(geometry.footer.bottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+  expect(geometry.footerChildren[0]).toEqual({
+    tag: 'DIV',
+    buttons: [afterPreview ? 'Обновить изменения' : 'Показать изменения', 'Отмена'],
+  });
+  if (afterPreview) {
+    expect(geometry.applyButton).not.toBeNull();
+    expect(geometry.applyButton!.height).toBeGreaterThanOrEqual(44);
+    expect(geometry.applyButton!.whiteSpace).toBe('nowrap');
+    expect(geometry.applyButton!.scrollWidth).toBeLessThanOrEqual(
+      geometry.applyButton!.clientWidth + 1,
+    );
+    expect(geometry.applyButton!.top).toBeGreaterThanOrEqual(geometry.choiceRow.bottom - 1);
+    expect(geometry.footerChildren[1]).toEqual({
+      tag: 'BUTTON',
+      buttons: ['Применить только сегодня'],
+    });
+  } else {
+    expect(geometry.applyButton).toBeNull();
+    expect(geometry.footerChildren).toHaveLength(1);
+  }
+}
+
 test('V9-01 replaces only an untouched active exercise and survives refresh', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await mockActiveWorkout(page);
@@ -1845,7 +2054,7 @@ test('V9-01 replaces only an untouched active exercise and survives refresh', as
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByText('Изменения применены только к сегодняшней тренировке')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   const replacedSummary = page.getByRole('region', { name: 'Что делать сейчас?' });
@@ -1962,15 +2171,20 @@ for (const width of [360, 393, 430]) {
           available_equipment_ids: ['cable', 'machine', 'dumbbell', 'bench'],
         });
         await page.screenshot({ path: testInfo.outputPath('preview-visible.png') });
-        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
         await expect(error).toContainText('Состав тренировки изменился');
         await expect(error).toBeInViewport();
-        await expect(dialog.getByRole('button', { name: 'Применить', exact: true })).toHaveCount(0);
+        await expect(
+          dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }),
+        ).toHaveCount(0);
         await dialog.getByRole('button', { name: 'Обновить изменения', exact: true }).click();
         await expect(previewHeading).toBeFocused();
-        await dialog.getByRole('button', { name: 'Применить', exact: true }).click();
+        await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
         await expect(
-          page.getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+          page
+            .locator('.active-workout-exercise')
+            .filter({ hasText: 'Жим гантелей лёжа' })
+            .getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
         ).toBeVisible();
         expect(
           writes.filter((request) => request.path.endsWith('/adaptations/apply')),
@@ -2010,7 +2224,7 @@ test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page 
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
   expect(
@@ -2037,12 +2251,234 @@ test('V9-01 desktop smoke keeps replacement scoped to the current workout', asyn
   await page.getByRole('checkbox', { name: 'Скамья' }).check();
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
-  await page.getByRole('button', { name: 'Применить' }).click();
+  await page.getByRole('button', { name: 'Применить только сегодня' }).click();
   await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
 });
+
+for (const [theme, width] of [
+  ['dark', 320],
+  ['light', 320],
+  ['dark', 360],
+  ['light', 360],
+  ['dark', 393],
+  ['light', 393],
+  ['dark', 430],
+  ['light', 430],
+  ['dark', 1440],
+  ['light', 1440],
+] as const) {
+  test(`#996 real AFTER ${theme} ${width}px`, async ({ page }) => {
+    await mkdir(ISSUE_996_AFTER_DIR, { recursive: true });
+    const dialog = await openIssue996Replacement(page, { width, theme });
+    const originalImage = dialog.locator('.adaptation-original-card img');
+    const alternativeCard = dialog
+      .locator('.adaptation-alternative-card')
+      .filter({ hasText: 'Жим гантелей лёжа' });
+    const alternativeImage = alternativeCard.locator('img');
+    await expect(originalImage).toBeVisible();
+    await expect(alternativeImage).toBeVisible();
+    await expect(alternativeCard.locator('input[type="radio"]')).toHaveValue('13');
+    await expect
+      .poll(() =>
+        originalImage.evaluate((image) => {
+          const element = image as HTMLImageElement;
+          return [element.complete, element.naturalWidth];
+        }),
+      )
+      .toEqual([true, expect.any(Number)]);
+    await expect
+      .poll(() => originalImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        alternativeImage.evaluate((image) => {
+          const element = image as HTMLImageElement;
+          return [element.complete, element.naturalWidth];
+        }),
+      )
+      .toEqual([true, expect.any(Number)]);
+    await expect
+      .poll(() => alternativeImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+      .toBeGreaterThan(0);
+    await expect(
+      dialog
+        .locator('.adaptation-alternative-card')
+        .filter({ hasText: 'Жим в тренажёре от груди' })
+        .getByText('Нет фото', { exact: true }),
+    ).toBeVisible();
+    await assertIssue996FooterGeometry(dialog);
+    if (width === 1440) {
+      await dialog.getByRole('button', { name: 'Все подходящие' }).click();
+      await expect(dialog.getByRole('searchbox')).toBeVisible();
+    } else {
+      await dialog
+        .locator('.workout-adaptation-dialog__body')
+        .evaluate((body) => body.scrollTo({ top: 0 }));
+    }
+
+    await page.screenshot({
+      path: resolve(ISSUE_996_AFTER_DIR, `issue-996-after-${theme}-${width}.png`),
+      fullPage: false,
+    });
+  });
+}
+
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#996 footer geometry ${theme} ${width}px`, async ({ page }) => {
+      const dialog = await openIssue996Replacement(page, { width, theme });
+      await assertIssue996FooterGeometry(dialog);
+      await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Что изменится', exact: true }),
+      ).toBeVisible();
+      await assertIssue996FooterGeometry(dialog, true);
+      await expect(
+        page
+          .locator('.active-workout-exercise')
+          .getByRole('heading', { name: 'Жим штанги лёжа', exact: true }),
+      ).toBeVisible();
+    });
+  }
+}
+
+test('#996 preserves the selected list, search focus and preview/cancel boundary', async ({
+  page,
+}) => {
+  const dialog = await openIssue996Replacement(page, { width: 393, theme: 'dark' });
+  await dialog.getByRole('button', { name: 'Все подходящие', exact: true }).click();
+  const search = dialog.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+  await search.fill('Смита');
+  await expect(search).toHaveValue('Смита');
+  await expect(search).toBeFocused();
+  await expect(dialog.getByRole('radio', { name: /Жим в тренажёре Смита/ })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toHaveCount(0);
+  await search.fill('');
+  await dialog.getByRole('button', { name: 'Тренажёры', exact: true }).click();
+  await expect(dialog.getByRole('radio', { name: /Жим в тренажёре от груди/ })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: /Жим гантелей лёжа/ })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Тренажёры', exact: true }).click();
+  await dialog.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
+
+  await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+  await expect(dialog.getByRole('heading', { name: 'Что изменится', exact: true })).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('.active-workout-exercise')
+      .getByRole('heading', { name: 'Жим штанги лёжа', exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Отмена', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(
+    page.getByRole('button', { name: 'Заменить только в этой тренировке' }),
+  ).toBeVisible();
+});
+
+test('#996 keeps a failed catalog image selectable with the missing-media fallback', async ({
+  page,
+}) => {
+  const dialog = await openIssue996Replacement(page, {
+    width: 393,
+    theme: 'light',
+    candidateMedia: 'broken',
+  });
+  const card = dialog
+    .locator('.adaptation-alternative-card')
+    .filter({ hasText: 'Жим гантелей лёжа' });
+  await expect(card.getByText('Нет фото', { exact: true })).toBeVisible();
+  await expect(card.getByRole('radio')).toHaveValue('13');
+  await expect(card.getByRole('radio')).toBeChecked();
+  await assertIssue996FooterGeometry(dialog);
+});
+
+test('#996 keeps the open sheet offline without preview or local mutation', async ({ page }) => {
+  const dialog = await openIssue996Replacement(page, { width: 393, theme: 'dark' });
+  await page.context().setOffline(true);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+    window.dispatchEvent(new Event('offline'));
+  });
+  await expect(dialog.getByText(/Замена требует подключения/)).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: 'Показать изменения', exact: true }),
+  ).toBeDisabled();
+  await expect(
+    dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }),
+  ).toHaveCount(0);
+  await page.context().setOffline(false);
+});
+
+for (const [theme, state] of [
+  ['dark', 'preview'],
+  ['light', 'preview'],
+  ['dark', 'error'],
+  ['light', 'error'],
+  ['dark', 'offline'],
+  ['light', 'offline'],
+  ['dark', 'conflict'],
+  ['light', 'conflict'],
+  ['dark', 'keyboard-modeled'],
+  ['light', 'keyboard-modeled'],
+] as const) {
+  test(`#996 real AFTER ${state} ${theme} 393px`, async ({ page }) => {
+    await mkdir(ISSUE_996_AFTER_DIR, { recursive: true });
+    const dialog = await openIssue996Replacement(page, { width: 393, theme });
+    if (state === 'error') {
+      await page.route('**/workouts/42/adaptations/preview', (route) =>
+        route.fulfill({ status: 503, json: { detail: 'Временная ошибка сервера' } }),
+      );
+      await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('Временная ошибка сервера');
+    } else if (state === 'offline') {
+      await page.context().setOffline(true);
+      await page.evaluate(() => {
+        Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
+        window.dispatchEvent(new Event('offline'));
+      });
+      await expect(dialog.getByText(/Замена требует подключения/)).toBeVisible();
+    } else if (state === 'conflict') {
+      await page.route('**/workouts/42/adaptations/apply', (route) =>
+        route.fulfill({ status: 409, json: { detail: 'Тренировка изменилась' } }),
+      );
+      await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Что изменится', exact: true }),
+      ).toBeVisible();
+      await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('Состав тренировки изменился');
+    } else if (state === 'keyboard-modeled') {
+      await dialog.getByRole('button', { name: 'Все подходящие', exact: true }).click();
+      const search = dialog.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+      await search.fill('Смита');
+      await expect(search).toBeFocused();
+      await page.evaluate(() => {
+        (
+          window.visualViewport as VisualViewport & { setHeight: (height: number) => void }
+        ).setHeight(420);
+        window.visualViewport!.dispatchEvent(new Event('resize'));
+      });
+      await expect(search).toBeFocused();
+      await expect(search).toHaveValue('Смита');
+    } else {
+      await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Что изменится', exact: true }),
+      ).toBeVisible();
+      await assertIssue996FooterGeometry(dialog, true);
+    }
+    await page.screenshot({
+      path: resolve(ISSUE_996_AFTER_DIR, `issue-996-after-${state}-${theme}-393.png`),
+      fullPage: false,
+    });
+    await page.context().setOffline(false);
+  });
+}
 
 test('V9-01 does not offer replacement after the target has actual data', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

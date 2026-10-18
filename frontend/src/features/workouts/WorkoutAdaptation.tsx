@@ -16,6 +16,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import type { ActiveWorkoutMutation } from './activeWorkoutQueue';
+import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 
 type AdaptationReason = WorkoutAdaptationRequest['reason'];
 type EquipmentId = NonNullable<WorkoutAdaptationRequest['available_equipment_ids']>[number];
@@ -143,6 +144,9 @@ export function WorkoutAdaptation({
   const [equipmentIds, setEquipmentIds] = useState<EquipmentId[]>([]);
   const [preview, setPreview] = useState<WorkoutAdaptationPreview | null>(null);
   const [error, setError] = useState<{ kind: ErrorKind; message: string } | null>(null);
+  const [alternativesExpanded, setAlternativesExpanded] = useState(false);
+  const [alternativeSearch, setAlternativeSearch] = useState('');
+  const [alternativeFilters, setAlternativeFilters] = useState<string[]>([]);
   const activeReason: AdaptationReason = safetyOnly ? 'pain_or_injury' : reason;
   const availableReasons = safetyOnly
     ? reasons.filter((item) => item.value === 'pain_or_injury')
@@ -179,10 +183,45 @@ export function WorkoutAdaptation({
   const initialTarget = initialTargetId
     ? workout.exercises.find((item) => item.id === initialTargetId)
     : undefined;
+  const isWorkoutInProgress = workout.status === 'in_progress';
   const initialTargetStarted =
-    workout.status === 'in_progress' &&
-    initialTarget != null &&
-    hasWorkoutExecutionEvidence(initialTarget);
+    isWorkoutInProgress && initialTarget != null && hasWorkoutExecutionEvidence(initialTarget);
+  const isQuickReplacement = Boolean(initialTargetId) && activeReason === 'replace_exercise';
+  const showTargetSelector =
+    !isQuickReplacement &&
+    (activeReason === 'unavailable_equipment' || activeReason === 'replace_exercise');
+  const showGenericAlternatives =
+    activeReason === 'replace_exercise' &&
+    !isQuickReplacement &&
+    Boolean(targetId) &&
+    equipmentIds.length > 0;
+  const safetyBoundary = activeReason === 'pain_or_injury';
+  const hasPreviewOrConflict = Boolean(preview) || error?.kind === 'conflict';
+  const canApplyPreview = preview?.status === 'preview' && Boolean(preview.preview_token);
+
+  const alternativeEquipmentOptions = useMemo(
+    () => Array.from(new Set(alternatives.data?.flatMap((item) => item.equipment_ids) ?? [])),
+    [alternatives.data],
+  );
+  const visibleAlternatives = useMemo(() => {
+    const query = alternativeSearch.trim().toLocaleLowerCase('ru');
+    return (alternatives.data ?? []).filter((item) => {
+      const matchesSearch =
+        !query ||
+        `${item.title} ${item.equipment_ids.join(' ')}`.toLocaleLowerCase('ru').includes(query);
+      const matchesEquipment = alternativeFilters.every((id) => item.equipment_ids.includes(id));
+      return matchesSearch && matchesEquipment;
+    });
+  }, [alternativeFilters, alternativeSearch, alternatives.data]);
+  const displayedAlternatives = alternativesExpanded
+    ? visibleAlternatives
+    : visibleAlternatives.slice(0, 3);
+  const selectedReplacementId =
+    isQuickReplacement &&
+    alternatives.data?.length &&
+    !alternatives.data.some((item) => String(item.exercise_id) === replacementId)
+      ? String(alternatives.data[0]?.exercise_id ?? '')
+      : replacementId;
 
   const resetPreview = () => {
     setPreview(null);
@@ -197,6 +236,9 @@ export function WorkoutAdaptation({
     setEquipmentIds([]);
     setPreview(null);
     setError(null);
+    setAlternativesExpanded(false);
+    setAlternativeSearch('');
+    setAlternativeFilters([]);
   };
 
   const buildRequest = (): WorkoutAdaptationRequest | null => {
@@ -223,7 +265,7 @@ export function WorkoutAdaptation({
       setError({ kind: 'validation', message: 'Выберите упражнение.' });
       return null;
     }
-    if (activeReason === 'replace_exercise' && !replacementId) {
+    if (activeReason === 'replace_exercise' && !selectedReplacementId) {
       setError({
         kind: 'validation',
         message:
@@ -237,7 +279,7 @@ export function WorkoutAdaptation({
       reason: activeReason,
       target_workout_exercise_id: Number(targetId),
       replacement_exercise_id:
-        activeReason === 'replace_exercise' ? Number(replacementId) : undefined,
+        activeReason === 'replace_exercise' ? Number(selectedReplacementId) : undefined,
       available_equipment_ids: equipmentIds,
     };
   };
@@ -324,10 +366,13 @@ export function WorkoutAdaptation({
             name: 'workout_adaptation_started',
             surface: productEventSurface(),
           });
-          if (initialTargetId) {
+          if (initialTargetId && targetId !== String(initialTargetId)) {
             setReason('replace_exercise');
             setTargetId(String(initialTargetId));
             setReplacementId('');
+            setAlternativesExpanded(false);
+            setAlternativeSearch('');
+            setAlternativeFilters([]);
             setEquipmentIds([]);
             resetPreview();
           }
@@ -384,8 +429,10 @@ export function WorkoutAdaptation({
                 </IconButton>
               </header>
 
-              <div className="workout-adaptation-dialog__body">
-                {!safetyOnly && (
+              <div
+                className={`workout-adaptation-dialog__body ${isQuickReplacement ? 'workout-adaptation-dialog__body--quick' : ''}`}
+              >
+                {!safetyOnly && !isQuickReplacement && (
                   <fieldset className="adaptation-section adaptation-reasons">
                     <legend>Что изменилось сегодня?</legend>
                     <div className="adaptation-choice-grid">
@@ -457,8 +504,7 @@ export function WorkoutAdaptation({
                   </fieldset>
                 )}
 
-                {(activeReason === 'unavailable_equipment' ||
-                  activeReason === 'replace_exercise') && (
+                {showTargetSelector && (
                   <div className="adaptation-section">
                     <Field label="Какое упражнение изменить?" labelFor={`${titleId}-target`}>
                       <Select
@@ -475,12 +521,10 @@ export function WorkoutAdaptation({
                           <option
                             value={item.id}
                             key={item.id}
-                            disabled={
-                              workout.status === 'in_progress' && hasWorkoutExecutionEvidence(item)
-                            }
+                            disabled={isWorkoutInProgress && hasWorkoutExecutionEvidence(item)}
                           >
                             {item.exercise_title}
-                            {workout.status === 'in_progress' && hasWorkoutExecutionEvidence(item)
+                            {isWorkoutInProgress && hasWorkoutExecutionEvidence(item)
                               ? ' — уже начато'
                               : ''}
                           </option>
@@ -490,8 +534,37 @@ export function WorkoutAdaptation({
                   </div>
                 )}
 
+                {isQuickReplacement && selectedTarget && (
+                  <section
+                    className="adaptation-original-card"
+                    aria-labelledby={`${titleId}-original`}
+                  >
+                    <div className="adaptation-original-card__content">
+                      <ExerciseMediaAsset
+                        alt={`${selectedTarget.exercise_title}: изображение упражнения`}
+                        className="adaptation-original-card__media"
+                        height={72}
+                        thumbnailUrl={selectedTarget.media_thumbnail_url}
+                        thumbnailSources={selectedTarget.media_thumbnail_sources}
+                        variant="thumbnail"
+                        width={72}
+                      />
+                      <div>
+                        <span className="eyebrow">Меняем</span>
+                        <h3 id={`${titleId}-original`}>{selectedTarget.exercise_title}</h3>
+                        <p>
+                          Подходы не начаты · {selectedTarget.prescribed_sets} ×{' '}
+                          {selectedTarget.prescribed_reps}
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
                 {needsEquipment && (
-                  <fieldset className="adaptation-section adaptation-equipment">
+                  <fieldset
+                    className={`adaptation-section adaptation-equipment ${isQuickReplacement ? 'adaptation-equipment--quick' : ''}`}
+                  >
                     <legend>Что доступно сейчас?</legend>
                     <p>Отметьте всё подходящее оборудование.</p>
                     <div className="adaptation-equipment__grid">
@@ -521,7 +594,7 @@ export function WorkoutAdaptation({
                   </fieldset>
                 )}
 
-                {activeReason === 'replace_exercise' && targetId && equipmentIds.length > 0 && (
+                {showGenericAlternatives && (
                   <fieldset className="adaptation-section adaptation-alternatives">
                     <legend>Проверенная замена для «{selectedTarget?.exercise_title}»</legend>
                     <p>Совместимость задана в каталоге, а не только совпадением основной мышцы.</p>
@@ -544,7 +617,7 @@ export function WorkoutAdaptation({
                       <div className="adaptation-alternatives__list">
                         {alternatives.data.map((item) => (
                           <label
-                            className={`adaptation-choice ${replacementId === String(item.exercise_id) ? 'is-selected' : ''}`}
+                            className={`adaptation-choice ${selectedReplacementId === String(item.exercise_id) ? 'is-selected' : ''}`}
                             data-yfc-choice="compact"
                             key={item.exercise_id}
                           >
@@ -552,7 +625,7 @@ export function WorkoutAdaptation({
                               type="radio"
                               name={`${titleId}-alternative`}
                               value={item.exercise_id}
-                              checked={replacementId === String(item.exercise_id)}
+                              checked={selectedReplacementId === String(item.exercise_id)}
                               onChange={(event) => {
                                 setReplacementId(event.target.value);
                                 resetPreview();
@@ -581,7 +654,134 @@ export function WorkoutAdaptation({
                   </fieldset>
                 )}
 
-                {activeReason === 'pain_or_injury' && (
+                {isQuickReplacement && targetId && equipmentIds.length > 0 && (
+                  <fieldset className="adaptation-section adaptation-alternatives">
+                    <legend>Проверенные варианты</legend>
+                    <div className="adaptation-alternatives__heading">
+                      <p>Показаны только результаты текущего ответа сервиса.</p>
+                      {alternatives.data && alternatives.data.length > 3 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setAlternativesExpanded((current) => !current)}
+                        >
+                          {alternativesExpanded ? 'Свернуть' : 'Все подходящие'}
+                        </Button>
+                      )}
+                    </div>
+
+                    {alternativesExpanded && alternatives.data?.length ? (
+                      <>
+                        <label className="sr-only" htmlFor={`${titleId}-alternative-search`}>
+                          Поиск по полному ответу сервиса
+                        </label>
+                        <Input
+                          id={`${titleId}-alternative-search`}
+                          type="search"
+                          placeholder="Поиск по этому списку"
+                          value={alternativeSearch}
+                          onChange={(event) => setAlternativeSearch(event.target.value)}
+                        />
+                        {alternativeEquipmentOptions.length > 0 && (
+                          <div
+                            className="adaptation-alternatives__filters"
+                            aria-label="Фильтр по оборудованию"
+                          >
+                            {alternativeEquipmentOptions.map((id) => (
+                              <Button
+                                className="adaptation-alternatives__filter"
+                                data-yfc-choice="compact"
+                                type="button"
+                                variant="ghost"
+                                aria-pressed={alternativeFilters.includes(id)}
+                                key={id}
+                                onClick={() =>
+                                  setAlternativeFilters((current) =>
+                                    current.includes(id)
+                                      ? current.filter((value) => value !== id)
+                                      : [...current, id],
+                                  )
+                                }
+                              >
+                                {equipment.find((entry) => entry.value === id)?.label ?? id}
+                              </Button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    ) : null}
+
+                    {alternatives.isLoading ? (
+                      <p className="adaptation-inline-status" role="status">
+                        Ищем подходящие варианты…
+                      </p>
+                    ) : alternatives.isError ? (
+                      <div className="adaptation-inline-error" role="alert">
+                        <span>{(alternatives.error as Error).message}</span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => void alternatives.refetch()}
+                        >
+                          Повторить
+                        </Button>
+                      </div>
+                    ) : alternatives.data?.length === 0 ? (
+                      <p className="adaptation-inline-status">
+                        Для выбранного оборудования нет проверенной замены. Измените условия или
+                        оставьте упражнение без изменений.
+                      </p>
+                    ) : alternatives.data?.length && displayedAlternatives.length === 0 ? (
+                      <p className="adaptation-inline-status">
+                        В этом ответе ничего не найдено. Измените поиск или фильтр.
+                      </p>
+                    ) : (
+                      <div className="adaptation-alternatives__list">
+                        {displayedAlternatives.map((item) => (
+                          <label
+                            className={`adaptation-alternative-card ${selectedReplacementId === String(item.exercise_id) ? 'is-selected' : ''}`}
+                            data-yfc-choice="compact"
+                            key={item.exercise_id}
+                          >
+                            <input
+                              type="radio"
+                              name={`${titleId}-alternative`}
+                              value={item.exercise_id}
+                              checked={selectedReplacementId === String(item.exercise_id)}
+                              onChange={(event) => {
+                                setReplacementId(event.target.value);
+                                resetPreview();
+                              }}
+                            />
+                            <ExerciseMediaAsset
+                              alt=""
+                              className="adaptation-alternative-card__media"
+                              height={56}
+                              thumbnailUrl={item.media_thumbnail_url}
+                              thumbnailSources={item.media_thumbnail_sources}
+                              variant="thumbnail"
+                              width={56}
+                            />
+                            <span className="adaptation-alternative-card__body">
+                              <strong>{item.title}</strong>
+                              <span className="adaptation-alternative-card__equipment">
+                                {item.equipment_ids
+                                  .map(
+                                    (id) =>
+                                      equipment.find((entry) => entry.value === id)?.label ?? id,
+                                  )
+                                  .join(' · ')}
+                              </span>
+                              <small>Допустимо при выбранном оборудовании</small>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </fieldset>
+                )}
+
+                {safetyBoundary && (
                   <div className="adaptation-safety-note">
                     <strong>Не подбираем «лечебную» замену</strong>
                     <p>
@@ -667,42 +867,85 @@ export function WorkoutAdaptation({
               </div>
 
               <footer className="workout-adaptation-dialog__footer">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={applyMutation.isPending}
-                  onClick={close}
-                >
-                  Отмена
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={!online || previewMutation.isPending || applyMutation.isPending}
-                  aria-busy={previewMutation.isPending}
-                  onClick={requestPreview}
-                >
-                  {previewMutation.isPending
-                    ? 'Считаем…'
-                    : preview || error?.kind === 'conflict'
-                      ? 'Обновить изменения'
-                      : activeReason === 'pain_or_injury'
-                        ? 'Показать рекомендации'
-                        : 'Показать изменения'}
-                </Button>
-                {preview?.status === 'preview' && preview.preview_token && (
-                  <Button
-                    type="button"
-                    disabled={!online || previewMutation.isPending || applyMutation.isPending}
-                    aria-busy={applyMutation.isPending}
-                    onClick={() => {
-                      const request = buildRequest();
-                      if (!request) return;
-                      applyMutation.mutate({ request, token: preview.preview_token! });
-                    }}
-                  >
-                    {applyMutation.isPending ? 'Применяем…' : 'Применить'}
-                  </Button>
+                {isQuickReplacement ? (
+                  <>
+                    <div className="workout-adaptation-dialog__choice-row">
+                      <Button
+                        type="button"
+                        disabled={!online || previewMutation.isPending || applyMutation.isPending}
+                        aria-busy={previewMutation.isPending}
+                        onClick={requestPreview}
+                      >
+                        {previewMutation.isPending
+                          ? 'Считаем…'
+                          : hasPreviewOrConflict
+                            ? 'Обновить изменения'
+                            : 'Показать изменения'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={applyMutation.isPending}
+                        onClick={close}
+                      >
+                        Отмена
+                      </Button>
+                    </div>
+                    {canApplyPreview && (
+                      <Button
+                        type="button"
+                        disabled={!online || previewMutation.isPending || applyMutation.isPending}
+                        aria-busy={applyMutation.isPending}
+                        onClick={() => {
+                          const request = buildRequest();
+                          if (!request) return;
+                          applyMutation.mutate({ request, token: preview.preview_token! });
+                        }}
+                      >
+                        {applyMutation.isPending ? 'Применяем…' : 'Применить только сегодня'}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={applyMutation.isPending}
+                      onClick={close}
+                    >
+                      Отмена
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={!online || previewMutation.isPending || applyMutation.isPending}
+                      aria-busy={previewMutation.isPending}
+                      onClick={requestPreview}
+                    >
+                      {previewMutation.isPending
+                        ? 'Считаем…'
+                        : hasPreviewOrConflict
+                          ? 'Обновить изменения'
+                          : safetyBoundary
+                            ? 'Показать рекомендации'
+                            : 'Показать изменения'}
+                    </Button>
+                    {canApplyPreview && (
+                      <Button
+                        type="button"
+                        disabled={!online || previewMutation.isPending || applyMutation.isPending}
+                        aria-busy={applyMutation.isPending}
+                        onClick={() => {
+                          const request = buildRequest();
+                          if (!request) return;
+                          applyMutation.mutate({ request, token: preview.preview_token! });
+                        }}
+                      >
+                        {applyMutation.isPending ? 'Применяем…' : 'Применить'}
+                      </Button>
+                    )}
+                  </>
                 )}
               </footer>
             </div>

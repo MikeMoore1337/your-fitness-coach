@@ -175,6 +175,14 @@ def test_replacement_requires_curated_compatible_alternative_and_fresh_preview(c
     )
     assert alternatives.status_code == 200
     replacement = next(item for item in alternatives.json() if item["title"] == "Жим гантелей лежа")
+    assert replacement["media_thumbnail_url"] == (
+        "/static/exercise-guides/gymvisual/dumbbell-bench-press-0289-SpYC0Kp.jpg"
+    )
+    assert replacement["media_thumbnail_sources"]
+    assert all(
+        source["url"].startswith("/static/exercise-guides/")
+        for source in replacement["media_thumbnail_sources"]
+    )
     avoided = client.patch(
         "/api/v1/me/profile",
         headers=headers,
