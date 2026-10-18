@@ -2929,8 +2929,10 @@ details:not([open]) > :not(summary) {
 }
 .weekly-review__target,
 .weekly-review__complete {
-  padding: 10px 0 10px 14px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__target strong {
   display: block;
@@ -2974,8 +2976,10 @@ details:not([open]) > :not(summary) {
   gap: 2px;
 }
 .weekly-review__notice {
-  padding: 12px 0 12px 14px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__calibration {
   padding-top: 16px;
@@ -3023,7 +3027,6 @@ details:not([open]) > :not(summary) {
 }
 .weekly-review__diff > div:last-child {
   background: var(--surface-subtle);
-  box-shadow: inset 3px 0 var(--weekly-review-lime);
 }
 .weekly-review__diff span,
 .weekly-review__diff small {
@@ -3040,8 +3043,10 @@ details:not([open]) > :not(summary) {
 .weekly-review__decision-note {
   grid-column: 1 / -1;
   margin-bottom: 2px;
-  padding-left: 12px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__decision button,
 .weekly-review__actions button {
@@ -3155,9 +3160,6 @@ details:not([open]) > :not(summary) {
   .weekly-review__diff > span {
     justify-self: center;
     transform: rotate(90deg);
-  }
-  .weekly-review__diff > div:last-child {
-    box-shadow: inset 0 3px var(--weekly-review-lime);
   }
   .weekly-review__decision,
   .weekly-review__actions {

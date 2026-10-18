@@ -2240,6 +2240,12 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   align-items: center;
 }
 
+.app-section--progress .progress-experience--approved .progress-body-approved {
+  display: grid;
+  gap: var(--v2-space-4);
+  min-width: 0;
+}
+
 .app-section--progress .progress-experience--approved .progress-body-hero__primary {
   min-height: 48px;
 }
@@ -2295,7 +2301,7 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
 .app-section--progress .progress-experience--approved .progress-body-trends {
   display: grid;
   min-width: 0;
-  gap: var(--v2-space-2);
+  gap: var(--v2-space-3);
 }
 
 .app-section--progress .progress-experience--approved .progress-trend-panel,
@@ -2319,9 +2325,22 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   margin-bottom: var(--v2-space-3);
 }
 
+.app-section--progress
+  .progress-experience--approved
+  .progress-body-diary
+  .measurement-diary--embedded
+  > .demo-capability-fieldset {
+  display: grid;
+  gap: var(--v2-space-3);
+}
+
+.app-section--progress .progress-experience--approved .measurement-custom-fields {
+  gap: var(--v2-space-3);
+}
+
 .app-section--progress .progress-experience--approved .progress-body-secondary {
   display: grid;
-  gap: var(--v2-space-1);
+  gap: var(--v2-space-3);
 }
 
 .app-section--progress

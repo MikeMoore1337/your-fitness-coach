@@ -1629,7 +1629,7 @@ test('all Progress views keep decorative lime edges out of informational surface
           const allowed = (element: HTMLElement) =>
             Boolean(
               element.closest(
-                '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta, .weekly-review__target, .weekly-review__complete, .weekly-review__notice, .weekly-review__decision-note, .weekly-review__diff > div:last-child',
+                '.data-viz-chart__selection, [aria-selected="true"], [aria-current], .is-active, .is-focused, .cta',
               ),
             );
           const violations: string[] = [];
@@ -1749,6 +1749,121 @@ test('all Progress views keep decorative lime edges out of informational surface
         expect(audit.unevenInfoFrames, `${colorScheme}/${viewport.width}/${view}`).toEqual([]);
       }
     }
+  }
+});
+
+test('mobile Body keeps expanded surfaces separated and reachable above the dock', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&progress_view=body');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await expect(page.getByRole('heading', { name: 'Тело', level: 2 })).toBeVisible();
+
+  const diary = page.locator('#progress-body details.progress-body-diary');
+  await diary.locator(':scope > summary').click();
+  await expect(diary).toHaveAttribute('open', '');
+
+  for (const viewport of [
+    { width: 320, height: 844 },
+    { width: 393, height: 844 },
+    { width: 430, height: 844 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expectNoHorizontalOverflow(page);
+
+    const contract = await page.locator('#progress-body').evaluate((root) => {
+      const visible = (element: Element) => {
+        const box = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          box.width > 0 &&
+          box.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      };
+      const rect = (element: Element) => {
+        const box = element.getBoundingClientRect();
+        return { top: box.top, bottom: box.bottom };
+      };
+      const gaps = (elements: Element[]) =>
+        elements.slice(1).map((element, index) => {
+          const previous = rect(elements[index]!);
+          return element.getBoundingClientRect().top - previous.bottom;
+        });
+      const token = (name: string) =>
+        getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+      const approved = root.querySelector<HTMLElement>('.progress-body-approved');
+      const trends = root.querySelector<HTMLElement>('.progress-body-trends');
+      const fieldset = root.querySelector<HTMLElement>(
+        '.progress-body-diary .measurement-diary--embedded > .demo-capability-fieldset',
+      );
+      const children = (parent: Element | null) =>
+        parent ? Array.from(parent.children).filter(visible) : [];
+      const cards = [
+        '.progress-body-hero-card',
+        '.progress-trend-panel',
+        '.progress-body-diary',
+        '.data-confidence',
+      ]
+        .flatMap((selector) => Array.from(root.querySelectorAll<HTMLElement>(selector)))
+        .filter(visible);
+
+      return {
+        bodyGap: approved ? getComputedStyle(approved).rowGap : null,
+        bodyGaps: gaps(children(approved)),
+        trendGap: trends ? getComputedStyle(trends).rowGap : null,
+        trendGaps: gaps(children(trends)),
+        diaryGap: fieldset ? getComputedStyle(fieldset).rowGap : null,
+        diaryGaps: gaps(children(fieldset)),
+        bodyToken: token('--v2-space-4'),
+        relatedToken: token('--v2-space-3'),
+        cards: cards.map((element) => {
+          const style = getComputedStyle(element);
+          return {
+            borderWidths: [
+              style.borderTopWidth,
+              style.borderRightWidth,
+              style.borderBottomWidth,
+              style.borderLeftWidth,
+            ],
+            borderColors: [
+              style.borderTopColor,
+              style.borderRightColor,
+              style.borderBottomColor,
+              style.borderLeftColor,
+            ],
+            borderRadius: style.borderRadius,
+          };
+        }),
+      };
+    });
+
+    const bodyGap = Number.parseFloat(contract.bodyToken);
+    const relatedGap = Number.parseFloat(contract.relatedToken);
+    expect(contract.bodyGap).toBe(contract.bodyToken);
+    expect(contract.bodyGaps.every((gap) => gap >= bodyGap - 0.5)).toBe(true);
+    expect(contract.trendGap).toBe(contract.relatedToken);
+    expect(contract.trendGaps.every((gap) => gap >= relatedGap - 0.5)).toBe(true);
+    expect(contract.diaryGap).toBe(contract.relatedToken);
+    expect(contract.diaryGaps.every((gap) => gap >= relatedGap - 0.5)).toBe(true);
+    expect(contract.cards.length).toBeGreaterThanOrEqual(4);
+    for (const card of contract.cards) {
+      expect(card.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(new Set(card.borderColors).size).toBe(1);
+      expect(card.borderRadius).not.toBe('0px');
+    }
+
+    const dock = page.locator('#appBottomNav');
+    await expect(dock).toBeVisible();
+    const lastHistoryRow = diary.locator('.measurement-history__row').last();
+    await lastHistoryRow.scrollIntoViewIfNeeded();
+    await expectNoOverlap(lastHistoryRow, dock);
+    const saveButton = diary.locator('.measurement-diary__save');
+    await saveButton.scrollIntoViewIfNeeded();
+    await expectNoOverlap(saveButton, dock);
   }
 });
 

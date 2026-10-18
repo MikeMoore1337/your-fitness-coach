@@ -1890,9 +1890,24 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
         primaryColor: primary ? getComputedStyle(primary).color : null,
         primaryRadius: primary ? getComputedStyle(primary).borderRadius : null,
         activeStepBoundary: activeStep ? getComputedStyle(activeStep).borderBottomColor : null,
-        boundaryBorder: boundary ? getComputedStyle(boundary).borderLeftColor : null,
+        boundaryBorder: boundary
+          ? {
+              leftColor: getComputedStyle(boundary).borderLeftColor,
+              topColor: getComputedStyle(boundary).borderTopColor,
+              leftWidth: getComputedStyle(boundary).borderLeftWidth,
+              topWidth: getComputedStyle(boundary).borderTopWidth,
+              radius: getComputedStyle(boundary).borderRadius,
+            }
+          : null,
         boundaryShadow: boundary ? getComputedStyle(boundary).boxShadow : null,
-        noteBorder: decisionNote ? getComputedStyle(decisionNote).borderLeftColor : null,
+        noteBorder: decisionNote
+          ? {
+              leftColor: getComputedStyle(decisionNote).borderLeftColor,
+              topColor: getComputedStyle(decisionNote).borderTopColor,
+              leftWidth: getComputedStyle(decisionNote).borderLeftWidth,
+              topWidth: getComputedStyle(decisionNote).borderTopWidth,
+            }
+          : null,
         disclosure: disclosureRect
           ? {
               width: disclosureRect.width,
@@ -1907,10 +1922,19 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
     expect(brandContract.primaryRadius).toBe(brandContract.actionRadius);
     expect(brandContract.activeStepBoundary).toBe(brandContract.lime);
     if (current.step === 'facts') {
-      expect(brandContract.boundaryBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryBorder).toMatchObject({
+        leftWidth: '1px',
+        topWidth: '1px',
+      });
+      expect(brandContract.boundaryBorder?.leftColor).toBe(brandContract.boundaryBorder?.topColor);
+      expect(brandContract.boundaryBorder?.radius).not.toBe('0px');
     } else {
-      expect(brandContract.boundaryShadow).toContain(brandContract.lime);
-      expect(brandContract.noteBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryShadow).toBe('none');
+    }
+    if (brandContract.noteBorder) {
+      expect(brandContract.noteBorder.leftWidth).toBe('1px');
+      expect(brandContract.noteBorder.topWidth).toBe('1px');
+      expect(brandContract.noteBorder.leftColor).toBe(brandContract.noteBorder.topColor);
     }
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
