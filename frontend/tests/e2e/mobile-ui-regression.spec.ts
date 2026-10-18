@@ -561,6 +561,25 @@ test('@extended mobile layout stress keeps long content inside viewport', async 
     );
     await expect(page.getByRole('button', { name: 'Начать тренировку' })).toBeVisible();
   }
+
+  await page.evaluate(() => {
+    const probe = document.createElement('div');
+    probe.dataset.yfcTestOverflowProbe = 'true';
+    probe.style.cssText =
+      'position:absolute;left:0;top:0;width:calc(100vw + 32px);height:1px;pointer-events:none;';
+    document.body.append(probe);
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+  await page.evaluate(() => {
+    document.querySelector('[data-yfc-test-overflow-probe]')?.remove();
+  });
+  await expectNoHorizontalOverflow(page);
 });
 
 for (const theme of ['light', 'dark'] as const) {
