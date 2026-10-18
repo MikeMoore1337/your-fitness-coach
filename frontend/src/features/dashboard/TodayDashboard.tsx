@@ -1062,6 +1062,7 @@ export function TodayDashboard({
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
     initialData: () => (user ? loadCurrentActiveWorkoutSnapshot(user.id) : undefined),
     initialDataUpdatedAt: 0,
+    refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
   const noTodayWorkout = workout.error instanceof ApiError && workout.error.status === 404;
@@ -1082,6 +1083,9 @@ export function TodayDashboard({
   useEffect(() => {
     const refreshOnReturn = () => {
       if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      const queueLength =
+        user && workout.data ? loadActiveWorkoutQueue(user.id, workout.data.id).queue.length : 0;
+      if (queueLength > 0) return;
       void queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
     };
     const handleVisibilityChange = () => {
@@ -1102,7 +1106,7 @@ export function TodayDashboard({
       window.removeEventListener('online', refreshOnReturn);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [persistSnapshotOnSuspend, queryClient]);
+  }, [persistSnapshotOnSuspend, queryClient, user, workout.data]);
 
   useEffect(() => {
     if (!user || !isPwaStandalone() || workout.fetchStatus !== 'idle') return;

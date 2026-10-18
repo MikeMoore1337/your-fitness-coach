@@ -2003,6 +2003,7 @@ export function TodayWorkout({
     queryFn: () => api<Workout>('/api/v1/workouts/today'),
     initialData: () => (user ? loadCurrentActiveWorkoutSnapshot(user.id) : undefined),
     initialDataUpdatedAt: 0,
+    refetchOnReconnect: false,
     retry: (count, error) => !(error instanceof ApiError && error.status === 404) && count < 1,
   });
   const activeSync = useActiveWorkoutQueue(user?.id, workout.data);
