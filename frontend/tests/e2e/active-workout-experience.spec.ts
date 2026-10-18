@@ -2181,7 +2181,10 @@ for (const width of [360, 393, 430]) {
         await expect(previewHeading).toBeFocused();
         await dialog.getByRole('button', { name: 'Применить только сегодня', exact: true }).click();
         await expect(
-          page.getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+          page
+            .locator('.active-workout-exercise')
+            .filter({ hasText: 'Жим гантелей лёжа' })
+            .getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
         ).toBeVisible();
         expect(
           writes.filter((request) => request.path.endsWith('/adaptations/apply')),
