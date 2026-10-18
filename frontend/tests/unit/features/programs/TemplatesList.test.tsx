@@ -125,6 +125,19 @@ describe('TemplatesList editing', () => {
           { status: 200 },
         );
       }
+      if (path === '/api/v1/programs/templates/20' && method === 'GET') {
+        return new Response(
+          JSON.stringify({
+            ...templateBase,
+            id: 20,
+            title: 'Фуллбади по правилам',
+            split_type: 'full_body',
+            is_example: true,
+            can_edit: false,
+          }),
+          { status: 200 },
+        );
+      }
       if (path === '/api/v1/programs/assigned/42' && method === 'DELETE') {
         if (deleteResponse) return deleteResponse();
         activeProgram = false;
