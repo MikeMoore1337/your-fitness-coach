@@ -29,5 +29,5 @@
 - C1: source provenance, source GIF/MP4 SHA-256, real PTS and source worktree integrity — passed.
 - C2: 24/24 GPU variants, H.264/yuv420p/720×720/no audio, complete decode, monotonic PTS — passed.
 - C3: local gallery and 16 contact sheets — passed; synthetic/local evidence only.
-- C4: targeted pytest and Ruff — passed; exact-head PR CI run `39148001976` is queued.
+- C4: targeted pytest and Ruff — passed; exact-head PR CI is queued/pending on GitHub.
 - C5: owner visual acceptance of motion/technique, merge, release and production smoke — pending.
