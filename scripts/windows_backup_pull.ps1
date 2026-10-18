@@ -763,8 +763,15 @@ function Invoke-Pull {
             $status.status_write_result = "SUCCESS"
         }
         catch {
-            $status.status_write_result = "FAILED"
             $status.state = "UNEXPECTED"
+            $status.last_pull_result = "FAILED"
+            $status.last_run_result = "FAILED"
+            $status.last_sync_result = "FAILED"
+            $status.last_failure_code = "UNEXPECTED"
+            $status.last_failure_at_utc = Get-UtcString
+            $status.status_write_result = "FAILED"
+            try { Write-AtomicFailureRecord $Config $status } catch {
+            }
             return $status
         }
         Write-SanitizedLog $Config "SUCCESS"

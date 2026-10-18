@@ -320,6 +320,15 @@ exit 0
     if ($failedStatusWrite.status_write_result -ne "FAILED") { throw "failed status write must be visible in the pull result" }
     $statusAfterWriteFailure = Invoke-StatusCase "failed-status-write-retains-error" 22
     if ($statusAfterWriteFailure.state -ne "NETWORK" -or $statusAfterWriteFailure.last_failure_code -ne "NETWORK") { throw "status sidecar did not preserve the failed pull when the primary status write failed" }
+    Invoke-PullCase "successful-status-write-failure" 27 ""
+    $successfulStatusWriteFailure = Get-OutputStatus
+    if ($successfulStatusWriteFailure.state -ne "UNEXPECTED" -or $successfulStatusWriteFailure.last_run_result -ne "FAILED" -or $successfulStatusWriteFailure.last_failure_code -ne "UNEXPECTED") {
+        throw "a successful sync with a failed status write must report an UNEXPECTED persisted failure"
+    }
+    $statusAfterSuccessfulWriteFailure = Invoke-StatusCase "successful-status-write-failure-retains-error" 27
+    if ($statusAfterSuccessfulWriteFailure.state -ne "UNEXPECTED" -or $statusAfterSuccessfulWriteFailure.last_failure_code -ne "UNEXPECTED") {
+        throw "Status must retain a failed status write after re-evaluating local files"
+    }
     $config.status_file = $originalStatusPath
     Write-JsonFile $configPath $config
     Invoke-PullCase "status-write-recovery" 0 "" | Out-Null
