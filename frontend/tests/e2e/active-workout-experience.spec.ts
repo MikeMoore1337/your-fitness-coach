@@ -812,9 +812,20 @@ async function activeWorkoutQueueLength(page: Page) {
 async function settleViewport(page: Page) {
   await page.evaluate(
     () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
+      new Promise<void>((resolve) => {
+        let previous = window.scrollY;
+        let stableFrames = 0;
+        let frames = 0;
+        const observe = () => {
+          const current = window.scrollY;
+          stableFrames = Math.abs(current - previous) <= 0.5 ? stableFrames + 1 : 0;
+          previous = current;
+          frames += 1;
+          if (stableFrames >= 3 || frames >= 60) resolve();
+          else requestAnimationFrame(observe);
+        };
+        requestAnimationFrame(observe);
+      }),
   );
 }
 

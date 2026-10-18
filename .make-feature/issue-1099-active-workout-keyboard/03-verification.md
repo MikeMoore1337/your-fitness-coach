@@ -13,6 +13,16 @@
 - Frontend build: `npm run build` passed.
 - `git diff --check` passed.
 
+## Final candidate follow-up
+
+- After CI exposed the first-focus helper regression, the final candidate keeps that action and
+  its layout space until both fields are filled; the focused prefill smoke passed in Chromium and
+  WebKit.
+- Final candidate #1099 recordings were regenerated after that correction; Chromium and WebKit
+  focused scroll-stability tests passed.
+- The earlier CI run `39119430278` correctly caught the intermediate candidate; it is not treated as
+  a green final result. A new CI run is required for the pushed final commit.
+
 ## Evidence
 
 - `docs/ux/final-issues-acceptance/evidence/1099-active-workout-keyboard-20261018/README.md`

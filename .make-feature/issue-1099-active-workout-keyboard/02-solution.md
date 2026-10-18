@@ -14,10 +14,11 @@ removing `.active-workout-set__prefill-actions` (96 px). Browser scroll anchorin
 by 105 px to keep the focused input in place; the existing `ResizeObserver` then issued a small
 fractional correction. This reproduced the Issue #1099 symptom without attributing it to ACK.
 
-Chosen D1: mark the previous-result helper dismissed on first focus or explicit reuse, so typing
-does not trigger a later conditional removal. Keep the existing viewport/observer path for genuine
-keyboard geometry changes and ignore only subpixel observer noise (`<=1px`). No fixed iPhone offset,
-new dependency, queue, API contract or persistence state is added.
+Chosen D1: mark the previous-result helper dismissed only when both fields become non-empty or the
+user explicitly reuses the previous result, while keeping an invisible layout reservation during
+the current edit. Typing therefore does not trigger a later conditional removal. Keep the existing
+viewport/observer path for genuine keyboard geometry changes and ignore only subpixel observer noise
+(`<=1px`). No fixed iPhone offset, new dependency, queue, API contract or persistence state is added.
 
 ## Files and checks
 

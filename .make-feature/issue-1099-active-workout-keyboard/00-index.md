@@ -6,8 +6,9 @@
 - Base: `origin/master` at `afc9a3e918f4085e506b711c5cacfe4b5c5a0f5c`.
 - Branch: `codex/1099-active-workout-keyboard`.
 - Scope: Issue #1099 only; PR #1098 and its branch are not modified.
-- Decision D1: dismiss the previous-result helper on first field focus/explicit reuse, and ignore
-  only subpixel positioning noise in the existing visibility correction.
+- Decision D1: dismiss the previous-result helper only once both fields are meaningfully filled or
+  explicitly reused, reserve its layout during the current edit, and ignore only subpixel
+  positioning noise in the existing visibility correction.
 
 ## Acceptance gates
 
