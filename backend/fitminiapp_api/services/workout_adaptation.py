@@ -25,7 +25,11 @@ from fitminiapp_api.services.exercise_catalog import (
     _source_exercise_slug,
     get_visible_exercise_display_map,
 )
-from fitminiapp_api.services.exercise_catalog_metadata import exercise_catalog_metadata
+from fitminiapp_api.services.exercise_catalog_metadata import (
+    CANONICAL_EXERCISE_REDIRECTS,
+    exercise_catalog_metadata,
+)
+from fitminiapp_api.services.exercise_guide_media import get_guide_media_preview
 from fitminiapp_api.services.prescription_semantics import compatible_for_substitution
 from fitminiapp_api.services.workout_metrics import (
     exercise_metric_type,
@@ -330,23 +334,30 @@ def list_compatible_alternatives(
     target = _find_workout_exercise(workout, workout_exercise_id)
     _ensure_replacement_unstarted(workout, target)
     used_ids = {_effective_exercise_id(item.exercise) for item in workout.exercises}
-    return [
-        {
-            "exercise_id": candidate.exercise.id,
-            "title": candidate.exercise.title,
-            "equipment_ids": list(candidate.equipment_ids),
-            "score": candidate.score,
-            "reason_keys": list(candidate.reason_keys),
-        }
-        for candidate in _alternative_candidates(
-            db,
-            current_user,
-            target,
-            available_equipment_ids,
-            allow_catalog_fallback=workout.status == "planned",
+    alternatives = []
+    for candidate in _alternative_candidates(
+        db,
+        current_user,
+        target,
+        available_equipment_ids,
+        allow_catalog_fallback=workout.status == "planned",
+    ):
+        if _effective_exercise_id(candidate.exercise) in used_ids:
+            continue
+        source_slug = _source_exercise_slug(candidate.exercise)
+        media = get_guide_media_preview(CANONICAL_EXERCISE_REDIRECTS.get(source_slug, source_slug))
+        alternatives.append(
+            {
+                "exercise_id": candidate.exercise.id,
+                "title": candidate.exercise.title,
+                "equipment_ids": list(candidate.equipment_ids),
+                "score": candidate.score,
+                "reason_keys": list(candidate.reason_keys),
+                "media_thumbnail_url": media["thumbnail_url"],
+                "media_thumbnail_sources": media["thumbnail_sources"],
+            }
         )
-        if _effective_exercise_id(candidate.exercise) not in used_ids
-    ]
+    return alternatives
 
 
 def _replacement_change(

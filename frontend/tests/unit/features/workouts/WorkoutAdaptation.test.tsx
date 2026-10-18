@@ -24,6 +24,17 @@ const workout: Workout = {
       prescribed_reps: '8-10',
       rest_seconds: 90,
       has_guide: true,
+      media_state: 'approved_static',
+      media_thumbnail_url: '/static/exercise-guides/bench-press.jpg',
+      media_thumbnail_sources: [
+        {
+          url: '/static/exercise-guides/bench-press.jpg',
+          mime_type: 'image/jpeg',
+          width: 180,
+          height: 180,
+          byte_size: 1000,
+        },
+      ],
       sets: [{ id: 201, set_number: 1, is_completed: false, version: 1 }],
     },
     {
@@ -313,13 +324,80 @@ describe('WorkoutAdaptation', () => {
     await user.click(await screen.findByRole('radio', { name: /Жим гантелей лежа/ }));
     await user.click(screen.getByRole('button', { name: 'Показать изменения' }));
     expect(await screen.findByRole('heading', { name: 'Что изменится' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Применить' }));
+    await user.click(screen.getByRole('button', { name: 'Применить только сегодня' }));
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining('/adaptations/apply'),
         expect.anything(),
       ),
     );
+  });
+
+  it('показывает каталоговые изображения и фильтрует только полный ответ сервера', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      if (String(input).includes('/alternatives?')) {
+        return new Response(
+          JSON.stringify([
+            {
+              exercise_id: 13,
+              title: 'Жим гантелей лежа',
+              equipment_ids: ['dumbbell', 'bench'],
+              media_thumbnail_url: '/static/exercise-guides/dumbbell-bench-press.jpg',
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 14,
+              title: 'Жим в тренажере от груди',
+              equipment_ids: ['machine'],
+              media_thumbnail_url: null,
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 15,
+              title: 'Отжимания от пола',
+              equipment_ids: ['bodyweight'],
+              media_thumbnail_url: '/static/exercise-guides/push-up.jpg',
+              media_thumbnail_sources: [],
+            },
+            {
+              exercise_id: 16,
+              title: 'Жим в тренажере Смита',
+              equipment_ids: ['machine', 'bench'],
+              media_thumbnail_url: '/static/exercise-guides/smith-press.jpg',
+              media_thumbnail_sources: [],
+            },
+          ]),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify({ detail: 'Unexpected request' }), { status: 500 });
+    });
+    const user = userEvent.setup();
+    renderAdaptation(false, {
+      initialTargetId: 101,
+      entryLabel: 'Заменить только в этой тренировке',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Заменить только в этой тренировке' }));
+    expect(
+      screen.getByRole('img', { name: 'Жим штанги лежа: изображение упражнения' }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('checkbox', { name: 'Гантели' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Скамья' }));
+    expect(await screen.findByRole('radio', { name: /Жим гантелей лежа/ })).toBeChecked();
+    expect(screen.getByText('Нет фото')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Все подходящие' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Все подходящие' }));
+    const search = screen.getByRole('searchbox', { name: 'Поиск по полному ответу сервиса' });
+    await user.type(search, 'Смита');
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
+    await user.clear(search);
+    await user.click(screen.getByRole('button', { name: 'Тренажёры' }));
+    expect(screen.getByRole('radio', { name: /Жим в тренажере от груди/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /Жим в тренажере Смита/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Жим гантелей лежа/ })).not.toBeInTheDocument();
   });
 
   it('не предлагает замену для уже начатого target', () => {
