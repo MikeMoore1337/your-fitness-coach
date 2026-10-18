@@ -5,8 +5,10 @@
   изменения production media/catalog.
 - Base: `origin/master` at `57e4393e2352e18a2e43e55b3698cb31c53f6a5f`.
 - Branch: `codex/issue-986-frame-interpolation-pilot-local`.
+- Remote PR branch: `codex/issue-986-frame-interpolation-pilot`.
 - Worktree: `.artifacts/worktrees/986-frame-interpolation-pilot`.
-- Issue: [#1110](https://github.com/MikeMoore1337/your-fitness-coach/issues/1110).
+- Issue: [#1110](https://github.com/MikeMoore1337/your-fitness-coach/issues/1110); Draft PR:
+  [#1111](https://github.com/MikeMoore1337/your-fitness-coach/pull/1111).
 - Scope: восемь AI-upscaled кандидатов из контекста #986, RIFE `8/12/16 FPS`, локальная
   галерея, contact sheets, отчёт и тесты.
 - Explicit exclusions: production manifest/media, PR #1094/#1109 branches, model/binary files,
@@ -27,5 +29,5 @@
 - C1: source provenance, source GIF/MP4 SHA-256, real PTS and source worktree integrity — passed.
 - C2: 24/24 GPU variants, H.264/yuv420p/720×720/no audio, complete decode, monotonic PTS — passed.
 - C3: local gallery and 16 contact sheets — passed; synthetic/local evidence only.
-- C4: targeted pytest and Ruff — passed; full exact-head PR CI remains pending until PR exists.
+- C4: targeted pytest and Ruff — passed; exact-head PR CI run `39148001976` is queued.
 - C5: owner visual acceptance of motion/technique, merge, release and production smoke — pending.

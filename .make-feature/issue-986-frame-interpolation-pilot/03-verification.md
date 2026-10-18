@@ -4,6 +4,8 @@
 
 - Issue #1110 created with `area:workout`, `gate:visual-approval` and `spike` labels; project
   Priority/Effort/Status still require live Project metadata verification.
+- Draft PR #1111 is open against `master` with head `258ea360`; exact-head CI run `39148001976`
+  is queued, not yet a green result.
 - `nvidia-smi`: NVIDIA GeForce RTX 4060 Ti, driver 617.42.
 - Official RIFE ncnn Vulkan `20221029` smoke passed on `ab-wheel`; the full run then produced
   8 exercises × 3 FPS = 24 variants and 1,117 genuine intermediate frames.
@@ -27,5 +29,6 @@
 
 The generated outputs are local ignored artifacts and are not production media. This evidence is
 GPU/CLI/ffprobe proof, not physical iPhone/Safari, native Telegram Mini App, VoiceOver, production
-or owner technique acceptance. The Draft PR and exact-head CI are still pending; merge, release and
-deployment are explicitly out of scope for this pilot turn.
+or owner technique acceptance. The Draft PR exists, but exact-head CI, owner visual acceptance,
+merge, release and deployment remain separate gates and are explicitly out of scope for this pilot
+turn.
