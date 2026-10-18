@@ -21,4 +21,4 @@
 - Production `max_connections`, reserved slots, pooler topology, effective `.env`, process/replica counts, attribution, overlap and safety margin: `NO_DATA`/`NOT_PROVEN`.
 - Owner approval of the numeric safety headroom and sanitized evidence: required before activation.
 - Independent dry run against authorized production-shaped evidence: required before production rollout.
-- Draft PR #1118 remains the only PR for this work at exact head `b70c4979478901008faac0dac94c13875d17c52e`; CI run `39166720799` and aggregate `checks` passed. Reviewer/security gate remains pending.
+- Draft PR #1118 remains the only PR for this work at exact head `2a9b324ed98c3494bdb910e3020cf03f71778ca4`; CI run `39167004925` and aggregate `checks` passed. Reviewer/security gate remains pending.
