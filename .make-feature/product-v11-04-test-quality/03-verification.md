@@ -1,9 +1,9 @@
 # Product V11-04 / Issue #819 — verification receipt
 
-Status: local verification complete; Draft PR/CI pending
-Exact HEAD: pending commit
-Draft PR: pending
-Issue comment: pending
+Status: Draft PR handoff complete; receipt-only CI rerun pending
+Exact HEAD: current branch head in PR #1119
+Draft PR: [#1119](https://github.com/MikeMoore1337/your-fitness-coach/pull/1119)
+Issue comment: [#6255004058](https://github.com/MikeMoore1337/your-fitness-coach/issues/819#issuecomment-6255004058)
 
 ## Acceptance receipts
 
@@ -16,8 +16,8 @@ Issue comment: pending
 | Skips/xfails classified | static source inventory | confirmed | frontend skips are opt-in evidence/fixture-origin; Python skips are host capability or PostgreSQL-lock conditional; no xfail |
 | Focused tests | `run_pytest.py backend/tests/test_account_lifecycle.py -q` and risk set | passed | 7 passed; 78 passed, 2 PostgreSQL-only skipped |
 | Full available regression | `npm test -- --reporter=dot`, `npm run lint`, Playwright `--list` | passed/blocked split | 155 files / 949 tests passed; lint passed; 2 extended tests listed; browser execution unavailable locally |
-| Exact-head CI | pending | pending | pending |
-| Draft PR and Issue comment | pending | pending | pending |
+| Exact-head CI | PR run `39165250376` | passed | aggregate `checks` passed on implementation commit `cb897d19353a4869c98d87f9d9658c40bd476212`; receipt-only follow-up commit requires the normal PR rerun |
+| Draft PR and Issue comment | live GitHub read-back | passed | Draft PR #1119 is open and unmerged; Issue #819 remains open with comment `6255004058` |
 
 ## Boundaries
 

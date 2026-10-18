@@ -1,7 +1,7 @@
 # Product V11-04 / Issue #819 — audit decision and plan
 
-Status: implementation complete; CI pending
-Version: 2
+Status: complete for Draft PR handoff; receipt-only CI rerun pending
+Version: 3
 Context: fresh worktree from `origin/master` at `7b755925ad03ea50215b9260b82e8c48cd506d22`.
 
 ## Requirements

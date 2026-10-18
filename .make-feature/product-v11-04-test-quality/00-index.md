@@ -1,6 +1,6 @@
 # Make Feature index — Product V11-04 / Issue #819
 
-Status: implementation complete; awaiting Draft PR and exact-head CI
+Status: complete for Draft PR handoff
 Mode: normal — multi-layer test audit plus scoped regression-test changes; no production mutation or irreversible data operation.
 Branch: `codex/819-test-quality-coverage`
 Base at start: `7b755925ad03ea50215b9260b82e8c48cd506d22` (`origin/master`)
@@ -8,7 +8,7 @@ Owner authorization: implementation and Draft PR only; merge/deploy remain separ
 
 ## Current stage
 
-Implementation and local verification complete. The source request is preserved in `01-request.md`; the audit decisions and test matrix are in `02-solution.md`; receipts are in `03-verification.md`.
+Implementation, local verification, Draft PR and exact-head CI are complete. The source request is preserved in `01-request.md`; the audit decisions and test matrix are in `02-solution.md`; receipts are in `03-verification.md`.
 
 ## Success criteria
 
@@ -28,6 +28,6 @@ Implementation and local verification complete. The source request is preserved 
 
 ## Open questions / gates
 
-- Draft PR, Issue comment and exact-head GitHub Checks remain to be created/read back.
-- Docker/PostgreSQL and local Firefox/WebKit are unavailable on this Windows host; CI is the required evidence for those layers.
+- Draft PR #1119, Issue comment #6255004058 and exact-head CI run `39165250376` were created/read back; the final receipt-only branch head is still subject to the normal PR check rerun.
+- Docker/PostgreSQL and local Firefox/WebKit are unavailable on this Windows host; GitHub CI is the accepted evidence for those layers.
 - Merge, deploy and Issue closure remain separate owner-authorized gates; no owner visual gate applies to this test-quality change.
