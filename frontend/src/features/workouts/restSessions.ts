@@ -30,6 +30,21 @@ interface QueuedRestAction {
   corrected_seconds?: number;
 }
 
+interface RestStartRecovery {
+  source_set_id: number;
+  started_at: string;
+  planned_seconds: number;
+  adjusted_seconds: number;
+  deadline: number;
+  start_mutation_id: string;
+}
+
+interface StoredRestRecovery {
+  source_set_id: number;
+  start?: RestStartRecovery;
+  operation?: QueuedRestAction;
+}
+
 export interface LocalRestSession {
   source_set_id: number;
   started_at: string;
@@ -79,6 +94,27 @@ function validSession(row: LocalRestSession): boolean {
   );
 }
 
+function validStartRecovery(value: unknown): value is RestStartRecovery {
+  if (!value || typeof value !== 'object') return false;
+  const start = value as Partial<RestStartRecovery>;
+  return Boolean(
+    typeof start.source_set_id === 'number' &&
+    Number.isInteger(start.source_set_id) &&
+    start.source_set_id > 0 &&
+    typeof start.started_at === 'string' &&
+    Number.isFinite(Date.parse(start.started_at)) &&
+    typeof start.planned_seconds === 'number' &&
+    Number.isInteger(start.planned_seconds) &&
+    start.planned_seconds > 0 &&
+    typeof start.adjusted_seconds === 'number' &&
+    Number.isInteger(start.adjusted_seconds) &&
+    start.adjusted_seconds > 0 &&
+    Number.isFinite(start.deadline) &&
+    typeof start.start_mutation_id === 'string' &&
+    start.start_mutation_id.length > 0,
+  );
+}
+
 function actionStorageKey(userId: number, workoutId: number, mutationId: string): string {
   return `${restJournalStorageKey(userId, workoutId)}:op:${mutationId}`;
 }
@@ -95,15 +131,23 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
     const keys = Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i)).filter(
       (key): key is string => Boolean(key?.startsWith(prefix)),
     );
-    for (const key of keys) {
-      const value = readStorage<{ source_set_id: number; operation: QueuedRestAction } | null>(
-        key,
-        null,
-      );
+    const recoveries = keys.map((key) => readStorage<StoredRestRecovery | null>(key, null));
+    for (const value of recoveries) {
+      const start = value?.start;
+      if (!validStartRecovery(start)) continue;
+      if (valid.some((session) => session.source_set_id === start.source_set_id)) continue;
+      valid.push({
+        ...start,
+        status: 'running',
+        pending: [],
+      });
+    }
+    for (const value of recoveries) {
+      const operation = value?.operation;
       const row = valid.find((session) => session.source_set_id === value?.source_set_id);
-      if (!row || !value?.operation?.mutation_id) continue;
-      if (!row.pending.some((operation) => operation.mutation_id === value.operation.mutation_id)) {
-        row.pending.push(value.operation);
+      if (!row || !operation?.mutation_id) continue;
+      if (!row.pending.some((item) => item.mutation_id === operation.mutation_id)) {
+        row.pending.push(operation);
       }
     }
     for (const row of valid) {
@@ -178,10 +222,15 @@ export function beginMeasuredRest(
   for (const row of records.filter((item) => item.status === 'running')) {
     row.status = 'interrupted';
     row.ended_at = new Date(acceptedAt).toISOString();
-    row.pending.push({
+    const operation = {
       action: 'interrupt',
       occurred_at: row.ended_at,
       mutation_id: makeId(),
+    } satisfies QueuedRestAction;
+    row.pending.push(operation);
+    writeStorage(actionStorageKey(userId, workoutId, operation.mutation_id), {
+      source_set_id: row.source_set_id,
+      operation,
     });
   }
   const created: LocalRestSession = {
@@ -195,6 +244,17 @@ export function beginMeasuredRest(
     pending: [],
   };
   records.push(created);
+  writeStorage(actionStorageKey(userId, workoutId, created.start_mutation_id), {
+    source_set_id: sourceSetId,
+    start: {
+      source_set_id: created.source_set_id,
+      started_at: created.started_at,
+      planned_seconds: created.planned_seconds,
+      adjusted_seconds: created.adjusted_seconds,
+      deadline: created.deadline,
+      start_mutation_id: created.start_mutation_id,
+    },
+  });
   saveRestJournal(userId, workoutId, records);
   return created;
 }
@@ -225,8 +285,7 @@ export function updateMeasuredRest(
       correctedSeconds > 86400)
   )
     return null;
-  if (action === 'complete' && correctedSeconds === undefined && at < Date.parse(row.started_at))
-    return null;
+  if (action === 'complete' && at < Date.parse(row.started_at)) return null;
   const effectiveAction = action;
   const occurredAt = new Date(at).toISOString();
   const entry: QueuedRestAction = {
@@ -357,7 +416,7 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
               },
             },
           );
-          acknowledgeRemote(userId, workoutId, sourceSetId, remote);
+          acknowledgeRemote(userId, workoutId, sourceSetId, remote, row.start_mutation_id);
         } catch (error) {
           // Completion of the source set can still be in its separate offline queue.
           if (error instanceof ApiError && [409, 503].includes(error.status)) continue;
