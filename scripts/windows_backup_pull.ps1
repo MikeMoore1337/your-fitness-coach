@@ -109,7 +109,10 @@ function Get-Sha256 {
 }
 
 function Read-JsonObject {
-    param([Parameter(Mandatory = $true)][string]$Path)
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$ErrorCode = "CORRUPTED"
+    )
     try {
         $jsonParameters = @{}
         if ((Get-Command ConvertFrom-Json).Parameters.ContainsKey("DateKind")) {
@@ -118,7 +121,7 @@ function Read-JsonObject {
         $value = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json @jsonParameters
     }
     catch {
-        Throw-BackupPullError "CORRUPTED" "backup metadata is not valid JSON"
+        Throw-BackupPullError $ErrorCode "backup metadata is not valid JSON"
     }
     if ($null -eq $value -or $value -is [Array]) {
         Throw-BackupPullError "CORRUPTED" "backup metadata must be a JSON object"
@@ -226,7 +229,7 @@ function Read-Config {
         Throw-BackupPullError "CONFIG_INVALID" "configuration file is missing"
     }
     $configDir = Split-Path -Parent $configFullPath
-    $raw = Read-JsonObject $configFullPath
+    $raw = Read-JsonObject $configFullPath "CONFIG_INVALID"
     $ssh = Get-PropertyValue $raw "ssh"
     if ($null -eq $ssh) {
         Throw-BackupPullError "CONFIG_INVALID" "ssh configuration is missing"
@@ -239,7 +242,18 @@ function Read-Config {
         Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest approval is required"
     }
     $encryptionMode = [string](Get-PropertyValue $encryption "mode")
-    $encryptionApproved = [bool](Get-PropertyValue $encryption "approved")
+    $encryptionApprovedValue = Get-PropertyValue $encryption "approved"
+    if ($encryptionApprovedValue -isnot [bool]) {
+        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest.approved must be a JSON boolean"
+    }
+    $encryptionApproved = [bool]$encryptionApprovedValue
+    $keyRecoveryDocument = [string](Get-PropertyValue $encryption "key_recovery_document")
+    if ([string]::IsNullOrWhiteSpace($keyRecoveryDocument)) {
+        Throw-BackupPullError "CONFIG_INVALID" "key_recovery_document is required"
+    }
+    if ($encryptionApproved -and $keyRecoveryDocument -match "REPLACE_WITH|OWNER_APPROVAL_REQUIRED") {
+        Throw-BackupPullError "CONFIG_INVALID" "approved encryption requires a concrete key recovery reference"
+    }
     if ($encryptionMode -notin @("bitlocker", "file_encryption", "OWNER_APPROVAL_REQUIRED")) {
         Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest mode is unsupported"
     }
@@ -302,6 +316,7 @@ function Read-Config {
         LogFile = $logFile
         EncryptionAtRestMode = $encryptionMode
         EncryptionAtRestApproved = $encryptionApproved
+        KeyRecoveryDocument = $keyRecoveryDocument
     }
 }
 

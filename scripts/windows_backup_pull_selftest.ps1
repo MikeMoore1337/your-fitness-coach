@@ -111,6 +111,7 @@ try {
 @echo off
 if "%YFC_FAKE_SFTP_FAILURE%"=="HOST_KEY" (echo Host key verification failed 1>&2 & exit /b 255)
 if "%YFC_FAKE_SFTP_FAILURE%"=="AUTHENTICATION" (echo Permission denied (publickey) 1>&2 & exit /b 255)
+if "%YFC_FAKE_SFTP_FAILURE%"=="NETWORK" (echo Connection timed out 1>&2 & exit /b 255)
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0fake-sftp-helper.ps1" %*
 exit /b %ERRORLEVEL%
 '@
@@ -184,6 +185,19 @@ exit 0
 
     Write-RemoteIndex @($entry)
     Invoke-PullCase "pinned-host-key-rejection" 20 "HOST_KEY"
+    Invoke-PullCase "authentication-failure" 21 "AUTHENTICATION"
+    Invoke-PullCase "network-timeout" 22 "NETWORK"
+
+    $lockStream = [IO.File]::Open($config.lock_file, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    try { Invoke-PullCase "concurrent-lock" 24 "" } finally { $lockStream.Dispose() }
+
+    $diskEntry = Add-RemoteBackup "fitminiapp-20261018T120300Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-three")) "2026-10-18T12:03:00Z"
+    Write-RemoteIndex @($diskEntry, $entry)
+    $config.minimum_free_bytes = [int64]1000000000000000
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "low-disk-margin" 23 ""
+    $config.minimum_free_bytes = 0
+    Write-JsonFile $configPath $config
 
     $localManifest = Join-Path $local $entry.manifest_name
     $stale = Get-Content -LiteralPath $localManifest -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -198,6 +212,11 @@ exit 0
     $config.encryption_at_rest.approved = $false
     Write-JsonFile $configPath $config
     Invoke-PullCase "encryption-approval-gate" 25 ""
+    $config.encryption_at_rest.approved = "false"
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "encryption-approval-type-gate" 25 ""
+    [IO.File]::WriteAllText($configPath, "{", (New-Object Text.UTF8Encoding($false)))
+    Invoke-PullCase "malformed-config" 25 ""
     Write-Host "Synthetic Windows pull scenarios passed. Root: $root"
 }
 finally {

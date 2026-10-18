@@ -116,7 +116,8 @@ pwsh -NoProfile -File scripts/windows_backup_pull_selftest.ps1
 отказ pinned host key, stale status и блокировка до owner approval шифрования. Python-тесты
 дополнительно проверяют schema/manifest, duplicate
 index, повторную верификацию архива публикатором и отказ от ротации при повреждённой старой
-записи.
+записи. Отдельно проверяются authentication failure, network timeout, low-disk margin,
+concurrent lock и malformed config.
 
 Синтетический прогон не доказывает физический BitLocker/file encryption, реальную SFTP
 аутентификацию, сетевой timeout, заполнение диска, VPS filesystem permissions, Task Scheduler,
@@ -158,6 +159,6 @@ DNS и фоновые writer processes должны быть остановле�
 | --- | --- | --- |
 | Phase A | Контракт, manifest/index, VPS helper, Windows pull, docs, synthetic checks | Реализовано локально; Draft PR |
 | Phase B | Owner decision по encryption/key custody/retention, независимый off-host объект, реальный SFTP pull, clean non-prod restore | `NOT_VERIFIED` / не запускалось |
-| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | `NOT_AUTHORIZED` / не запускалось |
+| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | `NOT_VERIFIED` + `NOT_AUTHORIZED` / не запускалось |
 
 Issue #849 остаётся открытым до независимой off-host копии и clean-host restore evidence.
