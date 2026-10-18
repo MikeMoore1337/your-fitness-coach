@@ -26,6 +26,8 @@ import { AssignedProgramDetails } from './AssignedProgramDetails';
 import { ProgramImportPanel } from './ProgramImportPanel';
 import { PublicProgramSharePanel } from './PublicProgramSharePanel';
 import { AppLink } from '../../shared/navigation/router';
+import { programPreviewFacts, previewSourceSignature } from './programPreviewFacts';
+import './programPreview.css';
 
 const goalLabels: Record<string, string> = {
   muscle_gain: 'Набор мышечной массы',
@@ -97,6 +99,9 @@ export function TemplatesList({
   const { user, reloadUser } = useAuth();
   const queryClient = useQueryClient();
   const [selectedExample, setSelectedExample] = useState<ProgramTemplate | null>(null);
+  const [previewSelectionId, setPreviewSelectionId] = useState<number | null>(null);
+  const [previewStale, setPreviewStale] = useState(false);
+  const [previewChecking, setPreviewChecking] = useState(false);
   const [guide, setGuide] = useState<{ id: number; title: string } | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<ProgramTemplate | null>(null);
   const [editorDirty, setEditorDirty] = useState(false);
@@ -263,6 +268,31 @@ export function TemplatesList({
     setAssignmentTemplate(template);
   };
 
+  const assignFromPreview = async (template: ProgramTemplate) => {
+    if (previewChecking) return;
+    setPreviewChecking(true);
+    try {
+      // Refresh before entering the existing assignment flow; never silently use stale preview facts.
+      const latest = await api<ProgramTemplate>(`/api/v1/programs/templates/${template.id}`);
+      if (previewSourceSignature(latest) !== previewSourceSignature(template)) {
+        setSelectedExample(latest);
+        setPreviewStale(true);
+        toast('Данные программы обновились. Проверьте состав и повторите выбор.', 'error');
+        return;
+      }
+      setPreviewStale(false);
+      setSelectedExample(null);
+      openAssignment(latest);
+    } catch (reason) {
+      toast(
+        reason instanceof Error ? reason.message : 'Не удалось проверить актуальность программы',
+        'error',
+      );
+    } finally {
+      setPreviewChecking(false);
+    }
+  };
+
   const editCopy = (template: ProgramTemplate) => {
     setSaveAsCopy(true);
     setEditingTemplate(template);
@@ -316,14 +346,19 @@ export function TemplatesList({
         type="button"
         className="text-button program-template-card__main"
         aria-label={`Посмотреть ${item.is_example ? 'шаблон' : 'программу'} «${item.title}»`}
-        onClick={() => setSelectedExample(item)}
+        onClick={() => {
+          setPreviewStale(false);
+          setSelectedExample(item);
+        }}
       >
         <span className="program-template-badges">
           <Badge>{programKind(item, user?.id)}</Badge>
         </span>
         <strong>{item.title}</strong>
         <span className="muted">{programMeta(item)}</span>
-        <span className="program-example-trigger__hint">Открыть состав</span>
+        <span className="program-example-trigger__hint">
+          {previewSelectionId === item.id ? 'Выбрана для назначения · Посмотреть состав' : 'Посмотреть состав'}
+        </span>
       </button>
       <div className="program-template-card__actions">
         <button
@@ -437,7 +472,10 @@ export function TemplatesList({
                   <button
                     type="button"
                     className="secondary"
-                    onClick={() => setSelectedExample(activeTemplate)}
+                    onClick={() => {
+                    setPreviewStale(false);
+                    setSelectedExample(activeTemplate);
+                  }}
                   >
                     Посмотреть план
                   </button>
@@ -645,7 +683,7 @@ export function TemplatesList({
             <div className="program-example-modal__head">
               <div>
                 <span className="eyebrow">
-                  {selectedExample.is_example ? 'Пример программы' : 'Моя программа'}
+                  {programKind(selectedExample, user?.id)}
                 </span>
                 <h2 id="program-example-title">{selectedExample.title}</h2>
                 <p className="muted">{programMeta(selectedExample)}</p>
@@ -659,12 +697,43 @@ export function TemplatesList({
                 <CloseIcon />
               </button>
             </div>
-            <div className="program-example-days">
-              {selectedExample.days.map((day) => (
-                <section className="program-example-day" key={day.id}>
-                  <h3>
-                    День {day.day_number}. {day.title}
-                  </h3>
+            <section className="program-preview-section" aria-label="Известные сведения о программе">
+              <h3>Что известно</h3>
+              <p className="muted">Только сведения из программы без предположений о нагрузке.</p>
+              <dl className="program-preview-facts">
+                {programPreviewFacts(selectedExample).map((fact) => (
+                  <div className="program-preview-fact" key={fact.label}>
+                    <dt>{fact.label}</dt>
+                    <dd>{fact.value}</dd>
+                    <small>{fact.source}</small>
+                  </div>
+                ))}
+              </dl>
+              <p className="program-example-modal__owner">
+                {selectedExample.assigned_by_user_id && selectedExample.assigned_by_user_id !== user?.id
+                  ? `Назначил тренер${selectedExample.assigned_by_full_name ? ` ${selectedExample.assigned_by_full_name}` : ''}. Изменения доступны только по разрешённым правам.`
+                  : selectedExample.can_edit
+                    ? 'Вы можете редактировать свою программу.'
+                    : 'Изменения исходного шаблона недоступны. Можно создать личную копию.'}
+              </p>
+              {selectedExample.assigned_program_revision_number != null && (
+                <p className="program-example-modal__owner">
+                  Ревизия назначения: {selectedExample.assigned_program_revision_number}
+                </p>
+              )}
+            </section>
+            <section className="program-preview-section" aria-label="Состав недели">
+              <h3>Состав недели</h3>
+              <p className="muted">Все дни из исходного шаблона. Первый день раскрыт для примера.</p>
+              <div className="program-example-days">
+              {selectedExample.days.map((day, dayIndex) => (
+                <details className="program-example-day" key={day.id} open={dayIndex === 0}>
+                  <summary>
+                    <h3>
+                      День {day.day_number}. {day.title}
+                    </h3>
+                    <span className="muted">{day.exercises.length} упражнений</span>
+                  </summary>
                   <ol>
                     {day.exercises.map((exercise) => (
                       <li key={exercise.id}>
@@ -696,39 +765,74 @@ export function TemplatesList({
                       </li>
                     ))}
                   </ol>
-                </section>
+                </details>
               ))}
-            </div>
+              </div>
+            </section>
+            <p className="program-preview-source">
+              Состав и настройки отображены по источнику. Если данных нет, они не заменяются
+              приблизительными значениями. Просмотр не изменяет активную программу.
+            </p>
+            {previewStale && (
+              <p className="program-preview-stale" role="status">
+                Данные обновились. Проверьте сведения выше и повторите назначение.
+              </p>
+            )}
             <div className="program-example-modal__actions">
-              <button
-                type="button"
-                className="secondary"
-                onClick={() => {
-                  const template = selectedExample;
-                  setSelectedExample(null);
-                  setSaveAsCopy(shouldSaveTemplateAsCopy(template));
-                  setEditingTemplate(template);
-                }}
-              >
-                {shouldSaveTemplateAsCopy(selectedExample)
-                  ? 'Настроить личную копию'
-                  : 'Редактировать программу'}
-              </button>
-              {selectedExample.is_active_for_current_user ? (
-                <button type="button" disabled>
-                  Уже запущена
-                </button>
+              {selectedExample.is_active_for_current_user &&
+              selectedExample.assigned_by_user_id &&
+              selectedExample.assigned_by_user_id !== user?.id ? (
+                <p className="muted">Эта программа назначена тренером. Изменение недоступно.</p>
               ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const template = selectedExample;
-                    setSelectedExample(null);
-                    openAssignment(template);
-                  }}
-                >
-                  Настроить расписание и запустить
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setPreviewSelectionId(selectedExample.id);
+                      toast('Программа выбрана. Назначение выполняется отдельно.');
+                    }}
+                  >
+                    {previewSelectionId === selectedExample.id ? 'Выбрана' : 'Выбрать'}
+                  </button>
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={() => {
+                      setSaveAsCopy(true);
+                      setEditingTemplate(selectedExample);
+                      setSelectedExample(null);
+                    }}
+                  >
+                    Создать копию
+                  </button>
+                  {selectedExample.can_edit && (
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setSaveAsCopy(false);
+                        setEditingTemplate(selectedExample);
+                        setSelectedExample(null);
+                      }}
+                    >
+                      Редактировать
+                    </button>
+                  )}
+                  {selectedExample.is_active_for_current_user ? (
+                    <button type="button" disabled>
+                      Уже запущена
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={previewChecking}
+                      onClick={() => void assignFromPreview(selectedExample)}
+                    >
+                      {previewChecking ? 'Проверяем…' : 'Назначить по расписанию'}
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
