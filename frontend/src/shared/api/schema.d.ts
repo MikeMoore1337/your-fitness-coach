@@ -17529,6 +17529,10 @@ export interface components {
             score?: number | null;
             /** Reason Keys */
             reason_keys?: string[];
+            /** Media Thumbnail Url */
+            media_thumbnail_url?: string | null;
+            /** Media Thumbnail Sources */
+            media_thumbnail_sources?: components["schemas"]["ExerciseGuideMediaSource"][];
         };
         /** WorkoutCommentCreate */
         WorkoutCommentCreate: {

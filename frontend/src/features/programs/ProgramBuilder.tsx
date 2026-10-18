@@ -11,6 +11,7 @@ import { programDraftStorageKey } from '../../shared/userScopedStorage';
 import { useAuth } from '../../app/AuthProvider';
 import { AppLink } from '../../shared/navigation/router';
 import { dateInputValue, detectedTimeZone } from '../../shared/dateTime';
+import { ContextualHelp } from '../../shared/ui/ContextualHelp';
 import { applyRestSeconds } from './programRest';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { scheduleWeekdaysForSave, templateDraftTitle } from './templateEditing';
@@ -922,10 +923,12 @@ export function ProgramBuilder({
                   </label>
                 </div>
                 {usesSequentialCycle ? (
-                  <p className="muted">
-                    Восьмидневный цикл планируется последовательно и автоматически повторяется после
-                    восьмой тренировки.
-                  </p>
+                  <ContextualHelp summary="Как устроен цикл?">
+                    <p>
+                      Восьмидневный цикл планируется последовательно и автоматически повторяется
+                      после восьмой тренировки.
+                    </p>
+                  </ContextualHelp>
                 ) : (
                   <div className="form-grid">
                     {days.map((day, dayIndex) => (

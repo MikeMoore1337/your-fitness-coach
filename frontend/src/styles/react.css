@@ -2929,8 +2929,10 @@ details:not([open]) > :not(summary) {
 }
 .weekly-review__target,
 .weekly-review__complete {
-  padding: 10px 0 10px 14px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__target strong {
   display: block;
@@ -2974,8 +2976,10 @@ details:not([open]) > :not(summary) {
   gap: 2px;
 }
 .weekly-review__notice {
-  padding: 12px 0 12px 14px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__calibration {
   padding-top: 16px;
@@ -3023,7 +3027,6 @@ details:not([open]) > :not(summary) {
 }
 .weekly-review__diff > div:last-child {
   background: var(--surface-subtle);
-  box-shadow: inset 3px 0 var(--weekly-review-lime);
 }
 .weekly-review__diff span,
 .weekly-review__diff small {
@@ -3040,8 +3043,10 @@ details:not([open]) > :not(summary) {
 .weekly-review__decision-note {
   grid-column: 1 / -1;
   margin-bottom: 2px;
-  padding-left: 12px;
-  border-left: 3px solid var(--weekly-review-lime);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
 }
 .weekly-review__decision button,
 .weekly-review__actions button {
@@ -3155,9 +3160,6 @@ details:not([open]) > :not(summary) {
   .weekly-review__diff > span {
     justify-self: center;
     transform: rotate(90deg);
-  }
-  .weekly-review__diff > div:last-child {
-    box-shadow: inset 0 3px var(--weekly-review-lime);
   }
   .weekly-review__decision,
   .weekly-review__actions {
@@ -5049,6 +5051,10 @@ button.today-text-link {
   gap: 8px;
   margin: -3px 0 0 48px;
 }
+.active-workout-set__prefill-actions.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;
 }
@@ -5129,6 +5135,12 @@ button.today-text-link {
 .active-workout-set__done {
   width: 100%;
   min-height: 48px;
+}
+.active-workout-set__contextual-help {
+  min-width: 0;
+}
+.active-workout-set__contextual-help .contextual-help {
+  margin-top: 0;
 }
 .active-workout-set:not(.is-current) .active-workout-set__done {
   border-color: var(--border);
@@ -5685,6 +5697,9 @@ button.today-text-link {
 .active-workout:has(.active-workout-rest) :is(input, [data-workout-field='done']) {
   scroll-margin-block-start: calc(var(--yfc-layout-safe-top, 0px) + 124px);
 }
+.active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
+  display: none;
+}
 
 @keyframes active-workout-set-confirm {
   50% {
@@ -5711,7 +5726,7 @@ button.today-text-link {
   text-transform: uppercase;
 }
 .active-workout-rest__time strong {
-  font: 700 1.5rem/1 var(--font-body);
+  font: 700 var(--rest-clock-font-size, 1.5rem)/1 var(--font-body);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -5771,13 +5786,21 @@ button.today-text-link {
 
 /* #960 - additive elapsed counter in the existing RestTimer top row. */
 .active-workout-rest:has(.active-workout-rest__actual) {
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 108px);
+  /* Both clocks keep one type scale. The middle label yields to real time values. */
+  --rest-clock-font-size: 1.5rem;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: 8px;
+}
+.active-workout-rest:has(.active-workout-rest__actual) .active-workout-rest__next span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .active-workout-rest__actual {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--touch-target, 44px);
+  grid-template-columns: max-content var(--touch-target, 44px);
   align-items: center;
-  gap: 3px;
+  gap: 6px;
   min-width: 0;
 }
 .active-workout-rest__actual-value {
@@ -5789,12 +5812,11 @@ button.today-text-link {
   color: var(--v2-text-primary);
   font-size: 0.65rem;
   font-weight: 800;
+  text-transform: uppercase;
 }
 .active-workout-rest__actual-value strong {
-  overflow: hidden;
-  font: 700 0.96rem/1 var(--font-body);
+  font: 700 var(--rest-clock-font-size, 1.5rem)/1 var(--font-body);
   font-variant-numeric: tabular-nums;
-  text-overflow: clip;
   white-space: nowrap;
 }
 .active-workout-rest__stop {
@@ -5818,6 +5840,15 @@ button.today-text-link {
 }
 .active-workout-rest:has(.active-workout-rest__actual) .active-workout-rest__actions {
   grid-column: 1 / -1;
+}
+@media (max-width: 360px) {
+  .active-workout-rest:has(.active-workout-rest__actual) {
+    --rest-clock-font-size: 1.25rem;
+    column-gap: 6px;
+  }
+  .active-workout-rest__actual {
+    gap: 4px;
+  }
 }
 
 /* #960 Variant C: one inline recovery panel, using existing YFC tokens. */

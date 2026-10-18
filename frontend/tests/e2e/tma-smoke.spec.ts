@@ -1362,7 +1362,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     .click();
   const bodyConfidence = tmaPage
     .locator('#progress-body')
-    .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
+    .getByRole('region', { name: 'Достаточно ли данных: Масса — Пока мало данных', exact: true })
     .filter({ hasText: 'Сейчас есть 0 замеров' });
   await expect(bodyConfidence).toHaveCount(1);
   await bodyConfidence.scrollIntoViewIfNeeded();
@@ -1890,9 +1890,24 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
         primaryColor: primary ? getComputedStyle(primary).color : null,
         primaryRadius: primary ? getComputedStyle(primary).borderRadius : null,
         activeStepBoundary: activeStep ? getComputedStyle(activeStep).borderBottomColor : null,
-        boundaryBorder: boundary ? getComputedStyle(boundary).borderLeftColor : null,
+        boundaryBorder: boundary
+          ? {
+              leftColor: getComputedStyle(boundary).borderLeftColor,
+              topColor: getComputedStyle(boundary).borderTopColor,
+              leftWidth: getComputedStyle(boundary).borderLeftWidth,
+              topWidth: getComputedStyle(boundary).borderTopWidth,
+              radius: getComputedStyle(boundary).borderRadius,
+            }
+          : null,
         boundaryShadow: boundary ? getComputedStyle(boundary).boxShadow : null,
-        noteBorder: decisionNote ? getComputedStyle(decisionNote).borderLeftColor : null,
+        noteBorder: decisionNote
+          ? {
+              leftColor: getComputedStyle(decisionNote).borderLeftColor,
+              topColor: getComputedStyle(decisionNote).borderTopColor,
+              leftWidth: getComputedStyle(decisionNote).borderLeftWidth,
+              topWidth: getComputedStyle(decisionNote).borderTopWidth,
+            }
+          : null,
         disclosure: disclosureRect
           ? {
               width: disclosureRect.width,
@@ -1907,10 +1922,19 @@ test('weekly review visual evidence covers compact Mobile Web, dark TMA and desk
     expect(brandContract.primaryRadius).toBe(brandContract.actionRadius);
     expect(brandContract.activeStepBoundary).toBe(brandContract.lime);
     if (current.step === 'facts') {
-      expect(brandContract.boundaryBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryBorder).toMatchObject({
+        leftWidth: '1px',
+        topWidth: '1px',
+      });
+      expect(brandContract.boundaryBorder?.leftColor).toBe(brandContract.boundaryBorder?.topColor);
+      expect(brandContract.boundaryBorder?.radius).not.toBe('0px');
     } else {
-      expect(brandContract.boundaryShadow).toContain(brandContract.lime);
-      expect(brandContract.noteBorder).toBe(brandContract.lime);
+      expect(brandContract.boundaryShadow).toBe('none');
+    }
+    if (brandContract.noteBorder) {
+      expect(brandContract.noteBorder.leftWidth).toBe('1px');
+      expect(brandContract.noteBorder.topWidth).toBe('1px');
+      expect(brandContract.noteBorder.leftColor).toBe(brandContract.noteBorder.topColor);
     }
     expect(brandContract.disclosure).toEqual({ width: 28, height: 28, radius: '50%' });
 
@@ -2087,7 +2111,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   expect(await tmaGuidance.textContent()).toBe(await mobileGuidance.textContent());
   await expect(tmaGuidance.locator('.ui-button--primary')).not.toBeAttached();
 
-  await tmaGuidance.getByText('Почему?', { exact: true }).click();
+  await tmaGuidance.getByText('Почему такой вес?', { exact: true }).click();
   await expect(tmaGuidance.getByText('Цель: 1 × 8–10')).toBeVisible();
   await expect(tmaGuidance.getByText(/запас записан: 1/)).toBeVisible();
   const disclosureGeometry = await tmaGuidance.locator('.disclosure-icon').evaluate((element) => {
@@ -2248,7 +2272,7 @@ test('progression guidance screenshots cover outcomes, long content and responsi
       .getByRole('button', { name: 'Что делать сейчас?' })
       .click();
     const guidance = exercise.getByRole('region', { name: 'Рекомендация по следующей нагрузке' });
-    await guidance.getByText('Почему?', { exact: true }).click();
+    await guidance.getByText('Почему такой вес?', { exact: true }).click();
     await expect(guidance).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-color-scheme', current.theme);
     await expectNoHorizontalOverflow(page);
@@ -2921,13 +2945,11 @@ test('contextual help covers workout, nutrition and Progress without a TMA libra
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   const currentSet = tmaPage.locator('[aria-current="step"]');
   await expect(currentSet).toHaveCount(1);
-  await currentSet.getByText('Дополнительно', { exact: true }).click();
-  const rirDetails = tmaPage.locator('.active-workout-rir .contextual-help');
-  const rirHelp = rirDetails.getByText('Что это?', { exact: true });
+  const rirDetails = currentSet.locator('.active-workout-set__contextual-help .contextual-help');
+  const rirHelp = rirDetails.getByText('Что такое RIR?', { exact: true });
+  await expect(rirHelp).toBeVisible();
   await rirHelp.click();
-  const rirArticleLink = tmaPage
-    .locator('.active-workout-rir')
-    .getByRole('link', { name: /Подробнее на сайте/ });
+  const rirArticleLink = rirDetails.getByRole('link', { name: /Подробнее на сайте/ });
   await expect(rirArticleLink).toHaveAttribute(
     'href',
     '/knowledge/training/repetitions-in-reserve',

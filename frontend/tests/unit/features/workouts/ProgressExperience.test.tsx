@@ -471,7 +471,7 @@ describe('ProgressExperience', () => {
     installApi({ summary });
     renderExperience('?section=progress&progress_view=body');
 
-    await screen.findByRole('heading', { name: 'Замеры и приоритеты' });
+    await screen.findByRole('heading', { name: 'Тело' });
     fireEvent.click(screen.getByText('Выбранные мышечные группы'));
     expect(await screen.findByText('Мышцы спины')).toBeVisible();
     expect(screen.getByText('Задняя поверхность тела')).toBeVisible();
@@ -525,7 +525,7 @@ describe('ProgressExperience', () => {
     installApi({ summary });
     renderExperience('?section=progress&progress_view=body');
 
-    await screen.findByRole('heading', { name: 'Замеры и приоритеты' });
+    await screen.findByRole('heading', { name: 'Тело' });
     expect(screen.getByRole('tab', { name: 'Живот' })).toHaveAttribute('aria-selected', 'false');
     expect(screen.queryByRole('img', { name: /Живот/ })).not.toBeInTheDocument();
 
