@@ -809,6 +809,86 @@ async function activeWorkoutQueueLength(page: Page) {
   });
 }
 
+test.describe('#1097 rest clock typography and responsive layout', () => {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`planned and measured clocks share size and fit the top row in ${theme}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 393, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page, true, 'approved_animated', false, null, true);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const first = page.locator('[data-workout-set-id="201"]');
+      await first.getByLabel(/^Вес,/).fill('40');
+      await first.getByLabel(/^Повторы,/).fill('10');
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+
+      const panel = page.locator('.active-workout-rest');
+      await expect(panel.locator('.active-workout-rest__actual-value')).toBeVisible();
+      await expect(panel.locator('.active-workout-rest__actual-value span')).toHaveText('ФАКТ');
+      await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+
+      for (const width of [320, 360, 393, 430, 1440]) {
+        await page.setViewportSize({ width, height: 844 });
+        const result = await panel.evaluate((element) => {
+          const planned = element.querySelector<HTMLElement>('.active-workout-rest__time strong')!;
+          const actual = element.querySelector<HTMLElement>(
+            '.active-workout-rest__actual-value strong',
+          )!;
+          const next = element.querySelector<HTMLElement>('.active-workout-rest__next')!;
+          const actualBlock = element.querySelector<HTMLElement>('.active-workout-rest__actual')!;
+          const stop = element.querySelector<HTMLElement>('.active-workout-rest__stop')!;
+          const original = actual.textContent;
+          // Exercise an hour-long measurement without waiting an hour or altering the journal.
+          actual.textContent = '1:07:08';
+          const timerSize = getComputedStyle(planned).fontSize;
+          const actualSize = getComputedStyle(actual).fontSize;
+          const actualFits = actual.scrollWidth <= actual.clientWidth + 1;
+          const geometry = {
+            timerSize,
+            actualSize,
+            actualFits,
+            plannedRight: planned.getBoundingClientRect().right,
+            nextLeft: next.getBoundingClientRect().left,
+            nextRight: next.getBoundingClientRect().right,
+            actualLeft: actualBlock.getBoundingClientRect().left,
+            actualRight: actualBlock.getBoundingClientRect().right,
+            stopRight: stop.getBoundingClientRect().right,
+            panelRight: element.getBoundingClientRect().right,
+            panelWidth: element.getBoundingClientRect().width,
+            documentOverflow:
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            actions: Array.from(
+              element.querySelectorAll<HTMLElement>('.active-workout-rest__actions button'),
+            ).map((button) => button.getBoundingClientRect().width),
+          };
+          actual.textContent = original;
+          return geometry;
+        });
+        expect(result.actualSize, `${width}px ${theme}: matching clock type scale`).toBe(
+          result.timerSize,
+        );
+        expect(result.actualFits, `${width}px ${theme}: full hour format visible`).toBe(true);
+        expect(result.plannedRight).toBeLessThanOrEqual(result.nextLeft + 1);
+        expect(result.nextRight).toBeLessThanOrEqual(result.actualLeft + 1);
+        expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
+        expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
+        expect(result.documentOverflow).toBeLessThanOrEqual(1);
+        expect(result.actions).toHaveLength(3);
+        expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
+        await panel.screenshot({
+          path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
+          animations: 'disabled',
+        });
+      }
+    });
+  }
+});
+
 test.describe('#1001 keyboard input stability', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
@@ -4502,7 +4582,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
   await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-  await expect(panel).toContainText('Факт');
+  await expect(panel).toContainText('ФАКТ');
   await expect(panel).not.toHaveClass(/is-compact/);
   await expect
     .poll(() =>
@@ -4536,7 +4616,7 @@ test('rest timer reaches its final state from the deadline without user events',
   // Policy C keeps the actual rest running beyond the planned countdown.
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
-  await expect(panel).toContainText('Факт');
+  await expect(panel).toContainText('ФАКТ');
   await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
   await panel.getByRole('button', { name: 'Завершить отдых' }).click();
   await expect(panel).toHaveClass(/is-compact/);
