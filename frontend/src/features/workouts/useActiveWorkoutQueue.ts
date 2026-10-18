@@ -94,6 +94,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   const [message, setMessage] = useState<string | null>(null);
   const inFlightId = useRef<string | null>(null);
   const flushPromise = useRef<Promise<boolean> | null>(null);
+  const enqueuePromise = useRef<Promise<void> | null>(null);
 
   const persist = useCallback((next: ActiveWorkoutQueue, requireDurable = false) => {
     const durable = saveActiveWorkoutQueue(next);
@@ -288,41 +289,53 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
       immediate = false,
     ): Promise<boolean> => {
       if (!userId || !workoutId || !lockName) return false;
-      setSyncState(navigator.onLine ? 'pending' : 'offline');
+      let releaseEnqueue!: () => void;
+      const currentEnqueue = new Promise<void>((resolve) => {
+        releaseEnqueue = resolve;
+      });
+      const previousEnqueue = enqueuePromise.current;
+      enqueuePromise.current = currentEnqueue;
+      await previousEnqueue;
       try {
-        const durable = await crossContextCoordinator.run(lockName, () => {
-          const next = enqueueWorkoutMutation(readFresh(), {
-            setId,
-            serverVersion,
-            values,
-            inFlightMutationId: inFlightId.current,
+        setSyncState(navigator.onLine ? 'pending' : 'offline');
+        try {
+          const durable = await crossContextCoordinator.run(lockName, () => {
+            const next = enqueueWorkoutMutation(readFresh(), {
+              setId,
+              serverVersion,
+              values,
+              inFlightMutationId: inFlightId.current,
+            });
+            const durable = persist(next, immediate && !navigator.onLine);
+            setMessage(
+              durable
+                ? navigator.onLine
+                  ? null
+                  : 'Нет сети. Изменения сохранены на этом устройстве.'
+                : 'Хранилище устройства недоступно. Не закрывайте приложение до синхронизации.',
+            );
+            return durable;
           });
-          const durable = persist(next, immediate && !navigator.onLine);
-          setMessage(
-            durable
-              ? navigator.onLine
-                ? null
-                : 'Нет сети. Изменения сохранены на этом устройстве.'
-              : 'Хранилище устройства недоступно. Не закрывайте приложение до синхронизации.',
-          );
-          return durable;
-        });
-        if (!navigator.onLine) {
-          setSyncState(durable ? 'offline' : 'error');
-          return durable;
+          if (!navigator.onLine) {
+            setSyncState(durable ? 'offline' : 'error');
+            return durable;
+          }
+          if (!immediate) return durable;
+          const acceptDurableOffline = () =>
+            durable && !navigator.onLine && latestMutationForSet(readFresh(), setId) !== undefined;
+          if (!(await flushNow())) return acceptDurableOffline();
+          // An existing flush can finish just before this enqueue acquires its write turn.
+          return latestMutationForSet(readFresh(), setId)
+            ? (await flushNow()) || acceptDurableOffline()
+            : true;
+        } catch (reason) {
+          setSyncState('error');
+          setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
+          return false;
         }
-        if (!immediate) return durable;
-        const acceptDurableOffline = () =>
-          durable && !navigator.onLine && latestMutationForSet(readFresh(), setId) !== undefined;
-        if (!(await flushNow())) return acceptDurableOffline();
-        // An existing flush can finish just before this enqueue acquires its write turn.
-        return latestMutationForSet(readFresh(), setId)
-          ? (await flushNow()) || acceptDurableOffline()
-          : true;
-      } catch (reason) {
-        setSyncState('error');
-        setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
-        return false;
+      } finally {
+        releaseEnqueue();
+        if (enqueuePromise.current === currentEnqueue) enqueuePromise.current = null;
       }
     },
     [flushNow, lockName, persist, readFresh, userId, workoutId],
@@ -362,11 +375,14 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
   useEffect(() => {
     if (!key) return;
     const retry = () => void flushNow();
-    const refreshWorkout = () => {
-      if (navigator.onLine) {
-        void queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
-      }
-      retry();
+    const refreshWorkout = async () => {
+      const pendingEnqueue = enqueuePromise.current;
+      if (pendingEnqueue) await pendingEnqueue;
+      if (!pendingEnqueue) await flushNow();
+      const nextEnqueue = enqueuePromise.current;
+      if (nextEnqueue) await nextEnqueue;
+      if (!navigator.onLine || readFresh().queue.length > 0) return;
+      await queryClient.invalidateQueries({ queryKey: ['workout', 'today'], exact: true });
     };
     const onStorage = (event: StorageEvent) => {
       if (event.key !== key) return;
@@ -378,14 +394,14 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
     const onVisible = () => {
       if (document.visibilityState === 'visible') refreshWorkout();
     };
-    window.addEventListener('online', retry);
+    window.addEventListener('online', refreshWorkout);
     window.addEventListener('focus', refreshWorkout);
     window.addEventListener('pageshow', refreshWorkout);
     window.addEventListener(YFC_PLATFORM_ACTIVATED_EVENT, retry);
     window.addEventListener('storage', onStorage);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      window.removeEventListener('online', retry);
+      window.removeEventListener('online', refreshWorkout);
       window.removeEventListener('focus', refreshWorkout);
       window.removeEventListener('pageshow', refreshWorkout);
       window.removeEventListener(YFC_PLATFORM_ACTIVATED_EVENT, retry);
