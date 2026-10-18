@@ -728,12 +728,18 @@ export function TemplatesList({
               <div className="program-example-days">
               {selectedExample.days.map((day, dayIndex) => (
                 <details className="program-example-day" key={day.id} open={dayIndex === 0}>
-                  <summary>
-                    <h3>
-                      День {day.day_number}. {day.title}
-                    </h3>
-                    <span className="muted">{day.exercises.length} упражнений</span>
+                  <summary className="yfc-disclosure-summary">
+                    <span>
+                      <strong>
+                        День {day.day_number}. {day.title}
+                      </strong>
+                      <span className="muted"> · {day.exercises.length} упражнений</span>
+                    </span>
+                    <DisclosureIcon />
                   </summary>
+                  <h3 className="sr-only">
+                    День {day.day_number}. {day.title}
+                  </h3>
                   <ol>
                     {day.exercises.map((exercise) => (
                       <li key={exercise.id}>
@@ -827,6 +833,7 @@ export function TemplatesList({
                     <button
                       type="button"
                       disabled={previewChecking}
+                      aria-label="Настроить расписание и запустить"
                       onClick={() => void assignFromPreview(selectedExample)}
                     >
                       {previewChecking ? 'Проверяем…' : 'Назначить по расписанию'}
