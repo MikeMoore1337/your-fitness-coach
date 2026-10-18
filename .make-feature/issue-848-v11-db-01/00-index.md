@@ -20,4 +20,4 @@
 - Production `max_connections`, reserved slots, pooler topology, effective `.env`, process/replica counts, attribution, overlap and safety margin: `NO_DATA`/`NOT_PROVEN`.
 - Owner approval of the numeric safety headroom and sanitized evidence: required before activation.
 - Independent dry run against authorized production-shaped evidence: required before production rollout.
-- Draft PR exact-head checks and reviewer/security gate: pending branch push/PR creation and GitHub Actions.
+- Draft PR #1118 is open at exact head `fd80be47`; CI run `39164466640` and aggregate `checks` passed. Reviewer/security gate remains pending.
