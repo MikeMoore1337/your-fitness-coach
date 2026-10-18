@@ -41,10 +41,13 @@ def test_video_profiles_are_additive_and_keep_original_gif() -> None:
         assert get_guide_media_preview(slug)["animation_url"] == source.url
 
 
-def test_unmatched_exercises_retain_legacy_gif() -> None:
-    (still_gif,) = guide("ab-wheel")
-    assert still_gif["video_sources"] == []
-    assert still_gif["url"].endswith(".gif")
+def test_ai_upscaled_exercises_retain_legacy_gif() -> None:
+    (item,) = guide("ab-wheel")
+    media = ExerciseGuideMedia.model_validate(item)
+    assert media.url.endswith(".gif")
+    assert media.sources[0].mime_type == "image/gif"
+    assert [(variant.width, variant.height) for variant in media.video_sources] == [(720, 720)]
+    assert media.video_sources[0].url.endswith("/ab-wheel-x4plus-720.mp4")
     assert guide("unknown-slug") == []
 
 
