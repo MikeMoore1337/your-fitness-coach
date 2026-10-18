@@ -4582,7 +4582,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
   await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-  await expect(panel).toContainText('Факт');
+  await expect(panel).toContainText('ФАКТ');
   await expect(panel).not.toHaveClass(/is-compact/);
   await expect
     .poll(() =>
@@ -4616,7 +4616,7 @@ test('rest timer reaches its final state from the deadline without user events',
   // Policy C keeps the actual rest running beyond the planned countdown.
   await expect(timer).toHaveText('0:00');
   const panel = page.locator('.active-workout-rest');
-  await expect(panel).toContainText('Факт');
+  await expect(panel).toContainText('ФАКТ');
   await expect(panel.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
   await panel.getByRole('button', { name: 'Завершить отдых' }).click();
   await expect(panel).toHaveClass(/is-compact/);
