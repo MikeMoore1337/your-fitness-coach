@@ -5051,6 +5051,10 @@ button.today-text-link {
   gap: 8px;
   margin: -3px 0 0 48px;
 }
+.active-workout-set__prefill-actions.is-hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;
 }
