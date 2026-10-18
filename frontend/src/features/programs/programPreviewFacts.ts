@@ -43,7 +43,7 @@ export function programPreviewFacts(template: ProgramTemplate): ProgramPreviewFa
     : 'Нет данных';
   const weeks = template.days.flatMap((day) =>
     day.exercises.flatMap((exercise) =>
-      exercise.weekly_prescriptions.map((week) => week.week_number),
+      (exercise.weekly_prescriptions ?? []).map((week) => week.week_number),
     ),
   );
   const maxExplicitWeek = Math.max(0, ...weeks.filter((week) => Number.isInteger(week) && week >= 1));
