@@ -446,12 +446,16 @@ function WorkoutSetRow({
   const serverVersion = set.version ?? 1;
   const canPrefillReps = reps === '' && previousValues?.actual_reps != null;
   const canPrefillWeight = weight === '' && previousValues?.actual_weight != null;
+  const [prefillDismissed, setPrefillDismissed] = useState(false);
   const canPrefill =
     isCurrent &&
     !disabled &&
     !completed &&
     previousResult !== null &&
+    !prefillDismissed &&
     (canPrefillReps || canPrefillWeight);
+  const prefillSpaceReserved =
+    prefillDismissed && isCurrent && !disabled && !completed && previousResult !== null;
   const completedFieldsDisabled = disabled || completing || (completed && !editingCompleted);
 
   const canStartRest = (nextSetKind: SetKind, nextCompleted: boolean) =>
@@ -733,8 +737,11 @@ function WorkoutSetRow({
       {isCurrent && previousResult && (
         <p className="active-workout-set__previous">Предыдущий подход: {previousResult}</p>
       )}
-      {canPrefill && (
-        <div className="active-workout-set__prefill-actions">
+      {(canPrefill || prefillSpaceReserved) && (
+        <div
+          className={`active-workout-set__prefill-actions${prefillSpaceReserved ? ' is-hidden' : ''}`}
+          aria-hidden={prefillSpaceReserved || undefined}
+        >
           <button
             className="active-workout-set__prefill"
             disabled={completing}
@@ -742,6 +749,7 @@ function WorkoutSetRow({
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
@@ -760,6 +768,7 @@ function WorkoutSetRow({
             onClick={() => {
               const nextReps = canPrefillReps ? String(previousValues?.actual_reps) : reps;
               const nextWeight = canPrefillWeight ? String(previousValues?.actual_weight) : weight;
+              setPrefillDismissed(nextReps !== '' && nextWeight !== '');
               editing.current = true;
               setReps(nextReps);
               setWeight(nextWeight);
@@ -818,6 +827,7 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextWeight = event.target.value;
               editing.current = true;
+              setPrefillDismissed(nextWeight !== '' && reps !== '');
               setWeight(nextWeight);
               if (!editingCompleted) enqueueSave({ weight: nextWeight });
             }}
@@ -844,6 +854,7 @@ function WorkoutSetRow({
             onChange={(event) => {
               const nextReps = event.target.value;
               editing.current = true;
+              setPrefillDismissed(nextReps !== '' && weight !== '');
               setReps(nextReps);
               if (!editingCompleted) enqueueSave({ reps: nextReps });
             }}
@@ -2126,7 +2137,8 @@ export function TodayWorkout({
         const target = box.height <= bottom - safeTop ? box : input.getBoundingClientRect();
         const delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
-        if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
+        // Ignore subpixel observer noise; visible displacement still gets corrected.
+        if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' });
       });
     };
     const pointerDown = () => {
