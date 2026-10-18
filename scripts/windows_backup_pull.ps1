@@ -124,7 +124,7 @@ function Read-JsonObject {
         Throw-BackupPullError $ErrorCode "backup metadata is not valid JSON"
     }
     if ($null -eq $value -or $value -is [Array]) {
-        Throw-BackupPullError "CORRUPTED" "backup metadata must be a JSON object"
+        Throw-BackupPullError $ErrorCode "backup metadata must be a JSON object"
     }
     return $value
 }

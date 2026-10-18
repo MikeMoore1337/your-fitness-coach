@@ -217,6 +217,8 @@ exit 0
     Invoke-PullCase "encryption-approval-type-gate" 25 ""
     [IO.File]::WriteAllText($configPath, "{", (New-Object Text.UTF8Encoding($false)))
     Invoke-PullCase "malformed-config" 25 ""
+    [IO.File]::WriteAllText($configPath, "[]", (New-Object Text.UTF8Encoding($false)))
+    Invoke-PullCase "non-object-config" 25 ""
     Write-Host "Synthetic Windows pull scenarios passed. Root: $root"
 }
 finally {
