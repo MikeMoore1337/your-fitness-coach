@@ -108,6 +108,10 @@ async function mockActiveWorkout(
     : null;
   let failSetPatch = false;
   let nextPatchBarrier: Promise<void> | null = null;
+  let workoutReadBarrier: Promise<void> | null = null;
+  let workoutReadCount = 0;
+  let workoutReadResponseCount = 0;
+  const workoutReadSnapshots: boolean[] = [];
   const patches: Array<{
     setId: number;
     method: string;
@@ -302,7 +306,14 @@ async function mockActiveWorkout(
       if (finished) {
         return route.fulfill({ status: 404, json: { detail: 'На сегодня тренировка завершена' } });
       }
-      return route.fulfill({ json: workout() });
+      workoutReadCount += 1;
+      const snapshotCompleted = sets.get(202)?.is_completed ?? false;
+      workoutReadSnapshots.push(snapshotCompleted);
+      const snapshot = workout();
+      if (workoutReadBarrier) await workoutReadBarrier;
+      await route.fulfill({ json: snapshot });
+      workoutReadResponseCount += 1;
+      return;
     }
     if (path.endsWith('/workouts/progress/summary')) {
       return route.fulfill({
@@ -782,6 +793,19 @@ async function mockActiveWorkout(
       });
       return release;
     },
+    holdWorkoutReads() {
+      let release!: () => void;
+      workoutReadBarrier = new Promise<void>((resolve) => {
+        release = () => {
+          workoutReadBarrier = null;
+          resolve();
+        };
+      });
+      return release;
+    },
+    workoutReadCount: () => workoutReadCount,
+    workoutReadResponseCount: () => workoutReadResponseCount,
+    workoutReadSnapshots: () => [...workoutReadSnapshots],
     failSetPatch(value: boolean) {
       failSetPatch = value;
     },
@@ -1313,6 +1337,57 @@ test.describe('#1001 completion navigation', () => {
       });
     }
   }
+});
+
+test('does not restore a completed set after a stale reconnect refetch', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('40');
+  await first.getByLabel(/^Повторы,/).fill('10');
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+
+  const second = page.locator('[data-workout-set-id="202"]');
+  await setNetworkOffline(page, true);
+  await second.getByLabel(/^Вес,/).fill('50');
+  await second.getByLabel(/^Повторы,/).fill('15');
+  await second.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '203');
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(1);
+
+  const readsBeforeReconnect = server.workoutReadCount();
+  const responsesBeforeReconnect = server.workoutReadResponseCount();
+  const releasePatch = server.holdNextPatch();
+  const releaseRead = server.holdWorkoutReads();
+  try {
+    await setNetworkOffline(page, false);
+    await expect.poll(() => server.patches.some((patch) => patch.setId === 202)).toBe(true);
+    expect(server.workoutReadCount()).toBe(readsBeforeReconnect);
+    releasePatch();
+    await expect.poll(() => server.readSet(202).is_completed).toBe(true);
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await expect.poll(() => server.workoutReadCount()).toBeGreaterThan(readsBeforeReconnect);
+    expect(server.workoutReadSnapshots().at(-1)).toBe(true);
+    releaseRead();
+    await expect
+      .poll(() => server.workoutReadResponseCount())
+      .toBeGreaterThan(responsesBeforeReconnect);
+    await expect(page.locator('[aria-current="step"]')).toHaveAttribute(
+      'data-workout-set-id',
+      '203',
+    );
+  } finally {
+    releasePatch();
+    releaseRead();
+  }
+
+  await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '203');
 });
 
 test('P1 completion waits for acceptance behind an in-flight autosave', async ({ page }, info) => {
