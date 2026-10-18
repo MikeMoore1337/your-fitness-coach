@@ -66,6 +66,7 @@ describe('program preview factual mapping', () => {
             prescribed_sets: 3,
             prescribed_reps: '8',
             rest_seconds: 90,
+            has_guide: false,
             weekly_prescriptions: [{
               exercise_id: 20,
               week_number: 12,
