@@ -2225,7 +2225,9 @@ test('V9-01 replaces an untouched active exercise in mocked TMA', async ({ page 
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await expect(page.getByRole('heading', { name: 'Что изменится' })).toBeVisible();
   await page.getByRole('button', { name: 'Применить только сегодня' }).click();
-  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  await expect(
+    page.locator('.active-workout-exercise').getByRole('heading', { name: 'Жим гантелей лёжа' }),
+  ).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-layout-surface', 'telegram');
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),

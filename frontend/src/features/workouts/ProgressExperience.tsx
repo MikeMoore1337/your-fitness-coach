@@ -68,6 +68,16 @@ const bodyMetricUnits: Record<BodyTrend['unit'], string> = {
   cm: 'см',
 };
 
+const bodyFactDefinitions = [
+  { key: 'weight_kg', label: 'Вес', unit: 'кг' },
+  { key: 'waist_cm', label: 'Талия', unit: 'см' },
+  { key: 'hips_cm', label: 'Бёдра', unit: 'см' },
+] as const;
+const balancedPriorityMode = 'balanced';
+const muscleGroupsPriorityMode = 'muscle_groups';
+const wellbeingProgressView = 'wellbeing';
+const historyProgressView = 'history';
+
 function bodyMetricLabel(trend: BodyTrend): string {
   return trend.label || bodyMetricLabels[trend.metric] || 'Замер';
 }
@@ -225,7 +235,7 @@ function ProgressTrendPanel({
       <div className="progress-trend-panel__head">
         <div>
           <span className="progress-section__eyebrow">Динамика</span>
-          <h3>{detail ? 'Один график для всех замеров' : 'Главная динамика'}</h3>
+          <h3>{detail ? 'Выберите показатель' : 'Главная динамика'}</h3>
         </div>
         {selectedTrend && (
           <strong className="progress-trend-panel__value">
@@ -684,28 +694,12 @@ function SummaryOverview({
   );
 }
 
-function TrainingFacts({
-  summary,
-  analytics,
-}: {
-  summary?: ProgressSummary;
-  analytics: TrainingAnalytics;
-}) {
+function TrainingFacts({ analytics }: { analytics: TrainingAnalytics }) {
   return (
     <dl className="progress-fact-strip" aria-label="Итоги тренировок">
       <div>
         <dt>Рабочих подходов</dt>
         <dd>{analytics.completed_set_count}</dd>
-      </div>
-      <div>
-        <dt>Частота</dt>
-        <dd>
-          {formatNumber(
-            analytics.frequency_per_week ?? summary?.training.frequency_per_week ?? 0,
-            2,
-          )}{' '}
-          в неделю
-        </dd>
       </div>
       <div>
         <dt>Внешняя нагрузка</dt>
@@ -867,7 +861,15 @@ function TrainingSection({
         />
       ) : analytics.data ? (
         <>
-          <TrainingFacts analytics={analytics.data} summary={summary} />
+          <TrainingFacts analytics={analytics.data} />
+          <p className="progress-training-meta">
+            Частота:{' '}
+            {formatNumber(
+              analytics.data.frequency_per_week ?? summary?.training.frequency_per_week ?? 0,
+              2,
+            )}{' '}
+            в неделю
+          </p>
           <DataConfidence
             isStale={analytics.isPlaceholderData}
             kind="training"
@@ -965,152 +967,202 @@ function BodySection({
       : [];
   const hasGuidance =
     body.guidance.consistency_tips.length > 0 || body.guidance.circumference_limitations.length > 0;
+  const trendsByMetric = new Map(body.trends.map((trend) => [trend.metric, trend]));
+  const bodyFacts = bodyFactDefinitions
+    .map(({ key, label, unit }) => ({
+      key,
+      label,
+      unit,
+      value: body.latest_measurement?.[key] ?? trendsByMetric.get(key)?.latest_value ?? null,
+    }))
+    .filter(({ value }) => body.latest_measurement || value != null);
+  const hasBodyData = Boolean(body.latest_measurement || body.trends.length);
+  const heroTitle = !hasBodyData
+    ? 'Замеры пока не добавлены'
+    : body.trends.length <= 1
+      ? 'Последний замер'
+      : 'Вес и окружности';
+
+  function openMeasurementDiary(): void {
+    const editor = document.getElementById('measurement-diary');
+    if (editor instanceof HTMLDetailsElement) editor.open = true;
+  }
+
   return (
     <section className="progress-section" id="progress-body" aria-labelledby="progress-body-title">
       <SectionHeading
         eyebrow="Замеры"
-        title="Замеры и приоритеты"
+        title="Тело"
         titleId="progress-body-title"
-        description="Фактические значения по датам и выбранный контекст развития — без идеальных пропорций и оценки тела."
+        description="Фактические значения по датам; пропуски не считаются нулём."
         trailing={
           body.latest_measurement && (
             <Badge>Последний замер {formatDate(body.latest_measurement.measured_on)}</Badge>
           )
         }
       />
-      <details className="progress-priority progress-priority--compact">
-        <summary className="yfc-disclosure-summary">
-          <span>
-            <small>Контекст планирования</small>
-            <strong>
-              {!body.priority
-                ? 'Приоритет не выбран'
-                : body.priority.mode === 'balanced'
-                  ? 'Сбалансированное развитие'
-                  : 'Выбранные мышечные группы'}
-            </strong>
-          </span>
-          <DisclosureIcon />
-        </summary>
-        <div>
-          {body.priority?.mode === 'muscle_groups' &&
-            (priorityOptions.isLoading ? (
-              <p role="status">Загружаем названия выбранных групп…</p>
-            ) : priorityOptions.error ? (
-              <p role="alert">
-                Не удалось загрузить названия групп. Выбрано:{' '}
-                {body.priority.muscle_group_ids?.length ?? 0}.
-              </p>
-            ) : (
-              <ul>
-                {priorityNames.map((name) => (
-                  <li key={name}>{name}</li>
-                ))}
-              </ul>
-            ))}
-          <p>
-            {body.priority
-              ? 'Это предпочтение для планирования. Оно не оценивает тело и не объясняет изменение окружностей.'
-              : 'Можно оставить развитие без отдельного акцента или выбрать предпочтения в профиле.'}
-          </p>
-          <AppLink to="/app?section=profile#profile-fitness">
-            {body.priority ? 'Изменить в профиле' : 'Выбрать в профиле'}
-          </AppLink>
-        </div>
-      </details>
-      <div className="progress-body-flow">
-        <div className="progress-body-trends" aria-label="Динамика замеров">
-          <div className="progress-confidence-grid">
-            <DataConfidence
-              isStale={isStale}
-              kind="weight"
-              signal={summary.data_sufficiency.weight_trend}
-              action={
-                measurementDiary ? (
-                  <a
-                    href="#measurement-diary"
-                    onClick={() => {
-                      const editor = document.getElementById('measurement-diary');
-                      if (editor instanceof HTMLDetailsElement) editor.open = true;
-                    }}
-                  >
-                    Добавить замер
-                  </a>
-                ) : undefined
-              }
-            />
-            <DataConfidence
-              isStale={isStale}
-              kind="anthropometry"
-              signal={summary.data_sufficiency.anthropometry}
-              action={
-                measurementDiary &&
-                summary.data_sufficiency.weight_trend.status === 'sufficient' ? (
-                  <a
-                    href="#measurement-diary"
-                    onClick={() => {
-                      const editor = document.getElementById('measurement-diary');
-                      if (editor instanceof HTMLDetailsElement) editor.open = true;
-                    }}
-                  >
-                    Добавить замер
-                  </a>
-                ) : undefined
-              }
-            />
+      <div className="progress-body-approved">
+        <article className="progress-detail-card progress-body-hero-card">
+          <div>
+            <span className="progress-section__eyebrow">
+              {!hasBodyData
+                ? 'Тело · пока без фактов'
+                : `Тело · последний факт · ${formatDate(body.latest_measurement?.measured_on ?? body.trends[0]?.latest_measured_on ?? summary.period_end)}`}
+            </span>
+            <h3>{heroTitle}</h3>
+            <p>
+              {hasBodyData
+                ? 'Сравнивайте только с собственной историей.'
+                : 'Добавьте первый факт, чтобы сохранить точку отсчёта для будущей динамики.'}
+            </p>
           </div>
-          <ProgressTrendPanel detail showConfidence={false} summary={summary} />
-          {body.trends.map((trend) => {
-            const interpretation = trendInterpretationText(trend, body.guidance);
-            return interpretation ? (
-              <p className="progress-note" key={`${trend.metric}-interpretation`}>
-                <strong>{bodyMetricLabel(trend)}:</strong> {interpretation}
-              </p>
-            ) : null;
-          })}
-          {hasGuidance && (
-            <details className="progress-body-guidance">
+          {measurementDiary && (
+            <div className="progress-detail-card__actions">
+              <a
+                className="button-link progress-body-hero__primary"
+                href="#measurement-diary"
+                onClick={openMeasurementDiary}
+              >
+                <Icon name="plus" size={16} /> Добавить замер
+              </a>
+              <a href="#measurement-diary" onClick={openMeasurementDiary}>
+                Открыть историю
+              </a>
+            </div>
+          )}
+        </article>
+        {bodyFacts.length > 0 && (
+          <dl className="progress-body-facts" aria-label="Последние факты тела">
+            {bodyFacts.map(({ key, label, unit, value }) => (
+              <div key={key}>
+                <dt>{label}</dt>
+                <dd>
+                  {value == null ? '—' : formatNumber(value)} <small>{unit}</small>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        )}
+        <div className="progress-body-flow">
+          <div className="progress-body-trends" aria-label="Динамика замеров">
+            <ProgressTrendPanel detail showConfidence={false} summary={summary} />
+            <div className="progress-confidence-grid">
+              <DataConfidence
+                isStale={isStale}
+                label="Масса"
+                kind="weight"
+                signal={summary.data_sufficiency.weight_trend}
+              />
+              <DataConfidence
+                isStale={isStale}
+                label="Окружности"
+                kind="anthropometry"
+                signal={summary.data_sufficiency.anthropometry}
+              />
+            </div>
+            {body.trends.map((trend) => {
+              const interpretation = trendInterpretationText(trend, body.guidance);
+              return interpretation ? (
+                <p className="progress-note" key={`${trend.metric}-interpretation`}>
+                  <strong>{bodyMetricLabel(trend)}:</strong> {interpretation}
+                </p>
+              ) : null;
+            })}
+          </div>
+          {measurementDiary && (
+            <details
+              id="measurement-diary"
+              className="progress-measurement-editor progress-body-diary"
+            >
               <summary className="yfc-disclosure-summary">
-                Как сравнивать замеры
+                История и редактирование
                 <DisclosureIcon />
               </summary>
-              <div>
-                {body.guidance.consistency_tips.length > 0 && (
-                  <ul>
-                    {body.guidance.consistency_tips.map((tip) => (
-                      <li key={tip}>{tip}</li>
-                    ))}
-                  </ul>
-                )}
-                {body.guidance.circumference_limitations.map((limitation) => (
-                  <p key={limitation}>{limitation}</p>
-                ))}
-              </div>
+              {measurementDiary}
             </details>
           )}
-          <ContextualHelp articlePath="/knowledge/progress/how-to-read-progress">
-            <p>
-              Сравнивайте значения только с собственной историей. Окружность участка тела не
-              показывает рост отдельной мышцы.
-            </p>
-          </ContextualHelp>
+        </div>
+        <div className="progress-body-secondary">
+          <details className="progress-priority progress-priority--compact">
+            <summary className="yfc-disclosure-summary">
+              <span>
+                <small>Контекст планирования</small>
+                <strong>
+                  {!body.priority
+                    ? 'Приоритет не выбран'
+                    : body.priority.mode === balancedPriorityMode
+                      ? 'Сбалансированное развитие'
+                      : 'Выбранные мышечные группы'}
+                </strong>
+              </span>
+              <DisclosureIcon />
+            </summary>
+            <div>
+              {body.priority?.mode === muscleGroupsPriorityMode &&
+                (priorityOptions.isLoading ? (
+                  <p role="status">Загружаем названия выбранных групп…</p>
+                ) : priorityOptions.error ? (
+                  <p role="alert">
+                    Не удалось загрузить названия групп. Выбрано:{' '}
+                    {body.priority.muscle_group_ids?.length ?? 0}.
+                  </p>
+                ) : (
+                  <ul>
+                    {priorityNames.map((name) => (
+                      <li key={name}>{name}</li>
+                    ))}
+                  </ul>
+                ))}
+              <p>
+                {body.priority
+                  ? 'Это предпочтение для планирования. Оно не оценивает тело и не объясняет изменение окружностей.'
+                  : 'Можно оставить развитие без отдельного акцента или выбрать предпочтения в профиле.'}
+              </p>
+              <AppLink to="/app?section=profile#profile-fitness">
+                {body.priority ? 'Изменить в профиле' : 'Выбрать в профиле'}
+              </AppLink>
+            </div>
+          </details>
+          <details className="progress-body-guidance">
+            <summary className="yfc-disclosure-summary">
+              Как сравнивать замеры
+              <DisclosureIcon />
+            </summary>
+            <div>
+              {hasGuidance ? (
+                <>
+                  {body.guidance.consistency_tips.length > 0 && (
+                    <ul>
+                      {body.guidance.consistency_tips.map((tip) => (
+                        <li key={tip}>{tip}</li>
+                      ))}
+                    </ul>
+                  )}
+                  {body.guidance.circumference_limitations.map((limitation) => (
+                    <p key={limitation}>{limitation}</p>
+                  ))}
+                </>
+              ) : (
+                <p>Сравнивайте значения только с собственной историей и в похожих условиях.</p>
+              )}
+            </div>
+          </details>
         </div>
       </div>
-      {measurementDiary && (
-        <details id="measurement-diary" className="progress-measurement-editor progress-body-diary">
-          <summary className="yfc-disclosure-summary">
-            Добавить замер · история и редактирование
-            <DisclosureIcon />
-          </summary>
-          {measurementDiary}
-        </details>
-      )}
     </section>
   );
 }
 
 function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: ProgressSummary }) {
   const { nutrition, adherence } = summary;
+  const confirmedDays = nutrition.complete_days + nutrition.fasted_days;
+  const coverageLabel = !nutrition.visible
+    ? 'Нет данных'
+    : confirmedDays === 0
+      ? 'Нет подтверждённых дней'
+      : confirmedDays < summary.period_days
+        ? 'Частично'
+        : 'Заполнено';
   return (
     <section
       className="progress-section"
@@ -1123,6 +1175,54 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
         titleId="progress-nutrition-title"
         description="Средние значения по заполненным прошлым дням и сравнение с действующей целью."
       />
+      <div className="progress-nutrition-overview">
+        <article className="progress-detail-card progress-nutrition-coverage">
+          <div>
+            <span className="progress-section__eyebrow">Статус дней</span>
+            <h3>{coverageLabel}</h3>
+            <p>
+              {nutrition.visible
+                ? `${confirmedDays} из ${summary.period_days} дней отмечены завершёнными или без приёмов пищи`
+                : 'Эти данные недоступны для текущей роли'}
+            </p>
+          </div>
+          <strong className="progress-detail-card__metric" aria-label="Подтверждено дней">
+            {nutrition.visible ? `${confirmedDays}/${summary.period_days}` : '—'}
+          </strong>
+        </article>
+        <details className="progress-detail-card progress-nutrition-goals">
+          <summary className="yfc-disclosure-summary">
+            <span>
+              <small>Вторичные факты</small>
+              <strong>Цели и гидратация</strong>
+            </span>
+            <DisclosureIcon />
+          </summary>
+          <div>
+            <dl>
+              <div>
+                <dt>Калории</dt>
+                <dd>
+                  {nutrition.target_calories == null
+                    ? 'Цель не задана'
+                    : `${formatNumber(nutrition.target_calories, 0)} ккал`}
+                </dd>
+              </div>
+              <div>
+                <dt>Белок</dt>
+                <dd>
+                  {nutrition.target_protein_g == null
+                    ? 'Цель не задана'
+                    : `${formatNumber(nutrition.target_protein_g, 0)} г`}
+                </dd>
+              </div>
+            </dl>
+            <p className="progress-note">
+              Фактическая гидратация и дневные записи доступны в полном отчёте ниже.
+            </p>
+          </div>
+        </details>
+      </div>
       {!nutrition.visible ? (
         <>
           <DataConfidence
@@ -1132,7 +1232,7 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
           />
           <EmptyState title="Данные питания недоступны" />
         </>
-      ) : nutrition.complete_days + nutrition.fasted_days === 0 ? (
+      ) : confirmedDays === 0 ? (
         <>
           <DataConfidence
             isStale={isStale}
@@ -1174,10 +1274,11 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               </small>
             </div>
             <div>
-              <span>Подтверждено</span>
-              <strong>{nutrition.complete_days + nutrition.fasted_days} дней</strong>
+              <span>Дни с данными для средних</span>
+              <strong>{nutrition.logged_days} дней</strong>
               <small>
-                {nutrition.incomplete_days} частичных · {nutrition.unlogged_days} без записей
+                {confirmedDays} подтверждённых статуса · {nutrition.incomplete_days} частичных ·{' '}
+                {nutrition.unlogged_days} без записей
               </small>
             </div>
           </div>
@@ -1466,7 +1567,7 @@ export function ProgressExperience({
   }, [focusMeasurements, summary.data]);
 
   return (
-    <div className="progress-experience progress-experience--bento">
+    <div className="progress-experience progress-experience--approved">
       <header className="progress-hero">
         <div className="progress-hero__heading">
           <div className="progress-hero__copy">
@@ -1558,13 +1659,19 @@ export function ProgressExperience({
                     </div>
                   </>
                 )}
-                {(view === 'wellbeing' || view === 'history') && detailContent}
-                {(view === 'wellbeing' || view === 'history') && !detailContent && (
-                  <EmptyState
-                    title="Раздел пока недоступен"
-                    text="Попробуйте открыть его ещё раз."
-                  />
-                )}
+                {(view === wellbeingProgressView || view === historyProgressView) &&
+                  detailContent && (
+                    <div className={`progress-external-detail progress-external-detail--${view}`}>
+                      {detailContent}
+                    </div>
+                  )}
+                {(view === wellbeingProgressView || view === historyProgressView) &&
+                  !detailContent && (
+                    <EmptyState
+                      title="Раздел пока недоступен"
+                      text="Попробуйте открыть его ещё раз."
+                    />
+                  )}
               </div>
             </>
           )}

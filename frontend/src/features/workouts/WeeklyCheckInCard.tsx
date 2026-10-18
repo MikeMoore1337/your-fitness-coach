@@ -189,9 +189,11 @@ function macroLine(calibration: EnergyCalibration, proposed: boolean): string | 
 
 export function WeeklyCheckInCard({
   autoFocus = false,
+  compact = false,
   userId,
 }: {
   autoFocus?: boolean;
+  compact?: boolean;
   userId: number | 'anonymous';
 }) {
   const queryClient = useQueryClient();
@@ -387,10 +389,10 @@ export function WeeklyCheckInCard({
 
   return (
     <Card
-      className="weekly-review-card"
+      className={`weekly-review-card${compact ? ' weekly-review-card--progress' : ''}`}
       title="Итоги недели"
       description={`${formatPeriod(summary.period_start, summary.period_end)} · ${current.data.timezone}`}
-      collapsible={!autoFocus}
+      collapsible={compact ? false : !autoFocus}
     >
       <div id="weekly-review" ref={cardRef} tabIndex={-1} className="weekly-review stack top-gap">
         {existing ? (
