@@ -266,6 +266,43 @@ def test_inconsistent_attribution_is_blocked() -> None:
     assert any(item.code == "connection_attribution_inconsistent" for item in result.diagnostics)
 
 
+def test_observed_yfc_must_fit_confirmed_steady_state_ceiling() -> None:
+    model = _model(
+        phases=(
+            PhaseDemand(
+                "steady-state",
+                {"backend": 0, "worker": 0, "migration": 0, "setup": 0},
+                0,
+            ),
+        ),
+    )
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.BLOCKED
+    assert any(
+        item.code == "observed_yfc_exceeds_steady_state_capacity" for item in result.diagnostics
+    )
+
+
+def test_zero_process_steady_state_with_no_observed_yfc_can_pass() -> None:
+    model = _model(
+        observed_yfc=0,
+        phases=(
+            PhaseDemand(
+                "steady-state",
+                {"backend": 0, "worker": 0, "migration": 0, "setup": 0},
+                0,
+            ),
+        ),
+    )
+
+    result = _evaluate(model)
+
+    assert result.status == Verdict.PASS
+    assert result.phase_reports[0]["app_connections"] == 0
+
+
 def test_empty_process_inventory_is_not_proven_zero_load() -> None:
     model = _model(phases=(PhaseDemand("steady-state", {}, 0),))
     model = replace(
@@ -376,6 +413,25 @@ def test_synthetic_input_cannot_be_used_as_production_evidence() -> None:
 
     assert result.status != Verdict.PASS
     assert any(item.code == "synthetic_evidence_not_allowed" for item in result.diagnostics)
+
+
+def test_relabelled_synthetic_snapshot_cannot_authorize_production_preflight() -> None:
+    model = replace(
+        _model(),
+        safety_headroom_source="owner-approved-headroom-record",
+        evidence=EvidenceMetadata(
+            environment="production",
+            source="owner-approved-runtime-collector",
+            captured_at="2026-10-19T00:00:00+00:00",
+            max_age_seconds=3600,
+            synthetic=False,
+        ),
+    )
+
+    result = evaluate(model, now=datetime(2026, 10, 19, tzinfo=UTC))
+
+    assert result.status == Verdict.BLOCKED
+    assert any(item.code == "runtime_provenance_untrusted" for item in result.diagnostics)
 
 
 def test_stale_runtime_snapshot_is_blocked() -> None:

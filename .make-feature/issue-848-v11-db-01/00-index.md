@@ -11,14 +11,15 @@
 
 - C1: static engine, setup/migration, phase, pooler, evidence and external-consumer inputs are explicit; missing or malformed critical values fail closed.
 - C1-review-fix: rollout/process inventory is explicit, QueuePool ceilings cannot be overridden, and pooler caps must be positive and sourced.
-- C2: formula covers steady state, candidate overlap, unexpected all-slot overlap, migrations/setup, backup/other consumers and rollback without double-counting current YFC sessions.
-- C3: verdicts are exactly `PASS`, `BLOCKED` or `UNKNOWN`; only numeric, credential-free evidence is emitted.
-- C4: synthetic tests cover normal headroom, exhaustion, unknown capacity, missing pools, replica/overlap, migration/setup, rollback, PostgreSQL read failure, invalid values, rejected bypass, stage ordering, incomplete topology, ceiling conflicts, pooler modes/caps, stale snapshots and synthetic-evidence rejection.
+- C2: formula covers steady state, candidate overlap, unexpected all-slot overlap, migrations/setup, backup/other consumers and rollback without double-counting current YFC sessions; observed YFC sessions cannot exceed confirmed steady-state capacity.
+- C3: verdicts are exactly `PASS`, `BLOCKED` or `UNKNOWN`; only numeric, credential-free evidence is emitted, and standalone provenance declarations cannot authorize production PASS.
+- C4: synthetic tests cover normal headroom, exhaustion, unknown capacity, missing pools, replica/overlap, migration/setup, rollback, PostgreSQL read failure, invalid values, rejected bypass, stage ordering, incomplete topology, ceiling conflicts, pooler modes/caps, stale snapshots, synthetic-evidence rejection, observed-vs-steady-state contradiction and explicit zero-process maintenance.
 - C5: documentation gives the future insertion point and exact owner-controlled production evidence; no production query, rollout, merge or Issue closure occurs in this change.
 
 ## Open gates
 
 - Production `max_connections`, reserved slots, pooler topology, effective `.env`, process/replica counts, attribution, overlap and safety margin: `NO_DATA`/`NOT_PROVEN`.
+- Standalone JSON provenance is `BLOCKED` as an authorization source; a future trusted collector, verified source and owner-approved freshness bound are required before a deployment adapter can mark runtime evidence trusted.
 - Owner approval of the numeric safety headroom and sanitized evidence: required before activation.
 - Independent dry run against authorized production-shaped evidence: required before production rollout.
 - Draft PR #1118 remains the only PR for this work at exact head `2a9b324ed98c3494bdb910e3020cf03f71778ca4`; CI run `39167004925` and aggregate `checks` passed. Reviewer/security gate remains pending.

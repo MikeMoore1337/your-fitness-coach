@@ -1,6 +1,6 @@
 # PostgreSQL connection budget и fail-closed preflight
 
-Документ описывает подготовленный для #848 расчёт и точку подключения rollout gate. В этой версии production deployment не вызывает preflight: фактическая PostgreSQL topology и итоговый safety headroom ещё не подтверждены владельцем.
+Документ описывает подготовленный для #848 расчёт и точку подключения rollout gate. В этой версии production deployment не вызывает preflight: фактическая PostgreSQL topology и итоговый safety headroom ещё не подтверждены владельцем, а standalone JSON не может самостоятельно доказать происхождение runtime evidence.
 
 ## Что подтверждено в репозитории
 
@@ -32,7 +32,7 @@
 | Migration, setup/seed, backup и прочие DB consumers | должны войти в фазу без двойного счёта |
 | Current sessions и attribution YFC/non-YFC | current YFC sessions нельзя складывать поверх projected YFC cap; неатрибутированные сессии блокируют решение |
 | Safety headroom | значение не фиксируется в коде; требуется owner-approved source и число |
-| Snapshot provenance/freshness | production preflight требует environment=`production`, non-synthetic source, capture timestamp и положительный max age |
+| Snapshot provenance/freshness | текстовые поля и `synthetic=false` — только декларации; production PASS требует trusted collector, проверенный источник и owner-approved freshness bound |
 | Effective topology inventory | process groups и применимые rollout phases должны быть перечислены явно; отсутствующие варианты отмечаются `false` |
 
 В этой ветке нет production SSH/DB запроса, контейнеры не перезапускались, параметры PostgreSQL не менялись, secrets/connection strings/дампы не записывались.
@@ -70,9 +70,9 @@ phase_required = observed_non_yfc + app_connections + phase_other_connections
 PASS iff phase_required + safety_headroom <= usable for every phase
 ```
 
-`observed_yfc` используется для проверки attribution, но не добавляется к `app_connections`: projected process caps уже описывают YFC worst case. `observed_non_yfc` и фазовые `other_connections` добавляются один раз. Если pooler известен, фаза должна содержать положительный отдельно подтверждённый PostgreSQL backend cap и источник этого cap. Для `session` cap не может быть ниже raw session demand; для `transaction` cap — это именно максимальная PostgreSQL backend capacity, а не число занятых сейчас соединений. Raw client ceiling и backend cap не складываются повторно.
+`observed_yfc` используется для проверки attribution, но не добавляется к `app_connections`: projected process caps уже описывают YFC worst case. Дополнительно для подтверждённой фазы `steady-state` обязательно `observed_yfc <= app_connections` (или verified PostgreSQL backend cap при pooler). Поэтому явный zero-process maintenance-сценарий допустим при `observed_yfc=0`, а ненулевое наблюдаемое YFC-соединение при нулевом ceiling получает `BLOCKED`; неизвестная или неполная steady-state topology получает `UNKNOWN`. `observed_non_yfc` и фазовые `other_connections` добавляются один раз. Если pooler известен, фаза должна содержать положительный отдельно подтверждённый PostgreSQL backend cap и источник этого cap. Для `session` cap не может быть ниже raw session demand; для `transaction` cap — это именно максимальная PostgreSQL backend capacity, а не число занятых сейчас соединений. Raw client ceiling и backend cap не складываются повторно.
 
-До расчёта preflight проверяет inventory contract. `topology.process_groups` содержит каждую возможную process group с `true`/`false`, а `topology.rollout_phases` — каждую применимую фазу с `true`/`false`. Все группы с `true` должны присутствовать в `processes` каждой применимой фазы; неактивная группа записывается с репликами `0`. Отсутствие ключа не означает нулевую нагрузку. Применимая, но отсутствующая фаза, пустой process inventory и незадекларированная группа дают `UNKNOWN`/`BLOCKED`. Фиксированный список backend/worker/migration/setup в модели не зашит: collector должен описать фактический вариант topology и явно отметить отсутствующие элементы.
+До расчёта preflight проверяет inventory contract. `topology.process_groups` содержит каждую возможную process group с `true`/`false`, а `topology.rollout_phases` — каждую применимую фазу с `true`/`false`; подтверждённая фаза `steady-state` обязательна для reconciliation observed YFC connections. Все группы с `true` должны присутствовать в `processes` каждой применимой фазы; неактивная группа записывается с репликами `0`. Отсутствие ключа не означает нулевую нагрузку. Применимая, но отсутствующая фаза, пустой process inventory и незадекларированная группа дают `UNKNOWN`/`BLOCKED`. Фиксированный список backend/worker/migration/setup в модели не зашит: collector должен описать фактический вариант topology и явно отметить отсутствующие элементы.
 
 Синтетический пример для repository defaults (`C=30`, только для тестов):
 
@@ -92,7 +92,7 @@ PASS iff phase_required + safety_headroom <= usable for every phase
 
 Модуль: `scripts/connection_budget_preflight.py`.
 
-Он принимает только обезличенный JSON с разделами `postgres`, `pools`, `phases`, `topology`, `pooler`, `safety_headroom_connections`, `safety_headroom_source` и `evidence`. В `evidence` для production нужны `environment=production`, `synthetic=false`, `source`, timezone-aware `captured_at` и положительный `max_age_seconds`. CLI печатает только статус, числовые результаты, имена фаз/process groups и безопасные диагностические коды. `DATABASE_URL`, password и другие секреты не читаются и не печатаются. `read_postgres_snapshot(connection)` выполняет только один `SELECT` по `current_setting(...)` и `pg_stat_activity`; attribution и provenance передаются отдельными sanitized fields.
+Он принимает только обезличенный JSON с разделами `postgres`, `pools`, `phases`, `topology`, `pooler`, `safety_headroom_connections`, `safety_headroom_source` и `evidence`. В `evidence` проверяются `environment=production`, `synthetic=false`, `source`, timezone-aware `captured_at` и положительный `max_age_seconds`, но эти поля не доказывают происхождение сами по себе. `model_from_mapping` не устанавливает доверие к runtime evidence; standalone JSON без внешнего trusted collector получает `BLOCKED` с кодом `runtime_provenance_untrusted`, даже если текстовые поля выглядят production-like. CLI печатает только статус, числовые результаты, имена фаз/process groups и безопасные диагностические коды. `DATABASE_URL`, password и другие секреты не читаются и не печатаются. `read_postgres_snapshot(connection)` выполняет только один `SELECT` по `current_setting(...)` и `pg_stat_activity`; attribution и provenance передаются отдельными sanitized fields.
 
 Пример запуска в изолированном окружении:
 
@@ -153,7 +153,7 @@ Exit codes: `0=PASS`, `1=BLOCKED`, `2=UNKNOWN`. У CLI нет `--bypass`/`--igno
 }
 ```
 
-The `10` and the full topology above are test data, not an approved production threshold or production evidence. `evaluate(..., require_runtime_evidence=False)` can be used in unit tests for the mathematical calculation; the CLI/default production path rejects synthetic, stale, missing or non-production evidence.
+The `10` and the full topology above are test data, not an approved production threshold or production evidence. `evaluate(..., require_runtime_evidence=False)` can be used in unit tests for the mathematical calculation; the CLI/default production path rejects synthetic, stale, missing or non-production evidence and blocks standalone provenance declarations from authorizing a production PASS.
 
 ## Подготовка read-only evidence
 
@@ -177,11 +177,11 @@ The `10` and the full topology above are test data, not an approved production t
 
 4. Для attribution получить только counts по заранее owner-approved allowlist role/application identifiers. Нельзя угадывать владельца соединения по похожему имени или складывать весь `pg_stat_activity` поверх projected YFC cap. Любая неразрешённая/неатрибутированная сессия остаётся в `UNKNOWN`.
 
-Операционный collector должен записать в sanitized JSON только числовые значения и фиксированные метаданные: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps, topology applicability, snapshot provenance/freshness и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены. Поля `synthetic=false` и `source` — декларация collector-а, а не доказательство без owner-approved происхождения; поэтому отдельное принятие evidence остаётся обязательным.
+Операционный collector должен записать в sanitized JSON только числовые значения и фиксированные метаданные: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps, topology applicability, snapshot provenance/freshness и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены. Поля `synthetic=false`, `environment`, `source` и `captured_at` — декларации, а не независимое доказательство. Будущий deployment adapter должен получать данные от trusted collector-а, проверять источник и owner-approved freshness bound до передачи evidence в preflight; standalone JSON этого trust boundary не закрывает.
 
 ## Точка подключения rollout gate
 
-После отдельного owner approval future adapter должен собрать effective sanitized input и выполнить:
+После отдельного owner approval future adapter должен получить effective sanitized input от trusted collector-а, проверить источник, freshness bound и rendered steady-state topology, затем выполнить:
 
 ```text
 connection_budget_preflight -> backup -> migration -> candidate_start -> traffic_switch -> consumer_handoff
@@ -209,4 +209,4 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 4. independently verified authorized dry run with the real rendered topology;
 5. separate release approval before any production deployment.
 
-До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; production rollout не разрешён. Runtime environment changes in this PR: `no`.
+До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; standalone provenance и отсутствие production integration — `BLOCKED`, недостающие runtime facts — `UNKNOWN`. Production rollout не разрешён. Runtime environment changes in this PR: `no`.

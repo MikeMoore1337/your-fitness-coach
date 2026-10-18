@@ -14,7 +14,7 @@ Verified on current master:
 - `scripts/zero_downtime_deploy.py` has preflight, backup, migration, candidate start, consumer handoff, rollback and single-slot paths. Its existing host capacity check is CPU/memory/disk only.
 - #815 closeout and the current V11 baseline explicitly leave effective production connection budget/headroom `NOT_PROVEN`/`NO_DATA`.
 
-Chosen path: standard-library standalone `scripts/connection_budget_preflight.py`, pure evaluation over sanitized JSON, a read-only DB-API snapshot adapter, and focused pytest coverage. Production wiring is documented but intentionally absent until the owner supplies and approves production-shaped facts.
+Chosen path: standard-library standalone `scripts/connection_budget_preflight.py`, pure evaluation over sanitized JSON, a read-only DB-API snapshot adapter, and focused pytest coverage. Standalone JSON is not an independent provenance proof: the current CLI/default path blocks production PASS until a future deployment adapter supplies trusted collector context. Production wiring is intentionally absent until the owner supplies and approves production-shaped facts.
 
 ## Contract
 
@@ -24,9 +24,9 @@ Chosen path: standard-library standalone `scripts/connection_budget_preflight.py
 4. Each `PhaseDemand` names process counts and explicit `other_connections`. Phases are mutually exclusive worst-case snapshots; sequential migration and setup are separate phases, so current YFC sessions are not added on top of their configured process ceilings.
 5. For no pooler, `phase_app_connections = sum(process_count * pool_ceiling)`. For a known session/transaction pooler, each phase must provide a positive verified PostgreSQL backend cap and the pooler must provide its provenance source. Backend cap is used once, never as current occupancy.
 6. `usable = max_connections - superuser_reserved_connections - reserved_connections`.
-7. `required(phase) = observed_non_yfc_connections + phase_app_connections + phase_other_connections`; `PASS` requires every phase to satisfy `required + safety_headroom <= usable`.
-8. The default/CLI path also requires non-synthetic, fresh, production-labelled evidence; a synthetic calculation can be exercised only with an explicit test-only opt-out.
-9. Missing/unreadable attribution, topology, evidence or headroom is `UNKNOWN`; invalid values or insufficient known headroom are `BLOCKED`. Only `PASS` exits zero. There is no bypass flag.
+7. `required(phase) = observed_non_yfc_connections + phase_app_connections + phase_other_connections`; `PASS` requires every phase to satisfy `required + safety_headroom <= usable`. In a complete confirmed `steady-state` phase, observed YFC sessions must not exceed the calculated app/backend ceiling; explicit zero-process maintenance is valid only when observed YFC sessions are zero.
+8. The default/CLI path also requires non-synthetic, fresh, production-labelled evidence and independent trusted provenance; changing `synthetic`, `environment` or text fields in standalone JSON cannot authorize production PASS. A synthetic calculation can be exercised only with an explicit test-only opt-out.
+9. Missing/unreadable attribution, topology, evidence or headroom is `UNKNOWN`; invalid values, contradictory observed/topology capacity or untrusted standalone provenance are `BLOCKED`. Only `PASS` exits zero. There is no bypass flag.
 10. A future deployment adapter must run the preflight before backup, migration, candidate launch and rollback. This branch does not call it from production deployment code.
 
 ## Plan

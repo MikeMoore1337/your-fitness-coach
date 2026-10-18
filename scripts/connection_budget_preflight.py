@@ -106,6 +106,8 @@ class BudgetModel:
     safety_headroom_source: str | None
     topology: TopologyInventory | None = None
     evidence: EvidenceMetadata | None = None
+    # Only a future deployment adapter may set this after independent collection.
+    runtime_evidence_trusted: bool = False
 
 
 @dataclass(frozen=True)
@@ -164,6 +166,7 @@ SELECT
 _ALLOWED_POOLER_MODES: Final = {"none", "session", "transaction"}
 _ALLOWED_POOL_TYPES: Final = {"queue", "null", "special"}
 _PRE_PROTECTED_STAGES: Final = ("backup", "migration", "candidate_start", "rollback")
+_STEADY_STATE_PHASE: Final = "steady-state"
 
 
 def _is_int(value: object) -> TypeGuard[int]:
@@ -474,6 +477,13 @@ def _validate_runtime_evidence(
             "Production preflight requires provenance for the effective runtime snapshot",
         )
         return
+    if not model.runtime_evidence_trusted:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "runtime_provenance_untrusted",
+            "Standalone JSON declarations do not independently prove runtime provenance",
+        )
     if evidence.environment is None or not evidence.environment.strip():
         _issue(
             issues,
@@ -839,7 +849,16 @@ def evaluate(
     issues: list[Diagnostic] = []
     if require_runtime_evidence:
         _validate_runtime_evidence(model, issues, now=now)
-    _validate_topology(model, issues)
+    process_groups, rollout_phases = _validate_topology(model, issues)
+    if require_runtime_evidence and (
+        rollout_phases is None or rollout_phases.get(_STEADY_STATE_PHASE) is not True
+    ):
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "steady_state_topology_unknown",
+            "A confirmed steady-state topology is required to reconcile observed YFC connections",
+        )
     postgres = model.postgres
 
     max_connections = postgres.max_connections
@@ -1055,6 +1074,7 @@ def evaluate(
     phase_reports: list[Mapping[str, object]] = []
     seen_phase_names: set[str] = set()
     projected_values: list[int] = []
+    steady_state_app_connections: int | None = None
     if not model.phases:
         _issue(issues, Verdict.UNKNOWN, "phases_unknown", "No rollout phases were supplied")
 
@@ -1176,6 +1196,21 @@ def evaluate(
                 "A PostgreSQL backend cap is supplied while pooler mode is none",
             )
 
+        if (
+            phase.name == _STEADY_STATE_PHASE
+            and rollout_phases is not None
+            and rollout_phases.get(_STEADY_STATE_PHASE) is True
+            and phase.processes is not None
+            and process_groups is not None
+            and any(present is True for present in process_groups.values())
+            and all(process_name in process_groups for process_name in phase.processes)
+            and all(
+                not present or process_name in phase.processes
+                for process_name, present in process_groups.items()
+            )
+        ):
+            steady_state_app_connections = app_connections
+
         projected: int | None = None
         headroom_after: int | None = None
         if (
@@ -1198,6 +1233,18 @@ def evaluate(
                 "projected_connections": projected,
                 "headroom_after": headroom_after,
             }
+        )
+
+    if (
+        steady_state_app_connections is not None
+        and _is_int(observed_yfc)
+        and observed_yfc > steady_state_app_connections
+    ):
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "observed_yfc_exceeds_steady_state_capacity",
+            "Observed YFC connections exceed the confirmed steady-state process/backend capacity",
         )
 
     worst_case = max(projected_values) if projected_values else None
