@@ -54,8 +54,12 @@ describe('RestTimer', () => {
       );
     });
     const panel = screen.getByRole('complementary', { name: 'Отдых между подходами' });
-    expect(panel.querySelector('.active-workout-rest__actual-value span')).toHaveTextContent('ФАКТ');
-    expect(panel.querySelector('.active-workout-rest__actual-value strong')).toHaveTextContent('0:00');
+    expect(panel.querySelector('.active-workout-rest__actual-value span')).toHaveTextContent(
+      'ФАКТ',
+    );
+    expect(panel.querySelector('.active-workout-rest__actual-value strong')).toHaveTextContent(
+      '0:00',
+    );
     expect(screen.getByRole('timer', { name: 'Отдых' })).toHaveTextContent('1:30');
     expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
   });
