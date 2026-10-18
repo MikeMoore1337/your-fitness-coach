@@ -21,7 +21,8 @@
 - Final candidate #1099 recordings were regenerated after that correction; Chromium and WebKit
   focused scroll-stability tests passed.
 - The earlier CI run `39119430278` correctly caught the intermediate candidate; it is not treated as
-  a green final result. A new CI run is required for the pushed final commit.
+  a green final result. Final CI run `39120646539` passed the aggregate `checks` gate on the pushed
+  candidate.
 
 ## Evidence
 
