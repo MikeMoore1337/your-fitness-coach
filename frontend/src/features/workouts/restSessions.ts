@@ -37,6 +37,8 @@ interface RestStartRecovery {
   adjusted_seconds: number;
   deadline: number;
   start_mutation_id: string;
+  server_id?: number;
+  server_version?: number;
 }
 
 interface StoredRestRecovery {
@@ -111,12 +113,74 @@ function validStartRecovery(value: unknown): value is RestStartRecovery {
     start.adjusted_seconds > 0 &&
     Number.isFinite(start.deadline) &&
     typeof start.start_mutation_id === 'string' &&
-    start.start_mutation_id.length > 0,
+    start.start_mutation_id.length > 0 &&
+    (start.server_id === undefined || (Number.isInteger(start.server_id) && start.server_id > 0)) &&
+    (start.server_version === undefined ||
+      (Number.isInteger(start.server_version) && start.server_version >= 0)),
   );
 }
 
 function actionStorageKey(userId: number, workoutId: number, mutationId: string): string {
   return `${restJournalStorageKey(userId, workoutId)}:op:${mutationId}`;
+}
+
+function terminalStatusForAction(action: RestAction): RestStatus | undefined {
+  switch (action) {
+    case 'complete':
+      return 'completed';
+    case 'skip':
+      return 'skipped';
+    case 'interrupt':
+      return 'interrupted';
+    case 'unknown':
+      return 'unknown';
+    default:
+      return undefined;
+  }
+}
+
+function acknowledgedStartRecovery(
+  start: RestStartRecovery,
+  remote: RemoteRestSession,
+): RestStartRecovery {
+  const adjustedSeconds =
+    Number.isInteger(remote.adjusted_seconds) && remote.adjusted_seconds > 0
+      ? remote.adjusted_seconds
+      : start.adjusted_seconds;
+  const plannedSeconds =
+    Number.isInteger(remote.planned_seconds) && remote.planned_seconds > 0
+      ? remote.planned_seconds
+      : start.planned_seconds;
+  const startedAt = Date.parse(start.started_at);
+  return {
+    ...start,
+    planned_seconds: plannedSeconds,
+    adjusted_seconds: adjustedSeconds,
+    deadline: Number.isFinite(startedAt) ? startedAt + adjustedSeconds * 1000 : start.deadline,
+    server_id: remote.id,
+    server_version: Math.max(start.server_version ?? 0, remote.version),
+  };
+}
+
+function updateStartRecovery(
+  userId: number,
+  workoutId: number,
+  startMutationId: string,
+  remote: RemoteRestSession,
+  remove: boolean,
+): void {
+  // Keep the start snapshot until a terminal action is acknowledged; the primary journal may be stale.
+  const key = actionStorageKey(userId, workoutId, startMutationId);
+  const recovery = readStorage<StoredRestRecovery | null>(key, null);
+  if (!recovery?.start) return;
+  if (remove) {
+    removeStorage(key);
+    return;
+  }
+  writeStorage(key, {
+    ...recovery,
+    start: acknowledgedStartRecovery(recovery.start, remote),
+  });
 }
 
 export function loadRestJournal(userId: number, workoutId: number): LocalRestSession[] {
@@ -135,7 +199,18 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
     for (const value of recoveries) {
       const start = value?.start;
       if (!validStartRecovery(start)) continue;
-      if (valid.some((session) => session.source_set_id === start.source_set_id)) continue;
+      const existing = valid.find((session) => session.source_set_id === start.source_set_id);
+      if (existing) {
+        if (existing.server_id === undefined && start.server_id !== undefined) {
+          existing.server_id = start.server_id;
+        }
+        if (start.server_version !== undefined) {
+          existing.server_version = Math.max(existing.server_version ?? 0, start.server_version);
+        }
+        existing.adjusted_seconds = Math.max(existing.adjusted_seconds, start.adjusted_seconds);
+        existing.deadline = Math.max(existing.deadline, start.deadline);
+        continue;
+      }
       valid.push({
         ...start,
         status: 'running',
@@ -380,13 +455,38 @@ function acknowledgeRemote(
 ): void {
   const records = loadRestJournal(userId, workoutId);
   const row = records.find((item) => item.source_set_id === sourceSetId);
-  if (!row) return;
+  if (!row) {
+    if (mutationId) updateStartRecovery(userId, workoutId, mutationId, remote, false);
+    return;
+  }
+  const acknowledgedOperation = mutationId
+    ? row.pending.find((operation) => operation.mutation_id === mutationId)
+    : undefined;
   row.server_id = remote.id;
   row.server_version = Math.max(row.server_version ?? 0, remote.version);
+  if (Number.isInteger(remote.adjusted_seconds) && remote.adjusted_seconds > 0) {
+    row.adjusted_seconds = Math.max(row.adjusted_seconds, remote.adjusted_seconds);
+    const startedAt = Date.parse(row.started_at);
+    if (Number.isFinite(startedAt)) {
+      row.deadline = Math.max(row.deadline, startedAt + remote.adjusted_seconds * 1000);
+    }
+  }
   if (mutationId) {
     row.pending = row.pending.filter((operation) => operation.mutation_id !== mutationId);
-    removeStorage(actionStorageKey(userId, workoutId, mutationId));
+    if (mutationId !== row.start_mutation_id) {
+      removeStorage(actionStorageKey(userId, workoutId, mutationId));
+    }
   }
+  const terminalStatus = acknowledgedOperation
+    ? terminalStatusForAction(acknowledgedOperation.action)
+    : undefined;
+  updateStartRecovery(
+    userId,
+    workoutId,
+    row.start_mutation_id,
+    remote,
+    terminalStatus !== undefined && remote.status === terminalStatus,
+  );
   saveRestJournal(userId, workoutId, records);
 }
 
