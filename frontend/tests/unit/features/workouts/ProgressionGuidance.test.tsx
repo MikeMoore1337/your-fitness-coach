@@ -87,10 +87,14 @@ describe('ProgressionGuidance', () => {
     );
 
     expect(screen.getByText('Можно рассмотреть небольшое увеличение веса')).toBeVisible();
-    fireEvent.click(screen.getByText('Почему?'));
+    fireEvent.click(screen.getByText('Почему такой вес?'));
     expect(screen.getByText('Цель: 3 × 8–10')).toBeVisible();
     expect(screen.getByText(/40 кг · 10 повторов/)).toBeVisible();
     expect(screen.getByText(/тренировка: нормально/)).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Подробнее о прогрессии' })).toHaveAttribute(
+      'href',
+      '/knowledge/training/progressive-overload',
+    );
 
     const apply = screen.getByRole('button', { name: 'Применить 42,5 кг' });
     fireEvent.click(apply);

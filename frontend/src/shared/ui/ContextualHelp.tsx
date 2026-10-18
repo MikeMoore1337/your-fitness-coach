@@ -9,7 +9,7 @@ export function ContextualHelp({
   summary = 'Что это?',
 }: {
   children: ReactNode;
-  articlePath: string;
+  articlePath?: string;
   summary?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -23,15 +23,27 @@ export function ContextualHelp({
         aria-expanded={expanded}
         className="yfc-disclosure-summary"
         onClick={() => setExpanded((value) => !value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return;
+          const details = event.currentTarget.parentElement;
+          if (!(details instanceof HTMLDetailsElement) || !details.open) return;
+          event.preventDefault();
+          details.open = false;
+          setExpanded(false);
+        }}
       >
         {summary}
         <DisclosureIcon />
       </summary>
       <div className="contextual-help__body">
         <div>{children}</div>
-        <PublicWebLink className="contextual-help__link" path={articlePath}>
-          Подробнее на сайте <Icon name="external-link" size={16} />
-        </PublicWebLink>
+        {articlePath ? (
+          <PublicWebLink className="contextual-help__link" path={articlePath}>
+            Подробнее на сайте <Icon name="external-link" size={16} />
+          </PublicWebLink>
+        ) : (
+          <p className="contextual-help__source-fallback">Источник: нет ссылки.</p>
+        )}
       </div>
     </details>
   );

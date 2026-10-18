@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { Workout } from '../../shared/api/types';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
+import { PublicWebLink } from '../../shared/navigation/PublicWebLink';
 import { Button, DisclosureIcon } from '../../shared/ui/common';
+import { Icon } from '../../shared/ui/Icon';
 
 type Guidance = NonNullable<Workout['exercises'][number]['progression_guidance']>;
 type Session = Guidance['evidence']['sessions'][number];
@@ -215,7 +217,7 @@ export function ProgressionGuidance({
 
       <details className="progression-guidance__details">
         <summary className="yfc-disclosure-summary">
-          <span>Почему?</span>
+          <span>Почему такой вес?</span>
           <DisclosureIcon />
         </summary>
         <div className="progression-guidance__evidence">
@@ -253,6 +255,12 @@ export function ProgressionGuidance({
               Пока нет полных сопоставимых тренировок в этом контексте программы.
             </p>
           )}
+          <PublicWebLink
+            className="contextual-help__link progression-guidance__source"
+            path="/knowledge/training/progressive-overload"
+          >
+            Подробнее о прогрессии <Icon name="external-link" size={16} />
+          </PublicWebLink>
         </div>
       </details>
 

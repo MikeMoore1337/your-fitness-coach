@@ -193,10 +193,13 @@ function formatWorkoutNumber(value: number): string {
 
 function RirContextualHelp() {
   return (
-    <ContextualHelp articlePath="/knowledge/training/repetitions-in-reserve">
+    <ContextualHelp
+      articlePath="/knowledge/training/repetitions-in-reserve"
+      summary="Что такое RIR?"
+    >
       <p>
-        Сколько повторов вы ещё могли бы сделать с хорошей техникой после завершения подхода? Поле
-        необязательное.
+        Повторы в запасе — субъективная оценка того, сколько качественных повторов вы ещё могли бы
+        выполнить после подхода. Поле необязательное: отсутствие оценки не равно нулю.
       </p>
     </ContextualHelp>
   );
@@ -874,6 +877,12 @@ function WorkoutSetRow({
         </Button>
       </div>
 
+      {isCurrent && (
+        <div className="active-workout-set__contextual-help">
+          <RirContextualHelp />
+        </div>
+      )}
+
       {isCurrent && set.set_kind !== 'warmup' && set.planned_role !== 'warmup' && (
         <WorkoutSetHelpers
           disabled={disabled || completing}
@@ -909,12 +918,6 @@ function WorkoutSetRow({
               <option value="drop">Подход со снижением веса</option>
             </select>
           </label>
-
-          {isCurrent && (
-            <div className="active-workout-rir">
-              <RirContextualHelp />
-            </div>
-          )}
 
           {!isCurrent && (
             <RirSelector
