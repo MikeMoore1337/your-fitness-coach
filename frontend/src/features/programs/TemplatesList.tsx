@@ -27,6 +27,7 @@ import { ProgramImportPanel } from './ProgramImportPanel';
 import { PublicProgramSharePanel } from './PublicProgramSharePanel';
 import { AppLink } from '../../shared/navigation/router';
 import { programPreviewFacts, previewSourceSignature } from './programPreviewFacts';
+import { exerciseCountLabel } from './programDefaults';
 import './programPreview.css';
 
 const goalLabels: Record<string, string> = {
@@ -158,6 +159,10 @@ export function TemplatesList({
   const examplePanelRef = useModalA11y<HTMLDivElement>(Boolean(selectedExample), () =>
     setSelectedExample(null),
   );
+  const selectedExampleIsTrainerReadonly =
+    selectedExample?.is_active_for_current_user === true &&
+    selectedExample.assigned_by_user_id != null &&
+    selectedExample.assigned_by_user_id !== user?.id;
   const assignmentPanelRef = useModalA11y<HTMLDivElement>(Boolean(assignmentTemplate), () =>
     setAssignmentTemplate(null),
   );
@@ -709,164 +714,180 @@ export function TemplatesList({
             ref={examplePanelRef}
             tabIndex={-1}
           >
-            <div className="program-example-modal__head">
-              <div>
-                <span className="eyebrow">{programKind(selectedExample, user?.id)}</span>
-                <h2 id="program-example-title">{selectedExample.title}</h2>
-                <p className="muted">{programMeta(selectedExample)}</p>
+            <div className="program-example-modal__content">
+              <div className="program-example-modal__head">
+                <div>
+                  <span className="eyebrow">{programKind(selectedExample, user?.id)}</span>
+                  <h2 id="program-example-title">{selectedExample.title}</h2>
+                  <p className="muted">{programMeta(selectedExample)}</p>
+                </div>
+                <button
+                  type="button"
+                  className="secondary program-example-modal__close"
+                  aria-label="Закрыть состав программы"
+                  onClick={() => setSelectedExample(null)}
+                >
+                  <CloseIcon />
+                </button>
               </div>
-              <button
-                type="button"
-                className="secondary program-example-modal__close"
-                aria-label="Закрыть состав программы"
-                onClick={() => setSelectedExample(null)}
+              <section
+                className="program-preview-section"
+                aria-label="Известные сведения о программе"
               >
-                <CloseIcon />
-              </button>
-            </div>
-            <section
-              className="program-preview-section"
-              aria-label="Известные сведения о программе"
-            >
-              <h3>Что известно</h3>
-              <p className="muted">Только сведения из программы без предположений о нагрузке.</p>
-              <dl className="program-preview-facts">
-                {programPreviewFacts(selectedExample).map((fact) => (
-                  <div className="program-preview-fact" key={fact.label}>
-                    <dt>{fact.label}</dt>
-                    <dd>{fact.value}</dd>
-                    <small>{fact.source}</small>
-                  </div>
-                ))}
-              </dl>
-              <p className="program-example-modal__owner">
-                {previewOwnership(selectedExample, user?.id)}
-              </p>
-              {selectedExample.assigned_program_revision_number != null && (
+                <h3>Что известно</h3>
+                <p className="muted">Только сведения из программы без предположений о нагрузке.</p>
+                <dl className="program-preview-facts">
+                  {programPreviewFacts(selectedExample).map((fact) => (
+                    <div className="program-preview-fact" key={fact.label}>
+                      <dt>{fact.label}</dt>
+                      <dd>{fact.value}</dd>
+                      <small>{fact.source}</small>
+                    </div>
+                  ))}
+                </dl>
                 <p className="program-example-modal__owner">
-                  Ревизия назначения: {selectedExample.assigned_program_revision_number}
+                  {previewOwnership(selectedExample, user?.id)}
+                </p>
+                {selectedExample.assigned_program_revision_number != null && (
+                  <p className="program-example-modal__owner">
+                    Ревизия назначения: {selectedExample.assigned_program_revision_number}
+                  </p>
+                )}
+              </section>
+              <section className="program-preview-section" aria-label="Состав недели">
+                <h3>Состав недели</h3>
+                <p className="muted">
+                  Все дни из исходного шаблона. Первый день раскрыт для примера.
+                </p>
+                <div className="program-example-days">
+                  {selectedExample.days.map((day, dayIndex) => {
+                    return (
+                      <details className="program-example-day" key={day.id} open={dayIndex === 0}>
+                        <summary className="yfc-disclosure-summary">
+                          <span>
+                            <strong>
+                              День {day.day_number}. {day.title}
+                            </strong>
+                            <span className="muted">
+                              {' '}
+                              · {exerciseCountLabel(day.exercises.length)}
+                            </span>
+                          </span>
+                          <DisclosureIcon />
+                        </summary>
+                        <h3 className="sr-only">
+                          День {day.day_number}. {day.title}
+                        </h3>
+                        <ol>
+                          {day.exercises.map((exercise) => {
+                            const isCardio = exercise.metric_type === 'cardio';
+                            return (
+                              <li key={exercise.id}>
+                                <strong>{exercise.exercise_title}</strong>
+                                <span>
+                                  {isCardio
+                                    ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
+                                    : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
+                                </span>
+                                {exercise.superset_group && (
+                                  <small>
+                                    Суперсет {exercise.superset_group} · упражнение{' '}
+                                    {exercise.superset_order} из 2
+                                  </small>
+                                )}
+                                {exercise.notes && <small>{exercise.notes}</small>}
+                                <button
+                                  type="button"
+                                  className="text-button"
+                                  onClick={() =>
+                                    setGuide({
+                                      id: exercise.exercise_id,
+                                      title: exercise.exercise_title,
+                                    })
+                                  }
+                                >
+                                  {exercise.has_guide
+                                    ? 'Техника и детали'
+                                    : 'Подробнее об упражнении'}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </details>
+                    );
+                  })}
+                </div>
+              </section>
+              <p className="program-preview-source">
+                Состав и настройки отображены по источнику. Если данных нет, они не заменяются
+                приблизительными значениями. Просмотр не изменяет активную программу.
+              </p>
+              {previewStale && (
+                <p className="program-preview-stale" role="status">
+                  Данные обновились. Проверьте сведения выше и повторите назначение.
                 </p>
               )}
-            </section>
-            <section className="program-preview-section" aria-label="Состав недели">
-              <h3>Состав недели</h3>
-              <p className="muted">
-                Все дни из исходного шаблона. Первый день раскрыт для примера.
-              </p>
-              <div className="program-example-days">
-                {selectedExample.days.map((day, dayIndex) => {
-                  return (
-                    <details className="program-example-day" key={day.id} open={dayIndex === 0}>
-                      <summary className="yfc-disclosure-summary">
-                        <span>
-                          <strong>
-                            День {day.day_number}. {day.title}
-                          </strong>
-                          <span className="muted"> · {day.exercises.length} упражнений</span>
-                        </span>
-                        <DisclosureIcon />
-                      </summary>
-                      <h3 className="sr-only">
-                        День {day.day_number}. {day.title}
-                      </h3>
-                      <ol>
-                        {day.exercises.map((exercise) => {
-                          const isCardio = exercise.metric_type === 'cardio';
-                          return (
-                            <li key={exercise.id}>
-                              <strong>{exercise.exercise_title}</strong>
-                              <span>
-                                {isCardio
-                                  ? `${exercise.prescribed_duration_minutes ?? '—'} мин`
-                                  : `${exercise.prescribed_sets} подх. × ${exercise.prescribed_reps} · отдых ${exercise.rest_seconds} сек.`}
-                              </span>
-                              {exercise.superset_group && (
-                                <small>
-                                  Суперсет {exercise.superset_group} · упражнение{' '}
-                                  {exercise.superset_order} из 2
-                                </small>
-                              )}
-                              {exercise.notes && <small>{exercise.notes}</small>}
-                              <button
-                                type="button"
-                                className="text-button"
-                                onClick={() =>
-                                  setGuide({
-                                    id: exercise.exercise_id,
-                                    title: exercise.exercise_title,
-                                  })
-                                }
-                              >
-                                {exercise.has_guide
-                                  ? 'Техника и детали'
-                                  : 'Подробнее об упражнении'}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ol>
-                    </details>
-                  );
-                })}
-              </div>
-            </section>
-            <p className="program-preview-source">
-              Состав и настройки отображены по источнику. Если данных нет, они не заменяются
-              приблизительными значениями. Просмотр не изменяет активную программу.
-            </p>
-            {previewStale && (
-              <p className="program-preview-stale" role="status">
-                Данные обновились. Проверьте сведения выше и повторите назначение.
-              </p>
-            )}
-            <div className="program-example-modal__actions">
-              {selectedExample.is_active_for_current_user &&
-              selectedExample.assigned_by_user_id &&
-              selectedExample.assigned_by_user_id !== user?.id ? (
-                <p className="muted">Эта программа назначена тренером. Изменение недоступно.</p>
+            </div>
+            <div
+              className={`program-example-modal__actions${
+                selectedExampleIsTrainerReadonly ? ' program-example-modal__actions--readonly' : ''
+              }`}
+            >
+              {selectedExampleIsTrainerReadonly ? (
+                <p className="muted program-example-modal__readonly">
+                  Эта программа назначена тренером. Изменение недоступно.
+                </p>
               ) : (
                 <>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => {
-                      setPreviewSelectionId(selectedExample.id);
-                      toast('Программа выбрана. Назначение выполняется отдельно.');
-                    }}
-                  >
-                    {previewSelectionId === selectedExample.id ? 'Выбрана' : 'Выбрать'}
-                  </button>
-                  <button
-                    type="button"
-                    className="secondary"
-                    onClick={() => {
-                      setSaveAsCopy(true);
-                      setEditingTemplate(selectedExample);
-                      setSelectedExample(null);
-                    }}
-                  >
-                    Создать копию
-                  </button>
-                  {selectedExample.can_edit && (
+                  <div className="program-example-modal__secondary-actions">
                     <button
                       type="button"
                       className="secondary"
                       onClick={() => {
-                        setSaveAsCopy(false);
+                        setPreviewSelectionId(selectedExample.id);
+                        toast('Программа выбрана. Назначение выполняется отдельно.');
+                      }}
+                    >
+                      {previewSelectionId === selectedExample.id ? 'Выбрана' : 'Выбрать'}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setSaveAsCopy(true);
                         setEditingTemplate(selectedExample);
                         setSelectedExample(null);
                       }}
                     >
-                      Редактировать
+                      Создать копию
                     </button>
-                  )}
+                    {selectedExample.can_edit && (
+                      <button
+                        type="button"
+                        className="secondary"
+                        onClick={() => {
+                          setSaveAsCopy(false);
+                          setEditingTemplate(selectedExample);
+                          setSelectedExample(null);
+                        }}
+                      >
+                        Редактировать
+                      </button>
+                    )}
+                  </div>
                   {selectedExample.is_active_for_current_user ? (
-                    <button type="button" disabled>
+                    <button
+                      type="button"
+                      className="program-example-modal__primary-action"
+                      disabled
+                    >
                       Уже запущена
                     </button>
                   ) : (
                     <button
                       type="button"
+                      className="program-example-modal__primary-action"
                       disabled={previewChecking}
                       aria-label="Настроить расписание и запустить"
                       onClick={() => void assignFromPreview(selectedExample)}

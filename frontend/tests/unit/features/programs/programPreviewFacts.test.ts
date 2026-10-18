@@ -49,6 +49,29 @@ describe('program preview factual mapping', () => {
     expect(facts.find((fact) => fact.label === 'Недель в источнике')?.value).toBe('Нет данных');
   });
 
+  it('reports a three-day source separately from its unknown frequency', () => {
+    const source = template();
+    const sourceDay = source.days[0]!;
+    const facts = programPreviewFacts({
+      ...source,
+      days: [1, 2, 3].map((dayNumber) => ({
+        ...sourceDay,
+        id: dayNumber,
+        day_number: dayNumber,
+      })),
+    });
+    expect(facts.find((fact) => fact.label === 'Дни')?.value).toBe('3 в составе шаблона');
+    expect(facts.find((fact) => fact.label === 'Частота')?.value).toBe('Нет данных');
+  });
+
+  it('keeps a legacy template without metadata factual and unknown', () => {
+    const facts = programPreviewFacts(
+      template({ level: 'legacy', program_metadata: null, default_duration_weeks: 1 }),
+    );
+    expect(facts.find((fact) => fact.label === 'Уровень')?.value).toBe('Нет данных');
+    expect(facts.find((fact) => fact.label === 'Недель в источнике')?.value).toBe('Нет данных');
+  });
+
   it('uses only explicit seed metadata and source week prescriptions', () => {
     const value = template({
       program_metadata: {

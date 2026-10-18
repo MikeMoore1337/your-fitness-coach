@@ -16,6 +16,39 @@ const TASK_293_EVIDENCE_DIR = process.env.TASK_293_EVIDENCE_DIR;
 const STAGE4_THUMBNAIL_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const STAGE4_ANIMATION_URL = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 
+function fullBodyThreeDayDays() {
+  const exercise = (id: number, title: string) => ({
+    id,
+    exercise_id: 1,
+    exercise_title: title,
+    prescribed_sets: 3,
+    prescribed_reps: '10–12',
+    rest_seconds: 90,
+    notes: null,
+    has_guide: true,
+  });
+  return [
+    {
+      id: 100,
+      day_number: 1,
+      title: 'Всё тело',
+      exercises: [exercise(1000, 'Тяга блока')],
+    },
+    {
+      id: 101,
+      day_number: 2,
+      title: 'Всё тело B',
+      exercises: [exercise(1001, 'Жим гантелей')],
+    },
+    {
+      id: 102,
+      day_number: 3,
+      title: 'Всё тело C',
+      exercises: [exercise(1002, 'Приседания')],
+    },
+  ];
+}
+
 async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_293_EVIDENCE_DIR) return;
   await page.screenshot({ path: path.resolve(TASK_293_EVIDENCE_DIR, fileName), fullPage: true });
@@ -710,25 +743,7 @@ async function mockApi(
             is_active_for_current_user: false,
             assigned_by_user_id: null,
             assigned_by_full_name: null,
-            days: [
-              {
-                id: 100,
-                day_number: 1,
-                title: 'Всё тело',
-                exercises: [
-                  {
-                    id: 1000,
-                    exercise_id: 1,
-                    exercise_title: 'Тяга блока',
-                    prescribed_sets: 3,
-                    prescribed_reps: '10–12',
-                    rest_seconds: 90,
-                    notes: null,
-                    has_guide: true,
-                  },
-                ],
-              },
-            ],
+            days: fullBodyThreeDayDays(),
           },
           {
             id: 11,
@@ -929,37 +944,7 @@ async function mockApi(
               can_edit: false,
               assigned_by_user_id: null,
               assigned_by_full_name: null,
-              days: [
-                {
-                  id: 100,
-                  day_number: 1,
-                  title: 'Всё тело',
-                  exercises: [
-                    {
-                      id: 1000,
-                      exercise_id: 1,
-                      exercise_title: 'Тяга блока',
-                      prescribed_sets: 3,
-                      prescribed_reps: '10–12',
-                      rest_seconds: 90,
-                      notes: null,
-                      has_guide: true,
-                    },
-                  ],
-                },
-                {
-                  id: 101,
-                  day_number: 2,
-                  title: 'Всё тело B',
-                  exercises: [],
-                },
-                {
-                  id: 102,
-                  day_number: 3,
-                  title: 'Всё тело C',
-                  exercises: [],
-                },
-              ],
+              days: fullBodyThreeDayDays(),
             },
             reason: 'Совпадает с выбранной целью, уровнем и ритмом.',
             fit_facts: [
@@ -2681,29 +2666,7 @@ test('поля адаптируются к разным iPhone, а пример 
         provenance_type: 'YFC_GENERIC',
         provenance: null,
         program_metadata: null,
-        days: [
-          {
-            id: 100,
-            day_number: 1,
-            title: 'Всё тело',
-            exercises: [
-              {
-                id: 1000,
-                exercise_id: 1,
-                exercise_title: 'Тяга блока',
-                metric_type: 'strength',
-                prescribed_sets: 3,
-                prescribed_reps: '10–12',
-                prescribed_duration_minutes: null,
-                rest_seconds: 90,
-                notes: null,
-                superset_group: null,
-                superset_order: null,
-                has_guide: true,
-              },
-            ],
-          },
-        ],
+        days: fullBodyThreeDayDays(),
       },
     });
   });
@@ -2804,7 +2767,7 @@ test('поля адаптируются к разным iPhone, а пример 
   const example = page.getByRole('button', {
     name: 'Посмотреть шаблон «Программа на всё тело — 3 дня»',
   });
-  await expect(example).toContainText('Рекомпозиция · Начальный уровень · 1 тренировка в цикле');
+  await expect(example).toContainText('Рекомпозиция · Начальный уровень · 3 тренировки в цикле');
   await expect(example).toContainText('Готовый шаблон');
   await expect(example).not.toContainText('recomposition');
   await expect(example).not.toContainText('beginner');
@@ -2842,6 +2805,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await example.click();
   const previewDialog = page.locator('.program-example-modal');
   const previewPanel = page.locator('.program-example-modal__panel');
+  const previewContent = page.locator('.program-example-modal__content');
   await expect(previewDialog).toBeVisible();
   for (const width of [320, 360, 393, 430, 1440]) {
     await page.setViewportSize({ width, height: 900 });
@@ -2860,6 +2824,27 @@ test('поля адаптируются к разным iPhone, а пример 
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
       width,
     );
+    if (width <= 600) {
+      const actions = page.locator('.program-example-modal__actions');
+      const primaryAction = actions.getByRole('button', {
+        name: 'Настроить расписание и запустить',
+      });
+      const [actionsBox, primaryBox] = await Promise.all([
+        actions.boundingBox(),
+        primaryAction.boundingBox(),
+      ]);
+      expect(actionsBox).not.toBeNull();
+      expect(primaryBox).not.toBeNull();
+      const actionPadding = await actions.evaluate((element) => {
+        const styles = getComputedStyle(element);
+        return Number.parseFloat(styles.paddingLeft) + Number.parseFloat(styles.paddingRight);
+      });
+      expect(primaryBox!.width).toBeGreaterThanOrEqual(actionsBox!.width - actionPadding - 2);
+      expect(primaryBox!.height).toBeLessThanOrEqual(50);
+      expect(
+        await primaryAction.evaluate((element) => element.scrollHeight <= element.clientHeight),
+      ).toBe(true);
+    }
     for (const theme of ['dark', 'light'] as const) {
       await setTheme(theme);
       await page.screenshot({
@@ -2867,6 +2852,47 @@ test('поля адаптируются к разным iPhone, а пример 
         animations: 'disabled',
       });
     }
+  }
+
+  await page.setViewportSize({ width: 320, height: 900 });
+  const lastDay = previewPanel.locator('.program-example-day').last();
+  await lastDay.locator('summary').click();
+  const lastExercise = lastDay.locator('li').last();
+  await lastExercise.scrollIntoViewIfNeeded();
+  const [lastExerciseBox, exerciseActionsBox] = await Promise.all([
+    lastExercise.boundingBox(),
+    page.locator('.program-example-modal__actions').boundingBox(),
+  ]);
+  expect(lastExerciseBox).not.toBeNull();
+  expect(exerciseActionsBox).not.toBeNull();
+  expect(lastExerciseBox!.y + lastExerciseBox!.height).toBeLessThanOrEqual(
+    exerciseActionsBox!.y + 1,
+  );
+  await previewContent.evaluate((panel) =>
+    panel.scrollTo({ top: panel.scrollHeight, behavior: 'instant' }),
+  );
+  await expect
+    .poll(() =>
+      previewContent.evaluate(
+        (panel) => panel.scrollTop + panel.clientHeight >= panel.scrollHeight - 1,
+      ),
+    )
+    .toBe(true);
+  const sourceNote = page.locator('.program-preview-source');
+  await expect(sourceNote).toBeVisible();
+  const [sourceNoteBox, bottomActionsBox] = await Promise.all([
+    sourceNote.boundingBox(),
+    page.locator('.program-example-modal__actions').boundingBox(),
+  ]);
+  expect(sourceNoteBox).not.toBeNull();
+  expect(bottomActionsBox).not.toBeNull();
+  expect(sourceNoteBox!.y + sourceNoteBox!.height).toBeLessThanOrEqual(bottomActionsBox!.y + 1);
+  for (const theme of ['dark', 'light'] as const) {
+    await setTheme(theme);
+    await page.screenshot({
+      path: path.join(previewEvidenceDir, `preview-scroll-bottom-${theme}-320.png`),
+      animations: 'disabled',
+    });
   }
 
   await page.setViewportSize({ width: 393, height: 900 });
@@ -2927,6 +2953,39 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(
     page.getByText('Эта программа назначена тренером. Изменение недоступно.'),
   ).toBeVisible();
+  const trainerActions = page.locator('.program-example-modal__actions');
+  const trainerNotice = trainerActions.locator('.program-example-modal__readonly');
+  await expect(trainerActions.locator('button')).toHaveCount(0);
+  await trainerNotice.scrollIntoViewIfNeeded();
+  const [trainerNoticeBox, trainerActionsBox] = await Promise.all([
+    trainerNotice.boundingBox(),
+    trainerActions.boundingBox(),
+  ]);
+  const trainerPanelBox = await previewPanel.boundingBox();
+  expect(trainerNoticeBox).not.toBeNull();
+  expect(trainerActionsBox).not.toBeNull();
+  expect(trainerPanelBox).not.toBeNull();
+  const trainerActionsPadding = await trainerActions.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      left: Number.parseFloat(styles.paddingLeft),
+      right: Number.parseFloat(styles.paddingRight),
+    };
+  });
+  const trainerContentLeft = trainerActionsBox!.x + trainerActionsPadding.left;
+  const trainerContentRight =
+    trainerActionsBox!.x + trainerActionsBox!.width - trainerActionsPadding.right;
+  expect(trainerNoticeBox!.x).toBeGreaterThanOrEqual(trainerContentLeft - 1);
+  expect(trainerNoticeBox!.x + trainerNoticeBox!.width).toBeLessThanOrEqual(
+    trainerContentRight + 1,
+  );
+  expect(trainerNoticeBox!.width).toBeGreaterThanOrEqual(
+    trainerContentRight - trainerContentLeft - 2,
+  );
+  expect(trainerNoticeBox!.y).toBeGreaterThanOrEqual(trainerPanelBox!.y - 1);
+  expect(trainerNoticeBox!.y + trainerNoticeBox!.height).toBeLessThanOrEqual(
+    trainerPanelBox!.y + trainerPanelBox!.height + 1,
+  );
   for (const theme of ['dark', 'light'] as const) {
     await setTheme(theme);
     await page.screenshot({
@@ -2966,8 +3025,10 @@ test('поля адаптируются к разным iPhone, а пример 
   }, originalTheme);
 
   await expect(page.getByRole('heading', { name: 'День 1. Всё тело' })).toBeVisible();
-  await expect(page.getByRole('dialog').getByText('Тяга блока')).toBeVisible();
-  await expect(page.getByRole('dialog').getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
+  const firstExercise = page.getByRole('listitem').filter({ hasText: 'Тяга блока' });
+  await expect(firstExercise).toHaveCount(1);
+  await expect(firstExercise.getByText('Тяга блока')).toBeVisible();
+  await expect(firstExercise.getByText('3 подх. × 10–12 · отдых 90 сек.')).toBeVisible();
   const [programPanelBox, programHeadBox] = await Promise.all([
     page.locator('.program-example-modal__panel').boundingBox(),
     page.locator('.program-example-modal__head').boundingBox(),
