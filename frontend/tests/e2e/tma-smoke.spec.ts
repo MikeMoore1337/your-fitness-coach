@@ -1362,7 +1362,7 @@ test('data confidence keeps insufficient analytics explicit in Mobile Web and da
     .click();
   const bodyConfidence = tmaPage
     .locator('#progress-body')
-    .getByRole('region', { name: 'Достаточно ли данных: Пока мало данных', exact: true })
+    .getByRole('region', { name: 'Достаточно ли данных: Масса — Пока мало данных', exact: true })
     .filter({ hasText: 'Сейчас есть 0 замеров' });
   await expect(bodyConfidence).toHaveCount(1);
   await bodyConfidence.scrollIntoViewIfNeeded();
