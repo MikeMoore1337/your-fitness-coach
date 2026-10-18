@@ -1,0 +1,57 @@
+{
+  "issue": 873,
+  "fixture": "frontend/tests/e2e/progress-experience.spec.ts::mockProgress",
+  "browser": "Chromium",
+  "before": {
+    "revision": "2f1cb8930e07a41a8b7303cb4c8b63ad45f65b82",
+    "sourcePackage": "../paired-20261018/after",
+    "meaning": "pre-final-refinement render; preserved historical captures"
+  },
+  "after": {
+    "revision": "00e2701adcb5ae889f27aa72555265628c19df25",
+    "sourcePackage": "./after",
+    "meaning": "final visual-refinement render"
+  },
+  "pairs": [
+    {
+      "id": "weekly-review-dark-393-expanded",
+      "purpose": "remove forbidden one-sided lime edge",
+      "theme": "dark",
+      "section": "wellbeing",
+      "viewport": "393x844",
+      "state": "expanded",
+      "before": "../paired-20261018/after/dark-wellbeing-393-expanded.jpg",
+      "after": "after/dark-wellbeing-393-expanded.jpg"
+    },
+    {
+      "id": "body-light-393-expanded",
+      "purpose": "separate Body surfaces and nested history/editing blocks",
+      "theme": "light",
+      "section": "body",
+      "viewport": "393x844",
+      "state": "expanded",
+      "before": "../paired-20261018/after/light-body-393-expanded.jpg",
+      "after": "after/light-body-393-expanded.jpg"
+    },
+    {
+      "id": "body-dark-1440-expanded",
+      "purpose": "preserve desktop hierarchy while expanding the diary",
+      "theme": "dark",
+      "section": "body",
+      "viewport": "1440x1000",
+      "state": "expanded",
+      "before": "../paired-20261018/after/dark-body-1440-expanded.jpg",
+      "after": "after/dark-body-1440-expanded.jpg"
+    },
+    {
+      "id": "body-light-393-action-add-measurement",
+      "purpose": "keep the add-measurement form reachable and separated",
+      "theme": "light",
+      "section": "body",
+      "viewport": "393x844",
+      "state": "action-add-measurement",
+      "before": "../paired-20261018/after/light-body-393-action-add-measurement.jpg",
+      "after": "after/light-body-393-action-add-measurement.jpg"
+    }
+  ]
+}
