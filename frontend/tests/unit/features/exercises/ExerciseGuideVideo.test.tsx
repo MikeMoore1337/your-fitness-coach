@@ -3,7 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ExerciseGuideVideo } from '../../../../src/features/exercises/ExerciseGuideVideo';
 
 const sources = [
-  { url: '/media/approved-hd.mp4', mime_type: 'video/mp4', width: 720, height: 720, byte_size: 8000 },
+  {
+    url: '/media/approved-hd.mp4',
+    mime_type: 'video/mp4',
+    width: 720,
+    height: 720,
+    byte_size: 8000,
+  },
 ];
 
 describe('ExerciseGuideVideo', () => {
@@ -47,7 +53,11 @@ describe('ExerciseGuideVideo', () => {
     const play = vi.mocked(HTMLMediaElement.prototype.play);
     const pause = vi.mocked(HTMLMediaElement.prototype.pause);
     const { container, unmount } = render(
-      <ExerciseGuideVideo sources={sources} poster="/media/approved-poster.webp" onError={vi.fn()} />,
+      <ExerciseGuideVideo
+        sources={sources}
+        poster="/media/approved-poster.webp"
+        onError={vi.fn()}
+      />,,
     );
     const video = container.querySelector('video');
     expect(video).not.toBeNull();
@@ -74,15 +84,24 @@ describe('ExerciseGuideVideo', () => {
     const play = vi.mocked(HTMLMediaElement.prototype.play);
     const pause = vi.mocked(HTMLMediaElement.prototype.pause);
     render(
-      <ExerciseGuideVideo expanded sources={sources} poster="/media/approved-poster.webp" onError={vi.fn()} />,
+      <ExerciseGuideVideo
+        expanded
+        sources={sources}
+        poster="/media/approved-poster.webp"
+        onError={vi.fn()}
+      />,,
     );
     const oldDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
     try {
       Object.defineProperty(document, 'hidden', { configurable: true, value: true });
-      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
       expect(pause).toHaveBeenCalled();
       Object.defineProperty(document, 'hidden', { configurable: true, value: false });
-      act(() => document.dispatchEvent(new Event('visibilitychange')));
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
       expect(play).toHaveBeenCalled();
       expect(observe).not.toHaveBeenCalled();
     } finally {
