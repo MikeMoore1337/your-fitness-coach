@@ -109,6 +109,24 @@ test('TMA asset detection ignores opaque Vite hash suffixes', () => {
   expect(isDedicatedTmaAsset('tma-bridge-D6X9tmA8.css')).toBe(true);
 });
 
+test('Telegram demo handoff clears private demo tokens before entering the app', async ({
+  page,
+}) => {
+  await installTelegramHarness(page, { colorScheme: 'dark' });
+  await installPlatformApi(page);
+  await page.addInitScript(() => {
+    sessionStorage.setItem(
+      'fit_demo_sessions_v1',
+      JSON.stringify({ trainer: 'a'.repeat(32) }),
+    );
+  });
+
+  await page.goto('/demo?tgWebAppPlatform=web');
+
+  await expect(page).toHaveURL(/\/app$/);
+  expect(await page.evaluate(() => sessionStorage.getItem('fit_demo_sessions_v1'))).toBeNull();
+});
+
 function captureConsoleFailures(page: Page) {
   const failures: string[] = [];
   page.on('console', (message) => {
