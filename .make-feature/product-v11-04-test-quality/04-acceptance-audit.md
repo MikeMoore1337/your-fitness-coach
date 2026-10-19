@@ -1,9 +1,10 @@
 # Product V11-04 / Issue #819 — acceptance audit receipt
 
-Status for the test-bearing exact HEAD `43aea2919209b2c094e5d4e39bd1ee6d01a77f45`:
-`READY_FOR_MERGE`. Required PR CI run
-[39216517207](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39216517207)
-has aggregate `checks=pass`; no merge, deploy or Issue closure is performed by this receipt.
+Status for the current test-bearing line at the local final commit:
+`NEEDS_WORK` until the added negative-proof test is pushed and its exact-head required CI is
+green. The previous required PR CI run
+[39217415385](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39217415385)
+was green for the prior head; no merge, deploy or Issue closure is performed by this receipt.
 
 ## 1. Firefox/WebKit extended regression
 
@@ -185,15 +186,37 @@ No Vale dependency, duplicate guard or subjective LLM evaluation is added.
 Full stateless deployment-scope result for `origin/master...HEAD` is:
 
 ```text
-changed_paths: 7
+changed_paths: 8 (after the pending contract-proof test commit)
 deploy_paths: []
 deploy_required: false
 reason: only documentation, governance, tests or developer tooling changed
 ```
 
 The existing Draft PR #1119 and branch `codex/819-test-quality-coverage` are retained. The
-technical verdict is **READY_FOR_MERGE**: the test-bearing exact HEAD has green required CI and
-the focused Firefox/WebKit plus unit evidence is green. Linux scheduled-only extended evidence,
+technical verdict is **NEEDS_WORK** until the new test-bearing exact HEAD has green required CI.
+The separate runtime-hardening branch is intentionally not part of this deployment-scope result.
+Linux scheduled-only extended evidence,
 physical iPhone/Safari, native Telegram, VoiceOver, production activation, owner merge approval
 and Issue closure remain explicit owner decisions or `NOT_VERIFIED`; none is inferred from this
 receipt. Merge, production deploy and Issue closure are not performed.
+
+## 8. Finalization receipt for the current request
+
+This table is the authoritative short receipt for the added work. `FIXED` means the scoped
+change exists in the intended branch/PR boundary; `COVERED` means existing evidence is sufficient;
+`JUSTIFIED_DEFERRED` means the item belongs to another Issue or requires unavailable evidence;
+`NEEDS_WORK` means a concrete receipt or gate is still missing.
+
+| Acceptance item | Status | Receipt / remaining gate |
+|---|---|---|
+| Nine-journey test-quality audit and regression classification | `COVERED` | Existing audit sections and the current source/fixture/workflow inventory remain in force. |
+| WeekStrip geometry and real document-overflow oracle | `COVERED` | Focused selector correction, scroll-container assertion and temporary overflow negative probe are retained. |
+| Cross-user export download-link privacy | `FIXED` | `backend/tests/test_account_lifecycle.py` protects the existing ownership filter with a `404` regression assertion. |
+| Producer-to-generated-consumer API contract proof | `FIXED` | `apiContractNegativeProof.test.ts` uses the installed `openapi-typescript` and TypeScript compiler; five representative schema mutations must fail. Exact-head CI after the pending commit is `NEEDS_WORK`. |
+| Raw/technical API error leakage at the frontend boundary | `FIXED` | Minimal runtime patch is isolated in branch `codex/819-safe-api-errors`; it preserves raw `body`/status for codes, localizes status fallbacks, and covers client plus Warmup UI behavior. Separate runtime exact-head CI and review are `NEEDS_WORK`. |
+| #1119 deploy classification | `COVERED` | Final local helper run against `origin/master...HEAD`: `deploy_required=false`, `deploy_paths=[]`, `changed_paths=8`. |
+| Weekly cross-browser/Allure lane (#821) | `JUSTIFIED_DEFERRED` | No timeout/retry/workflow policy change is included; cancellation is not a weekly PASS. |
+| Physical iPhone/Safari, native Telegram, VoiceOver, production smoke | `JUSTIFIED_DEFERRED` | These require direct owner-controlled environments and are not inferred from browser mocks or CI. |
+| Final PR/Issue gate | `NEEDS_WORK` | Push both scoped branches, obtain exact-head required CI, then owner separately decides merge, release/deploy and Issue closure. |
+
+No deployment, merge or Issue closure is authorized or performed by this receipt.

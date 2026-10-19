@@ -1,14 +1,14 @@
 # Make Feature index — Product V11-04 / Issue #819
 
-Status: acceptance audit complete; Linux extended receipt pending
+Status: test-only contract proof added; exact-head CI and runtime-hardening PR receipt pending
 Mode: normal — multi-layer test audit plus scoped regression-test changes; no production mutation or irreversible data operation.
 Branch: `codex/819-test-quality-coverage`
-Base at start: `7b755925ad03ea50215b9260b82e8c48cd506d22` (`origin/master`)
+Current base: `bc48d09c3415c4b146a0400efc18cb9031413d18` (`origin/master`)
 Owner authorization: implementation and Draft PR only; merge/deploy remain separate gates.
 
 ## Current stage
 
-Implementation and static/local verification are complete. The source request is preserved in `01-request.md`; the audit decisions and test matrix are in `02-solution.md`; receipts are in `03-verification.md` and the scoped acceptance audit is in `04-acceptance-audit.md`. Supported Linux Firefox/WebKit extended evidence remains the final open receipt.
+Implementation is split by deployment scope. The source request is preserved in `01-request.md`; audit decisions and the test matrix are in `02-solution.md`; receipts are in `03-verification.md` and the scoped acceptance audit is in `04-acceptance-audit.md`. The test-only branch contains the negative generated-consumer contract proof. Production-path API error hardening is isolated in a separate Draft PR because it must not be mixed into this no-deploy branch.
 
 ## Success criteria
 
@@ -25,9 +25,12 @@ Implementation and static/local verification are complete. The source request is
 - D2: prioritize behavior/risk coverage over raw coverage percentage.
 - D3: keep evidence boundaries explicit: local Windows, Docker/PostgreSQL, mocked browser, CI and production are separate.
 - D4: if a production defect is found, record a reproduction and stop that product fix outside this PR.
+- D5: the confirmed frontend error-leak defect is fixed only in the separate runtime-hardening Draft PR; #1119 remains test/docs/tooling-only and retains `deploy_required=false`.
+- D6: API drift proof uses a synthetic temporary OpenAPI producer, the existing `openapi-typescript` package and a real TypeScript consumer. Mutations for endpoint/method, required field, nullability, enum and request type must fail; no production schema or second generator is added.
 
 ## Open questions / gates
 
-- Draft PR #1119 and Issue comment #6255004058 were created/read back. Prior exact-head run `39165842461` passed its executable PR jobs; the new audit commit requires a fresh exact-head run and the supported weekly extended lane.
+- Draft PR #1119 remains open and test-only. Its previous exact-head run `39217415385` was green for `33fff54be9c98c2aaa90cba18918b46df754c301`; the added negative-proof test requires a fresh exact-head run.
+- Separate runtime Draft PR `codex/819-safe-api-errors` is prepared locally from `origin/master` at `bc48d09c3415c4b146a0400efc18cb9031413d18`; its source changes require separate CI, review and release-scope classification.
 - Docker/PostgreSQL and local Firefox/WebKit are unavailable on this Windows host; GitHub CI is the accepted evidence for those layers.
 - Merge, deploy and Issue closure remain separate owner-authorized gates; no owner visual gate applies to this test-quality change.
