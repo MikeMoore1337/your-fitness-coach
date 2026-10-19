@@ -4,52 +4,69 @@ Issue: [#818](https://github.com/MikeMoore1337/your-fitness-coach/issues/818) ·
 PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
 2026-10-19.
 
-## Revisions and measurement boundaries
+## Revisions and measurement method
 
-- V11-00 historical build: `9b5a24b49408fee63339dbdc93af57767fdc977e` (2026-10-18).
-- Verified base of #818 branch: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1`.
-- Between these refs: 42 commits, including frontend/API client changes. The historical figures are **not a matched before-state** for #818.
-- Desktop Commander hosts were offline during this work. A local Vite bundle/profile was **not** measured. Tests performed by GitHub Actions must be associated with the final exact PR HEAD.
-- Browser lab, real mobile/TMA, CrUX/RUM, React Profiler and navigation timings: `NO_DATA` until captured.
+- Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` (`origin/master` at measurement time).
+- Matched AFTER application code: `4e6b85235bb425ab7bcbcc81659149fa2af244d3` (PR #1126 head before this evidence-only documentation commit).
+- Both revisions used the same `npm ci --ignore-scripts --no-audit --no-fund`, Node `24.14.0`, npm `11.11.1`, Vite `7.3.6`, Windows runner and existing lockfile.
+- Browser lab used the existing Playwright Chromium harness with mocked API fixtures, reduced motion, mobile `390x844` and desktop `1440x900`. This is synthetic local evidence, not a physical-device or production measurement.
+- Historical #815 values remain useful context, but are not used as the #818 BEFORE.
 
-Historical #815 observations, **not** proof of #818 impact:
+## Comparable bundle results
 
-| Metric | #815 historical | #818 base BEFORE | #818 final AFTER |
-| --- | ---: | --- | --- |
-| Entry JS raw | 309,087 B | NO_DATA | NO_DATA |
-| Entry JS gzip | 96,775 B | NO_DATA | NO_DATA |
-| Entry JS gzip budget | 96,000 B | 96,000 B | 96,000 B |
-| Entry CSS gzip | 13,216 B | NO_DATA | NO_DATA |
-| Core route/nav latency | NO_DATA | NO_DATA | NO_DATA |
-| React render cost | NO_DATA | NO_DATA | NO_DATA |
-| Repeat API requests | NO_DATA | NO_DATA | NO_DATA |
-| LCP, CLS, INP - field | NO_DATA | NO_DATA | NO_DATA |
+| Metric | BEFORE `42a75a5f` | AFTER `4e6b8523` | Change | Result |
+| --- | ---: | ---: | ---: | --- |
+| Entry JS raw | 310,971 B | 295,379 B | -15,592 B | PASS |
+| Entry JS gzip | 97,485 B | 92,773 B | -4,712 B | PASS; 3,227 B below 96,000 B |
+| Entry JS gzip budget | 96,000 B | 96,000 B | unchanged | unchanged contract |
+| Entry CSS raw | 64,478 B | 64,478 B | 0 B | PASS |
+| Entry CSS gzip | 13,216 B | 13,216 B | 0 B | PASS |
+| Public assets | 31 / 647,377 B | 31 / 647,377 B | 0 B | PASS |
+| Largest public asset | 100,570 B | 100,570 B | 0 B | PASS |
+| Performance guard | FAIL: +1,485 B gzip and +971 B raw | PASS | budget recovered | verified |
 
-## Measured intermediate build (not the final result)
+The BEFORE failure is the current-master fact that the existing guard exposed. The AFTER entry reduction comes from deferring Telegram demo-only session code and moving authenticated route internals behind an auth-only lazy boundary. No budget was raised.
 
-GitHub Actions run [39289139494](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39289139494), commit `087531a8`, `frontend-performance` output:
+Key chunk observation: `CoachPage` moved from 186.51 kB raw / 45.77 kB gzip to 386.98 kB raw / 97.80 kB gzip because authenticated dependencies now remain with the private route. That is an intentional route-local trade-off for a smaller public entry; authenticated route performance was not claimed improved without a route timing profile. New auth chunks were emitted separately: `AuthenticatedRoutes` 3.80 kB raw / 1.86 kB gzip, `AuthProvider` 9.86 kB raw / 3.57 kB gzip and `OnboardingGate` 0.13 kB raw / 0.13 kB gzip.
 
-- Entry JS: **309,019 B raw / 96,761 B gzip**; budget 96,000 B -> **FAIL by 761 B**.
-- Entry CSS: 64,478 B raw / 13,216 B gzip -> PASS.
-- Public assets: 31 files / 646,496 B; largest 100,570 B -> PASS.
-- This prompted a second code-splitting change. No before/after claim is made based on the historical #815 data.
+## Comparable browser-lab observations
 
-## Source-confirmed targets and bounded changes
+The same `performance-hardening.spec.ts` scenarios passed on both revisions (BEFORE 7/7, AFTER 8/8; AFTER includes the new Telegram demo handoff regression).
 
-1. `main.tsx` imported demo session code eagerly although it only needs `clearAllDemoSessions()` for Telegram `/demo` at startup. Moved this module into an awaited dynamic import inside that narrow branch, keeping credential/session cleanup **before** render.
-2. `ExerciseGuideVideo` disconnected `IntersectionObserver` after the first intersection. For looping HD videos, this removed the ability to pause playback when scrolled offscreen. Keep observing to pause out of view, resume in view, and pause/resume with document visibility. Once loaded, the source URL remains mounted: do not discard frames, replace a video with a static image, reduce bitrate/resolution or change the approved animation.
-3. Move the existing authenticated wrapper, coach-vs-personal navigation decision and trainer-intent routing into an auth-only lazy module. Keep their logic unchanged; `AuthProvider` and `OnboardingGate` are lazily loaded for non-public routes. The intermediate strict budget failure above justifies a targeted bootstrap split, but navigation latency is not claimed to improve without timings.
-4. Preserve the existing architecture, route-level lazy components, font `font-display: swap`, video poster/GIF fallback, and asset rules. No justified source/runtime evidence for global Query-cache tuning, new memoization, router refactor or media re-encoding.
+| Lab observation, one run per revision | BEFORE | AFTER | Interpretation |
+| --- | ---: | ---: | --- |
+| Mobile `/` LCP | 504 ms | 564 ms | within 2,500 ms guard; single-run variance, no improvement claim |
+| Mobile `/login` LCP | 368 ms | 368 ms | unchanged in this run |
+| Desktop `/` LCP | 448 ms | 444 ms | within guard; single-run variance |
+| Desktop `/` CLS | 0.022907 | 0.022907 | unchanged |
+| Desktop `/` INP | 32 ms | 32 ms | unchanged |
+| Today API requests | 11 expected paths × 1 | 11 expected paths × 1 | no duplicate fetch in either run |
+| Web/TMA resource graph | equal | equal | no dedicated TMA bundle or public-content chunk in the app flow |
 
-## Regression contract
+The Playwright LCP/CLS/INP values are laboratory observations from mocked Chromium, not CrUX, RUM, production field data or a physical Telegram WebView. Route-switch timing, React Profiler cost, low-end device CPU/memory and real resume behavior remain `NO_DATA`.
 
-- `npm ci && npm run build && npm run perf:check` on the same production-like Node/runtime profile for both revisions. The strict `entryJsGzip: 96_000` limit remains unchanged.
-- `npm run typecheck && npm run lint && npm run format:check && npm test`.
-- `npx playwright test performance-hardening.spec.ts --project=chromium` with existing isolated fixtures.
-- Existing `frontend-checks`, `frontend-unit`, frontend smoke and Chromium+WebKit mobile regression on **exact PR HEAD**.
-- E2E checks Telegram `/demo` clears session state before the `/app` navigation; unit tests check video remains lazy, paused offscreen, resumes without a second source load and pauses when hidden.
-- Where altered screens apply, preserve 320/360/393/430/1440 px and light/dark appearances. No design or media assets changed.
+## Source-confirmed bounded changes
 
-## Release status
+1. `main.tsx` now loads demo session code only for Telegram `/demo`, while cleanup still completes before React render.
+2. `ExerciseGuideVideo` keeps its existing approved HD source and poster, but keeps observing visibility so looping video pauses offscreen and on document hide, then resumes without a second source load.
+3. The existing authenticated wrapper, coach-vs-personal navigation decision and trainer-intent routing moved into an auth-only lazy module. Private behavior is unchanged; public bootstrap no longer carries those dependencies.
+4. The existing `frontend-checks` group now runs `npm run perf:check` immediately after the production build. The strict budget is unchanged.
+5. No global Query cache tuning, broad memoization, router replacement, media re-encoding, CSS/design change, backend change or production infrastructure change was justified by the available evidence.
 
-`NEEDS_WORK` until the latest CI run is green, the current-master BEFORE and final AFTER are comparable, and justified runtime/field limitations are recorded. No merge or production deploy is authorized under #818 without separate owner approval.
+## Verification
+
+- `npm run build`: PASS on both matched revisions; 568 modules BEFORE, 569 AFTER.
+- `npm run perf:check`: FAIL on BEFORE with the recorded budget breach; PASS on AFTER.
+- `npm run typecheck`: PASS.
+- `npm run lint`: PASS, including Russian UI and thick-lime-edge guards.
+- CI-compatible format command `npx prettier --check . --end-of-line auto`: PASS.
+- Full `npm run test`: **157 files / 962 tests passed** on AFTER.
+- Targeted Chromium Playwright: BEFORE 7 passed; AFTER 8 passed.
+- Exact code-head GitHub Actions run [39290956448](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39290956448) for `4e6b8523`: required checks reported green, including frontend checks, unit, smoke, Chromium/WebKit mobile regression, security and aggregate `checks`.
+- The plain local `npm run format:check` command reports pre-existing line-ending formatting differences across 539 files; the repository CI contract uses `--end-of-line auto`, which passed. No broad formatting rewrite was made.
+
+## Evidence boundaries and release status
+
+- Real mobile devices, real Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, production API traces, React Profiler recordings and memory/CPU profiles: `NO_DATA`.
+- No visual composition, design token, HD media asset, animation duration/FPS, workout/nutrition business rule, authorization policy, backend or production infrastructure changed.
+- Status: `READY_FOR_RELEASE_APPROVAL` for the scoped implementation and evidence. Merge, production deploy and Issue closure remain separate owner-authorized gates.
