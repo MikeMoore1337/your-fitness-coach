@@ -29,7 +29,7 @@ jobs:
         run: uv lock --upgrade-package aiohttp
       - name: Validate locked Telegram bot installation and tests
         run: |
-          uv sync --locked --no-default-groups --extra bot --group dev
+          uv sync --locked --no-default-groups --extra backend --extra bot --group dev
           uv run --no-sync pytest -q bot/tests
       - name: Check precise package changes and emit compact patch
         run: |
