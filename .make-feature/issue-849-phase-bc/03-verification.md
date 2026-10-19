@@ -18,4 +18,3 @@
 The production inventory was read-only. No production payload was downloaded, no configuration was
 mutated, no scheduled task was registered, no restore or migration ran, and no merge/deploy/Issue
 close was performed.
-
