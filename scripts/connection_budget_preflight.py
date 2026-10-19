@@ -11,7 +11,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from contextlib import suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
@@ -30,6 +30,9 @@ class ConfigurationError(ValueError):
 
 class PostgresSnapshotError(RuntimeError):
     """A read-only PostgreSQL snapshot could not be collected safely."""
+
+
+_TRUSTED_RUNTIME_EVIDENCE_TOKEN = object()
 
 
 @dataclass(frozen=True)
@@ -69,6 +72,7 @@ class PostgresCapacity:
     current_connections: int | None = None
     observed_yfc_connections: int | None = None
     observed_non_yfc_connections: int | None = None
+    unattributed_connections: int | None = None
 
 
 @dataclass(frozen=True)
@@ -106,8 +110,9 @@ class BudgetModel:
     safety_headroom_source: str | None
     topology: TopologyInventory | None = None
     evidence: EvidenceMetadata | None = None
-    # Only a future deployment adapter may set this after independent collection.
-    runtime_evidence_trusted: bool = False
+    # This is deliberately not accepted by model_from_mapping.  Only the
+    # trusted runtime collector can obtain the private token.
+    _runtime_evidence_token: object | None = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -123,6 +128,7 @@ class PreflightResult:
     usable_connections: int | None = None
     reserved_connections_effective: int | None = None
     observed_non_yfc_connections: int | None = None
+    unattributed_connections: int | None = None
     safety_headroom_connections: int | None = None
     worst_case_connections: int | None = None
     required_connections_with_headroom: int | None = None
@@ -136,6 +142,7 @@ class PreflightResult:
             "usable_connections": self.usable_connections,
             "reserved_connections_effective": self.reserved_connections_effective,
             "observed_non_yfc_connections": self.observed_non_yfc_connections,
+            "unattributed_connections": self.unattributed_connections,
             "safety_headroom_connections": self.safety_headroom_connections,
             "worst_case_connections": self.worst_case_connections,
             "required_connections_with_headroom": self.required_connections_with_headroom,
@@ -163,6 +170,7 @@ SELECT
     NULLIF(current_setting('reserved_connections', true), '')::int,
     (SELECT count(*)::int FROM pg_stat_activity)
 """
+_APPLICATION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,63}$")
 _ALLOWED_POOLER_MODES: Final = {"none", "session", "transaction"}
 _ALLOWED_POOL_TYPES: Final = {"queue", "null", "special"}
 _PRE_PROTECTED_STAGES: Final = ("backup", "migration", "candidate_start", "rollback")
@@ -247,6 +255,10 @@ def model_from_mapping(payload: Mapping[str, object]) -> BudgetModel:
         observed_non_yfc_connections=_optional_int(
             postgres.get("observed_non_yfc_connections"),
             field="postgres.observed_non_yfc_connections",
+        ),
+        unattributed_connections=_optional_int(
+            postgres.get("unattributed_connections"),
+            field="postgres.unattributed_connections",
         ),
     )
 
@@ -434,6 +446,145 @@ def read_postgres_snapshot(connection: object) -> PostgresCapacity:
                 cursor.close()
 
 
+def _sql_application_names(application_names: Sequence[str]) -> str:
+    if (
+        isinstance(application_names, (str, bytes))
+        or not application_names
+        or any(
+            not isinstance(name, str) or _APPLICATION_NAME_PATTERN.fullmatch(name) is None
+            for name in application_names
+        )
+    ):
+        raise PostgresSnapshotError("read-only PostgreSQL snapshot has invalid application names")
+    names = tuple(dict.fromkeys(application_names))
+    return ", ".join(f"'{name}'" for name in names)
+
+
+def read_postgres_runtime_snapshot(
+    connection: object,
+    application_names: Sequence[str],
+) -> PostgresCapacity:
+    """Read a complete, aggregated session snapshot without exposing session data."""
+
+    names_sql = _sql_application_names(application_names)
+    query = f"""
+SELECT
+    current_setting('server_version_num')::int,
+    current_setting('max_connections')::int,
+    current_setting('superuser_reserved_connections')::int,
+    NULLIF(current_setting('reserved_connections', true), '')::int,
+    (SELECT count(*)::int FROM pg_stat_activity),
+    (SELECT count(*)::int FROM pg_stat_activity WHERE application_name IN ({names_sql})),
+    (SELECT count(*)::int FROM pg_stat_activity
+       WHERE application_name IS NULL OR btrim(application_name) = ''),
+    (SELECT count(*)::int FROM pg_stat_activity
+       WHERE application_name IS NOT NULL
+         AND btrim(application_name) <> ''
+         AND application_name NOT IN ({names_sql})),
+    pg_has_role(current_user, 'pg_read_all_stats', 'member'),
+    current_setting('is_superuser')::boolean
+"""
+    cursor = None
+    try:
+        cursor = connection.cursor()  # type: ignore[attr-defined]
+        cursor.execute(query)
+        row = cursor.fetchone()
+        if not isinstance(row, Sequence) or len(row) != 10:
+            raise PostgresSnapshotError("read-only PostgreSQL runtime snapshot returned no row")
+
+        parsed: list[int | bool | None] = []
+        for index, value in enumerate(row):
+            if value is None and index == 3:
+                parsed.append(None)
+                continue
+            if index >= 8:
+                if not isinstance(value, bool):
+                    raise PostgresSnapshotError(
+                        "read-only PostgreSQL runtime snapshot returned invalid permissions"
+                    )
+                parsed.append(value)
+                continue
+            if isinstance(value, bool):
+                raise PostgresSnapshotError(
+                    "read-only PostgreSQL runtime snapshot returned invalid numeric data"
+                )
+            try:
+                numeric = int(value)
+            except (TypeError, ValueError) as exc:
+                raise PostgresSnapshotError(
+                    "read-only PostgreSQL runtime snapshot returned invalid numeric data"
+                ) from exc
+            if numeric < 0:
+                raise PostgresSnapshotError(
+                    "read-only PostgreSQL runtime snapshot returned invalid numeric data"
+                )
+            parsed.append(numeric)
+
+        (
+            version_num,
+            max_connections,
+            superuser_reserved,
+            reserved,
+            current,
+            observed_yfc,
+            unattributed,
+            observed_non_yfc,
+            has_read_all_stats,
+            is_superuser,
+        ) = parsed
+        if not all(
+            _is_int(value)
+            for value in (
+                version_num,
+                max_connections,
+                superuser_reserved,
+                current,
+                observed_yfc,
+                unattributed,
+                observed_non_yfc,
+            )
+        ):
+            raise PostgresSnapshotError(
+                "read-only PostgreSQL runtime snapshot omitted required settings"
+            )
+        if has_read_all_stats is not True:
+            raise PostgresSnapshotError(
+                "read-only PostgreSQL runtime snapshot lacks pg_stat_activity visibility"
+            )
+        if is_superuser is True:
+            raise PostgresSnapshotError("runtime collector must not use a superuser role")
+        if observed_yfc + unattributed + observed_non_yfc != current:
+            raise PostgresSnapshotError(
+                "read-only PostgreSQL runtime snapshot attribution does not reconcile"
+            )
+        return PostgresCapacity(
+            server_version_major=version_num // 10_000,
+            max_connections=max_connections,
+            superuser_reserved_connections=superuser_reserved,
+            reserved_connections=reserved,
+            current_connections=current,
+            observed_yfc_connections=observed_yfc,
+            observed_non_yfc_connections=observed_non_yfc + unattributed,
+            unattributed_connections=unattributed,
+        )
+    except PostgresSnapshotError:
+        raise
+    except Exception:
+        raise PostgresSnapshotError("read-only PostgreSQL runtime snapshot failed") from None
+    finally:
+        if cursor is not None:
+            with suppress(Exception):
+                cursor.close()
+
+
+def _mark_runtime_evidence_trusted(model: BudgetModel, *, token: object) -> BudgetModel:
+    """Mark a model only from the collector's in-process trust boundary."""
+
+    if token is not _TRUSTED_RUNTIME_EVIDENCE_TOKEN:
+        raise ConfigurationError("runtime evidence can only be marked by the trusted collector")
+    return replace(model, _runtime_evidence_token=_TRUSTED_RUNTIME_EVIDENCE_TOKEN)
+
+
 def validate_rollout_stage_order(stages: Sequence[str]) -> None:
     """Require the future gate before every connection-increasing stage."""
 
@@ -477,7 +628,7 @@ def _validate_runtime_evidence(
             "Production preflight requires provenance for the effective runtime snapshot",
         )
         return
-    if not model.runtime_evidence_trusted:
+    if model._runtime_evidence_token is not _TRUSTED_RUNTIME_EVIDENCE_TOKEN:
         _issue(
             issues,
             Verdict.BLOCKED,
@@ -964,6 +1115,28 @@ def evaluate(
 
     observed_non_yfc = postgres.observed_non_yfc_connections
     observed_yfc = postgres.observed_yfc_connections
+    unattributed = postgres.unattributed_connections
+    if require_runtime_evidence and unattributed is None:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "connection_attribution_incomplete",
+            "Trusted runtime evidence must account for unattributed PostgreSQL sessions",
+        )
+    elif unattributed is not None and (not _is_int(unattributed) or unattributed < 0):
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "unattributed_connections_invalid",
+            "Unattributed PostgreSQL session count is invalid",
+        )
+    elif require_runtime_evidence and unattributed:
+        _issue(
+            issues,
+            Verdict.UNKNOWN,
+            "connection_attribution_incomplete",
+            "Unattributed PostgreSQL sessions are conservatively counted as non-YFC",
+        )
     for name, value in (
         ("observed_non_yfc_connections", observed_non_yfc),
         ("observed_yfc_connections", observed_yfc),
@@ -1271,6 +1444,7 @@ def evaluate(
         usable_connections=usable,
         reserved_connections_effective=reserved,
         observed_non_yfc_connections=observed_non_yfc,
+        unattributed_connections=unattributed,
         safety_headroom_connections=safety if _is_int(safety) else None,
         worst_case_connections=worst_case,
         required_connections_with_headroom=required_with_headroom,

@@ -218,6 +218,25 @@ def test_production_settings_reject_placeholder_secret():
         )
 
 
+def test_db_application_name_is_bounded_and_overridable():
+    common = {
+        "app_env": "dev",
+        "app_name": "Your Fitness Coach",
+        "app_debug": False,
+        "secret_key": "test-secret",
+        "access_token_expire_minutes": 60,
+        "refresh_token_expire_days": 30,
+        "database_url": "postgresql+psycopg://app:password@db/app",
+        "telegram_bot_token": "test-token",
+    }
+
+    configured = Settings(**common, db_application_name="yfc-worker")
+
+    assert configured.db_application_name == "yfc-worker"
+    with pytest.raises(ValidationError):
+        Settings(**common, db_application_name="not safe; application name")
+
+
 def test_versioned_frontend_assets_have_immutable_cache_contract(client):
     response = client.get("/assets/test.js")
 

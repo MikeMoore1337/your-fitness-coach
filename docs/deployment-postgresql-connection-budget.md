@@ -1,10 +1,10 @@
-# PostgreSQL connection budget и fail-closed preflight
+# V11-DB-01 Phase B: trusted PostgreSQL connection budget
 
-Документ описывает подготовленный для #848 расчёт и точку подключения rollout gate. В этой версии production deployment не вызывает preflight: фактическая PostgreSQL topology и итоговый safety headroom ещё не подтверждены владельцем, а standalone JSON не может самостоятельно доказать происхождение runtime evidence.
+Документ описывает trusted runtime collector, fail-closed расчёт и подготовленную точку подключения rollout gate для #848. Collector и application markers реализованы, но production deployment пока не вызывает новый gate: live snapshot, owner-approved safety headroom, dry run и release approval не подтверждены.
 
 ## Что подтверждено в репозитории
 
-Проверено на `origin/master` `7b755925ad03ea50215b9260b82e8c48cd506d22`:
+Проверено относительно merge commit `bc48d09c3415c4b146a0400efc18cb9031413d18` (`origin/master` на начало Phase B):
 
 | Область | Подтверждённый факт | Статус |
 |---|---|---|
@@ -15,6 +15,8 @@
 | Compose topology | legacy `backend`/`worker` и blue/green `backend-*`/`worker-*`; bot — отдельные consumers без найденного SQLAlchemy engine | `VERIFIED` по исходнику |
 | Rollout order | существующий helper имеет `preflight`, `backup`, `migration`, candidate start, consumer handoff, observation и rollback/single-slot paths | `VERIFIED` по исходнику |
 | Existing capacity audit | текущий manual audit снимает только часть host/PostgreSQL metrics и не считает rollout budget с reserved slots и attribution | `VERIFIED` по workflow |
+| Trusted runtime collector | `scripts/trusted_runtime_collector.py` связывает rendered Compose, running container revision labels и read-only PostgreSQL child snapshot | `IMPLEMENTED`, live run `NOT_VERIFIED` |
+| Connection attribution | backend/worker/setup/Alembic получают фиксированные `application_name`; неизвестные sessions не считаются YFC | `IMPLEMENTED`, production attribution `NOT_PROVEN` |
 
 `30` — это не production budget. Он не учитывает число процессов, blue/green overlap, pooler, внешние сессии и PostgreSQL reservations.
 
@@ -32,10 +34,10 @@
 | Migration, setup/seed, backup и прочие DB consumers | должны войти в фазу без двойного счёта |
 | Current sessions и attribution YFC/non-YFC | current YFC sessions нельзя складывать поверх projected YFC cap; неатрибутированные сессии блокируют решение |
 | Safety headroom | значение не фиксируется в коде; требуется owner-approved source и число |
-| Snapshot provenance/freshness | текстовые поля и `synthetic=false` — только декларации; production PASS требует trusted collector, проверенный источник и owner-approved freshness bound |
+| Snapshot provenance/freshness | private in-process token, exact host/revision context, bounded clock skew и trusted 300-second policy; stale/future/mixed snapshots fail closed |
 | Effective topology inventory | process groups и применимые rollout phases должны быть перечислены явно; отсутствующие варианты отмечаются `false` |
 
-В этой ветке нет production SSH/DB запроса, контейнеры не перезапускались, параметры PostgreSQL не менялись, secrets/connection strings/дампы не записывались.
+В этой ветке нет production SSH/DB запроса, контейнеры не перезапускались, параметры PostgreSQL не менялись, secrets/connection strings/дампы не записывались. Изменения `docker-compose.yml`, backend engine setup и `backend/Dockerfile` являются deployment-affecting и намеренно не классифицируются как no-deploy.
 
 ## Модель
 
@@ -113,7 +115,8 @@ Exit codes: `0=PASS`, `1=BLOCKED`, `2=UNKNOWN`. У CLI нет `--bypass`/`--igno
     "reserved_connections": 2,
     "current_connections": 20,
     "observed_yfc_connections": 8,
-    "observed_non_yfc_connections": 12
+    "observed_non_yfc_connections": 12,
+    "unattributed_connections": 0
   },
   "pooler": {"mode": "none"},
   "pools": {
@@ -155,6 +158,56 @@ Exit codes: `0=PASS`, `1=BLOCKED`, `2=UNKNOWN`. У CLI нет `--bypass`/`--igno
 
 The `10` and the full topology above are test data, not an approved production threshold or production evidence. `evaluate(..., require_runtime_evidence=False)` can be used in unit tests for the mathematical calculation; the CLI/default production path rejects synthetic, stale, missing or non-production evidence and blocks standalone provenance declarations from authorizing a production PASS.
 
+## Trusted runtime collector Phase B
+
+Модуль `scripts/trusted_runtime_collector.py` реализует следующий bounded flow:
+
+```text
+release/.deployment-sha + docker compose config/ps + image revision labels
+        ↓
+effective topology snapshot (allowlisted values only)
+        ↓ docker compose exec active backend
+read-only PostgreSQL child snapshot (no URL leaves the container)
+        ↓ exact context + freshness validation
+private trusted model → existing evaluator → sanitized verdict
+```
+
+Host-side collection требует explicit release directory и запускает только `docker compose config`, `docker compose ps --all`, `docker inspect` и `docker compose exec -T` с bounded timeout/output. Collector не выполняет `restart`, `up`, `down`, `pull`, dump, DDL/DML или изменение конфигурации. Пример owner-authorized dry run:
+
+```text
+python scripts/trusted_runtime_collector.py collect --release-path /srv/yfc/releases/<sha> --json
+```
+
+Команда пока не запускалась на production. Child mode подключается к уже настроенному `DATABASE_URL` внутри активного backend-контейнера с `connect_timeout=5`, `statement_timeout=5s`, `lock_timeout=1s`, `default_transaction_read_only=on` и фиксированным `application_name`. В stdout попадают только числовые поля, timestamp и безопасный статус. Ошибка child процесса не переносит текст исключения, URL, password или token в host output.
+
+PostgreSQL query агрегирует `pg_stat_activity` без query text, client address, username или user data. Нужна роль с `pg_read_all_stats`, но не superuser; `is_superuser=true`, отсутствие visibility, mismatch counts или malformed row дают fail-closed. Точное разбиение: известные YFC application names, пустая/неизвестная метка (`unattributed`) и остальные non-YFC. `observed_non_yfc` включает `unattributed` как conservative upper bound, а сам `unattributed > 0` переводит production evaluation в `UNKNOWN`; такие sessions никогда не становятся YFC.
+
+В effective topology учитываются backend/worker base и blue/green services, active upstream, all configured slots, rendered pool values, Alembic `NullPool`, setup/seed ceiling, backup connection, worker handoff, rollback, single-slot и pooler. Дополнительный service с `DATABASE_URL`, отсутствующая worker pair, missing application marker, contradictory pool values или неизвестный pooler не превращаются в ноль: они дают `UNKNOWN`/`BLOCKED`.
+
+### Trust boundary и provenance policy
+
+`model_from_mapping()` не принимает поле `trusted`, `synthetic=false`, source, environment или headroom как доказательство. Private in-process token создаётся только в collector module после проверки:
+
+- production environment;
+- immutable release marker и full OCI revision labels;
+- одинаковый hashed host context и revision tuple для topology и PostgreSQL observations;
+- capture timestamps в доверенном clock-skew window;
+- trusted 300-second max age, не значение из входного JSON;
+- complete topology, pool, phase и attribution fields.
+
+Любая подмена sanitized JSON, изменение revision, mixed host/environment, stale/future snapshot, partial child output, missing policy, timeout или collector crash остаются без private token и не могут дать production `PASS`. Host fingerprint — только усечённый SHA-256 hostname; raw hostname и container IDs не входят в verdict.
+
+### Safety headroom
+
+В collector policy окончательный headroom по умолчанию отсутствует. Это намеренно даёт `safety_headroom_unknown`, пока владелец не подтвердит число и источник. После получения runtime data можно показать:
+
+```text
+observed usable capacity = max_connections - superuser_reserved - reserved
+maximum measured slack = usable - worst_case_required
+```
+
+`maximum measured slack` — верхняя граница наблюдаемого запаса, а не рекомендация. Рекомендация должна отдельно учитывать кратковременные spikes, внешние consumers, изменение replicas/pool size и confidence измерения; collector не фиксирует это решение самостоятельно.
+
 ## Подготовка read-only evidence
 
 Следующие команды только подготовлены для owner-authorized host run. В этой задаче они не выполнялись.
@@ -181,7 +234,7 @@ The `10` and the full topology above are test data, not an approved production t
 
 ## Точка подключения rollout gate
 
-После отдельного owner approval future adapter должен получить effective sanitized input от trusted collector-а, проверить источник, freshness bound и rendered steady-state topology, затем выполнить:
+После отдельного owner approval future adapter должен получить effective sanitized input от `trusted_runtime_collector.py`, проверить источник, freshness bound и rendered steady-state topology, затем выполнить:
 
 ```text
 connection_budget_preflight -> backup -> migration -> candidate_start -> traffic_switch -> consumer_handoff
@@ -190,6 +243,8 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 Для rollback preflight должен быть отдельным predecessor до запуска rollback candidate. Для single-slot он должен быть до backup/migration и до запуска восстановленного application process. `scripts/connection_budget_preflight.py` уже проверяет этот ordering contract, но текущий deployment helper намеренно не импортирует его.
 
 `PASS` продолжает существующий stage. `BLOCKED` или `UNKNOWN` завершают stage с non-zero result до backup/migration/candidate mutation. PostgreSQL unreachable, missing attribution и missing headroom не являются warning. Incident recovery не использует CLI bypass: owner-authorized native GitHub `workflow_dispatch` rollback/repair/verify path остаётся отдельным разрешением и не превращает failed preflight в `PASS`.
+
+Точные точки будущего подключения: existing `preflight` stage в `scripts/zero_downtime_deploy.py` непосредственно перед `backup`, а для single-slot — перед `backup`/migration gate. Этот Phase B не меняет `scripts/zero_downtime_deploy.py` или `.github/workflows/deploy.yml`, поэтому обычный deploy flow не активирует новую блокировку.
 
 ## Rollback и failure behavior
 
@@ -201,6 +256,22 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 
 ## Owner approvals before activation
 
+## Phase B readiness matrix
+
+| Критерий | Статус | Доказательство | Что осталось |
+|---|---|---|---|
+| Trusted collector | `IMPLEMENTED` | bounded host/child flow in `scripts/trusted_runtime_collector.py`; 300-second trusted policy | owner-authorized live dry run |
+| PostgreSQL snapshot | `IMPLEMENTED` | read-only aggregate query, PG16 reserved slots, non-superuser visibility check | real production values and role verification |
+| Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, OCI revision labels, pool/phase inventory | production rendered output |
+| Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers plus unattributed fail-closed path | live `pg_stat_activity` attribution |
+| Safety headroom | `NOT_PROVEN` | evaluator requires explicit positive source; default collector policy leaves it unset | owner-approved number and rationale |
+| Synthetic regressions | `PASS` | targeted pytest: preflight, reader, trust, topology and false-pass cases | exact-head CI |
+| Deployment gate integration | `PREPARED` | stage-order contract and documented insertion before backup/migration/candidate | separate owner approval; workflow remains unchanged |
+| Production dry run | `NOT_VERIFIED` | no SSH/DB/docker production command executed | authorized read-only dry run |
+| Owner approval | `BLOCKED` | no Phase C activation decision in this request | explicit release/gate approval |
+
+## Owner approvals before activation
+
 Нужны отдельные подтверждения:
 
 1. exact sanitized production snapshot: effective pool values, PostgreSQL version/max/reserved, pooler, process/replica topology, current attribution and phase overlap;
@@ -209,4 +280,4 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 4. independently verified authorized dry run with the real rendered topology;
 5. separate release approval before any production deployment.
 
-До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; standalone provenance и отсутствие production integration — `BLOCKED`, недостающие runtime facts — `UNKNOWN`. Production rollout не разрешён. Runtime environment changes in this PR: `no`.
+До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; standalone provenance и отсутствие production integration — `BLOCKED`, недостающие runtime facts — `UNKNOWN`. Production rollout не разрешён. Production environment changes in this PR: `no`. Code/config changes that would affect the next image/runtime are present and must be deployed only through the existing protected release path; `deployment_scope.py` must report `deploy_required=true` for this diff.

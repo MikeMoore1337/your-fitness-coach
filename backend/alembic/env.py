@@ -63,6 +63,11 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=(
+            {}
+            if settings.database_url.startswith("sqlite")
+            else {"application_name": settings.db_application_name}
+        ),
     )
     with connectable.connect() as connection:
         run(connection)

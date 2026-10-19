@@ -33,6 +33,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN python -m pip uninstall --yes pip setuptools wheel
 ENV PATH="/app/.venv/bin:$PATH"
 COPY scripts/fetch_rapidocr_models.py /app/scripts/fetch_rapidocr_models.py
+COPY scripts/connection_budget_preflight.py scripts/trusted_runtime_collector.py /app/scripts/
 RUN python /app/scripts/fetch_rapidocr_models.py --output /opt/rapidocr/models
 RUN useradd --create-home --uid 10001 appuser
 RUN chmod 0555 /opt/rapidocr/models \
