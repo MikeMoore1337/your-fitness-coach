@@ -115,10 +115,7 @@ test('Telegram demo handoff clears private demo tokens before entering the app',
   await installTelegramHarness(page, { colorScheme: 'dark' });
   await installPlatformApi(page);
   await page.addInitScript(() => {
-    sessionStorage.setItem(
-      'fit_demo_sessions_v1',
-      JSON.stringify({ trainer: 'a'.repeat(32) }),
-    );
+    sessionStorage.setItem('fit_demo_sessions_v1', JSON.stringify({ trainer: 'a'.repeat(32) }));
   });
 
   await page.goto('/demo?tgWebAppPlatform=web');
