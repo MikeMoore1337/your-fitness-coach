@@ -8,6 +8,7 @@ PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
 
 - Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` (`origin/master` at measurement time).
 - Matched AFTER application code: `4e6b85235bb425ab7bcbcc81659149fa2af244d3` (PR #1126 head before this evidence-only documentation commit).
+- The follow-up security unblock changes only `uv.lock`, refreshing `aiohttp` from `3.14.3` to `3.14.5`; it does not change backend source or the measured frontend application code.
 - Both revisions used the same `npm ci --ignore-scripts --no-audit --no-fund`, Node `24.14.0`, npm `11.11.1`, Vite `7.3.6`, Windows runner and existing lockfile.
 - Browser lab used the existing Playwright Chromium harness with mocked API fixtures, reduced motion, mobile `390x844` and desktop `1440x900`. This is synthetic local evidence, not a physical-device or production measurement.
 - Historical #815 values remain useful context, but are not used as the #818 BEFORE.
@@ -51,7 +52,7 @@ The Playwright LCP/CLS/INP values are laboratory observations from mocked Chromi
 2. `ExerciseGuideVideo` keeps its existing approved HD source and poster, but keeps observing visibility so looping video pauses offscreen and on document hide, then resumes without a second source load.
 3. The existing authenticated wrapper, coach-vs-personal navigation decision and trainer-intent routing moved into an auth-only lazy module. Private behavior is unchanged; public bootstrap no longer carries those dependencies.
 4. The existing `frontend-checks` group now runs `npm run perf:check` immediately after the production build. The strict budget is unchanged.
-5. No global Query cache tuning, broad memoization, router replacement, media re-encoding, CSS/design change, backend change or production infrastructure change was justified by the available evidence.
+5. No global Query cache tuning, broad memoization, router replacement, media re-encoding, CSS/design change, backend source change or production infrastructure change was justified by the available evidence. The only follow-up outside frontend source is the lockfile-only `aiohttp` security refresh required by the repository audit.
 
 ## Verification
 
@@ -62,11 +63,12 @@ The Playwright LCP/CLS/INP values are laboratory observations from mocked Chromi
 - CI-compatible format command `npx prettier --check . --end-of-line auto`: PASS.
 - Full `npm run test`: **157 files / 962 tests passed** on AFTER.
 - Targeted Chromium Playwright: BEFORE 7 passed; AFTER 8 passed.
+- `uv audit --locked --no-group dev --no-group scheduled-report`: PASS after the lockfile-only `aiohttp` refresh; no known vulnerabilities reported.
 - Exact code-head GitHub Actions run [39290956448](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39290956448) for `4e6b8523`: required checks reported green, including frontend checks, unit, smoke, Chromium/WebKit mobile regression, security and aggregate `checks`.
 - The plain local `npm run format:check` command reports pre-existing line-ending formatting differences across 539 files; the repository CI contract uses `--end-of-line auto`, which passed. No broad formatting rewrite was made.
 
 ## Evidence boundaries and release status
 
 - Real mobile devices, real Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, production API traces, React Profiler recordings and memory/CPU profiles: `NO_DATA`.
-- No visual composition, design token, HD media asset, animation duration/FPS, workout/nutrition business rule, authorization policy, backend or production infrastructure changed.
+- No visual composition, design token, HD media asset, animation duration/FPS, workout/nutrition business rule, authorization policy, backend source or production infrastructure changed; the follow-up dependency change is lockfile-only.
 - Status: `READY_FOR_RELEASE_APPROVAL` for the scoped implementation and evidence. Merge, production deploy and Issue closure remain separate owner-authorized gates.

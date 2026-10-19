@@ -8,7 +8,7 @@ Measured application head: `4e6b85235bb425ab7bcbcc81659149fa2af244d3`.
 
 ## Current stage
 
-The existing PR implementation is accepted for this pass. Matched BEFORE/AFTER bundle and browser-lab evidence is recorded in [the implementation report](../../docs/development/product-v11-03-frontend-performance-2026-10-19.md). The final documentation commit contains no application-runtime change after the measured application head.
+The existing PR implementation is accepted for this pass. Matched BEFORE/AFTER bundle and browser-lab evidence is recorded in [the implementation report](../../docs/development/product-v11-03-frontend-performance-2026-10-19.md). Follow-up work is limited to the lockfile-only `aiohttp` security refresh required by the repository audit; no backend source or application-runtime change was added after the measured application head.
 
 ## Success criteria
 
@@ -24,7 +24,7 @@ The existing PR implementation is accepted for this pass. Matched BEFORE/AFTER b
 - Defer Telegram demo-only code and authenticated route internals with existing Vite/React lazy imports.
 - Keep HD exercise video source/poster and pause/resume it from visibility signals; do not re-encode or replace media.
 - Enforce the existing `entryJsGzip: 96_000` budget after the frontend build; do not raise it.
-- Do not tune TanStack Query, add broad memoization, refactor routing or change backend without measured evidence.
+- Do not tune TanStack Query, add broad memoization, refactor routing or change backend source without measured evidence. Keep the required `aiohttp` lockfile security refresh narrow.
 
 ## Open evidence
 
