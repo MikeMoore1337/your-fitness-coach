@@ -24,6 +24,7 @@ _NO_DEPLOY_PREFIXES = (
     ".artifacts/",
     "codex-backlog/",
     "docs/",
+    ".make-feature/",
     "tests/",
     "backend/tests/",
     "bot/tests/",

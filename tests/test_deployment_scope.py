@@ -35,6 +35,33 @@ def test_docs_governance_tests_and_ci_only_do_not_deploy() -> None:
     assert decision["deploy_paths"] == []
 
 
+def test_make_feature_process_evidence_does_not_deploy() -> None:
+    evidence_paths = [
+        ".make-feature/issue-848-v11-db-01/00-index.md",
+        ".make-feature/issue-848-v11-db-01/01-request.md",
+        ".make-feature/issue-848-v11-db-01/02-solution.md",
+        ".make-feature/issue-848-v11-db-01/03-verification.md",
+    ]
+
+    decision = classify_paths(evidence_paths)
+
+    assert decision["deploy_required"] is False
+    assert decision["deploy_paths"] == []
+    assert decision["no_deploy_paths"] == evidence_paths
+
+
+def test_make_feature_evidence_cannot_hide_runtime_changes() -> None:
+    decision = classify_paths(
+        [
+            ".make-feature/issue-848-v11-db-01/03-verification.md",
+            "backend/fitminiapp_api/main.py",
+        ]
+    )
+
+    assert decision["deploy_required"] is True
+    assert decision["deploy_paths"] == ["backend/fitminiapp_api/main.py"]
+
+
 def test_host_delivery_tooling_does_not_redeploy_unchanged_application() -> None:
     decision = classify_paths(
         [
