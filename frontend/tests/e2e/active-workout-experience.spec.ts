@@ -2520,7 +2520,13 @@ test('V9-01 desktop smoke keeps replacement scoped to the current workout', asyn
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await page.getByRole('button', { name: 'Применить только сегодня' }).click();
-  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  await expect(
+    page
+      .locator('.active-workout-exercise')
+      .filter({ hasText: 'Жим гантелей лёжа' })
+      .first()
+      .getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+  ).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
