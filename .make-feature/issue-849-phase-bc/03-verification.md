@@ -18,3 +18,19 @@
 The production inventory was read-only. No production payload was downloaded, no configuration was
 mutated, no scheduled task was registered, no restore or migration ran, and no merge/deploy/Issue
 close was performed.
+
+## Phase B.1 verification update — 2026-10-19
+
+| Criterion | Result | Evidence boundary |
+|---|---|---|
+| D: volume | PASS (read-only) | NTFS; total 1,000,203,087,872 bytes; free 195,896,864,768 bytes |
+| `D:\YFC-Backups` | NOT_CREATED | Path absent; no existing content changed and no payload written |
+| ACL/owner preparation | BLOCKED_OWNER_FACTS | Target ACL does not exist; parent ACL is broad; current session is not elevated and runner identity is not selected |
+| BitLocker / recovery key | NOT_VERIFIED | CIM/`Get-BitLockerVolume`, `manage-bde` and `fsutil` were denied; key material was not read |
+| Sync/share boundary | PARTIAL / NOT_VERIFIED | Not under a known OneDrive root; no OneDrive process or target reparse point observed; SMB query denied and this does not cover every sync provider |
+| Task Scheduler | NOT_VERIFIED | `schtasks /query` returned “The network address is invalid”; Schedule service was not available; no task was registered |
+| Synthetic pull contract | PASS | 28/28 in PowerShell 7 and 28/28 in Windows PowerShell 5.1, including checksum, host-key/auth/network failures, corruption, low disk, atomic promotion, prior-copy preservation and concurrency |
+| Live SFTP authentication | NOT_VERIFIED | No authorized protected endpoint was used; the self-test uses an isolated fake SFTP adapter |
+| Final decision | BLOCKED_OWNER_FACTS | Storage encryption/key custody, elevated ACL identity, hardened endpoint authorization and scheduler access remain open |
+
+No production dump, production SSH key, VPS configuration, scheduled task, restore or merge/deploy operation was performed.
