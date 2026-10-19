@@ -120,6 +120,13 @@ const STATUS_ERROR_MESSAGES: Record<number, string> = {
 const UNSAFE_DETAIL_PATTERN =
   /<[^>]*>|traceback|stack trace|exception|\berror\b|\b(?:select|insert|update|delete|drop|alter|create)\b|\bsql\b|postgres|psycopg|sqlalchemy|connection\s*string|\b(?:access\s+|refresh\s+)?token\b|bearer\s+|secret|password|authorization|https?:\/\/|file:\/\/|(?:[A-Za-z]:[\\/])|(?:^|[\s(["'])\/(?:app|usr|var|home|tmp|workspace|etc)(?:[\\/]|$)/i;
 
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+}
+
 function isSafeUserFacingDetail(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const detail = value.trim();
@@ -127,7 +134,7 @@ function isSafeUserFacingDetail(value: unknown): value is string {
     !detail ||
     detail.length > 500 ||
     !/[А-Яа-яЁё]/u.test(detail) ||
-    /[\u0000-\u001f\u007f]/.test(detail) ||
+    hasControlCharacters(detail) ||
     UNSAFE_DETAIL_PATTERN.test(detail) ||
     /[A-Za-z0-9_-]{24,}/.test(detail)
   ) {
