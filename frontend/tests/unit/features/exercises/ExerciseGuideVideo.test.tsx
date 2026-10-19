@@ -57,7 +57,7 @@ describe('ExerciseGuideVideo', () => {
         sources={sources}
         poster="/media/approved-poster.webp"
         onError={vi.fn()}
-      />,,
+      />,
     );
     const video = container.querySelector('video');
     expect(video).not.toBeNull();
@@ -89,7 +89,7 @@ describe('ExerciseGuideVideo', () => {
         sources={sources}
         poster="/media/approved-poster.webp"
         onError={vi.fn()}
-      />,,
+      />,
     );
     const oldDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
     try {
