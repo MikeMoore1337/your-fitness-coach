@@ -9,6 +9,15 @@ records the final #1119 audit state; the separately scoped runtime-hardening PR 
 PR #1124 with its own exact-head CI. No merge, deploy or Issue closure is performed by this
 receipt.
 
+Runtime follow-up receipt: PR #1124 is Draft and clean at exact head
+`e1d8cc3ce8ec809d1c3ef6dfbb9911467547bcaf`. Its required CI
+[39243840898](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39243840898)
+is green after a retry of the single unrelated `icon-system-review` focus assertion in
+`Frontend smoke (2/5)`; the retry passed without a source change. The runtime review found no
+confirmed security finding and retained fail-closed handling for unsafe error details. The
+collector/production and physical-device limits remain explicit and are not promoted by this
+receipt.
+
 ## 1. Firefox/WebKit extended regression
 
 The original scheduled failure is `39111015160`, job `Extended mobile regression (Firefox +
@@ -217,7 +226,7 @@ change exists in the intended branch/PR boundary; `COVERED` means existing evide
 | WeekStrip geometry and real document-overflow oracle | `COVERED` | Focused selector correction, scroll-container assertion and temporary overflow negative probe are retained. |
 | Cross-user export download-link privacy | `FIXED` | `backend/tests/test_account_lifecycle.py` protects the existing ownership filter with a `404` regression assertion. |
 | Producer-to-generated-consumer API contract proof | `COVERED` | `apiContractNegativeProof.test.ts` uses the installed `openapi-typescript` and TypeScript compiler; five representative schema mutations must fail. Exact-head required CI [39240339447](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39240339447) is green. |
-| Raw/technical API error leakage at the frontend boundary | `FIXED` | Runtime hardening is isolated in PR #1124 / branch `codex/819-safe-api-errors-runtime`; it preserves raw `body`/status for semantic routing while keeping user-facing errors safe. Its exact-head CI and final review are separate evidence. |
+| Raw/technical API error leakage at the frontend boundary | `COVERED` | Runtime hardening is isolated in PR #1124 / branch `codex/819-safe-api-errors-runtime`; it preserves raw `body`/status for semantic routing while keeping user-facing errors safe. Exact-head required CI [39243840898](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39243840898) and the final fail-closed review are green/complete. |
 | #1119 deploy classification | `COVERED` | Final local helper run against `origin/master...HEAD`: `deploy_required=false`, `deploy_paths=[]`, `changed_paths=9`. |
 | Weekly cross-browser/Allure lane (#821) | `JUSTIFIED_DEFERRED` | No timeout/retry/workflow policy change is included; cancellation is not a weekly PASS. |
 | Physical iPhone/Safari, native Telegram, VoiceOver, production smoke | `JUSTIFIED_DEFERRED` | These require direct owner-controlled environments and are not inferred from browser mocks or CI. |
