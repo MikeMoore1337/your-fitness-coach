@@ -40,7 +40,5 @@ export function AuthenticatedAppRoute({ children }: { children: ReactNode }) {
   ) {
     return <Redirect to="/coach" />;
   }
-  return (
-    <OnboardingGate>{children}</OnboardingGate>
-  );
+  return <OnboardingGate>{children}</OnboardingGate>;
 }
