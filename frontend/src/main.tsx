@@ -8,11 +8,7 @@ import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
 import { applyPlatformTheme, useTelegram } from './shared/telegram/useTelegram';
-import {
-  NavigationProvider,
-  Redirect,
-  useNavigation,
-} from './shared/navigation/router';
+import { NavigationProvider, Redirect, useNavigation } from './shared/navigation/router';
 import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
