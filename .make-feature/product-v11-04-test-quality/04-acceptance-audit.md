@@ -1,10 +1,13 @@
 # Product V11-04 / Issue #819 — acceptance audit receipt
 
-Status for the current test-bearing line at the local final commit:
-`NEEDS_WORK` until the added negative-proof test is pushed and its exact-head required CI is
-green. The previous required PR CI run
-[39217415385](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39217415385)
-was green for the prior head; no merge, deploy or Issue closure is performed by this receipt.
+Status for the current test-bearing line:
+`TECHNICALLY_READY_FOR_OWNER_REVIEW` at PR #1119 head
+`0144da52f8c203ec8d7a68ff62ba490f3a8f045f`. Exact-head required CI
+[39240339447](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39240339447)
+completed successfully, including the negative OpenAPI/TypeScript contract proof. This receipt
+records the final #1119 audit state; the separately scoped runtime-hardening PR is tracked in
+PR #1124 with its own exact-head CI. No merge, deploy or Issue closure is performed by this
+receipt.
 
 ## 1. Firefox/WebKit extended regression
 
@@ -183,19 +186,20 @@ No Vale dependency, duplicate guard or subjective LLM evaluation is added.
 
 ## 7. Delivery boundary
 
-Full stateless deployment-scope result for `origin/master...HEAD` is:
+Full stateless deployment-scope result for `origin/master...HEAD` at the audited #1119 line is:
 
 ```text
-changed_paths: 8 (after the pending contract-proof test commit)
+changed_paths: 9
 deploy_paths: []
 deploy_required: false
 reason: only documentation, governance, tests or developer tooling changed
 ```
 
 The existing Draft PR #1119 and branch `codex/819-test-quality-coverage` are retained. The
-technical verdict is **NEEDS_WORK** until the new test-bearing exact HEAD has green required CI.
-The separate runtime-hardening branch is intentionally not part of this deployment-scope result.
-Linux scheduled-only extended evidence,
+technical verdict for this test-quality branch is **TECHNICALLY_READY_FOR_OWNER_REVIEW**: the
+negative contract proof and the other required checks are green on the recorded exact head. The
+separate runtime-hardening branch is intentionally not part of this deployment-scope result and
+is reviewed independently in PR #1124. Linux scheduled-only extended evidence,
 physical iPhone/Safari, native Telegram, VoiceOver, production activation, owner merge approval
 and Issue closure remain explicit owner decisions or `NOT_VERIFIED`; none is inferred from this
 receipt. Merge, production deploy and Issue closure are not performed.
@@ -212,11 +216,11 @@ change exists in the intended branch/PR boundary; `COVERED` means existing evide
 | Nine-journey test-quality audit and regression classification | `COVERED` | Existing audit sections and the current source/fixture/workflow inventory remain in force. |
 | WeekStrip geometry and real document-overflow oracle | `COVERED` | Focused selector correction, scroll-container assertion and temporary overflow negative probe are retained. |
 | Cross-user export download-link privacy | `FIXED` | `backend/tests/test_account_lifecycle.py` protects the existing ownership filter with a `404` regression assertion. |
-| Producer-to-generated-consumer API contract proof | `FIXED` | `apiContractNegativeProof.test.ts` uses the installed `openapi-typescript` and TypeScript compiler; five representative schema mutations must fail. Exact-head CI after the pending commit is `NEEDS_WORK`. |
-| Raw/technical API error leakage at the frontend boundary | `FIXED` | Minimal runtime patch is isolated in branch `codex/819-safe-api-errors`; it preserves raw `body`/status for codes, localizes status fallbacks, and covers client plus Warmup UI behavior. Separate runtime exact-head CI and review are `NEEDS_WORK`. |
-| #1119 deploy classification | `COVERED` | Final local helper run against `origin/master...HEAD`: `deploy_required=false`, `deploy_paths=[]`, `changed_paths=8`. |
+| Producer-to-generated-consumer API contract proof | `COVERED` | `apiContractNegativeProof.test.ts` uses the installed `openapi-typescript` and TypeScript compiler; five representative schema mutations must fail. Exact-head required CI [39240339447](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39240339447) is green. |
+| Raw/technical API error leakage at the frontend boundary | `FIXED` | Runtime hardening is isolated in PR #1124 / branch `codex/819-safe-api-errors-runtime`; it preserves raw `body`/status for semantic routing while keeping user-facing errors safe. Its exact-head CI and final review are separate evidence. |
+| #1119 deploy classification | `COVERED` | Final local helper run against `origin/master...HEAD`: `deploy_required=false`, `deploy_paths=[]`, `changed_paths=9`. |
 | Weekly cross-browser/Allure lane (#821) | `JUSTIFIED_DEFERRED` | No timeout/retry/workflow policy change is included; cancellation is not a weekly PASS. |
 | Physical iPhone/Safari, native Telegram, VoiceOver, production smoke | `JUSTIFIED_DEFERRED` | These require direct owner-controlled environments and are not inferred from browser mocks or CI. |
-| Final PR/Issue gate | `NEEDS_WORK` | Push both scoped branches, obtain exact-head required CI, then owner separately decides merge, release/deploy and Issue closure. |
+| Final PR/Issue gate | `TECHNICALLY_READY_FOR_OWNER_REVIEW` | #1119 exact-head required CI is green; PR #1124 carries the separate runtime proof. Owner separately decides merge, release/deploy, runtime activation and Issue closure. |
 
 No deployment, merge or Issue closure is authorized or performed by this receipt.
