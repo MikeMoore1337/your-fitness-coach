@@ -1,0 +1,26 @@
+{
+  "local_root": "D:\\YFC-Backups",
+  "retention_days": 30,
+  "minimum_valid_backups": 2,
+  "stale_after_hours": 36,
+  "minimum_free_bytes": 1073741824,
+  "encryption_at_rest": {
+    "mode": "OWNER_APPROVAL_REQUIRED",
+    "approved": false,
+    "key_recovery_document": "REPLACE_WITH_OWNER_APPROVED_KEY_RECOVERY_REFERENCE"
+  },
+  "lock_file": "D:\\YFC-Backups\\backup-pull.lock",
+  "status_file": "D:\\YFC-Backups\\backup-status.json",
+  "log_file": "D:\\YFC-Backups\\backup-pull.log",
+  "ssh": {
+    "host": "replace-with-vps-hostname",
+    "port": 22,
+    "user": "yfc-backup-readonly",
+    "identity_file": "C:\\Users\\REPLACE\\.ssh\\yfc-backup",
+    "known_hosts_file": "C:\\Users\\REPLACE\\.ssh\\yfc-backup-known_hosts",
+    "sftp_path": "C:\\Windows\\System32\\OpenSSH\\sftp.exe",
+    "remote_root": "/srv/yfc/.artifacts/operations/backups/offhost",
+    "remote_index": "index.json",
+    "connect_timeout_seconds": 20
+  }
+}
