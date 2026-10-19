@@ -229,6 +229,8 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "scripts/run_pytest.py",
                 "backend/tests",
                 "bot/tests",
+                "tests/test_backup_manifest.py",
+                "tests/test_db_maintenance.py",
                 "-q",
                 "-n",
                 "4",
@@ -605,6 +607,14 @@ _MIGRATION_PREFIXES = (
 )
 _MIGRATED_STACK_TEST_PATHS = frozenset({"frontend/tests/integration/migrated-stack.spec.ts"})
 _PYTHON_CI_SCRIPT_PATHS = frozenset({"scripts/run_pytest.py", "scripts/pytest_shard.py"})
+_BACKUP_PYTHON_PATHS = frozenset(
+    {
+        "scripts/backup_manifest.py",
+        "scripts/db_maintenance.py",
+        "tests/test_backup_manifest.py",
+        "tests/test_db_maintenance.py",
+    }
+)
 _ALL_ROUTABLE_GROUPS = tuple(sorted(COMMAND_GROUPS))
 
 
@@ -647,6 +657,7 @@ def _is_backend_path(path: str) -> bool:
     return (
         path in _PYTHON_CI_SCRIPT_PATHS
         or path in {"backend", "bot", "pyproject.toml", "uv.lock"}
+        or path in _BACKUP_PYTHON_PATHS
         or path.startswith(("backend/", "bot/", "tests/integration/"))
     )
 
@@ -715,6 +726,8 @@ def _profile_for_paths(
         reasons.append("frontend surface changed")
     if backend:
         reasons.append("backend, bot or integration-test surface changed")
+    if any(path in _BACKUP_PYTHON_PATHS for path in normalized):
+        reasons.append("backup Python implementation/tests changed; requiring Python tests")
     if workflow:
         reasons.append("workflow/platform/deployment surface changed")
     if shared_ci_contract:
@@ -1271,7 +1284,7 @@ def _normalize_python_test_node(line: str) -> str | None:
     if not separator:
         return None
     normalized_path = path.replace("\\", "/")
-    if not normalized_path.startswith(("backend/tests/", "bot/tests/")):
+    if not normalized_path.startswith(("backend/tests/", "bot/tests/", "tests/")):
         return None
     return f"{normalized_path}::{test_id}"
 
@@ -1283,6 +1296,8 @@ def _collect_python_test_nodes(root: Path, env: Mapping[str, str]) -> tuple[str,
             "scripts/run_pytest.py",
             "backend/tests",
             "bot/tests",
+            "tests/test_backup_manifest.py",
+            "tests/test_db_maintenance.py",
             "--collect-only",
             "-q",
         )
@@ -1326,7 +1341,12 @@ def _sharded_python_command(
     shard_count: int,
 ) -> CommandSpec:
     del root, env  # Pytest now collects once while selecting this shard in-process.
-    if not {"backend/tests", "bot/tests"}.issubset(command.argv):
+    if not {
+        "backend/tests",
+        "bot/tests",
+        "tests/test_backup_manifest.py",
+        "tests/test_db_maintenance.py",
+    }.issubset(command.argv):
         raise CIContractError("Python test command must collect both test suites")
     return CommandSpec(
         name=f"{command.name}-shard",

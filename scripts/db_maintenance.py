@@ -11,8 +11,40 @@ import argparse
 import os
 import subprocess
 import sys
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover - Windows developer hosts do not publish VPS backups.
+    fcntl = None
+
+try:
+    from scripts.backup_manifest import (
+        BackupManifestError,
+        build_index,
+        build_manifest,
+        index_entry,
+        manifest_name_for,
+        read_index,
+        read_manifest,
+        sha256_file,
+        write_json_atomic,
+    )
+except ModuleNotFoundError:  # direct `python scripts/db_maintenance.py` invocation
+    from backup_manifest import (
+        BackupManifestError,
+        build_index,
+        build_manifest,
+        index_entry,
+        manifest_name_for,
+        read_index,
+        read_manifest,
+        sha256_file,
+        write_json_atomic,
+    )
 
 ROOT = Path(__file__).resolve().parent.parent
 ARTIFACTS = Path(os.environ.get("DEPLOY_ARTIFACT_ROOT", str(ROOT / ".artifacts"))).resolve()
@@ -28,6 +60,16 @@ RESTORE_SCRIPT = (
     '--dbname="$POSTGRES_DB" --username="$POSTGRES_USER"'
 )
 VERIFY_DUMP_SCRIPT = "exec pg_restore --list"
+DATABASE_MAJOR_SCRIPT = (
+    "exec psql --tuples-only --no-align "
+    '--dbname="$POSTGRES_DB" --username="$POSTGRES_USER" '
+    "--command 'SHOW server_version_num'"
+)
+SCHEMA_REVISION_SCRIPT = (
+    "exec psql --tuples-only --no-align "
+    '--dbname="$POSTGRES_DB" --username="$POSTGRES_USER" '
+    "--command 'SELECT version_num FROM alembic_version ORDER BY version_num DESC LIMIT 1'"
+)
 
 
 def _timestamp() -> str:
@@ -58,6 +100,32 @@ def _database_name() -> str:
     if not name:
         raise RuntimeError("POSTGRES_DB is empty inside the db service")
     return name
+
+
+def _compose_query(script: str) -> str:
+    result = subprocess.run(
+        _compose_exec(script),
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return next((line.strip() for line in result.stdout.splitlines() if line.strip()), "")
+
+
+def _database_major() -> str:
+    raw = _compose_query(DATABASE_MAJOR_SCRIPT)
+    try:
+        return str(int(raw) // 10_000)
+    except ValueError as exc:
+        raise RuntimeError("could not determine PostgreSQL major version") from exc
+
+
+def _schema_revision() -> str:
+    revision = _compose_query(SCHEMA_REVISION_SCRIPT)
+    if not revision:
+        raise RuntimeError("could not determine Alembic schema revision")
+    return revision
 
 
 def create_backup(output: Path) -> Path:
@@ -97,6 +165,154 @@ def create_backup(output: Path) -> Path:
         partial.unlink(missing_ok=True)
         raise
     return target
+
+
+def _verify_archive(archive: Path) -> None:
+    """Verify the archive format immediately before it becomes publishable."""
+
+    with archive.open("rb") as stream:
+        verification = subprocess.run(
+            _compose_exec(VERIFY_DUMP_SCRIPT),
+            cwd=ROOT,
+            check=False,
+            stdin=stream,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    if verification.returncode != 0:
+        raise RuntimeError("pg_restore could not read the archive; refusing to publish it")
+
+
+@contextmanager
+def _publisher_lock(root: Path) -> Iterator[None]:
+    """Serialize manifest/index publication on the Linux VPS."""
+
+    lock_path = root / ".publish.lock"
+    root.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a+b") as stream:
+        if fcntl is not None:
+            try:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError as exc:
+                raise RuntimeError("backup publication is already running") from exc
+        try:
+            yield
+        finally:
+            if fcntl is not None:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+
+def _validate_published_entry(root: Path, entry: dict[str, object]) -> None:
+    """Recheck the actual archive and sidecar before using an index entry."""
+
+    archive = root / str(entry["archive_name"])
+    manifest_path = root / str(entry["manifest_name"])
+    if not archive.is_file() or not manifest_path.is_file():
+        raise BackupManifestError("published index points to a missing archive or manifest")
+    manifest = read_manifest(manifest_path)
+    if index_entry(manifest) != entry:
+        raise BackupManifestError("published index does not match its manifest")
+    if manifest["archive_size_bytes"] != archive.stat().st_size:
+        raise BackupManifestError("published archive size does not match its manifest")
+    if manifest["archive_sha256"] != sha256_file(archive):
+        raise BackupManifestError("published archive digest does not match its manifest")
+
+
+def publish_backup(
+    archive: Path,
+    *,
+    publish_dir: Path,
+    database_major: str,
+    schema_revision: str,
+    created_at: datetime | None = None,
+    retain: int = 7,
+) -> tuple[Path, Path, tuple[str, ...]]:
+    """Publish one verified archive and its index, with rotation after commit."""
+
+    if retain < 2:
+        raise ValueError("published retention must keep at least two backups")
+    root = _artifact_path(publish_dir)
+    if root == BACKUP_DIR or not root.is_relative_to(BACKUP_DIR):
+        raise ValueError("publish directory must be a child of the backup directory")
+    target = _artifact_path(archive)
+    if target.parent != root:
+        raise ValueError("published archive must be directly below the publish directory")
+    if not target.is_file():
+        raise FileNotFoundError(f"backup does not exist: {target}")
+
+    with _publisher_lock(root):
+        _verify_archive(target)
+        manifest_path = root / manifest_name_for(target.name)
+        if manifest_path.exists():
+            manifest = read_manifest(manifest_path)
+            if (
+                manifest["archive_name"] != target.name
+                or manifest["archive_size_bytes"] != target.stat().st_size
+                or manifest["archive_sha256"] != sha256_file(target)
+            ):
+                raise BackupManifestError("existing backup manifest does not match archive")
+        else:
+            manifest = build_manifest(
+                target,
+                database_major=database_major,
+                schema_revision=schema_revision,
+                created_at=created_at,
+            )
+            write_json_atomic(manifest_path, manifest)
+
+        index_path = root / "index.json"
+        current_entries: list[dict[str, object]] = []
+        if index_path.exists():
+            current_entries = list(read_index(index_path)["backups"])
+            for entry in current_entries:
+                _validate_published_entry(root, entry)
+        current_entries = [
+            entry for entry in current_entries if entry["archive_name"] != target.name
+        ]
+        current_entries.append(index_entry(manifest))
+        retained_entries = build_index(current_entries)["backups"][:retain]
+        # index.json is the commit marker: it is replaced only after all metadata is complete.
+        write_json_atomic(index_path, build_index(retained_entries))
+
+        warnings: list[str] = []
+        retained_names = {str(entry["archive_name"]) for entry in retained_entries}
+        for entry in current_entries:
+            archive_name = str(entry["archive_name"])
+            if archive_name in retained_names:
+                continue
+            old_archive = root / archive_name
+            old_manifest = root / str(entry["manifest_name"])
+            for candidate in (old_archive, old_manifest):
+                try:
+                    candidate.unlink(missing_ok=True)
+                except OSError:
+                    warnings.append(f"rotation could not remove {candidate.name}")
+        return manifest_path, index_path, tuple(warnings)
+
+
+def create_published_backup(
+    output: Path,
+    *,
+    publish_dir: Path,
+    database_major: str,
+    schema_revision: str,
+    retain: int = 7,
+) -> tuple[Path, Path, Path, tuple[str, ...]]:
+    root = _artifact_path(publish_dir)
+    target = _artifact_path(output)
+    if target.parent != root:
+        raise ValueError("published archive must be directly below the publish directory")
+    created_at = datetime.now(UTC)
+    archive = create_backup(target)
+    manifest, index, warnings = publish_backup(
+        archive,
+        publish_dir=root,
+        database_major=database_major,
+        schema_revision=schema_revision,
+        created_at=created_at,
+        retain=retain,
+    )
+    return archive, manifest, index, warnings
 
 
 def restore_backup(source: Path, *, confirmed_database: str) -> tuple[Path, str]:
@@ -140,6 +356,28 @@ def main() -> int:
         default=None,
         help="path below .artifacts/operations/backups (default: timestamped backup file)",
     )
+    backup_parser.add_argument(
+        "--publish-dir",
+        type=Path,
+        default=None,
+        help="publish a verified archive, manifest and index below this backup child directory",
+    )
+    backup_parser.add_argument(
+        "--database-major",
+        default=None,
+        help="PostgreSQL major version for published metadata (queried when omitted)",
+    )
+    backup_parser.add_argument(
+        "--schema-revision",
+        default=None,
+        help="Alembic revision for published metadata (queried when omitted)",
+    )
+    backup_parser.add_argument(
+        "--retain-published",
+        type=int,
+        default=7,
+        help="number of published archives to retain; minimum is two",
+    )
 
     restore_parser = subparsers.add_parser(
         "restore",
@@ -157,10 +395,28 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "backup":
-            output = args.output or BACKUP_DIR / f"fitminiapp-{_timestamp()}.dump"
-            created = create_backup(output)
+            if args.publish_dir is None:
+                output = args.output or BACKUP_DIR / f"fitminiapp-{_timestamp()}.dump"
+                created = create_backup(output)
+                print(f"Backup created: {created}")
+                return 0
+            publish_dir = _artifact_path(args.publish_dir)
+            output = args.output or publish_dir / f"fitminiapp-{_timestamp()}.dump"
+            database_major = args.database_major or _database_major()
+            schema_revision = args.schema_revision or _schema_revision()
+            created, manifest, index, warnings = create_published_backup(
+                output,
+                publish_dir=publish_dir,
+                database_major=database_major,
+                schema_revision=schema_revision,
+                retain=args.retain_published,
+            )
             print(f"Backup created: {created}")
-            return 0
+            print(f"Backup manifest: {manifest}")
+            print(f"Backup index: {index}")
+            for warning in warnings:
+                print(f"WARNING: {warning}", file=sys.stderr)
+            return 2 if warnings else 0
 
         safety_backup, database = restore_backup(
             args.input,
@@ -169,7 +425,13 @@ def main() -> int:
         print(f"Database restored: {database}")
         print(f"Pre-restore safety backup: {safety_backup}")
         return 0
-    except (OSError, RuntimeError, subprocess.SubprocessError, ValueError) as exc:
+    except (
+        OSError,
+        RuntimeError,
+        subprocess.SubprocessError,
+        ValueError,
+        BackupManifestError,
+    ) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
