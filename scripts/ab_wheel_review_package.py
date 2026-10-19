@@ -136,7 +136,7 @@ def build_package(
             sheet.paste(thumbnail, (left, top))
             draw.text((left + 8, top + 244), f"{index:03d} / {index / 30:.3f} s", fill="black")
     sheet.save(output_dir / "contact-sheet.png")
-    (output_dir / "index.html").write_text(_HTML, encoding="utf-8")
+    (output_dir / "index.html").write_text(_HTML, encoding="utf-8", newline="\n")
     baseline_probe = json.loads(
         _run(ffprobe, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(baseline))
     )
@@ -180,7 +180,7 @@ def build_package(
         "contact_sheet_frame_indices": sample_indices,
     }
     (output_dir / "qc.json").write_text(
-        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
+        json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n"
     )
     return report
 

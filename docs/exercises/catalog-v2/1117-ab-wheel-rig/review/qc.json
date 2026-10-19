@@ -9,14 +9,15 @@
     "Pillow": "12.3.0",
     "reference_commit": "36b689ebab402f65f60a60b1f15240cb60b4feaa",
     "atlas_sha256": "f5d61acefb86cfd816ee05162afb45d76f25aad7bd76f72f7f7ca03f3971d257",
-    "config_sha256": "dbc377ad68a63b09a11e8d840e8e8d26322ea87d0de258aa915581d424f3dd3a",
+    "config_sha256": "fec2b92fea24d79b7c8a07353fed85a2343d803b5e9f91fbe3ee2c1adabab919",
     "generation_seconds": 57.46136580000166,
     "renderer": "Pillow CPU, 2x supersampled rigid sprites; no optical flow/crossfade",
     "gpu": "RTX 4060 Ti 8 GiB detected; not used by local renderer",
     "style_fidelity": "NEEDS_WORK",
     "technique_qc": "TECHNIQUE_REVIEW",
     "owner_visual_acceptance": "PENDING",
-    "final_verdict": "NEEDS_WORK"
+    "final_verdict": "NEEDS_WORK",
+    "config_sha256_encoding": "UTF-8 LF"
   },
   "technical": {
     "technical_status": "PASS",
@@ -3515,7 +3516,7 @@
       }
     ],
     "format": {
-      "filename": ".artifacts\\tasks\\1117-anatomical-video\\deliverables\\baseline.mp4",
+      "filename": "D:\\Pet-projects\\your-fitness-coach\\.artifacts\\tasks\\1117-anatomical-video\\deliverables\\baseline.mp4",
       "nb_streams": 1,
       "nb_programs": 0,
       "nb_stream_groups": 0,
@@ -3548,11 +3549,11 @@
     "ffprobe": "ffprobe version 9.0.2-essentials_build-www.gyan.dev Copyright (c) 2007-2026 the FFmpeg developers"
   },
   "sources": {
-    ".artifacts\\tasks\\1117-anatomical-video\\temporary\\references\\docs\\exercises\\catalog-v2\\1117-ab-wheel-anatomical-reference\\approved-storyboard.png": {
+    "D:\\Pet-projects\\your-fitness-coach\\.artifacts\\tasks\\1117-anatomical-video\\temporary\\references\\docs\\exercises\\catalog-v2\\1117-ab-wheel-anatomical-reference\\approved-storyboard.png": {
       "sha256": "8acb7e7a4901bf8d747db602d5c008ca2ba2219af8b428c290e1481dcd6abd5c",
       "bytes": 1278325
     },
-    "backend\\assets\\exercise-guides\\gymvisual\\ab-wheel-0857-NAgVB3t.gif": {
+    "D:\\Pet-projects\\your-fitness-coach\\backend\\assets\\exercise-guides\\gymvisual\\ab-wheel-0857-NAgVB3t.gif": {
       "sha256": "e12b3649a3e5a1d09cc0fe78607c6670997f58af47aa3adfeb76350760f9a310",
       "bytes": 56454
     },
@@ -4057,8 +4058,8 @@
       "bytes": 184634
     },
     "index.html": {
-      "sha256": "7ea1c022c2541e65173e6d1fae91de81b72a6ce8b1537fc47aa485c0c4583c76",
-      "bytes": 6592,
+      "sha256": "f44a6a7d166e557f5c2d9957705b54c9165ea5b8bf793a66ca10ef1bb8636396",
+      "bytes": 6538,
       "note": "Published gallery resolves primary storyboard from pinned reference commit; local self-contained gallery uses copied original PNG."
     }
   },

@@ -256,7 +256,11 @@ def main():
         "Pillow": pillow_version,
         "reference_commit": REFERENCE_SHA,
         "atlas_sha256": digest(args.atlas),
-        "config_sha256": digest(args.config),
+        # Git stores LF; normalize Windows checkout newlines before recording provenance.
+        "config_sha256": hashlib.sha256(
+            args.config.read_text(encoding="utf-8").encode("utf-8")
+        ).hexdigest(),
+        "config_sha256_encoding": "UTF-8 LF",
         "generation_seconds": time.monotonic() - started,
         "renderer": "Pillow CPU, 2x supersampled rigid sprites; no optical flow/crossfade",
         "gpu": "RTX 4060 Ti 8 GiB detected; not used by local renderer",
