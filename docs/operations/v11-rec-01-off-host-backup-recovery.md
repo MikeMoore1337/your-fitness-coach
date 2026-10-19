@@ -1,6 +1,7 @@
 # V11-REC-01: off-host backup и disaster recovery
 
-Статус документа: Phase A, Draft. Issue: [#849](https://github.com/MikeMoore1337/your-fitness-coach/issues/849).
+Статус документа: Phase A реализована и смержена в protected master; Phase B/C:
+BLOCKED_OWNER_FACTS / NOT_VERIFIED. Issue: [#849](https://github.com/MikeMoore1337/your-fitness-coach/issues/849).
 
 Документ фиксирует контракт, локальную синтетическую проверку и runbook. Он не доказывает,
 что независимая копия уже существует, что шифрование уже включено, или что восстановление на
@@ -187,8 +188,88 @@ DNS и фоновые writer processes должны быть остановле�
 
 | Фаза | Требование | Состояние в этом PR |
 | --- | --- | --- |
-| Phase A | Контракт, manifest/index, VPS helper, Windows pull, docs, synthetic checks | Реализовано локально; Draft PR |
-| Phase B | Owner decision по encryption/key custody/retention, независимый off-host объект, реальный SFTP pull, clean non-prod restore | `NOT_VERIFIED` / не запускалось |
-| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | `NOT_VERIFIED` + `NOT_AUTHORIZED` / не запускалось |
+| Phase A | Контракт, manifest/index, VPS helper, Windows pull, docs, synthetic checks | Реализовано; merged master revision 499b189d |
+| Phase B | Owner decision по encryption/key custody/retention, независимый off-host объект, реальный SFTP pull, clean non-prod restore | BLOCKED_OWNER_FACTS / NOT_VERIFIED |
+| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | NOT_VERIFIED + NOT_AUTHORIZED / не запускалось |
 
 Issue #849 остаётся открытым до независимой off-host копии и clean-host restore evidence.
+
+## 9. Фактическая перепроверка Phase B/C (2026-10-19)
+
+Проверка выполнена read-only на доступном production VPS и на Windows-ПК владельца.
+Production payload не скачивался на Windows, restore не выполнялся, а конфигурация VPS,
+SSH/SFTP и Task Scheduler не изменялась. Поэтому ниже разделены подтверждённые локальные
+факты и ещё не доказанные внешние гейты.
+
+### 9.1 Подтверждённые факты
+
+| Область | Факт | Граница доказательства |
+| --- | --- | --- |
+| Phase A | PR #1120 смержен в revision 499b189d; exact-head CI run 39218187131 имеет aggregate checks=success, deployment scope deploy_required=false | Это техническое завершение Phase A, не доказательство Phase B/C |
+| VPS dump | В локальном backup-каталоге есть latest dump fitminiapp-20261018T172240Z.dump, 50 275 155 bytes; filename timestamp 2026-10-18 17:22:40Z; SHA-256 начинается с 0807d340 и заканчивается ccd4f2 | Это on-host copy, не независимый off-host объект |
+| Dump format | pg_restore --list завершился кодом 0 в read-only/network-isolated контейнере | Проверена структура custom-format; restore не выполнялся |
+| Database | PostgreSQL 16.0.15; размер базы около 80 MB; pg_is_in_recovery=false; Alembic head 0130_workout_rest_sessions | Это snapshot production DB, не clean-host recovery |
+| Publication metadata | В backup-каталоге не найдены index.json и manifest sidecar для текущих dump-файлов | Публикатор/index contract в текущем каталоге фактически не подтверждён |
+| Scheduling | YFC backup timer и Windows target task в проверенной инвентаризации отсутствуют | Отсутствие найденного задания не является доказательством настроенной периодической доставки |
+| Windows client | PowerShell 7.6.6 и OpenSSH client 9.5.6.2 доступны; наблюдалось около 524.6 GB свободного места на C: и 197.9 GB на D: | Это capability/space check, не доказательство успешного pull |
+| Windows target | Предусмотренный backup-каталог и YFC Scheduled Task не обнаружены | Конкретный target и schedule owner ещё не выбраны/подтверждены |
+
+Backup-каталог содержит также secrets-likely файл .env. Его содержимое не читалось и не
+передавалось. До любого SFTP-предоставления нужно отдельно исключить secrets из export surface,
+проверить права и получить owner/security решение по хранению и ротации.
+
+### 9.2 SFTP и encryption gates
+
+Read-only inventory не подтвердил отдельный hardened read-only SFTP endpoint. Системный
+пользователь с именем backup существует без login shell, но его фактический доступ к каталогу
+не доказан. Эффективная конфигурация sshd при проверке не ограничивает этот путь требуемым
+набором: password authentication и forwarding разрешены глобально, chroot/ForceCommand
+отсутствуют. Каталог и dump-файлы принадлежат deploy-пользователю; отдельная SFTP-граница
+владельцу не предоставлена.
+
+Это состояние классифицировано как BLOCKED_OWNER_FACTS / FAILED для текущего security
+контракта. SSH-аккаунт, authorized key, chroot, ForceCommand, allowlist и права не менялись.
+Production identity не переиспользовалась для backup authorization.
+
+Проверка BitLocker/file encryption на Windows не завершилась: CIM и manage-bde получили
+access denied. Это NOT_VERIFIED, а не утверждение, что шифрование отсутствует. Recovery key
+custody и проверка восстановления ключа также не предоставлены.
+
+### 9.3 Сводный verdict
+
+| Критерий | Состояние | Что требуется дальше |
+| --- | --- | --- |
+| Phase A contract, self-tests и exact-head CI | PASS | Ничего для Phase A; не смешивать с production activation |
+| Независимый off-host object | NOT_PROVEN | Owner-approved target, privacy scope, real copy и независимая проверка digest |
+| Physical encryption at rest | NOT_VERIFIED | Owner decision, device evidence и recovery-key test |
+| Hardened read-only SFTP | BLOCKED_OWNER_FACTS / FAILED | Отдельная identity, key-only auth, chroot/ForceCommand, no forwarding и проверка прав |
+| Windows scheduled pull | ABSENT / NOT_VERIFIED | Выбранный target, task policy, logs и успешный реальный pull |
+| Clean-host restore | NOT_VERIFIED | Изолированный clean host, exact archive/revision, restore и integrity smoke |
+| RPO/RTO | NOT_VERIFIED | Владелец должен задать targets и измерить их на drill |
+| Merge, deploy, production restore, Issue close | NOT_AUTHORIZED | Нужны отдельные разрешения после выполнения обязательных gates |
+
+Итог этой перепроверки: BLOCKED_OWNER_FACTS. Вердикт
+PHASE_B_VERIFIED_PHASE_C_PENDING невозможен, потому что реальный независимый off-host
+transfer ещё не выполнен и SFTP/encryption gates не закрыты.
+
+### 9.4 Owner facts required before the next gate
+
+До любой реальной передачи или изменения VPS нужно зафиксировать:
+
+1. физическую страну/юрисдикцию storage, допустимые PII-категории и решение по privacy
+   dependency #108;
+2. retention/deletion policy и минимальный набор данных, который допустимо хранить off-host;
+3. target RPO/RTO и критерии свежести;
+4. выбранный encryption-at-rest режим, место хранения recovery key и отдельный тест его
+   восстановления;
+5. точный Windows target, backup identity, pinned host key и право на owner-approved
+   изменение production SSH/SFTP;
+6. clean-host isolation, synthetic/non-production credentials, блокировку внешних provider
+   calls и exact release/image/database versions для restore drill;
+7. расписание pull и подтверждённый способ доставки sanitized status/alert без публикации
+   секретов или пользовательских данных.
+
+Пока эти факты не получены, Phase B остаётся BLOCKED_OWNER_FACTS, Phase C не запускается,
+а Issue #849 не закрывается. Этот документ не выдаёт разрешение на transfer, restore, merge
+или deploy.
+
