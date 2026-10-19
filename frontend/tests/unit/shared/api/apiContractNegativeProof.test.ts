@@ -203,6 +203,7 @@ describe('API contract negative proof', () => {
           name: 'removed required response field',
           mutate: (schema) => {
             const workout = schema.components.schemas.WorkoutResponse;
+            if (!workout) throw new Error('WorkoutResponse schema is missing');
             const properties = workout.properties as JsonObject;
             delete properties.id;
             workout.required = ['started_at'];
@@ -212,6 +213,7 @@ describe('API contract negative proof', () => {
           name: 'nullable response changed to non-nullable',
           mutate: (schema) => {
             const workout = schema.components.schemas.WorkoutResponse;
+            if (!workout) throw new Error('WorkoutResponse schema is missing');
             const properties = workout.properties as JsonObject;
             properties.started_at = { type: 'string' };
           },
@@ -219,13 +221,16 @@ describe('API contract negative proof', () => {
         {
           name: 'enum value removed',
           mutate: (schema) => {
-            schema.components.schemas.ProgramStatus.enum = ['planned'];
+            const programStatus = schema.components.schemas.ProgramStatus;
+            if (!programStatus) throw new Error('ProgramStatus schema is missing');
+            programStatus.enum = ['planned'];
           },
         },
         {
           name: 'request field type changed',
           mutate: (schema) => {
             const request = schema.components.schemas.NutritionEntryRequest;
+            if (!request) throw new Error('NutritionEntryRequest schema is missing');
             const properties = request.properties as JsonObject;
             properties.food_id = { type: 'string' };
           },
