@@ -30,4 +30,3 @@
 - Windows Task Scheduler target and successful scheduled pull: ABSENT / NOT_VERIFIED.
 - Clean-host restore, integrity smoke and measured RPO/RTO: NOT_VERIFIED.
 - Merge, deployment, production restore and Issue closure: not authorized.
-
