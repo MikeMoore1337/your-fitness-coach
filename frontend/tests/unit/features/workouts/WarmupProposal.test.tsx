@@ -140,6 +140,34 @@ describe('WarmupProposal', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('shows a safe fallback instead of malicious backend error text', async () => {
+    const malicious =
+      'Traceback (most recent call last): File "/srv/app/main.py", line 7, secret=sk-test-secret';
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/warmup-proposals/preview')) {
+        return new Response(JSON.stringify(preview), { status: 200 });
+      }
+      return new Response(JSON.stringify({ detail: { code: 'internal', message: malicious } }), {
+        status: 500,
+      });
+    });
+    const user = userEvent.setup();
+    renderProposal();
+
+    await user.click(screen.getByRole('button', { name: 'Подготовить разминку' }));
+    await user.click(screen.getByRole('button', { name: 'Рассчитать предложение' }));
+    await screen.findByRole('heading', { name: 'Проверьте подходы' });
+    await user.click(screen.getByRole('button', { name: 'Добавить в тренировку' }));
+
+    expect(
+      await screen.findByText('Сервис временно недоступен. Попробуйте ещё раз.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(malicious)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Traceback|sk-test-secret/)).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('does not offer persistence while offline', async () => {
     Object.defineProperty(navigator, 'onLine', { configurable: true, value: false });
     const fetchMock = vi.spyOn(globalThis, 'fetch');

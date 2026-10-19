@@ -35,6 +35,93 @@ describe('api client', () => {
     expect(getAccessToken()).toBe('new');
   });
 
+  it('keeps a safe Russian business detail, status, and raw conflict body', async () => {
+    const body = {
+      detail: { code: 'warmup_target_stale', message: 'Тренировка изменилась' },
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(body), { status: 409 }),
+    );
+
+    await expect(api('/api/v1/workouts/42')).rejects.toMatchObject({
+      status: 409,
+      message: 'Тренировка изменилась',
+      body,
+    });
+  });
+
+  it.each([500, 502, 503])('uses a Russian fallback for server status %s', async (status) => {
+    const body = {
+      detail: {
+        message:
+          'Traceback (most recent call last): File "/srv/app/main.py", line 7, secret=sk-test-secret',
+      },
+    };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(body), { status }),
+    );
+
+    await expect(api('/api/v1/workouts/42')).rejects.toMatchObject({
+      status,
+      message: 'Сервис временно недоступен. Попробуйте ещё раз.',
+      body,
+    });
+  });
+
+  it('does not expose HTML gateway responses', async () => {
+    const body = '<html><body>secret=sk-test-secret</body></html>';
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(new Response(body, { status: 502 }));
+
+    await expect(api('/api/v1/workouts/42')).rejects.toMatchObject({
+      status: 502,
+      message: 'Сервис временно недоступен. Попробуйте ещё раз.',
+      body,
+    });
+  });
+
+  it('does not flatten malformed validation arrays into user-facing text', async () => {
+    const body = { detail: [{ msg: { leaked: 'internal-path' }, loc: ['body', 'weight'] }] };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(body), { status: 422 }),
+    );
+
+    await expect(api('/api/v1/workouts/42')).rejects.toMatchObject({
+      status: 422,
+      message: 'Проверьте введённые данные.',
+      body,
+    });
+  });
+
+  it('preserves an expired 401 status and body while clearing the failed session', async () => {
+    setAccessToken('expired-session');
+    const body = { detail: 'expired' };
+    vi.spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'invalid refresh' }), { status: 401 }));
+
+    await expect(api('/api/v1/me')).rejects.toMatchObject({
+      status: 401,
+      message: 'Сессия недействительна или истекла. Войдите снова.',
+      body,
+    });
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('preserves a 403 status and raw body without clearing the session', async () => {
+    setAccessToken('active-session');
+    const body = { detail: 'Forbidden' };
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      new Response(JSON.stringify(body), { status: 403 }),
+    );
+
+    await expect(api('/api/v1/workouts/42')).rejects.toMatchObject({
+      status: 403,
+      message: 'Недостаточно прав для выполнения этого действия.',
+      body,
+    });
+    expect(getAccessToken()).toBe('active-session');
+  });
+
   it('reuses a token refreshed by another tab while waiting for the browser lock', async () => {
     setAccessToken('old');
     const fetchMock = vi.spyOn(globalThis, 'fetch');
@@ -163,6 +250,29 @@ describe('api client', () => {
       status: 0,
       message: 'Нет соединения с сервером. Проверьте интернет и попробуйте снова.',
     });
+  });
+
+  it('turns an elapsed request timeout into a readable timeout error', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.spyOn(globalThis, 'fetch').mockImplementationOnce((_input, init) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Timed out', 'AbortError'));
+          });
+        });
+      });
+
+      const request = api('/api/v1/me', { timeoutMs: 10 });
+      await vi.advanceTimersByTimeAsync(10);
+
+      await expect(request).rejects.toMatchObject({
+        status: 0,
+        message: 'Сервер не ответил вовремя. Попробуйте снова.',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('sends FormData with auth without overriding the browser multipart boundary', async () => {
