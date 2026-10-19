@@ -1615,7 +1615,9 @@ for (const state of ['loading', 'error', 'empty'] as const) {
       await expect(hydration.getByText('850 из 2200 мл', { exact: true })).toBeVisible();
     }
     if (state === 'error')
-      await expect(hydration.getByText('Гидратация временно недоступна')).toBeVisible();
+      await expect(
+        hydration.getByText('Сервис временно недоступен. Попробуйте ещё раз.'),
+      ).toBeVisible();
     if (state === 'empty') await expect(hydration.getByText('0 мл записано')).toBeVisible();
     await hydration.screenshot({
       path: `../.artifacts/runtime/tests/screenshots/task-81/mobile-${state}.png`,
