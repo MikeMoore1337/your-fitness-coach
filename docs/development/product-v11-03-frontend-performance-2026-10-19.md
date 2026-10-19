@@ -25,11 +25,21 @@ Historical #815 observations, **not** proof of #818 impact:
 | Repeat API requests | NO_DATA | NO_DATA | NO_DATA |
 | LCP, CLS, INP - field | NO_DATA | NO_DATA | NO_DATA |
 
+## Measured intermediate build (not the final result)
+
+GitHub Actions run [39289139494](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39289139494), commit `087531a8`, `frontend-performance` output:
+
+- Entry JS: **309,019 B raw / 96,761 B gzip**; budget 96,000 B -> **FAIL by 761 B**.
+- Entry CSS: 64,478 B raw / 13,216 B gzip -> PASS.
+- Public assets: 31 files / 646,496 B; largest 100,570 B -> PASS.
+- This prompted a second code-splitting change. No before/after claim is made based on the historical #815 data.
+
 ## Source-confirmed targets and bounded changes
 
 1. `main.tsx` imported demo session code eagerly although it only needs `clearAllDemoSessions()` for Telegram `/demo` at startup. Moved this module into an awaited dynamic import inside that narrow branch, keeping credential/session cleanup **before** render.
 2. `ExerciseGuideVideo` disconnected `IntersectionObserver` after the first intersection. For looping HD videos, this removed the ability to pause playback when scrolled offscreen. Keep observing to pause out of view, resume in view, and pause/resume with document visibility. Once loaded, the source URL remains mounted: do not discard frames, replace a video with a static image, reduce bitrate/resolution or change the approved animation.
-3. Preserve the existing architecture, route-level lazy components, font `font-display: swap`, video poster/GIF fallback, and asset rules. No justified source/runtime evidence for global Query-cache tuning, new memoization, router refactor or media re-encoding.
+3. Move the existing authenticated wrapper, coach-vs-personal navigation decision and trainer-intent routing into an auth-only lazy module. Keep their logic unchanged; `AuthProvider` and `OnboardingGate` are lazily loaded for non-public routes. The intermediate strict budget failure above justifies a targeted bootstrap split, but navigation latency is not claimed to improve without timings.
+4. Preserve the existing architecture, route-level lazy components, font `font-display: swap`, video poster/GIF fallback, and asset rules. No justified source/runtime evidence for global Query-cache tuning, new memoization, router refactor or media re-encoding.
 
 ## Regression contract
 
