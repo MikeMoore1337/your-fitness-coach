@@ -263,13 +263,13 @@ describe('api client', () => {
         });
       });
 
-      const request = api('/api/v1/me', { timeoutMs: 10 });
-      await vi.advanceTimersByTimeAsync(10);
-
-      await expect(request).rejects.toMatchObject({
+      const request = expect(api('/api/v1/me', { timeoutMs: 10 })).rejects.toMatchObject({
         status: 0,
         message: 'Сервер не ответил вовремя. Попробуйте снова.',
       });
+      await vi.advanceTimersByTimeAsync(10);
+
+      await request;
     } finally {
       vi.useRealTimers();
     }
