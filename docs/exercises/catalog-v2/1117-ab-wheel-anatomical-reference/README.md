@@ -1,7 +1,6 @@
 # Ab Wheel — anatomical animation visual references (#1117)
 
-**STAGING ONLY: source image binaries are not committed yet.**
-The full byte-exact image bundle was prepared separately for owner upload into this branch; do not treat this folder as a usable media reference until all eight images are present and their SHA-256 values match `SHA256SUMS.txt`.
+**Все восемь оригинальных PNG загружены.** Проверены CRC и безопасные пути исходного ZIP, декодирование, размеры и SHA-256 каждого PNG из `manifest.json` и `SHA256SUMS.txt`. Файлы повторно скачаны с GitHub на commit `36b689ebab402f65f60a60b1f15240cb60b4feaa`; SHA совпали. Это референсы, не готовая анимация.
 
 ## Images to provide
 
