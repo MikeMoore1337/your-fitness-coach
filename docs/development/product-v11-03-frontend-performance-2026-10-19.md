@@ -64,8 +64,12 @@ Local evidence for the test-fix worktree:
   functional and geometry checks passed.
 - `tests/test_ci_contract.py`: `53/53` passed.
 
-Final exact-head GitHub Actions evidence is recorded below after the documentation commit. Until
-that run is green, release readiness remains `NEEDS_WORK`.
+Corrected exact-head GitHub Actions run [39329542165](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39329542165)
+passed on commit `8c9acecdd6aa36c5dac1d3da7664d7fbbc5a0719`: aggregate `checks` and all required
+jobs were green, including `Frontend smoke (3/5)`, `Frontend (checks)`, unit, mobile, Python,
+security, container and contract jobs. Extended Firefox/WebKit and weekly cross-browser suites
+were skipped by the existing CI routing. The follow-up commit for this evidence update changes
+documentation only and must retain the same green required-check result.
 
 ## Bundle results and CoachPage contract
 
@@ -288,13 +292,16 @@ servers and browser contexts isolated; do not publish trace files or fixture cre
   completed on `0d46ff806c3978e7f8f14b08e8d9898fd989e133` with the same aggregate failure.
   `Frontend smoke (3/5)` again failed only `progress-experience.spec.ts:2992` with expected
   `0s` and received `1e-05s`; build, unit, mobile, security and other completed jobs passed.
+- The corrected exact-head run [39329542165](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39329542165)
+  completed on `8c9acecdd6aa36c5dac1d3da7664d7fbbc5a0719` with aggregate `checks: pass` and all
+  required jobs passed, including the previously failing `Frontend smoke (3/5)`.
 - Real devices, Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, React Profiler,
   CPU/heap field data and production API traces: `NO_DATA`.
 
 The confirmed PR regression was the `/app` lazy waterfall. The selected fix is implemented
 and measured, while the remaining small lab residual and the proposed runtime convention are
 explicitly not treated as owner-approved SLAs. Merge, production deploy and Issue closure
-remain separate owner-authorized gates. Final status: `NEEDS_WORK` because the exact-head
-aggregate `checks` is not green; the performance investigation and code fix are otherwise
-complete. Release approval must wait for that CI blocker to be resolved or explicitly classified
-by the owner.
+remain separate owner-authorized gates. Final status: `READY_FOR_RELEASE_APPROVAL`; the
+performance investigation and code fix are complete, the reduced-motion CI blocker is resolved,
+and the evidence-only follow-up must retain green exact-head checks. The PR remains Draft and
+release approval, merge, deploy and Issue closure are not granted by this result.

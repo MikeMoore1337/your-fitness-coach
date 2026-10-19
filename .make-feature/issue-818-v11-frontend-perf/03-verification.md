@@ -1,6 +1,6 @@
 # Make Feature verification — Product V11-03 / Issue #818
 
-Status: NEEDS_WORK pending final exact-head required CI after reduced-motion test correction;
+Status: READY_FOR_RELEASE_APPROVAL after corrected exact-head CI;
 owner release approval, merge, deploy and Issue closure remain pending.
 
 | Criterion | Action | Result |
@@ -20,8 +20,9 @@ owner release approval, merge, deploy and Issue closure remain pending.
 | Warm/transition evidence | Opt-in profiles | completed; warm cache limitation is documented |
 | Pre-commit | Source commit hooks | passed |
 | CI contracts | `.venv\\Scripts\\python.exe -m pytest tests/test_ci_contract.py` | 53/53 passed |
-| Previous PR-head CI | [run 39324048719](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39324048719) | aggregate failed only unchanged `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`); final rerun pending |
-| Final exact-head CI | After this test/documentation commit | `PENDING` |
+| Previous PR-head CI | [run 39324048719](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39324048719) | aggregate failed only unchanged `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`) |
+| Corrected exact-head CI | [run 39329542165](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39329542165) | commit `8c9acec`; aggregate `checks` and all required jobs passed; extended/weekly suites skipped by routing |
+| Evidence-only follow-up | Documentation-only commit after the green run | Must retain green required checks; no runtime files change |
 | Field/device proof | Real device, Telegram WebView, CrUX/RUM, production traces | `NO_DATA` |
 
 ## Residuals

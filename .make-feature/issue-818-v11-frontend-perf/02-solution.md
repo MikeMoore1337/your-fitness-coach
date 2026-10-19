@@ -1,6 +1,6 @@
 # Make Feature solution — Product V11-03 / Issue #818
 
-Status: NEEDS_WORK pending final exact-head required CI after reduced-motion test correction; the remaining runtime threshold is a
+Status: READY_FOR_RELEASE_APPROVAL after corrected exact-head CI; the remaining runtime threshold is a
 proposed diagnostic convention, not an owner approval.
 Context: existing Draft PR #1126; final application code `415b4e720fe0bb1c51784c40f43a3d9558fd92bd`.
 
@@ -41,4 +41,6 @@ failed only the unchanged reduced-motion assertion (`progress-experience.spec.ts
 vs `1e-05s`). The selected continuation fix parses the existing CSS contract numerically,
 keeps a `0.01ms` upper bound, rejects unknown units and visible durations, and adds regression
 cases for `0s`, `1e-05s`, `0.01ms`, `150ms` and malformed values. It does not change production
-CSS. Final exact-head CI is pending after the documentation commit.
+CSS. Corrected exact-head run [39329542165](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39329542165)
+passed aggregate `checks` and all required jobs on commit `8c9acecdd6aa36c5dac1d3da7664d7fbbc5a0719`.
+A follow-up evidence-only documentation commit must retain that green result.
