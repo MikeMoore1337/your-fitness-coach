@@ -542,6 +542,47 @@ for (const theme of ['dark', 'light'] as const) {
   }
 }
 
+test('@extended WeekStrip reveals a changed selected date inside the visible rail', async ({
+  page,
+}) => {
+  await preparePage(page, 'light', 'browser');
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.goto('/app?section=nutrition');
+  await waitForSurface(page, 'nutrition');
+
+  const week = page.getByRole('navigation', { name: 'Неделя дневника' });
+  const rail = week.locator('.week-strip__days');
+  const initialSelected = rail.locator('button[aria-pressed="true"]');
+  const target = rail.locator('button[aria-pressed="false"]:not(:disabled)').first();
+  await expect(initialSelected).toHaveCount(1);
+  await expect(target).toHaveCount(1);
+  const initialLabel = await initialSelected.getAttribute('aria-label');
+
+  await target.click();
+
+  const selected = rail.locator('button[aria-pressed="true"]');
+  await expect(selected).toHaveCount(1);
+  await expect.poll(() => selected.getAttribute('aria-label')).not.toBe(initialLabel);
+  await expect
+    .poll(() =>
+      rail.evaluate((element) => {
+        const railRect = element.getBoundingClientRect();
+        const selected = element.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
+        if (!selected) return { selected: false, intersects: false, contained: false };
+        const selectedRect = selected.getBoundingClientRect();
+        return {
+          selected: true,
+          intersects: selectedRect.right > railRect.left && selectedRect.left < railRect.right,
+          contained:
+            selectedRect.left >= railRect.left - 0.5 && selectedRect.right <= railRect.right + 0.5,
+          rail: { left: railRect.left, right: railRect.right },
+          selectedRect: { left: selectedRect.left, right: selectedRect.right },
+        };
+      }),
+    )
+    .toMatchObject({ selected: true, intersects: true, contained: true });
+});
+
 test('@extended mobile layout stress keeps long content inside viewport', async ({ page }) => {
   await preparePage(page, 'light', 'browser', { longExerciseName: true });
   await page.goto('/app?section=today');
@@ -569,16 +610,20 @@ test('@extended mobile layout stress keeps long content inside viewport', async 
       'position:absolute;left:0;top:0;width:calc(100vw + 32px);height:1px;pointer-events:none;';
     document.body.append(probe);
   });
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
-      ),
-    )
-    .toBe(true);
-  await page.evaluate(() => {
-    document.querySelector('[data-yfc-test-overflow-probe]')?.remove();
-  });
+  try {
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+        ),
+      )
+      .toBe(true);
+    await expect(expectNoHorizontalOverflow(page)).rejects.toThrow();
+  } finally {
+    await page.evaluate(() => {
+      document.querySelector('[data-yfc-test-overflow-probe]')?.remove();
+    });
+  }
   await expectNoHorizontalOverflow(page);
 });
 

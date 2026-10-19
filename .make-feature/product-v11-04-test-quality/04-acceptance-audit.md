@@ -12,7 +12,7 @@ retry all reported the same intentional WeekStrip reveal margin: a selected day 
 `left=-4`. The corrected assertion keeps document/shell geometry and the CTA checks, while
 excluding only `.week-strip__day` from the broad page-level list of ordinary Today elements.
 
-The exact extended configuration remains unchanged and selects only the intended test:
+The exact extended configuration remains unchanged and selects only the two intended tests:
 
 ```text
 frontend/playwright.mobile-regression.extended.config.ts
@@ -29,10 +29,17 @@ npm run e2e:mobile-regression:extended -- --list
 npm run e2e:mobile-regression:extended
 ```
 
-Local Windows discovery listed exactly two tests. Local execution is not browser proof: the
-host has no Playwright Firefox 153.0 build `1538` and no WebKit 26.5 build `2336`; both direct
-project runs stopped at `browserType.launch` with the missing executable error. The supported
-Linux proof is the existing workflow path, with no production deploy:
+After the merge from current `origin/master`, the focused local browser run passed on both
+projects:
+
+```text
+npm run e2e:mobile-regression:extended -- --project=mobile-firefox --project=mobile-webkit
+4 passed (10.3s)
+```
+
+This is Windows Firefox/WebKit evidence, not a claim of physical-device, Telegram-native or
+Linux-run equivalence. The supported Linux proof remains the existing workflow path, with no
+production deploy:
 
 ```text
 gh workflow run ci.yml --ref codex/819-test-quality-coverage -f run_kind=weekly
@@ -51,14 +58,32 @@ The evidence is scoped as follows:
 | Property | Existing or added proof | Status |
 |---|---|---|
 | Rail does not create page overflow | `frontend/tests/e2e/fixtures/mobile-tma.ts:380-388` checks `document.documentElement.scrollWidth <= clientWidth`; the nutrition E2E repeats it at 1440/768/390/360px (`frontend/tests/e2e/nutrition-diary.spec.ts:2277-2302`). | COVERED |
-| Selected date is revealed inside the visible rail | `WeekStrip.tsx:180-193` moves only `.week-strip__days.scrollLeft`; the unit test asserts `scrollLeft > 0` and that `window.scrollTo` is not called (`frontend/tests/unit/shared/ui/WeekStrip.test.tsx:20-43`). The real E2E asserts visible `aria-current=date` and `aria-pressed=true` buttons. | COVERED |
+| Selected date is revealed inside the visible rail | `WeekStrip.tsx:180-193` moves only `.week-strip__days.scrollLeft`; the unit test asserts `scrollLeft > 0` and that `window.scrollTo` is not called (`frontend/tests/unit/shared/ui/WeekStrip.test.tsx:20-43`). The focused E2E now changes the selected date at 320px and compares the real `.week-strip__days` and selected-button bounding rectangles, asserting intersection and containment without requiring all seven days to be visible. | COVERED |
 | Ordinary Today elements remain viewport-checked | `mobile-ui-regression.spec.ts:120-128` checks the shell; the changed extended selector at `:558-560` excludes only `.week-strip__day` and still checks Today buttons, links and headings. | COVERED |
-| Real outside-rail overflow remains a failure | The extended test now appends a temporary `100vw + 32px` body element, asserts the same document metric becomes overflowing, removes it, and re-runs `expectNoHorizontalOverflow`. This is a narrow negative oracle for page overflow, not a WeekStrip visibility rule. | COVERED |
+| Real outside-rail overflow remains a failure | The extended test appends a temporary `100vw + 32px` body element, proves the document metric is overflowing, asserts that `expectNoHorizontalOverflow()` itself rejects, removes the probe in `try/finally`, and then re-runs the helper after cleanup. This is a narrow negative oracle for page overflow, not a WeekStrip visibility rule. | COVERED |
 
 The selected-date behavior therefore remains a scroll-container contract, while genuine document
 overflow remains a failing condition.
 
-## 3. API contract compatibility
+## 3. Weekly cross-browser boundary (#821)
+
+Workflow [39168451628](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39168451628)
+is completed with conclusion `CANCELLED`; it is not `in_progress`. It is not WeekStrip evidence
+and is not a weekly PASS:
+
+- the Chromium, Firefox and WebKit lanes each scheduled 952 browser tests;
+- the 60-minute cross-browser lane ended with numerous Playwright timeouts and approved visual
+  baseline `#895` errors before cancellation;
+- three Allure uncompressed bundle-limit violations exceeded the 50 MiB limit;
+- the generated Allure report was incomplete, although publication metadata still recorded
+  `published`, and the scheduled publication/aggregate result failed closed.
+
+This is the separate CI-efficiency/regression-truth boundary tracked by [Issue
+#821](https://github.com/MikeMoore1337/your-fitness-coach/issues/821). No timeout increase,
+retry addition or Allure workflow change was made in #819. The cancelled weekly lane is not
+mixed with the independently passing focused WeekStrip/overflow tests.
+
+## 4. API contract compatibility
 
 The comparison used the live FastAPI application schema, not a second handwritten schema:
 
@@ -105,7 +130,7 @@ Additional contract dimensions:
 The gaps are contract-test coverage limitations, not confirmed product incompatibilities. A
 separate Bug is not warranted by this audit.
 
-## 4. Localization guard and Vale pilot
+## 5. Localization guard and Vale pilot
 
 `npm run lint:ui-copy` and the existing localization unit suite passed. The targeted unit suite
 also passed 19/19 tests. The current guard is AST-based and checks changed user-facing JSX,
@@ -141,7 +166,7 @@ new-copy failure mode at the AST boundary. The observed fitness/technical false 
 policy/allowlist decision, not evidence that an unconfigured prose linter would be better.
 No Vale dependency, duplicate guard or subjective LLM evaluation is added.
 
-## 5. Remaining acceptance audit
+## 6. Remaining acceptance audit
 
 | Acceptance risk | Existing contract/test | Finding | Action/evidence |
 |---|---|---|---|
@@ -154,7 +179,7 @@ No Vale dependency, duplicate guard or subjective LLM evaluation is added.
 | Allure SSH publication | Scheduled report workflow and Issue #821 | Separate private publication/SSH timeout boundary. | Deferred to #821; no Allure workflow change in #819. |
 | #848 / #849 isolation | PR diff is limited to this audit, two tests and receipts; separate worktrees/issues remain separate. | No overlapping production DB/recovery changes. | No changes to #848/#849. |
 
-## 6. Delivery boundary
+## 7. Delivery boundary
 
 The existing Draft PR #1119 and branch `codex/819-test-quality-coverage` are retained. Merge,
 production deploy and Issue closure are not performed. The final verdict is `NEEDS_CHANGES` until
