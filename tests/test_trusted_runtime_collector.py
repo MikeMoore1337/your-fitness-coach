@@ -1,18 +1,26 @@
 from __future__ import annotations
 
+import json
+import sys
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from scripts.connection_budget_preflight import PostgresCapacity, Verdict, evaluate
 from scripts.trusted_runtime_collector import (
+    POOL_KEYS,
     CollectorFailure,
     CollectorPolicy,
+    ContainerEnvironment,
     PostgresObservation,
     RuntimeContext,
     _failure_payload,
+    _inspect_revisions,
     _merge_diagnostics,
     _parse_child_snapshot,
+    _parse_container_environment,
+    _run_bounded,
     build_topology_observation,
     build_verified_budget_model,
 )
@@ -43,6 +51,18 @@ def _app_environment(marker: str) -> dict[str, str]:
         "DB_POOL_TIMEOUT_SECONDS": "30",
         "DB_POOL_RECYCLE_SECONDS": "1800",
     }
+
+
+def _runtime_environment(
+    marker: str,
+    *,
+    pool_size: str = "10",
+    max_overflow: str = "20",
+) -> ContainerEnvironment:
+    values = _app_environment(marker)
+    values["DB_POOL_SIZE"] = pool_size
+    values["DB_MAX_OVERFLOW"] = max_overflow
+    return ContainerEnvironment(values=values, has_database_url=True)
 
 
 def _compose(*, include_worker: bool = True, extra_consumer: bool = False) -> dict[str, object]:
@@ -159,6 +179,15 @@ def test_context_revision_mismatch_is_blocked_before_evaluation() -> None:
         build_verified_budget_model(postgres, _topology(), _approved_policy())
 
 
+def test_context_host_mismatch_is_blocked_before_evaluation() -> None:
+    postgres = _postgres(_context())
+    topology = _topology()
+    topology = replace(topology, context=replace(topology.context, host_fingerprint="other-host"))
+
+    with pytest.raises(CollectorFailure, match="host"):
+        build_verified_budget_model(postgres, topology, _approved_policy())
+
+
 def test_stale_and_future_contexts_cannot_pass() -> None:
     stale_model, _ = build_verified_budget_model(
         _postgres(_context(captured_at=CAPTURED_AT - timedelta(minutes=10))),
@@ -175,7 +204,7 @@ def test_stale_and_future_contexts_cannot_pass() -> None:
     future = evaluate(future_model, now=CAPTURED_AT)
 
     assert stale.status == Verdict.BLOCKED
-    assert future.status == Verdict.UNKNOWN
+    assert future.status == Verdict.BLOCKED
 
 
 def test_missing_worker_is_unknown_and_not_treated_as_zero_replicas() -> None:
@@ -276,3 +305,124 @@ def test_pooler_mode_requires_and_propagates_a_backend_cap() -> None:
 
     assert topology.pooler.mode == "transaction"
     assert all(phase.pooler_backend_connections == 60 for phase in topology.phases)
+
+
+def test_runtime_environment_drift_blocks_rendered_topology() -> None:
+    runtime = {
+        "backend": (_runtime_environment("yfc-worker"),),
+        "worker": (_runtime_environment("yfc-worker"),),
+    }
+
+    topology = build_topology_observation(
+        _compose(),
+        _ps(),
+        _context(),
+        runtime_environments=runtime,
+    )
+
+    assert any(
+        item.code == "runtime_container_environment_mismatch" and item.status == Verdict.BLOCKED
+        for item in topology.diagnostics
+    )
+
+
+def test_runtime_pool_override_is_used_and_inconsistent_instances_are_unknown() -> None:
+    runtime = {
+        "backend": (
+            _runtime_environment("yfc-backend", pool_size="40"),
+            _runtime_environment("yfc-backend", pool_size="50"),
+        ),
+        "worker": (_runtime_environment("yfc-worker"),),
+    }
+
+    topology = build_topology_observation(
+        _compose(),
+        _ps(),
+        _context(),
+        runtime_environments=runtime,
+    )
+
+    assert topology.pools["backend"].pool_size is None
+    assert any(
+        item.code == "runtime_container_environment_inconsistent" and item.status == Verdict.UNKNOWN
+        for item in topology.diagnostics
+    )
+
+
+def test_running_database_consumer_outside_rendered_compose_is_unknown() -> None:
+    ps = [*_ps(), {"Service": "analytics", "State": "running"}]
+    runtime = {
+        "analytics": (
+            ContainerEnvironment(
+                values=dict.fromkeys(("APP_ENV", "YFC_DB_APPLICATION_NAME", *POOL_KEYS)),
+                has_database_url=True,
+            ),
+        )
+    }
+
+    topology = build_topology_observation(
+        _compose(),
+        ps,
+        _context(),
+        runtime_environments=runtime,
+    )
+
+    assert any(item.code == "unexpected_db_consumer" for item in topology.diagnostics)
+
+
+def test_all_slots_use_actual_running_instances_when_scaled() -> None:
+    ps = [
+        *_ps(),
+        {"Service": "backend-blue", "State": "running"},
+        {"Service": "backend-blue", "State": "running"},
+    ]
+
+    topology = build_topology_observation(_compose(), ps, _context())
+    all_slots = next(phase for phase in topology.phases if phase.name == "unexpected-all-slots")
+    candidate = next(phase for phase in topology.phases if phase.name == "candidate-overlap")
+
+    assert all_slots.processes is not None
+    assert all_slots.processes["backend"] == 4
+    assert candidate.processes is not None
+    assert candidate.processes["backend"] == 3
+
+
+def test_container_environment_parser_does_not_retain_database_url() -> None:
+    parsed = _parse_container_environment(
+        [
+            "APP_ENV=prod",
+            "YFC_DB_APPLICATION_NAME=yfc-backend",
+            "DATABASE_URL=postgresql://user:secret@example/db",
+        ]
+    )
+
+    assert parsed.has_database_url is True
+    assert "secret" not in repr(parsed.values)
+
+
+def test_bounded_command_timeout_is_fail_closed() -> None:
+    with pytest.raises(CollectorFailure, match="timeout"):
+        _run_bounded(
+            [sys.executable, "-c", "import time; time.sleep(5)"],
+            cwd=Path.cwd(),
+            policy=CollectorPolicy(command_timeout_seconds=1),
+        )
+
+
+def test_running_image_revision_must_match_release_sha(tmp_path: Path, monkeypatch) -> None:
+    other_revision = "b" * 40
+
+    def fake_run(command, *, cwd, policy):
+        assert command[-1] == "container"
+        del cwd, policy
+        return json.dumps({"org.opencontainers.image.revision": other_revision}).encode() + b"\n"
+
+    monkeypatch.setattr("scripts.trusted_runtime_collector._run_bounded", fake_run)
+
+    with pytest.raises(CollectorFailure, match="revision"):
+        _inspect_revisions(
+            [{"Service": "backend", "State": "running", "ID": "container"}],
+            cwd=tmp_path,
+            policy=CollectorPolicy(),
+            expected_revision=REVISION,
+        )

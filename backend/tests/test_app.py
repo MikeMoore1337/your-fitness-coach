@@ -234,6 +234,8 @@ def test_db_application_name_is_bounded_and_overridable():
 
     assert configured.db_application_name == "yfc-worker"
     with pytest.raises(ValidationError):
+        Settings(**common, db_application_name="yfc-rogue")
+    with pytest.raises(ValidationError):
         Settings(**common, db_application_name="not safe; application name")
 
 

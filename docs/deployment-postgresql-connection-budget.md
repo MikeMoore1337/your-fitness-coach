@@ -10,15 +10,15 @@
 |---|---|---|
 | SQLAlchemy backend/worker | PostgreSQL engine использует `pool_pre_ping=true`, `pool_size=DB_POOL_SIZE`, `max_overflow=DB_MAX_OVERFLOW`, `pool_timeout=DB_POOL_TIMEOUT_SECONDS`, `pool_recycle=DB_POOL_RECYCLE_SECONDS` | `VERIFIED` |
 | Локальный статический baseline | `10 + 20 = 30` соединений на один pooled engine; `pool_timeout=30 s` | `VERIFIED` как настройки репозитория |
-| Alembic | `backend/alembic/env.py` использует `NullPool`; отдельный migration connection — последовательный этап | `VERIFIED` по исходнику |
+| Alembic | `backend/alembic/env.py` использует `NullPool` и передаёт фиксированный `application_name=yfc-migration`; отдельный migration connection — последовательный этап | `VERIFIED` по исходнику и regression test |
 | Setup | readiness, Alembic и seed запускаются последовательно в `backend/setup-entrypoint.sh`; seed импортирует обычный application engine | `VERIFIED` по исходнику |
 | Compose topology | legacy `backend`/`worker` и blue/green `backend-*`/`worker-*`; bot — отдельные consumers без найденного SQLAlchemy engine | `VERIFIED` по исходнику |
 | Rollout order | существующий helper имеет `preflight`, `backup`, `migration`, candidate start, consumer handoff, observation и rollback/single-slot paths | `VERIFIED` по исходнику |
 | Existing capacity audit | текущий manual audit снимает только часть host/PostgreSQL metrics и не считает rollout budget с reserved slots и attribution | `VERIFIED` по workflow |
-| Trusted runtime collector | `scripts/trusted_runtime_collector.py` связывает rendered Compose, running container revision labels и read-only PostgreSQL child snapshot | `IMPLEMENTED`, live run `NOT_VERIFIED` |
-| Connection attribution | backend/worker/setup/Alembic получают фиксированные `application_name`; неизвестные sessions не считаются YFC | `IMPLEMENTED`, production attribution `NOT_PROVEN` |
+| Trusted runtime collector | `scripts/trusted_runtime_collector.py` связывает rendered Compose, running container IDs, allowlisted runtime env, matching OCI revision labels и read-only PostgreSQL child snapshot из exact active container | `IMPLEMENTED`, live run `NOT_VERIFIED` |
+| Connection attribution | backend/worker/setup/Alembic получают фиксированные `application_name`; runtime marker drift, неизвестные sessions и unattributed connections не становятся YFC | `IMPLEMENTED`, production attribution `NOT_PROVEN` |
 
-`30` — это не production budget. Он не учитывает число процессов, blue/green overlap, pooler, внешние сессии и PostgreSQL reservations.
+`30` — это не production budget. Он не учитывает фактическое число процессов, blue/green overlap, pooler, внешние сессии и PostgreSQL reservations.
 
 ## Что остаётся `NO_DATA` / `NOT_PROVEN`
 
@@ -26,11 +26,11 @@
 
 | Параметр | Почему блокирует production PASS |
 |---|---|
-| Effective `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS` для каждого production process | render/runtime override не доказан |
+| Effective `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS` для каждого production process | collector проверяет rendered/runtime equality и считает фактические running instances, но production output ещё не получен |
 | `max_connections`, `superuser_reserved_connections`, PostgreSQL 16+ `reserved_connections` | без них нельзя получить usable capacity |
 | Pooler: наличие, режим и backend connection caps | application pool ceiling не равен PostgreSQL backend ceiling при pooler |
-| Число backend/worker процессов и реплик в steady state | определяет static maximum |
-| Точный candidate/blue-green overlap, all-slot overlap и rollback concurrency | разные фазы имеют разные worst cases |
+| Число backend/worker процессов и реплик в steady state | collector учитывает configured и фактически running replicas, но production topology ещё не получена |
+| Точный candidate/blue-green overlap, all-slot overlap и rollback concurrency | разные фазы имеют разные worst cases; scaled candidate instances учитываются консервативно |
 | Migration, setup/seed, backup и прочие DB consumers | должны войти в фазу без двойного счёта |
 | Current sessions и attribution YFC/non-YFC | current YFC sessions нельзя складывать поверх projected YFC cap; неатрибутированные сессии блокируют решение |
 | Safety headroom | значение не фиксируется в коде; требуется owner-approved source и число |
@@ -163,16 +163,17 @@ The `10` and the full topology above are test data, not an approved production t
 Модуль `scripts/trusted_runtime_collector.py` реализует следующий bounded flow:
 
 ```text
-release/.deployment-sha + docker compose config/ps + image revision labels
+release/.deployment-sha + docker compose config/ps
+        ↓ docker inspect exact IDs: allowlisted env + image revision labels
         ↓
 effective topology snapshot (allowlisted values only)
-        ↓ docker compose exec active backend
+        ↓ docker exec exact active container ID
 read-only PostgreSQL child snapshot (no URL leaves the container)
         ↓ exact context + freshness validation
 private trusted model → existing evaluator → sanitized verdict
 ```
 
-Host-side collection требует explicit release directory и запускает только `docker compose config`, `docker compose ps --all`, `docker inspect` и `docker compose exec -T` с bounded timeout/output. Collector не выполняет `restart`, `up`, `down`, `pull`, dump, DDL/DML или изменение конфигурации. Пример owner-authorized dry run:
+Host-side collection требует explicit release directory и запускает только `docker compose config`, `docker compose ps --all`, `docker inspect` и `docker exec` для exact ID выбранного running backend с bounded timeout/output. Collector не выполняет `restart`, `up`, `down`, `pull`, dump, DDL/DML или изменение конфигурации. Пример owner-authorized dry run:
 
 ```text
 python scripts/trusted_runtime_collector.py collect --release-path /srv/yfc/releases/<sha> --json
@@ -182,20 +183,21 @@ python scripts/trusted_runtime_collector.py collect --release-path /srv/yfc/rele
 
 PostgreSQL query агрегирует `pg_stat_activity` без query text, client address, username или user data. Нужна роль с `pg_read_all_stats`, но не superuser; `is_superuser=true`, отсутствие visibility, mismatch counts или malformed row дают fail-closed. Точное разбиение: известные YFC application names, пустая/неизвестная метка (`unattributed`) и остальные non-YFC. `observed_non_yfc` включает `unattributed` как conservative upper bound, а сам `unattributed > 0` переводит production evaluation в `UNKNOWN`; такие sessions никогда не становятся YFC.
 
-В effective topology учитываются backend/worker base и blue/green services, active upstream, all configured slots, rendered pool values, Alembic `NullPool`, setup/seed ceiling, backup connection, worker handoff, rollback, single-slot и pooler. Дополнительный service с `DATABASE_URL`, отсутствующая worker pair, missing application marker, contradictory pool values или неизвестный pooler не превращаются в ноль: они дают `UNKNOWN`/`BLOCKED`.
+В effective topology учитываются backend/worker base и blue/green services, active upstream, configured и фактически running instances всех slots, runtime pool values, Alembic `NullPool`, setup/seed ceiling, backup connection, worker handoff, rollback, single-slot и pooler. OCI revision каждого running application container обязан совпадать с release SHA; runtime marker/pool drift блокируется, а несовпадающие экземпляры одного service дают `UNKNOWN`. Дополнительный service с `DATABASE_URL`, отсутствующая worker pair, missing application marker, contradictory pool values или неизвестный pooler не превращаются в ноль: они дают `UNKNOWN`/`BLOCKED`.
 
 ### Trust boundary и provenance policy
 
 `model_from_mapping()` не принимает поле `trusted`, `synthetic=false`, source, environment или headroom как доказательство. Private in-process token создаётся только в collector module после проверки:
 
 - production environment;
-- immutable release marker и full OCI revision labels;
+- immutable release marker и full OCI revision labels, совпадающие с release SHA;
+- allowlisted runtime environment и exact container ID для связи inspected image с child snapshot;
 - одинаковый hashed host context и revision tuple для topology и PostgreSQL observations;
 - capture timestamps в доверенном clock-skew window;
 - trusted 300-second max age, не значение из входного JSON;
 - complete topology, pool, phase и attribution fields.
 
-Любая подмена sanitized JSON, изменение revision, mixed host/environment, stale/future snapshot, partial child output, missing policy, timeout или collector crash остаются без private token и не могут дать production `PASS`. Host fingerprint — только усечённый SHA-256 hostname; raw hostname и container IDs не входят в verdict.
+Любая подмена sanitized JSON, изменение revision, runtime environment drift, mixed host/environment, stale/future snapshot, partial child output, missing policy, timeout или collector crash остаются без private token и не могут дать production `PASS`. Private token не является криптографической аттестацией: код с теми же host/container полномочиями может подделать in-process boundary. Host fingerprint — только усечённый SHA-256 hostname; raw hostname и container IDs не входят в verdict.
 
 ### Safety headroom
 
@@ -262,10 +264,10 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 |---|---|---|---|
 | Trusted collector | `IMPLEMENTED` | bounded host/child flow in `scripts/trusted_runtime_collector.py`; 300-second trusted policy | owner-authorized live dry run |
 | PostgreSQL snapshot | `IMPLEMENTED` | read-only aggregate query, PG16 reserved slots, non-superuser visibility check | real production values and role verification |
-| Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, OCI revision labels, pool/phase inventory | production rendered output |
-| Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers plus unattributed fail-closed path | live `pg_stat_activity` attribution |
+| Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, exact `docker inspect` env/OCI labels, configured-vs-running replica inventory, pool/phase inventory | production rendered output |
+| Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers, runtime marker drift block and unattributed fail-closed path | live `pg_stat_activity` attribution |
 | Safety headroom | `NOT_PROVEN` | evaluator requires explicit positive source; default collector policy leaves it unset | owner-approved number and rationale |
-| Synthetic regressions | `PASS` | targeted pytest: preflight, reader, trust, topology and false-pass cases | exact-head CI |
+| Synthetic regressions | `PASS` | targeted pytest: 317 passed, включая runtime drift, scaled candidate/all-slots, revision, host/timestamp, trust and timeout negatives | exact-head CI |
 | Deployment gate integration | `PREPARED` | stage-order contract and documented insertion before backup/migration/candidate | separate owner approval; workflow remains unchanged |
 | Production dry run | `NOT_VERIFIED` | no SSH/DB/docker production command executed | authorized read-only dry run |
 | Owner approval | `BLOCKED` | no Phase C activation decision in this request | explicit release/gate approval |

@@ -1,9 +1,10 @@
 """Collect a bounded, read-only runtime snapshot for the connection budget gate.
 
-The host side reads only rendered Compose metadata and immutable image labels. The
-PostgreSQL query runs inside the active backend image, so the database URL never
-crosses the host-side JSON boundary. No collector output contains raw environment
-values, container IDs, SQL rows, or exception text.
+The host side reads rendered Compose metadata, running-container inventory,
+allowlisted runtime environment values and immutable image labels. The PostgreSQL
+query runs inside the exact inspected active backend container, so the database URL
+never crosses the host-side JSON boundary. No collector output contains raw
+environment values, container IDs, SQL rows, or exception text.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import json
 import os
 import platform
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -153,6 +155,12 @@ class RuntimeCollection:
     context: RuntimeContext
 
 
+@dataclass(frozen=True)
+class ContainerEnvironment:
+    values: Mapping[str, str | None]
+    has_database_url: bool
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 
@@ -244,16 +252,36 @@ def _run_bounded(
                     overflow.set()
                     return
                 buffer.extend(chunk)
-        except AttributeError, OSError:
+        except Exception:
             reader_error.set()
 
+    def terminate() -> None:
+        if os.name == "nt":
+            with suppress(OSError, subprocess.SubprocessError):
+                subprocess.run(
+                    ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=2,
+                )
+        else:
+            with suppress(OSError):
+                os.killpg(process.pid, signal.SIGKILL)
+        with suppress(OSError):
+            process.kill()
+
     try:
-        process = subprocess.Popen(
-            list(command),
-            cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
+        popen_kwargs: dict[str, object] = {
+            "cwd": cwd,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        else:
+            popen_kwargs["start_new_session"] = True
+        process = subprocess.Popen(list(command), **popen_kwargs)
     except OSError as exc:
         raise CollectorFailure("runtime_command_unavailable", Verdict.UNKNOWN) from exc
 
@@ -269,27 +297,42 @@ def _run_bounded(
     timed_out = False
     while process.poll() is None:
         if overflow.is_set():
-            with suppress(OSError):
-                process.kill()
+            terminate()
             break
         if time.monotonic() >= deadline:
             timed_out = True
-            with suppress(OSError):
-                process.kill()
+            terminate()
             break
         time.sleep(0.01)
-    process.wait()
-    stdout_thread.join(timeout=1)
-    stderr_thread.join(timeout=1)
-    if timed_out:
-        raise CollectorFailure("runtime_command_timeout", Verdict.BLOCKED)
-    if overflow.is_set():
-        raise CollectorFailure("runtime_command_output_exceeded", Verdict.BLOCKED)
-    if reader_error.is_set():
-        raise CollectorFailure("runtime_command_output_failed", Verdict.UNKNOWN)
-    if process.returncode != 0:
-        raise CollectorFailure("runtime_command_failed", Verdict.UNKNOWN)
-    return bytes(stdout_buffer)
+    try:
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired as exc:
+            terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired as wait_exc:
+                raise CollectorFailure(
+                    "runtime_command_termination_failed", Verdict.BLOCKED
+                ) from wait_exc
+            raise CollectorFailure("runtime_command_termination_failed", Verdict.BLOCKED) from exc
+        stdout_thread.join(timeout=2)
+        stderr_thread.join(timeout=2)
+        if stdout_thread.is_alive() or stderr_thread.is_alive():
+            raise CollectorFailure("runtime_command_output_failed", Verdict.BLOCKED)
+        if timed_out:
+            raise CollectorFailure("runtime_command_timeout", Verdict.BLOCKED)
+        if overflow.is_set():
+            raise CollectorFailure("runtime_command_output_exceeded", Verdict.BLOCKED)
+        if reader_error.is_set():
+            raise CollectorFailure("runtime_command_output_failed", Verdict.UNKNOWN)
+        if process.returncode != 0:
+            raise CollectorFailure("runtime_command_failed", Verdict.UNKNOWN)
+        return bytes(stdout_buffer)
+    finally:
+        for stream in (process.stdout, process.stderr):
+            with suppress(OSError, ValueError):
+                stream.close()  # type: ignore[union-attr]
 
 
 def _json_bytes(value: bytes, *, code: str) -> object:
@@ -381,6 +424,121 @@ def _ps_items(payload: object) -> list[Mapping[str, object]]:
     return result
 
 
+def _container_id(item: Mapping[str, object]) -> str:
+    raw_id = item.get("ID", item.get("Id", item.get("id")))
+    if not isinstance(raw_id, str) or CONTAINER_ID.fullmatch(raw_id) is None:
+        raise CollectorFailure("runtime_container_identity_unknown", Verdict.UNKNOWN)
+    return raw_id
+
+
+def _running_container_ids(
+    items: Sequence[Mapping[str, object]], service_name: str
+) -> tuple[str, ...]:
+    ids = sorted(
+        _container_id(item)
+        for item in items
+        if _service_name(item) == service_name and _running(item)
+    )
+    if not ids:
+        raise CollectorFailure("runtime_active_instance_unknown", Verdict.UNKNOWN)
+    if len(ids) != len(set(ids)):
+        raise CollectorFailure("runtime_container_identity_duplicate", Verdict.BLOCKED)
+    return tuple(ids)
+
+
+def _parse_container_environment(payload: object) -> ContainerEnvironment:
+    if not isinstance(payload, list):
+        raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.UNKNOWN)
+    allowed = {"APP_ENV", "YFC_DB_APPLICATION_NAME", *POOL_KEYS}
+    values: dict[str, str | None] = dict.fromkeys(allowed)
+    seen: set[str] = set()
+    has_database_url = False
+    for item in payload:
+        if not isinstance(item, str):
+            raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.UNKNOWN)
+        key, separator, raw_value = item.partition("=")
+        if not key:
+            raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.UNKNOWN)
+        if key == "DATABASE_URL":
+            has_database_url = True
+            continue
+        if key not in allowed:
+            continue
+        if key in seen:
+            raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.BLOCKED)
+        seen.add(key)
+        values[key] = raw_value if separator else None
+    return ContainerEnvironment(values=values, has_database_url=has_database_url)
+
+
+def _inspect_runtime_environments(
+    items: Sequence[Mapping[str, object]],
+    *,
+    cwd: Path,
+    policy: CollectorPolicy,
+) -> Mapping[str, tuple[ContainerEnvironment, ...]]:
+    running: list[tuple[str, str]] = []
+    for item in items:
+        if not _running(item):
+            continue
+        service = _service_name(item)
+        if service is None:
+            raise CollectorFailure("runtime_service_identity_unknown", Verdict.UNKNOWN)
+        running.append((service, _container_id(item)))
+    if not running:
+        return {}
+    ids = [container_id for _service, container_id in running]
+    if len(ids) != len(set(ids)):
+        raise CollectorFailure("runtime_container_identity_duplicate", Verdict.BLOCKED)
+    output = _run_bounded(
+        ["docker", "inspect", "--format", "{{json .Config.Env}}", *ids],
+        cwd=cwd,
+        policy=policy,
+    )
+    lines = output.decode("utf-8", errors="strict").splitlines()
+    if len(lines) != len(running):
+        raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.UNKNOWN)
+    result: dict[str, list[ContainerEnvironment]] = {}
+    for (service, _container_id_value), line in zip(running, lines, strict=True):
+        try:
+            payload = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise CollectorFailure(
+                "runtime_environment_inventory_invalid", Verdict.UNKNOWN
+            ) from exc
+        result.setdefault(service, []).append(_parse_container_environment(payload))
+    return {service: tuple(values) for service, values in result.items()}
+
+
+def _runtime_environment_values(
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None,
+    service_name: str,
+) -> Mapping[str, str | None] | None:
+    if runtime_environments is None:
+        return None
+    observations = runtime_environments.get(service_name)
+    if not observations:
+        return None
+    first = observations[0].values
+    if any(observation.values != first for observation in observations[1:]):
+        return {}
+    return first
+
+
+def _effective_service_environment(
+    service_name: str,
+    service: Mapping[str, object],
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None,
+) -> dict[str, str | None]:
+    rendered = _service_environment(service)
+    runtime_values = _runtime_environment_values(runtime_environments, service_name)
+    if runtime_values is None:
+        return rendered
+    if not runtime_values:
+        return dict.fromkeys((*POOL_KEYS, "APP_ENV", "YFC_DB_APPLICATION_NAME"))
+    return {**rendered, **runtime_values}
+
+
 def _service_running_count(items: Sequence[Mapping[str, object]], service_name: str) -> int | None:
     matching = [item for item in items if _service_name(item) == service_name]
     if not matching:
@@ -396,13 +554,42 @@ def _configured_replicas(service: Mapping[str, object]) -> int | None:
     return 1
 
 
-def _sum_configured_replicas(
-    services: Mapping[str, Mapping[str, object]], names: Sequence[str]
+def _effective_replicas(
+    services: Mapping[str, Mapping[str, object]],
+    items: Sequence[Mapping[str, object]],
+    name: str,
 ) -> int | None:
-    values = [_configured_replicas(services[name]) for name in names if name in services]
-    if len(values) != len(names) or any(value is None for value in values):
+    service = services.get(name)
+    if service is None:
+        return None
+    configured = _configured_replicas(service)
+    if configured is None:
+        return None
+    return max(configured, _service_running_count(items, name) or 0)
+
+
+def _sum_effective_replicas(
+    services: Mapping[str, Mapping[str, object]],
+    items: Sequence[Mapping[str, object]],
+    names: Sequence[str],
+) -> int | None:
+    values = [_effective_replicas(services, items, name) for name in names]
+    if len(values) != len(names):
+        return None
+    if any(value is None for value in values):
         return None
     return sum(cast(list[int], values))
+
+
+def _max_effective_replicas(
+    services: Mapping[str, Mapping[str, object]],
+    items: Sequence[Mapping[str, object]],
+    names: Sequence[str],
+) -> int | None:
+    values = [_effective_replicas(services, items, name) for name in names]
+    if not values or any(value is None for value in values):
+        return None
+    return max(cast(list[int], values))
 
 
 def _active_backend_service(services: Mapping[str, Mapping[str, object]]) -> str | None:
@@ -428,13 +615,16 @@ def _pool_spec(
     name: str,
     services: Mapping[str, Mapping[str, object]],
     service_names: Sequence[str],
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
 ) -> PoolSpec:
     parsed: list[tuple[int | None, int | None, int | None, int | None]] = []
     for service_name in service_names:
         service = services.get(service_name)
         if service is None:
             return PoolSpec(name=name, pool_type="queue")
-        environment = _service_environment(service)
+        environment = _effective_service_environment(service_name, service, runtime_environments)
+        if _runtime_environment_values(runtime_environments, service_name) == {}:
+            return PoolSpec(name=name, pool_type="queue")
         values = tuple(_parse_nonnegative_int(environment.get(key)) for key in POOL_KEYS)
         parsed.append(cast(tuple[int | None, int | None, int | None, int | None], values))
     if not parsed or any(values != parsed[0] for values in parsed[1:]):
@@ -474,11 +664,20 @@ def _pooler(
     )
 
 
-def _setup_pool_spec(services: Mapping[str, Mapping[str, object]]) -> PoolSpec:
+def _setup_pool_spec(
+    services: Mapping[str, Mapping[str, object]],
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
+) -> PoolSpec:
     setup = services.get("setup")
     if setup is None:
         return PoolSpec("setup", pool_type="special")
-    values = _service_environment(setup)
+    values = _effective_service_environment("setup", setup, runtime_environments)
+    if _runtime_environment_values(runtime_environments, "setup") == {}:
+        return PoolSpec(
+            "setup",
+            pool_type="special",
+            connection_ceiling_source="setup readiness and seed rendered environment",
+        )
     pool_size = _parse_nonnegative_int(values.get("DB_POOL_SIZE"))
     max_overflow = _parse_nonnegative_int(values.get("DB_MAX_OVERFLOW"))
     if pool_size is None or max_overflow is None or pool_size < 1:
@@ -507,6 +706,8 @@ def build_topology_observation(
     compose_payload: Mapping[str, object],
     ps_payload: object,
     context: RuntimeContext,
+    *,
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
 ) -> TopologyObservation:
     """Reduce rendered Compose and `ps` data to an allowlisted runtime model."""
 
@@ -530,16 +731,56 @@ def build_topology_observation(
     worker_names = tuple(name for name in WORKER_SERVICES if name in services)
     active_backend_count = _service_running_count(items, active) if active else None
     active_worker_count = _service_running_count(items, active_worker) if active_worker else None
-    all_backend_count = _sum_configured_replicas(services, backend_names)
-    all_worker_count = _sum_configured_replicas(services, worker_names)
+    all_backend_count = _sum_effective_replicas(services, items, backend_names)
+    all_worker_count = _sum_effective_replicas(services, items, worker_names)
     candidate_backend_count = (
-        _add_counts(active_backend_count, 1) if candidate_backend_slots else active_backend_count
+        _add_counts(
+            active_backend_count,
+            _max_effective_replicas(services, items, candidate_backend_slots),
+        )
+        if candidate_backend_slots
+        else active_backend_count
     )
     candidate_worker_count = (
-        _add_counts(active_worker_count, 1) if candidate_worker_slots else active_worker_count
+        _add_counts(
+            active_worker_count,
+            _max_effective_replicas(services, items, candidate_worker_slots),
+        )
+        if candidate_worker_slots
+        else active_worker_count
     )
 
     diagnostics: list[Diagnostic] = []
+    if runtime_environments is not None:
+        for name, observations in runtime_environments.items():
+            service = services.get(name)
+            if service is None:
+                continue
+            rendered = _service_environment(service)
+            if any(
+                any(
+                    observation.values.get(key) != rendered.get(key)
+                    for key in (*POOL_KEYS, "APP_ENV", "YFC_DB_APPLICATION_NAME")
+                )
+                for observation in observations
+            ):
+                diagnostics.append(
+                    Diagnostic(
+                        "runtime_container_environment_mismatch",
+                        Verdict.BLOCKED,
+                        "Running container environment differs from rendered Compose",
+                    )
+                )
+            if any(
+                observation.values != observations[0].values for observation in observations[1:]
+            ):
+                diagnostics.append(
+                    Diagnostic(
+                        "runtime_container_environment_inconsistent",
+                        Verdict.UNKNOWN,
+                        "Running instances of one service do not share effective runtime settings",
+                    )
+                )
     if active is None or active_worker is None:
         diagnostics.append(
             Diagnostic(
@@ -560,7 +801,7 @@ def build_topology_observation(
             )
         )
     for name in sorted(relevant_names):
-        environment = _service_environment(services[name])
+        environment = _effective_service_environment(name, services[name], runtime_environments)
         app_env = environment.get("APP_ENV")
         if app_env is None:
             diagnostics.append(
@@ -621,6 +862,14 @@ def build_topology_observation(
         for name, service in services.items()
         if name not in known_db_consumers and "DATABASE_URL" in _service_environment(service)
     ]
+    if runtime_environments is not None:
+        extra_db_consumers.extend(
+            name
+            for name, observations in runtime_environments.items()
+            if name not in known_db_consumers
+            and any(observation.has_database_url for observation in observations)
+            and name not in extra_db_consumers
+        )
     if extra_db_consumers:
         diagnostics.append(
             Diagnostic(
@@ -702,15 +951,15 @@ def build_topology_observation(
     return TopologyObservation(
         context=context,
         pools={
-            "backend": _pool_spec("backend", services, backend_names),
-            "worker": _pool_spec("worker", services, worker_names),
+            "backend": _pool_spec("backend", services, backend_names, runtime_environments),
+            "worker": _pool_spec("worker", services, worker_names, runtime_environments),
             "migration": PoolSpec(
                 "migration",
                 connection_ceiling=1,
                 pool_type="null",
                 connection_ceiling_source="backend/alembic/env.py",
             ),
-            "setup": _setup_pool_spec(services),
+            "setup": _setup_pool_spec(services, runtime_environments),
         },
         phases=phases,
         pooler=pooler,
@@ -836,16 +1085,14 @@ def _inspect_revisions(
     *,
     cwd: Path,
     policy: CollectorPolicy,
+    expected_revision: str,
 ) -> tuple[str, ...]:
     ids: list[str] = []
     for item in items:
         service = _service_name(item)
         if service not in REVISION_SERVICES or not _running(item):
             continue
-        raw_id = item.get("ID", item.get("Id", item.get("id")))
-        if not isinstance(raw_id, str) or CONTAINER_ID.fullmatch(raw_id) is None:
-            raise CollectorFailure("runtime_container_identity_unknown", Verdict.UNKNOWN)
-        ids.append(raw_id)
+        ids.append(_container_id(item))
     if not ids:
         raise CollectorFailure("runtime_revision_unknown", Verdict.UNKNOWN)
     output = _run_bounded(
@@ -867,7 +1114,10 @@ def _inspect_revisions(
         revision = labels.get("org.opencontainers.image.revision")
         if not isinstance(revision, str) or FULL_REVISION.fullmatch(revision.lower()) is None:
             raise CollectorFailure("runtime_revision_unknown", Verdict.UNKNOWN)
-        revisions.add(revision.lower())
+        normalized_revision = revision.lower()
+        if normalized_revision != expected_revision:
+            raise CollectorFailure("runtime_revision_mismatch", Verdict.BLOCKED)
+        revisions.add(normalized_revision)
     return tuple(sorted(revisions))
 
 
@@ -895,30 +1145,44 @@ def collect_runtime_snapshot(
     )
     ps_payload = _json_ps_bytes(ps_output or b"[]")
     ps_items = _ps_items(ps_payload)
-    revisions = tuple(
-        sorted({expected_revision, *_inspect_revisions(ps_items, cwd=release_path, policy=policy)})
+    runtime_environments = _inspect_runtime_environments(
+        ps_items,
+        cwd=release_path,
+        policy=policy,
     )
+    inspected_revisions = _inspect_revisions(
+        ps_items,
+        cwd=release_path,
+        policy=policy,
+        expected_revision=expected_revision,
+    )
+    revisions = tuple(sorted({expected_revision, *inspected_revisions}))
     context = RuntimeContext(
         environment=policy.environment,
         host_fingerprint=_host_fingerprint(),
         revisions=revisions,
         captured_at=_now(),
     )
-    topology = build_topology_observation(compose, ps_payload, context)
+    topology = build_topology_observation(
+        compose,
+        ps_payload,
+        context,
+        runtime_environments=runtime_environments,
+    )
     if topology.active_backend_service is None:
         raise CollectorFailure("runtime_active_upstream_unknown", Verdict.UNKNOWN)
+    active_container_id = _running_container_ids(ps_items, topology.active_backend_service)[0]
     child_output = _run_bounded(
-        _compose_command(
-            compose_file,
+        [
+            "docker",
             "exec",
-            "-T",
-            topology.active_backend_service,
+            active_container_id,
             "python",
             "-m",
             "scripts.trusted_runtime_collector",
             "postgres-child",
             "--json",
-        ),
+        ],
         cwd=release_path,
         policy=policy,
     )
@@ -1035,6 +1299,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(_failure_payload(failure), ensure_ascii=False, sort_keys=True))
         return 1 if failure.status == Verdict.BLOCKED else 2
     except ConfigurationError, OSError, ValueError:
+        print(
+            json.dumps(
+                _failure_payload(CollectorFailure("collector_failed", Verdict.BLOCKED)),
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
+        return 1
+    except Exception:
         print(
             json.dumps(
                 _failure_payload(CollectorFailure("collector_failed", Verdict.BLOCKED)),

@@ -702,7 +702,7 @@ def _validate_runtime_evidence(
     if age_seconds < 0:
         _issue(
             issues,
-            Verdict.UNKNOWN,
+            Verdict.BLOCKED,
             "snapshot_timestamp_in_future",
             "Snapshot capture time is later than the preflight clock",
         )
