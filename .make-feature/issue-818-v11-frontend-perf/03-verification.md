@@ -1,7 +1,7 @@
 # Make Feature verification — Product V11-03 / Issue #818
 
-Status: NEEDS_WORK pending exact-head required CI; owner release approval, merge, deploy and
-Issue closure remain pending.
+Status: NEEDS_WORK pending final exact-head required CI after reduced-motion test correction;
+owner release approval, merge, deploy and Issue closure remain pending.
 
 | Criterion | Action | Result |
 | --- | --- | --- |
@@ -14,11 +14,14 @@ Issue closure remain pending.
 | TypeScript/lint | `npm run typecheck`; `npm run lint` | passed |
 | Unit behavior | `npm run test` | 157 files, 962 tests passed |
 | Browser behavior | `performance-hardening.spec.ts` | Chromium 8/8 passed |
-| Mobile Chromium | Critical mobile regression suite | 23/26 passed; 3 screenshot failures reproduced exactly on BEFORE |
-| Mobile WebKit | Critical mobile regression suite | 25/26 passed; Active Workout screenshot failure reproduced on BEFORE |
+| Reduced-motion helper | Targeted Playwright regression | `2/2` passed; `0s`, `1e-05s`, `0.01ms` pass; `150ms`, mixed visible duration and malformed units fail |
+| Reduced-motion media state | Targeted Playwright regression | `forced-colors: active` and `prefers-reduced-motion: reduce` both matched |
+| Mobile Chromium + WebKit | Critical mobile regression suite | `48/52` passed; only Progress light/dark Chromium and Active Workout Chromium/WebKit baseline screenshots failed; functional/geometry checks passed |
 | Warm/transition evidence | Opt-in profiles | completed; warm cache limitation is documented |
 | Pre-commit | Source commit hooks | passed |
-| Exact-head CI | [run 39321786132](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39321786132) on `0d46ff8` | aggregate failed only unchanged `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`) |
+| CI contracts | `.venv\\Scripts\\python.exe -m pytest tests/test_ci_contract.py` | 53/53 passed |
+| Previous PR-head CI | [run 39324048719](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39324048719) | aggregate failed only unchanged `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`); final rerun pending |
+| Final exact-head CI | After this test/documentation commit | `PENDING` |
 | Field/device proof | Real device, Telegram WebView, CrUX/RUM, production traces | `NO_DATA` |
 
 ## Residuals

@@ -25,6 +25,48 @@ PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
 - This is synthetic local evidence. Physical devices, Telegram WebView, CrUX, RUM and
   production traces remain `NO_DATA`.
 
+## Reduced-motion CI blocker - targeted remediation
+
+The previous PR head `d61c9df240a9fbc9ece7227fb2db7a02e450ee5e` was blocked by run
+[39324048719](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39324048719).
+`Frontend smoke (3/5)` failed twice in
+`progress-experience.spec.ts:2992` because Chromium serialized the computed duration as
+`1e-05s` while the test required the literal string `0s`. The run was on the PR merge ref
+`447b0f265ca17c4351a16010a65a6e45c57adb57`; the PR head was unchanged at `d61c9df2`.
+
+The application CSS was not the defect. `data-viz.css` already disables chart transitions with
+`transition: none !important`, while the existing global reduced-motion contract sets
+`transition-duration: 0.01ms !important`. `1e-05s` is the same `0.01ms` duration expressed in
+seconds. The production CSS and chart behavior were therefore left unchanged.
+
+The baseline `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` and PR `d61c9df` have identical
+`progress-experience.spec.ts`, `design-system.css` and `data-viz.css` for this contract. The
+original test passed locally on both revisions with Windows Chromium CSSOM returning `0s`, but
+the Linux CI runner exposed the valid scientific notation. The new test explicitly confirms both
+`prefers-reduced-motion: reduce` and `forced-colors: active`, then parses computed CSS durations
+numerically instead of comparing a platform-specific string.
+
+The parser accepts `0s`, `1e-05s`, `0.01ms` and lists whose every duration is at most `0.01ms`.
+It rejects visible durations such as `150ms`, mixed lists containing a visible duration, and
+unknown units or malformed values. No CSS, design, HD media or runtime code changed.
+
+Local evidence for the test-fix worktree:
+
+- Targeted reduced-motion tests: `2/2` Chromium passed, including the parser regression cases
+  and both active media-feature assertions.
+- `npm run typecheck`: PASS; `npm run lint`: PASS, including Russian UI and thick-lime-edge
+  guards.
+- `npm run test`: `157` files / `962` tests passed.
+- `npm run build`: PASS, `570` modules; `npm run perf:check`: PASS with the unchanged Entry and
+  CoachPage budgets below.
+- Critical mobile matrix: `48/52` passed. The four failures are the already-known baseline-only
+  screenshots: Progress light/dark on Chromium and Active Workout on Chromium/WebKit; all
+  functional and geometry checks passed.
+- `tests/test_ci_contract.py`: `53/53` passed.
+
+Final exact-head GitHub Actions evidence is recorded below after the documentation commit. Until
+that run is green, release readiness remains `NEEDS_WORK`.
+
 ## Bundle results and CoachPage contract
 
 | Metric | BEFORE `42a75a5f` | PR before fix `775cc734` | Final code `415b4e72` | Result |
