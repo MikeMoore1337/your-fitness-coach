@@ -43,7 +43,7 @@ Statuses:
 - `EXACT_FILENAME_REVIEW` — identical filename only, **not a safe equivalence**.
 - `NAME_ONLY_REVIEW` — loose token overlap; may return obviously wrong equipment or technique. Review queue, **not** recommended media.
 - `NO_SAFE_FILENAME_CANDIDATE` — no sufficiently similar source filename, not proof no appropriate media exists.
-  
+
 The algorithm does not auto-approve candidates and never updates runtime files. For source updates or catalog expansion it **fails closed** until reviewed.
 
 ## Review queue: concrete next videos
