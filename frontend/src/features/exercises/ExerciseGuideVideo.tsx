@@ -23,20 +23,33 @@ export function ExerciseGuideVideo({
   const [visible, setVisible] = useState(expanded);
 
   useEffect(() => {
-    if (expanded || typeof IntersectionObserver === 'undefined') return;
     const node = videoRef.current;
     if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '120px' },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
+    let inViewport = expanded || typeof IntersectionObserver === 'undefined';
+    const syncPlayback = () => {
+      if (document.hidden || !inViewport) {
+        node.pause();
+      } else if (node.getAttribute('src')) {
+        void node.play().catch(() => undefined);
+      }
+    };
+    const observer =
+      expanded || typeof IntersectionObserver === 'undefined'
+        ? null
+        : new IntersectionObserver(
+            (entries) => {
+              inViewport = entries.some((entry) => entry.isIntersecting);
+              if (inViewport) setVisible(true);
+              syncPlayback();
+            },
+            { rootMargin: '120px' },
+          );
+    observer?.observe(node);
+    document.addEventListener('visibilitychange', syncPlayback);
+    return () => {
+      observer?.disconnect();
+      document.removeEventListener('visibilitychange', syncPlayback);
+    };
   }, [expanded]);
 
   const sorted = [...sources].sort((a, b) => a.width - b.width);
