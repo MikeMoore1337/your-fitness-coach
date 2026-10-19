@@ -288,7 +288,7 @@ transfer ещё не выполнен и SFTP/encryption gates не закрыт
 | Recovery key | Key material не читался; custody/escrow и recovery test не подтверждены | `NOT_VERIFIED` |
 | Sync/share | Путь не находится под известным OneDrive root; процесс OneDrive и target reparse point не обнаружены; SMB query получил отказ | Частичная проверка; отсутствие всех sync/share механизмов не доказано |
 
-Каталог и ACL намеренно не создавались: при отсутствии elevated owner/runner identity это могло бы закрепить неподходящее наследование. Предложенный следующий шаг — отдельный BitLocker-encrypted VHDX/container, смонтированный под backup root, либо отдельно одобренный encrypted file/container с recoverable key; шифрование всего D: не предлагается.
+Каталог и ACL намеренно не создавались: при отсутствии elevated owner/runner identity это могло бы закрепить неподходящее наследование. Ранее предложенный BitLocker-encrypted VHDX/container позднее отклонён владельцем в пользу обычной папки `D:\YFC-Backups`; отдельное шифрование тома/контейнера не внедряется. Подтверждено администратором Windows: `D:` FullyDecrypted, ProtectionStatus Off, EncryptionMethod None. Перед переносом реальных персональных данных остаётся открытым отдельное решение о допустимости хранения без шифрования.
 
 ### 10.2 SFTP security state и план hardening
 
@@ -316,12 +316,18 @@ Owner-approved план, не применённый:
 
 | Решение | Предложение, не утверждение | Нужное подтверждение |
 | --- | --- | --- |
-| Cadence | Проверенный dump публикуется раз в сутки; Windows pull опрашивает новый `index.json` раз в час | Фактическое расписание VPS publisher и нагрузка |
-| Retention | 30 дней, минимум 2 valid copies, резерв свободного места 1 GiB | Рост dump и размер persistent assets |
+| Cadence | **OWNER-APPROVED:** один новый архив в сутки. Опрос Windows каждый час остаётся предложением, а не утверждённым расписанием | Настройка и проверка реального VPS timer / Windows pull |
+| Retention | **OWNER-APPROVED:** хранить архивы 7 дней (обычно 7 ежедневных копий). При очистке не удалять единственную последнюю проверенную копию в период сбоев; отдельно сигнализировать о нарушении retention | Проверить расписание очистки и корректность безопасного удаления после валидации новой копии |
 | RPO | Не хуже 24 часов | Последний успешный pull и время публикации |
 | RTO | Первичная цель 8 часов | Измеренный clean-host restore |
-| Encryption | Dedicated BitLocker VHDX/container на D:, не whole-disk encryption | Elevated BitLocker evidence и recovery-key drill |
-| Key recovery | Две независимые owner-controlled custody locations и recovery test | Фактическое custody и успешное восстановление |
+| Encryption | **OWNER DECISION:** VHDX/зашифрованные контейнеры отклонены; использовать обычную папку на незашифрованном `D:` | Физическая защита данных отсутствует; отдельный security/privacy gate для переноса production PII |
+| Key recovery | Не применяется к отклонённому BitLocker/VHDX-контейнеру; ключи SSH/SFTP при этом остаются отдельным security gate | Нельзя объявлять `encryption-at-rest=PASS` при незашифрованном D: |
 | Clean host | Disposable non-public Linux VM/host, независимый от VPS и Windows-ПК, matching PostgreSQL major/revision, без внешнего egress | Exact image/revision и approved non-production inputs |
 
 До подтверждения elevated storage/ACL identity, recovery-key custody, отдельного hardened SFTP endpoint, non-interactive key access, scheduler checks и owner targets вердикт остаётся `BLOCKED_OWNER_FACTS`. `PHASE_B_1_READY_FOR_ACTIVATION` не заявляется.
+
+### 10.6 Owner decisions — simplified backup policy (2026-10-19)
+
+Владелец **утвердил только частоту создания и срок хранения**: один архив в день, retention 7 суток. Ранее предложенные 30 дней и вариант VHDX/container отвергнуты; обычная целевая папка — `D:\YFC-Backups`. Windows disk evidence: `D:` BitLocker Off / FullyDecrypted; Task Scheduler Running; задач YFC нет. Опрос Windows каждый час, RPO 24 часа и RTO 8 часов пока **не утверждены и не измерены**. Ежедневный архив сам по себе не доказывает RPO ≤24 ч при недоступном ПК. Безопасная очистка должна сохранять последнюю проверенную копию при сбое очередного создания/скачивания и показывать stale alert.
+
+Отказ от шифрованного контейнера **не является доказательством** выполнения исходного encryption-at-rest acceptance #849: физическая защита отсутствует, и до передачи реальных персональных данных требуется отдельное privacy/security решение. Hardened SFTP, реальный dump/transfer, планировщик и isolated restore также не авторизованы этим решением. Состояние остаётся `BLOCKED_OWNER_FACTS`; PR остаётся Draft, Issue OPEN. Исправленный privacy/legal контекст: [#707](https://github.com/MikeMoore1337/your-fitness-coach/issues/707) и [#711](https://github.com/MikeMoore1337/your-fitness-coach/issues/711); GitHub Issue #108 — другая задача, не privacy gate.
