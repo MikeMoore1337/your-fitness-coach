@@ -22,7 +22,6 @@ import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import { LANDING_AUDIENCE_ROUTES } from './pages/landing/landingAudience';
@@ -330,6 +329,7 @@ async function bootstrap(): Promise<void> {
   captureFirstTouchAttribution();
   initializeYandexMetrica();
   if (window.location.pathname === '/demo' && isTelegramLaunch(window.location)) {
+    const { clearAllDemoSessions } = await import('./features/demo/demoApi');
     clearAllDemoSessions();
   }
   renderApp();
