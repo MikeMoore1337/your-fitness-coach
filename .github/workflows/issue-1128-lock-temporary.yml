@@ -1,0 +1,71 @@
+name: Temporary aiohttp lock regeneration (remove before merge)
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - pyproject.toml
+      - .github/workflows/issue-1128-lock-temporary.yml
+
+permissions:
+  contents: read
+
+jobs:
+  regenerate-and-test:
+    if: github.head_ref == 'fix/1128-aiohttp-security'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
+        with:
+          version: '0.11.32'
+      - name: Re-lock only aiohttp using repository uv version
+        run: uv lock --upgrade-package aiohttp
+      - name: Validate locked Telegram bot installation and tests
+        run: |
+          uv sync --locked --no-default-groups --extra bot --group dev
+          uv run --no-sync pytest -q bot/tests
+      - name: Check precise package changes and emit compact patch
+        run: |
+          python - <<'PY'
+          import difflib
+          import hashlib
+          import json
+          import pathlib
+          import subprocess
+          import tomllib
+
+          old = subprocess.check_output(['git', 'show', 'HEAD:uv.lock'], text=True)
+          new = pathlib.Path('uv.lock').read_text(encoding='utf-8')
+          old_data = tomllib.loads(old)
+          new_data = tomllib.loads(new)
+          old_packages = {p['name']: p for p in old_data['package']}
+          new_packages = {p['name']: p for p in new_data['package']}
+          if old_packages.keys() != new_packages.keys():
+              raise RuntimeError('PACKAGE_SET_CHANGED')
+          changed_versions = {name: (old_packages[name]['version'], new_packages[name]['version'])
+                              for name in old_packages
+                              if old_packages[name]['version'] != new_packages[name]['version']}
+          if set(changed_versions) != {'aiohttp'}:
+              raise RuntimeError('UNRELATED_PACKAGE_VERSIONS_CHANGED:' + repr(changed_versions))
+          if changed_versions['aiohttp'][1] not in ('3.14.4', '3.14.5'):
+              raise RuntimeError('UNEXPECTED_AIOHTTP_VERSION')
+          patch = ''.join(difflib.unified_diff(
+              old.splitlines(keepends=True), new.splitlines(keepends=True),
+              fromfile='a/uv.lock', tofile='b/uv.lock', n=3))
+          if not patch or len(patch) > 150000:
+              raise RuntimeError('UNEXPECTED_PATCH_SIZE')
+          output_sha = hashlib.sha256(new.encode('utf-8')).hexdigest()
+          print('YFC_AIOHTTP_VERSION=' + changed_versions['aiohttp'][1])
+          print('YFC_LOCK_EXPECTED_SHA256=' + output_sha)
+          print('YFC_PATCH_CHARACTERS=' + str(len(patch)))
+          for i in range(0, len(patch), 1200):
+              print('YFC_LOCK_PATCH_CHUNK:' + json.dumps(patch[i:i+1200]))
+          print('YFC_PATCH_DONE')
+          PY
