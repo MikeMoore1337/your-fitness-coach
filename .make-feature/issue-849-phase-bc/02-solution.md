@@ -46,3 +46,15 @@ changed.
 - Do not run restore, migrations, DNS changes, traffic cutover or provider calls.
 - Do not claim BitLocker absent when the OS checks were access-denied.
 - Do not infer merge, deployment or Issue closure from green Phase A CI.
+
+## Phase B.1 update — bounded plan, not applied
+
+The owner-selected `D:\YFC-Backups` path is retained. The minimum safe preparation is:
+
+1. Confirm an elevated owner/admin session and a dedicated non-production Windows runner identity. Create the empty target only after rechecking that the path is absent; do not copy a dump.
+2. Prefer a dedicated BitLocker-encrypted VHDX/container mounted for this root, with recovery-key custody documented outside GitHub and a recovery test. Do not encrypt the whole D: volume. If BitLocker is unavailable, use a separately approved file/container encryption method with the same recovery-key requirements.
+3. Remove inherited broad access from the target; retain full control for SYSTEM and Administrators, grant Modify only to the dedicated runner identity, and grant no access to Authenticated Users/Users. Verify owner, inheritance, reparse points, SMB shares and known sync roots after creation.
+4. Keep the SFTP export root separate from the previously observed backup root that contained a secrets-likely `.env`. The proposed account is `yfc-backup-readonly`: public-key-only, no shell/TTY/forwarding/write, `internal-sftp` behind a chroot, a dedicated pinned `known_hosts`, and an allowlist limited to `index.json`, dump archives and their manifests. Apply only after owner approval, `sshd -t`, an existing-admin-session check and a reversible reload/rollback plan.
+5. Use the existing Task Scheduler template only after the runner identity can read the key and config non-interactively. Preserve `IgnoreNew`, `StartWhenAvailable`, `RunOnlyIfNetworkAvailable`, bounded execution time, sanitized logs and exit codes; do not register the task in this phase.
+
+Proposed, not approved, operating defaults: daily verified dump publication with hourly Windows polling, 30-day retention with at least two valid copies and a 1 GiB free-space reserve, RPO no worse than 24 hours, and an initial RTO target of 8 hours pending an isolated restore drill. The clean-host environment should be a disposable non-public Linux VM/host, independent of both the production VPS and Windows storage, with matching PostgreSQL major/revision and external egress disabled.
