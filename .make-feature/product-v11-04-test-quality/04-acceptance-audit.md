@@ -1,8 +1,9 @@
 # Product V11-04 / Issue #819 — acceptance audit receipt
 
-Status at the audit commit: `NEEDS_CHANGES` until the supported Linux Firefox/WebKit
-extended run is completed on this branch. No merge, deploy or Issue closure is performed by
-this receipt.
+Status for the test-bearing exact HEAD `43aea2919209b2c094e5d4e39bd1ee6d01a77f45`:
+`READY_FOR_MERGE`. Required PR CI run
+[39216517207](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39216517207)
+has aggregate `checks=pass`; no merge, deploy or Issue closure is performed by this receipt.
 
 ## 1. Firefox/WebKit extended regression
 
@@ -45,10 +46,10 @@ production deploy:
 gh workflow run ci.yml --ref codex/819-test-quality-coverage -f run_kind=weekly
 ```
 
-That workflow installs Firefox/WebKit with `--with-deps`, runs the existing
-`frontend-mobile-regression-extended` group, and also runs the weekly cross-browser lane. The
-final result is recorded against the exact pushed SHA in the PR and Issue receipt; the ordinary
-Chromium/WebKit PR lane is not substituted for this evidence.
+The PR workflow's exact-head required result is green, while its router correctly skips the
+scheduled-only `frontend-mobile-regression-extended` and weekly cross-browser jobs. The ordinary
+Chromium/WebKit PR lane is not substituted for the focused local Firefox/WebKit evidence; the
+local run is reported separately above.
 
 ## 2. WeekStrip and overflow boundary
 
@@ -170,18 +171,29 @@ No Vale dependency, duplicate guard or subjective LLM evaluation is added.
 
 | Acceptance risk | Existing contract/test | Finding | Action/evidence |
 |---|---|---|---|
-| Weak mobile geometry oracle | Extended mobile test and shared geometry helpers | Original WeekStrip false positive confirmed; no product overflow regression found in source. | Scoped selector fix plus negative overflow probe; Linux extended run still required. |
+| Weak mobile geometry oracle | Focused local Firefox/WebKit run plus exact-head required CI | Original WeekStrip false positive confirmed; the changed-date rect assertion and overflow negative proof pass. | Linux scheduled-only extended lane is `NOT_RUN` by the PR router; owner may request a separate scheduled run if that platform-specific evidence is needed. |
 | Export privacy / tenant isolation | `backend/tests/test_account_lifecycle.py:42-94` | Missing cross-user denial assertion was a real test gap; ownership filter already existed. | Added 404 regression assertion; local backend rerun is host-blocked, CI is authoritative. |
 | Auth/RBAC and Coach access | Auth hardening, app and Coach test families above | No new incompatibility found. | Existing tests retained; #819 does not change product authorization. |
 | API drift | Live OpenAPI -> existing generated types; consumer inventory above | No observed path/method/schema mismatch. | Receipt only; request typing/auth metadata remain documented GAP/DEFERRED. |
 | Localization | AST guard and 19 unit cases | Current guard passes; Vale is not a proven improvement. | REJECT Vale for this PR. |
-| PostgreSQL/migrations | CI `python-tests`/migrated stack contracts | Docker/PostgreSQL is not available locally. | Use exact-head GitHub CI; do not call local host proof. |
+| PostgreSQL/migrations | Exact-head CI `python-tests` and migrated PostgreSQL stack | Docker/PostgreSQL is not available locally; all required Python shards and migrated stack passed. | CI is authoritative; no local host proof claimed. |
 | Allure SSH publication | Scheduled report workflow and Issue #821 | Separate private publication/SSH timeout boundary. | Deferred to #821; no Allure workflow change in #819. |
-| #848 / #849 isolation | PR diff is limited to this audit, two tests and receipts; separate worktrees/issues remain separate. | No overlapping production DB/recovery changes. | No changes to #848/#849. |
+| #848 / #849 isolation | PR diff against current `origin/master` is limited to the seven existing #819 paths; the sync merge only brought current master into the branch. | No #848/#849 path is in the PR diff. | No changes to #848/#849. |
 
 ## 7. Delivery boundary
 
-The existing Draft PR #1119 and branch `codex/819-test-quality-coverage` are retained. Merge,
-production deploy and Issue closure are not performed. The final verdict is `NEEDS_CHANGES` until
-the Linux extended Firefox/WebKit evidence and exact-head aggregate CI are green; if that receipt
-passes, the PR may be reviewed for merge separately.
+Full stateless deployment-scope result for `origin/master...HEAD` is:
+
+```text
+changed_paths: 7
+deploy_paths: []
+deploy_required: false
+reason: only documentation, governance, tests or developer tooling changed
+```
+
+The existing Draft PR #1119 and branch `codex/819-test-quality-coverage` are retained. The
+technical verdict is **READY_FOR_MERGE**: the test-bearing exact HEAD has green required CI and
+the focused Firefox/WebKit plus unit evidence is green. Linux scheduled-only extended evidence,
+physical iPhone/Safari, native Telegram, VoiceOver, production activation, owner merge approval
+and Issue closure remain explicit owner decisions or `NOT_VERIFIED`; none is inferred from this
+receipt. Merge, production deploy and Issue closure are not performed.
