@@ -115,7 +115,11 @@ import type { components, paths } from './schema';
 
 type Workout = paths['/api/v1/workouts/{workout_id}']['get']['responses']['200']['content']['application/json'];
 type WorkoutEndpoint = paths['/api/v1/workouts/{workout_id}']['get'];
-type NullableContract<T> = T extends string | null ? (string | null extends T ? true : false) : false;
+type NullableContract<T> = [T] extends [string | null]
+  ? [string | null] extends [T]
+    ? true
+    : false
+  : false;
 type Assert<T extends true> = T;
 type StartedAtIsNullable = Assert<NullableContract<Workout['started_at']>>;
 
