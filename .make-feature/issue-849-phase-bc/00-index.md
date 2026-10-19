@@ -1,6 +1,6 @@
 # Make Feature: Issue #849 / V11-REC-01 Phase B/C
 
-- Stage: evidence and decision package complete; production gates intentionally inactive.
+- Stage: Phase B.1 read-only storage/SFTP preparation recorded; production gates intentionally inactive.
 - Depth: deep — the remaining blockers are real infrastructure, privacy, encryption and
   clean-host recovery facts, not missing application code.
 - Base: origin/master revision 499b189d641b66077bdec431b39c477c7b2bc722.
@@ -30,3 +30,13 @@
 - Windows Task Scheduler target and successful scheduled pull: ABSENT / NOT_VERIFIED.
 - Clean-host restore, integrity smoke and measured RPO/RTO: NOT_VERIFIED.
 - Merge, deployment, production restore and Issue closure: not authorized.
+
+## Phase B.1 follow-up — 2026-10-19
+
+- Owner-selected target: `D:\YFC-Backups`; no production payload was written.
+- Read-only Windows inventory: `D:` is NTFS, total 1,000,203,087,872 bytes, free 195,896,864,768 bytes; the target path does not exist.
+- BitLocker and recovery-key custody remain `NOT_VERIFIED`: CIM/`Get-BitLockerVolume`, `manage-bde -status D:`, and `fsutil` checks were denied in the non-elevated session. No key material was read.
+- Target ACL/structure was not created because the parent D: ACL is broader than the required backup boundary and the dedicated runner identity/elevated owner is not confirmed.
+- Known OneDrive checks did not place the target under a known OneDrive root; no OneDrive process or target reparse point was observed. SMB-share inspection and Task Scheduler inspection were unavailable/denied, so third-party sync and share absence are not proven.
+- Synthetic Windows pull self-test passed 28/28 in PowerShell 7 and 28/28 in Windows PowerShell 5.1. This is contract evidence only, not live SFTP or physical-encryption evidence.
+- Decision remains `BLOCKED_OWNER_FACTS`; the next gate is an owner-approved elevated storage/identity check and a separately approved SFTP hardening plan.
