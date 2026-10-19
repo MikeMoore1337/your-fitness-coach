@@ -1,35 +1,38 @@
 # Make Feature solution — Product V11-03 / Issue #818
 
-Status: NEEDS_WORK for release approval; the scoped chunk-graph fix is implemented and verified.
-Context: existing Draft PR #1126, measured application head `b516f9ca`; the security follow-up is lockfile-only.
+Status: READY_FOR_RELEASE_APPROVAL after exact-head required CI; the remaining runtime
+threshold is a proposed diagnostic convention, not an owner approval.
+Context: existing Draft PR #1126; final application code `415b4e720fe0bb1c51784c40f43a3d9558fd92bd`.
 
-## Requirements
+## Confirmed cause and selected fix
 
-The Issue requires a faster existing Web/PWA/TMA experience without visual redesign, business-logic changes, security weakening, HD-media degradation or production changes. Only measured bottlenecks are in scope.
+The PR-before-fix `/app` route loaded the authenticated boundary first and only then started
+the `MiniAppPage` dynamic import. The 10-run mobile profile reproduced the effect for Today
+(`3,113 -> 3,482 ms` p50) and Programs (`2,979 -> 3,096 ms` p50). Auth checks and API counts
+were unchanged.
 
-## Basis and choice
+The selected fix adds one private-only `AuthenticatedAppPage` lazy entry. It composes the
+existing `AuthenticatedRoute`, `AuthenticatedAppRoute` and `MiniAppPage`, allowing the auth
+dependencies and the app page graph to start together. It does not bypass AuthGate, show
+private data early, move private code to public entry, or alter route decisions.
 
-The matched current-master build was 310,971 raw / 97,485 gzip for the entry JS and failed the existing 96,000-byte gzip budget. Source tracing showed eager demo-session code and authenticated route internals in the public bootstrap. The smallest fixes were existing dynamic imports and one auth-only route module. The final profiling also showed that nesting `MiniAppPage` under that auth module inflated `CoachPage` from 186.51 kB raw / 45.77 kB gzip to 386.98 kB / 97.80 kB; moving the existing `MiniAppPage` lazy import back to the top-level route graph restored 186.59 kB / 45.80 kB without changing route behavior.
-
-The source audit found no defensible evidence for global Query cache changes, broad render memoization, router replacement, or media re-encoding. Those candidates remain deferred rather than optimized by intuition. A required audit failure was fixed with the smallest compatible lockfile-only `aiohttp` refresh; backend source was not changed.
+The isolated private-only preload experiment was rejected: it started more requests but did
+not improve Today under the throttled connection. No Query, render, router, media or backend
+change was justified.
 
 ## Contract
 
 - Public routes do not load demo-only session code or authenticated route internals eagerly.
-- Telegram `/demo` clears stored demo tokens before React renders.
-- Exercise guide video remains lazy, uses the approved HD source/poster, pauses when offscreen or document-hidden, and resumes without replacing the source.
-- `perf:check` remains strict and runs after the frontend build in the existing CI group.
-- Auth, navigation, API and user data contracts stay unchanged.
-- `AuthenticatedAppRoute` receives the existing `MiniAppPage` child; it does not own or eagerly import the page.
-- The locked runtime dependency set uses an `aiohttp` version with the CI-reported advisories fixed.
+- `/app` keeps AuthProvider, AuthGate, OnboardingGate and trainer-intent behavior.
+- Telegram `/demo` cleanup remains before React renders.
+- Exercise guide video keeps its approved HD source/poster and visibility behavior.
+- `perf:check` remains strict at `entryJsGzip: 96_000`.
+- CoachPage remains `186,590 raw / 45,800 gzip`; no CoachPage graph regression returned.
+- Existing API, authorization, navigation, TMA and user-data contracts stay unchanged.
 
-## Plan and checks
+## Evidence and checks
 
-1. Build and run `perf:check` on `42a75a5f` and final application source `b516f9ca`.
-2. Run typecheck, lint, CI-compatible Prettier and full Vitest on AFTER.
-3. Run the existing performance-hardening Playwright scenario on both revisions with the same mocked fixtures, then run the bounded cold/warm route and transition profiler.
-4. Re-read the exact PR checks and leave merge/deploy to the owner.
-5. Run the locked Python dependency audit after the security refresh.
-6. Keep production/field/device claims as `NO_DATA` where the source is unavailable.
-
-Evidence and command results are in [the implementation report](../../docs/development/product-v11-03-frontend-performance-2026-10-19.md). The report records the remaining synthetic mobile private-route cost as a release residual rather than inventing field evidence.
+The exact 10-run cold, five-run warm, five-run transition and isolated experiment results are
+in [the implementation report](../../../docs/development/product-v11-03-frontend-performance-2026-10-19.md).
+The opt-in profilers are `frontend/tests/e2e/*profile.ts`; the ordinary E2E glob does not run
+them. Exact-head GitHub checks must be re-read after the final documentation commit.

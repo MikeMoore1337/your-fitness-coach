@@ -7,87 +7,176 @@ PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
 ## Revisions and measurement method
 
 - Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` (`origin/master`).
-- Previous PR application head: `1cb669bc91aab8390ae4cd16568f710688a85df0`.
-- Final measured application source: `b516f9ca` (`perf(frontend): preserve private route chunk split`).
-- The parent PR follow-up after the measured application code is the lockfile-only `aiohttp`
-  security refresh; it does not change backend source or the measured frontend behavior.
-- Both builds used Node `24.14.0`, npm `11.11.1`, Vite `7.3.6`, Windows and the existing
-  lockfile. The browser lab used Playwright Chromium `151.0.7922.34`, mocked
-  `platform-api` fixtures, reduced motion, desktop `1440x900` and mobile `390x844`.
-- Mobile throttling was CPU `4x`, `150 ms` latency, `1.5 Mbps` down / `750 Kbps` up.
-- The full route profiler used three runs per route/cache state and five runs for Coach OS;
-  the canonical `performance-hardening.spec.ts` remains the CI regression suite.
-- This is synthetic local evidence. It is not a physical-device, Telegram WebView, CrUX,
-  RUM or production measurement.
+- PR before the mobile investigation fix: `775cc7343fc5f79a3f165bd1ed39ab722e12c398`.
+- Final application code: `415b4e720fe0bb1c51784c40f43a3d9558fd92bd`.
+- Both revisions were built in isolated worktrees with Node `24.14.0`, npm `11.11.1` and
+  Vite `7.3.6`. The lab used Playwright Chromium `151.0.7922.34`, mocked
+  `platform-api` fixtures, reduced motion, mobile `390x844`, CPU `4x`, `150 ms` latency,
+  `1.5 Mbps` down and `750 Kbps` up.
+- Cold profiles used 10 independent browser contexts per scenario, in one worker. Warm
+  profiles used one context and five reloads per scenario. Client transitions used five
+  same-context Today -> Nutrition and Today -> Programs navigations per revision.
+- Route readiness means the first visible scenario-specific locator. `TBT`, Long Tasks,
+  LCP and Resource Timing bytes are synthetic browser diagnostics, not product UX or field
+  metrics. `jsEncodedBytes` is the encoded JavaScript response total observed by the page.
+- The measurements use local Vite preview servers. Their responses were not browser-cache
+  hits during the warm profile, so warm numbers are a comparison of the route graph rather
+  than production cache performance.
+- This is synthetic local evidence. Physical devices, Telegram WebView, CrUX, RUM and
+  production traces remain `NO_DATA`.
 
-## Bundle results and CoachPage investigation
+## Bundle results and CoachPage contract
 
-| Metric | BEFORE `42a75a5f` | Previous PR app `1cb669bc` | Final `b516f9ca` | Final result |
+| Metric | BEFORE `42a75a5f` | PR before fix `775cc734` | Final code `415b4e72` | Result |
 | --- | ---: | ---: | ---: | --- |
-| Entry JS raw | 310,971 B | 295,379 B | 295,985 B | PASS |
-| Entry JS gzip | 97,485 B | 92,773 B | 92,971 B | PASS; 3,029 B below 96,000 B |
+| Entry JS raw | 310,971 B | 295,985 B | 295,889 B | PASS |
+| Entry JS gzip | 97,485 B | 92,971 B | 92,983 B | PASS; 3,017 B below 96,000 B |
 | Entry CSS raw / gzip | 64,478 / 13,216 B | 64,478 / 13,216 B | 64,478 / 13,216 B | unchanged |
 | Public assets | 31 / 647,377 B | 31 / 647,377 B | 31 / 647,377 B | unchanged |
 | Largest public asset | 100,570 B | 100,570 B | 100,570 B | unchanged |
-| `CoachPage` raw / gzip | 186,512 / 45,771 B | 386,984 / 97,795 B | 186,586 / 45,799 B | returned to baseline-sized route chunk |
+| `CoachPage` raw / gzip | 186,512 / 45,771 B | 186,586 / 45,799 B | 186,590 / 45,800 B | no growth |
 | `perf:check` | expected FAIL | PASS | PASS | budget unchanged |
 
-The earlier `CoachPage` growth was a Rollup dependency-ownership effect, not new Coach OS
-business logic. Moving `MiniAppPage` under the new lazy `AuthenticatedRoutes` boundary made
-private feature modules attach to the CoachPage dynamic entry. The final narrow fix keeps
-`MiniAppPage` as a top-level dynamic import and passes it through `AuthenticatedAppRoute`;
-the auth boundary, route decisions and child behavior stay unchanged. This restores the
-private route split without returning authenticated code to the public entry.
+The earlier ~98 KB `CoachPage` result was a Rollup dependency-ownership effect. The final
+code keeps Coach OS as its own private dynamic entry and does not move authenticated code to
+the public bootstrap. The final private `/app` graph adds a 1,104 raw / 567 gzip
+`AuthenticatedAppPage` boundary; `AuthenticatedRoutes` remains 3,027 raw / 1,497 gzip and
+`AuthProvider` remains 9,858 raw / 3,571 gzip. No performance budget was raised.
 
-The final build emits `AuthenticatedRoutes` at 3,028 raw / 1,498 gzip and `AuthProvider` at
-9,858 raw / 3,570 gzip. No performance budget was raised.
+## Historical three-run matrix
 
-## Final route-lab matrix
+The earlier three-run profile is retained as historical context. It is superseded for the
+mobile private-route decision by the 10-run investigation below.
 
-`ready` is the time to the scenario's visible synthetic locator, not a field UX metric.
-`TBT` and Long Tasks are browser-lab observations. Resource-timing transfer bytes are
-diagnostic only; build artifact sizes above are the authoritative bundle measurements.
+| Scenario | Cache/profile | BEFORE ready p50 | PR before fix ready p50 | TBT p50 BEFORE -> PR |
+| --- | --- | ---: | ---: | ---: |
+| Today | cold mobile-throttled | 2,005 ms | 2,105 ms | 11 -> 143 ms |
+| Active Workout | cold mobile-throttled | 2,343 ms | 2,839 ms | 117 -> 124 ms |
+| Nutrition | cold mobile-throttled | 2,053 ms | 2,275 ms | 121 -> 212 ms |
+| Exercise Encyclopedia | cold mobile-throttled | 1,993 ms | 1,973 ms | 12 -> 101 ms |
+| Programs | cold mobile-throttled | 1,739 ms | 2,011 ms | 10 -> 95 ms |
+| Coach OS | cold mobile-throttled | 1,983 ms | 2,152 ms | 37 -> 12 ms |
 
-| Scenario | Cache/profile | BEFORE ready p50 | Final ready p50 | BEFORE → final TBT p50 | API duplicate paths |
-| --- | --- | ---: | ---: | ---: | --- |
-| Landing | cold desktop | 443 ms | 459 ms | 0 → 0 ms | none |
-| Today | cold desktop | 874 ms | 875 ms | 0 → 0 ms | none |
-| Active Workout | cold desktop | 960 ms | 973 ms | 0 → 0 ms | same `progress/summary`, `week` |
-| Nutrition | cold desktop | 447 ms* | 875 ms | 0 → 0 ms | same `/api/v1/me` |
-| Exercise Encyclopedia | cold desktop | 867 ms | 887 ms | 0 → 0 ms | none |
-| Programs | cold desktop | 875 ms | 871 ms | 0 → 0 ms | none |
-| Coach OS | cold desktop | 873 ms | 873 ms | 0 → 0 ms | none |
-| Today | cold mobile-throttled | 2,005 ms | 2,105 ms | 11 → 143 ms | none |
-| Active Workout | cold mobile-throttled | 2,343 ms | 2,839 ms | 117 → 124 ms | same `progress/summary`, `week` |
-| Nutrition | cold mobile-throttled | 2,053 ms | 2,275 ms | 121 → 212 ms | same `/api/v1/me` |
-| Exercise Encyclopedia | cold mobile-throttled | 1,993 ms | 1,973 ms | 12 → 101 ms | none |
-| Programs | cold mobile-throttled | 1,739 ms | 2,011 ms | 10 → 95 ms | none |
-| Coach OS | cold mobile-throttled | 1,983 ms | 2,152 ms | 37 → 12 ms | none |
+Those small samples motivated the controlled re-measurement; they were not treated as proof
+of a regression.
 
-`*` The BEFORE Nutrition p50 has a wide `436–860 ms` range; it is not treated as a
-stable improvement or regression. The final mobile matrix shows a remaining synthetic
-private-route cost from the auth-only boundary and the resulting route graph. The narrow
-source fix resolves the confirmed CoachPage chunk-growth problem, but it does not prove a
-private mobile route performance budget. A stricter private-route budget or a real-device
-calibration would need a separate scoped decision; no broader routing or cache rewrite is
-introduced here.
+## Mobile Private Route Regression - Final Investigation
 
-### Coach transitions
+### Decision table
 
-The final same-context transition profile measured three runs per profile:
+The values below are medians of 10 cold runs under the fixed mobile profile. `Difference` is
+Final minus BEFORE; the conclusion also reports the change from the PR before the fix.
 
-- `/app → /coach`: desktop p50 `872 ms`, mobile-throttled p50 `609 ms`; 12 new JS
-  resources and five expected Coach API calls.
-- `/coach → /app`: desktop p50 `389 ms`, mobile-throttled p50 `622 ms`; four new JS
-  resources and nine expected Today API calls.
-- `/login → /coach`: `NO_DATA`. The authenticated synthetic fixture did not expose a
-  valid login-start state consistently; the run only observed the immediate synthetic
-  redirect in some attempts. This is not OAuth or real login evidence.
-- Background/resume and Telegram WebView lifecycle: `NO_DATA`.
+| Screen | BEFORE p50 | PR before fix p50 | Final p50 | Difference | Conclusion |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Active Workout | 3,874 ms | 3,813 ms | 3,827 ms | -47 ms | No regression versus BEFORE; final is 14 ms slower than PR before fix |
+| Programs | 2,979 ms | 3,096 ms | 3,073 ms | +94 ms | Regression confirmed in PR; boundary change recovers 23 ms, residual is small but measurable |
+| Nutrition | 4,089 ms | 4,052 ms | 4,060 ms | -29 ms | No regression versus BEFORE; duplicate `/me` is unchanged |
+| Today | 3,113 ms | 3,482 ms | 3,225 ms | +112 ms | Regression confirmed in PR; boundary change recovers 257 ms |
+| Coach OS | 3,493 ms | 3,527 ms | 3,529 ms | +36 ms | Small lab delta; Coach route graph is unchanged and chunk budget is preserved |
+| Exercise Encyclopedia | 3,490 ms | 3,563 ms | 3,580 ms | +90 ms | Control route remains variable; no encyclopedia-specific code was changed |
 
-The repeated Active Workout and Nutrition duplicate paths are present in BEFORE and final
-under the same fixture; they are not attributed to this change and were not “fixed” by
-adding retries, cache tuning or weakened assertions.
+### Cold-run distribution and transfer evidence
+
+Each cell in the three revision columns is `p50 / p75 / min-max / SD`, in milliseconds.
+Final JavaScript is the observed `count / encoded bytes`; Programs and Encyclopedia have
+late route chunks that sometimes load after the readiness locator, so their resource totals
+are reported as sets.
+
+| Screen | BEFORE distribution | PR before fix distribution | Final distribution | Final JS / TBT p50 |
+| --- | --- | --- | --- | --- |
+| Today | 3,113 / 3,120 / 3,091-3,147 / 16 | 3,482 / 3,498 / 3,469-3,514 / 15 | 3,225 / 3,240 / 3,207-3,244 / 14 | 27 / 218,374 B; 64 ms |
+| Active Workout | 3,874 / 3,887 / 3,855-3,892 / 13 | 3,813 / 3,816 / 3,804-3,824 / 6 | 3,827 / 3,832 / 3,811-3,853 / 12 | 27 / 218,374 B; 176 ms |
+| Nutrition | 4,089 / 4,107 / 3,976-4,113 / 43 | 4,052 / 4,064 / 3,971-4,077 / 30 | 4,060 / 4,069 / 4,001-4,088 / 24 | 31 / 287,049 B; 22 ms |
+| Programs | 2,979 / 2,987 / 2,959-3,011 / 14 | 3,096 / 3,449 / 3,074-3,475 / 178 | 3,073 / 3,084 / 3,054-3,455 / 121 | 27/28/32; 218,374/219,006/268,415 B; 60 ms |
+| Coach OS | 3,493 / 3,506 / 3,472-3,516 / 16 | 3,527 / 3,541 / 3,482-3,556 / 24 | 3,529 / 3,534 / 3,488-3,542 / 17 | 34 / 271,517 B; 7 ms |
+| Exercise Encyclopedia | 3,490 / 3,506 / 3,456-3,511 / 17 | 3,563 / 3,574 / 3,552-3,598 / 13 | 3,580 / 3,587 / 3,461-3,607 / 41 | 29 / 225,336 B; 60 ms |
+
+The PR-before-fix 10-run batch confirms the direction of the earlier observation for Today
+and Programs, but not for Active Workout or Nutrition. The final boundary change materially
+improves Today and slightly improves Programs without restoring the failed public entry
+budget or inflating CoachPage. The remaining Today/Programs residual is not silently
+converted into a new hard runtime budget.
+
+### Warm and in-app transition checks
+
+The five-reload warm p50 values were:
+
+| Scenario | BEFORE | Final | Final - BEFORE |
+| --- | ---: | ---: | ---: |
+| Today | 3,030 ms | 3,421 ms | +391 ms |
+| Active Workout | 3,738 ms | 3,717 ms | -21 ms |
+| Nutrition | 3,998 ms | 3,948 ms | -51 ms |
+| Programs | 3,165 ms | 3,445 ms | +280 ms |
+| Coach OS | 3,434 ms | 3,411 ms | -23 ms |
+| Exercise Encyclopedia | 3,440 ms | 3,405 ms | -35 ms |
+
+These warm values are diagnostic only because the local preview did not return cache hits;
+they should not be used as production warm-cache claims. Same-context transitions stayed
+within the existing route graph: Today -> Nutrition was `1,539 -> 1,583 ms` p50 with four
+new JS resources and the same five expected API paths; Today -> Programs was `237 -> 264 ms`
+p50 with no new JS resources and no duplicate API path. The small transition deltas do not
+show a new navigation waterfall.
+
+### Lazy-boundary experiments
+
+Two isolated variants were tested against the PR-before-fix build:
+
+1. **Private-only preload:** started `AuthenticatedRoutes` and `MiniAppPage` from
+   `bootstrap` only for `/app` or `/coach`. Entry gzip became `93,017 B` and CoachPage
+   stayed `45,800 B`. The five-run Today p50 was `3,475 ms`, so the earlier request start
+   did not produce a reliable gain: the concurrent private requests contended for the same
+   throttled connection.
+2. **Combined `/app` lazy entry (selected):** moved the existing auth wrappers and
+   `MiniAppPage` composition into `AuthenticatedAppPage`, a private-only lazy module. The
+   experimental entry remained `92,983 B` gzip and CoachPage remained `45,800 B`. The
+   five-run Today p50 was `3,228 ms` and Programs p50 was `3,076 ms`; the final 10-run
+   results above confirm the direction. No public route imports this module.
+
+The measured module graph is:
+
+```text
+PR before fix:  public entry -> AuthenticatedRoutes/AuthProvider -> MiniAppPage -> screen
+Final:         public entry -> AuthenticatedAppPage
+                 -> AuthenticatedRoutes/AuthProvider and MiniAppPage -> screen
+```
+
+AuthProvider, AuthGate, OnboardingGate, trainer-intent redirects and the `/api/v1/me`
+authorization check remain in the same trusted path. The change starts independent private
+modules together; it does not display private data before AuthGate completes.
+
+### Hypothesis results
+
+- **Sequential dynamic imports:** confirmed for the PR `/app` graph. In the PR-before-fix
+  trace, auth chunks started around `1,020 ms` while `MiniAppPage` started around `1,478 ms`.
+  In the final trace, `AuthenticatedAppPage`, auth dependencies and `MiniAppPage` started
+  around `1,020 ms`.
+- **Authorization cost:** not bypassed. `/api/v1/me` stayed one request for Today and two
+  for Nutrition in BEFORE, PR-before-fix and Final; the Nutrition duplicate is pre-existing
+  under the fixture.
+- **Additional API/query work:** no new duplicate path or invalidation was found. The
+  canonical Today query-count test remains green.
+- **React rendering:** no React Profiler recording was available (`NO_DATA`). No broad
+  memoization or Query default change was justified.
+- **CoachPage ownership:** preserved. The selected `/app` composition does not move the
+  MiniApp graph into CoachPage; CoachPage stays `186,590 / 45,800 B`.
+
+### Proposed diagnostic runtime control (not owner-approved)
+
+The existing build budget remains the hard CI control: Entry JS gzip must stay at or below
+`96,000 B`. Runtime should remain a separate lab diagnostic because local and CI machines,
+browser cache policy and real Telegram WebView behavior differ.
+
+For future investigations, the evidence-based proposal is:
+
+- use at least 10 alternating cold runs per revision with the fixed profile above;
+- publish p50, p75, min, max, SD, request duplicates, JS count/encoded bytes and TBT;
+- investigate a runtime regression only when p50 and p75 move in the same direction by more
+  than 10% and at least 150 ms, then repeat a second batch before changing code;
+- do not turn this local threshold into a CI wall-time gate or raise the existing bundle
+  limit without an owner decision.
+
+This proposal is a measurement convention, not an approved product SLA.
 
 ## Source-confirmed bounded changes
 
@@ -95,37 +184,61 @@ adding retries, cache tuning or weakened assertions.
    completes before React renders.
 2. `ExerciseGuideVideo` keeps the approved HD source/poster and pauses offscreen or when the
    document is hidden, then resumes without a second source load.
-3. Authenticated route internals remain outside the public bootstrap. `MiniAppPage` is kept
-   as a top-level private dynamic entry so Rollup can share feature chunks instead of placing
-   them in the CoachPage chunk.
-4. The existing `frontend-checks` group keeps the strict `perf:check` immediately after the
-   production build.
-5. No global Query cache tuning, broad memoization, router replacement, media re-encoding,
-   CSS/design change, backend source change or production infrastructure change was justified.
-   The `aiohttp` security follow-up remains lockfile-only.
+3. The authenticated `/app` composition is now one private-only lazy entry so its auth graph
+   and MiniAppPage can start together. Auth, navigation, onboarding, trainer-intent routing,
+   API contracts and data boundaries are unchanged.
+4. CoachPage remains a separate dynamic entry and the existing `perf:check` stays strict.
+5. No global Query tuning, broad memoization, router replacement, media re-encoding, CSS or
+   design change, backend source change or production infrastructure change was justified.
 
-## Verification
+## Reproduction commands
 
-- `npm run build`: PASS on final `b516f9ca`; 569 modules, entry `295,985 / 92,971 B`.
-- `npm run perf:check`: PASS; the unchanged BEFORE guard failure remains `310,971 / 97,485 B`.
-- `npm run test -- --run`: PASS, 157 files / 962 tests.
+The committed opt-in profilers are `frontend/tests/e2e/v11-route-profile.profile.ts` and
+`frontend/tests/e2e/v11-transition-profile.profile.ts`; they use the existing mocked
+`platform-api` fixture and are excluded from the ordinary E2E glob by their `.profile.ts`
+suffix.
+
+```powershell
+cd frontend
+npm run build
+npm run perf:check
+
+$env:PW_BASE_URL = 'http://127.0.0.1:4175'
+$env:PW_EXTERNAL_SERVER = '1'
+$env:V11_PROFILE_MODE = 'cold'
+$env:V11_PROFILE_RUNS = '10'
+$env:V11_PROFILE_REVISION = '415b4e720fe0bb1c51784c40f43a3d9558fd92bd'
+$env:V11_PROFILE_OUT = '..\.artifacts\runtime\tmp\v11-profile-final-cold-10.json'
+npx playwright test --config=playwright.profile.config.ts tests/e2e/v11-route-profile.profile.ts
+
+$env:V11_PROFILE_RUNS = '5'
+$env:V11_PROFILE_OUT = '..\.artifacts\runtime\tmp\v11-transition-final-5.json'
+npx playwright test --config=playwright.profile.config.ts tests/e2e/v11-transition-profile.profile.ts
+```
+
+Run the same commands from the BEFORE worktree with port `4174`, revision
+`42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` and a separate output file. Keep the two preview
+servers and browser contexts isolated; do not publish trace files or fixture credentials.
+
+## Verification and evidence boundaries
+
+- `npm run build`: PASS on final code; 570 modules, entry `295,889 / 92,983 B`.
+- `npm run perf:check`: PASS; the unchanged BEFORE guard failure is `310,971 / 97,485 B`.
+- `npm run typecheck`: PASS.
 - `npm run lint`: PASS, including Russian UI and thick-lime-edge guards.
-- Canonical Chromium Playwright: PASS, 8/8 `performance-hardening.spec.ts` tests.
+- `npm run test`: PASS, 157 files / 962 tests.
+- Targeted Chromium `performance-hardening.spec.ts`: PASS, 8/8.
+- Mobile Chromium: 23/26 functional/geometry checks passed; the three screenshot failures
+  (Progress light/dark and Active Workout full-page) reproduced exactly on BEFORE.
+- Mobile WebKit: 25/26 checks passed; the Active Workout screenshot failure reproduced on
+  BEFORE. No functional, safe-area or geometry failure was introduced.
+- Opt-in cold, warm and transition profiles completed for both revisions as documented above.
 - Pre-commit hooks for the source commit: PASS.
-- Plain local `npm run format:check`: baseline failure across 539 files from existing
-  line-ending formatting differences. No broad formatting rewrite was made; the repository
-  CI contract uses `--end-of-line auto`.
-- Full route and transition aggregates are retained as ignored local diagnostics under
-  `.artifacts/runtime/tmp/profile-final.json` and `transitions-final.json`; this report is
-  the committed summary.
+- Real devices, Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, React Profiler,
+  CPU/heap field data and production API traces: `NO_DATA`.
 
-## Evidence boundaries and release status
-
-- Real mobile devices, real Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP,
-  production API traces, React Profiler recordings and reliable CPU/heap field profiles:
-  `NO_DATA`.
-- The final source evidence is technically complete for the scoped public-entry and
-  CoachPage chunk work. Because the synthetic mobile private-route matrix still shows a
-  route-graph/auth-boundary cost without an owner-approved private-route budget, status is
-  `NEEDS_WORK` for release approval rather than an unsupported `READY_FOR_RELEASE_APPROVAL`.
-- Merge, production deploy and Issue closure remain separate owner-authorized gates.
+The confirmed PR regression was the `/app` lazy waterfall. The selected fix is implemented
+and measured, while the remaining small lab residual and the proposed runtime convention are
+explicitly not treated as owner-approved SLAs. Merge, production deploy and Issue closure
+remain separate owner-authorized gates. Final status: `READY_FOR_RELEASE_APPROVAL` after
+exact-head required CI is green.
