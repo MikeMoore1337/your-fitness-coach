@@ -170,7 +170,7 @@ exit 0
 
     $config = [ordered]@{
         local_root = $local
-        retention_days = 30
+        retention_days = 7
         minimum_valid_backups = 2
         stale_after_hours = 36
         minimum_free_bytes = 0
@@ -202,6 +202,33 @@ exit 0
     $persistedSuccess = Get-Content -LiteralPath $config.status_file -Raw | ConvertFrom-Json
     if ($persistedSuccess.status_write_result -ne "SUCCESS") { throw "successful status write must persist SUCCESS in the status file" }
     Invoke-PullCase "repeat-is-idempotent" 0 ""
+
+    # Owner's simple-folder choice is supported, but cannot masquerade as BitLocker.
+    $config.encryption_at_rest.mode = "none"
+    $config.encryption_at_rest.approved = $false
+    $config.encryption_at_rest.key_recovery_document = "NOT_APPLICABLE"
+    $config.encryption_at_rest.plaintext_risk_acknowledged = $true
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "plain-folder-explicit-opt-in" 0 ""
+
+    $config.encryption_at_rest.plaintext_risk_acknowledged = $false
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "plain-folder-without-risk-ack-is-blocked" 25 ""
+
+    $config.encryption_at_rest.plaintext_risk_acknowledged = "true"
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "plain-folder-string-risk-ack-is-blocked" 25 ""
+
+    $config.encryption_at_rest.plaintext_risk_acknowledged = $true
+    $config.encryption_at_rest.approved = $true
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "plain-folder-fake-encryption-approval-is-blocked" 25 ""
+
+    $config.encryption_at_rest.mode = "bitlocker"
+    $config.encryption_at_rest.approved = $true
+    $config.encryption_at_rest.key_recovery_document = "synthetic-only"
+    $config.encryption_at_rest.plaintext_risk_acknowledged = $false
+    Write-JsonFile $configPath $config
     Remove-Item -LiteralPath (Join-Path $local $entry.manifest_name) -Force
     Invoke-PullCase "orphan-archive-recovery" 0 ""
 
