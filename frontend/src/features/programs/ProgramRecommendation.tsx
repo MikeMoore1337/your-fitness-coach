@@ -1,7 +1,7 @@
 import { FormEvent, useId, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type {
   ApiSchemas,
   Exercise,
@@ -334,7 +334,7 @@ export function ProgramRecommendation({
       if (
         reason instanceof ApiError &&
         reason.status === 409 &&
-        reason.message.toLowerCase().includes('архив')
+        apiErrorDetailIncludes(reason, 'архив')
       ) {
         const accepted = await confirm({
           title: 'Заменить активную программу?',

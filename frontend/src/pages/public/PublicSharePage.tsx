@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useOptionalAuth } from '../../app/AuthProvider';
-import { ApiError, api } from '../../shared/api/client';
+import { ApiError, api, apiErrorDetailIncludes } from '../../shared/api/client';
 import type {
   PublicShare,
   PublicShareImportResponse,
@@ -252,7 +252,7 @@ function PublicShareContent({ share }: { share: PublicShare }) {
         reason instanceof ApiError &&
         reason.status === 409 &&
         !replaceActive &&
-        reason.message.toLowerCase().includes('confirmation')
+        apiErrorDetailIncludes(reason, 'confirmation')
       ) {
         const accepted = await confirm({
           title: 'Заменить активную программу?',

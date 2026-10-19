@@ -139,7 +139,9 @@ describe('WorkoutFeedback', () => {
     await user.type(screen.getByLabelText('Комментарий'), 'Следите за коленями.');
     await user.click(screen.getByRole('button', { name: 'Отправить комментарий' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Временная ошибка сети');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Сервис временно недоступен. Попробуйте ещё раз.',
+    );
     expect(screen.getByLabelText('Комментарий')).toHaveValue('Следите за коленями.');
     queryClient.setQueryData(queryKeys.workoutComments.trainer(11, 501), [replayedComment]);
     await user.click(screen.getByRole('button', { name: 'Повторить отправку' }));

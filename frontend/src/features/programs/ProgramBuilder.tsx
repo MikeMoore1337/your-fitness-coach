@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, apiErrorDetailIncludes } from '../../shared/api/client';
 import type { Exercise, ProgramTemplate, ProgramTemplateCreate } from '../../shared/api/types';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { DisclosureIcon, Badge, Card, LoadingState, TrashIcon } from '../../shared/ui/common';
@@ -294,7 +294,7 @@ export function ProgramBuilder({
         reason instanceof ApiError &&
         reason.status === 409 &&
         !variables.replaceActive &&
-        reason.message.toLowerCase().includes('confirmation')
+        apiErrorDetailIncludes(reason, 'confirmation')
       ) {
         if (
           await confirm({
@@ -311,7 +311,7 @@ export function ProgramBuilder({
       toast(
         reason instanceof ApiError && reason.status === 409
           ? 'Программа уже изменилась на другом устройстве. Обновите список и повторите сохранение.'
-          : reason instanceof ApiError && reason.message.toLowerCase().includes('in progress')
+          : apiErrorDetailIncludes(reason, 'in progress')
             ? 'Сначала завершите текущую тренировку — во время неё программу заменить нельзя.'
             : (reason as Error).message,
         'error',
