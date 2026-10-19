@@ -46,4 +46,3 @@ changed.
 - Do not run restore, migrations, DNS changes, traffic cutover or provider calls.
 - Do not claim BitLocker absent when the OS checks were access-denied.
 - Do not infer merge, deployment or Issue closure from green Phase A CI.
-
