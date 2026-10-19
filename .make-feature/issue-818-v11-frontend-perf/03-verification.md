@@ -1,7 +1,7 @@
 # Make Feature verification — Product V11-03 / Issue #818
 
-Status: READY_FOR_RELEASE_APPROVAL after exact-head required CI; owner release approval,
-merge, deploy and Issue closure remain pending.
+Status: NEEDS_WORK pending exact-head required CI; owner release approval, merge, deploy and
+Issue closure remain pending.
 
 | Criterion | Action | Result |
 | --- | --- | --- |
@@ -18,7 +18,7 @@ merge, deploy and Issue closure remain pending.
 | Mobile WebKit | Critical mobile regression suite | 25/26 passed; Active Workout screenshot failure reproduced on BEFORE |
 | Warm/transition evidence | Opt-in profiles | completed; warm cache limitation is documented |
 | Pre-commit | Source commit hooks | passed |
-| Exact-head CI | PR #1126 after documentation commit | must be re-read before release approval |
+| Exact-head CI | [run 39321786132](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39321786132) on `0d46ff8` | aggregate failed only unchanged `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`) |
 | Field/device proof | Real device, Telegram WebView, CrUX/RUM, production traces | `NO_DATA` |
 
 ## Residuals

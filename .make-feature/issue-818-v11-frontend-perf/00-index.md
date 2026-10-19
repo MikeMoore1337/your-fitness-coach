@@ -1,6 +1,6 @@
 # Make Feature index — Product V11-03 / Issue #818
 
-Status: READY_FOR_RELEASE_APPROVAL after exact-head required CI; merge, deploy and Issue closure remain separate owner gates.
+Status: NEEDS_WORK pending exact-head required CI; merge, deploy and Issue closure remain separate owner gates.
 Mode: normal — existing PR continuation with matched 10-run mobile evidence and a bounded private lazy-boundary fix.
 Branch: `codex/818-v11-frontend-perf`; PR #1126.
 Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1`.
@@ -23,6 +23,9 @@ Entry JS remains `295,889 raw / 92,983 gzip`; CoachPage remains `186,590 raw / 4
 - `perf:check`, typecheck, lint, Vitest, targeted Chromium and mobile Chromium/WebKit checks
   are recorded; baseline-only screenshot failures are not misclassified as new regressions.
 - Exact-head GitHub checks are re-read after the evidence/documentation commit.
+- Run [39321786132](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39321786132)
+  on `0d46ff806c3978e7f8f14b08e8d9898fd989e133` completed with `checks: failure` only on the
+  unchanged reduced-motion assertion at `progress-experience.spec.ts:2992` (`0s` vs `1e-05s`).
 - Merge, deploy and Issue closure remain owner-authorized.
 
 ## Decisions

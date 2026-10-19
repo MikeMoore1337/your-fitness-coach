@@ -1,7 +1,7 @@
 # Make Feature solution — Product V11-03 / Issue #818
 
-Status: READY_FOR_RELEASE_APPROVAL after exact-head required CI; the remaining runtime
-threshold is a proposed diagnostic convention, not an owner approval.
+Status: NEEDS_WORK pending exact-head required CI; the remaining runtime threshold is a
+proposed diagnostic convention, not an owner approval.
 Context: existing Draft PR #1126; final application code `415b4e720fe0bb1c51784c40f43a3d9558fd92bd`.
 
 ## Confirmed cause and selected fix
@@ -36,3 +36,7 @@ The exact 10-run cold, five-run warm, five-run transition and isolated experimen
 in [the implementation report](../../../docs/development/product-v11-03-frontend-performance-2026-10-19.md).
 The opt-in profilers are `frontend/tests/e2e/*profile.ts`; the ordinary E2E glob does not run
 them. Exact-head GitHub checks must be re-read after the final documentation commit.
+The latest completed evidence run [39321786132](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39321786132)
+on `0d46ff806c3978e7f8f14b08e8d9898fd989e133` failed only the unchanged reduced-motion
+assertion (`progress-experience.spec.ts:2992`, `0s` vs `1e-05s`); release approval remains
+blocked until that repository check is resolved or owner-approved as baseline noise.

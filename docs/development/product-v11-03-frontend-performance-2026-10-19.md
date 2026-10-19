@@ -242,6 +242,10 @@ servers and browser contexts isolated; do not publish trace files or fixture cre
   jobs passed. This is a CI acceptance blocker, not evidence of a private-route performance
   regression; it remains `NEEDS_WORK` until the repository check is resolved or owner-approved
   as baseline noise.
+- The subsequent exact-head run [39321786132](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39321786132)
+  completed on `0d46ff806c3978e7f8f14b08e8d9898fd989e133` with the same aggregate failure.
+  `Frontend smoke (3/5)` again failed only `progress-experience.spec.ts:2992` with expected
+  `0s` and received `1e-05s`; build, unit, mobile, security and other completed jobs passed.
 - Real devices, Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, React Profiler,
   CPU/heap field data and production API traces: `NO_DATA`.
 
