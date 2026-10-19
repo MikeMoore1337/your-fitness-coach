@@ -1,13 +1,14 @@
 {
   "local_root": "D:\\YFC-Backups",
-  "retention_days": 30,
+  "retention_days": 7,
   "minimum_valid_backups": 2,
   "stale_after_hours": 36,
   "minimum_free_bytes": 1073741824,
   "encryption_at_rest": {
-    "mode": "OWNER_APPROVAL_REQUIRED",
+    "mode": "none",
     "approved": false,
-    "key_recovery_document": "REPLACE_WITH_OWNER_APPROVED_KEY_RECOVERY_REFERENCE"
+    "plaintext_risk_acknowledged": false,
+    "key_recovery_document": "NOT_APPLICABLE"
   },
   "lock_file": "D:\\YFC-Backups\\backup-pull.lock",
   "status_file": "D:\\YFC-Backups\\backup-status.json",
