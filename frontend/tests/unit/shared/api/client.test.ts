@@ -97,7 +97,9 @@ describe('api client', () => {
     const body = { detail: 'expired' };
     vi.spyOn(globalThis, 'fetch')
       .mockResolvedValueOnce(new Response(JSON.stringify(body), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'invalid refresh' }), { status: 401 }));
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ detail: 'invalid refresh' }), { status: 401 }),
+      );
 
     await expect(api('/api/v1/me')).rejects.toMatchObject({
       status: 401,
