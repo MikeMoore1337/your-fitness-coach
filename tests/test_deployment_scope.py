@@ -64,6 +64,35 @@ def test_runtime_scripts_copied_into_images_require_deploy() -> None:
     ]
 
 
+def test_deploy_directory_remains_deployable() -> None:
+    decision = classify_paths(["deploy/backup/production-pull.config.json"])
+
+    assert decision["deploy_required"] is True
+    assert decision["deploy_paths"] == ["deploy/backup/production-pull.config.json"]
+
+
+def test_v11_rec_01_full_diff_is_no_deploy() -> None:
+    decision = classify_paths(
+        [
+            "docs/operations/v11-rec-01-off-host-backup-recovery.md",
+            "docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull-task.example.xml",
+            "docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json",
+            "scripts/backup_manifest.py",
+            "scripts/ci_contract.py",
+            "scripts/db_maintenance.py",
+            "scripts/windows_backup_pull.ps1",
+            "scripts/windows_backup_pull_selftest.ps1",
+            "tests/test_backup_manifest.py",
+            "tests/test_ci_contract.py",
+            "tests/test_deployment_scope.py",
+        ]
+    )
+
+    assert decision["deploy_required"] is False
+    assert decision["deploy_paths"] == []
+    assert decision["no_deploy_paths"] == decision["changed_paths"]
+
+
 def test_unknown_non_governance_path_is_conservative() -> None:
     decision = classify_paths(["config/production-feature.toml"])
 

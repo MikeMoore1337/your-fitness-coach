@@ -199,6 +199,8 @@ exit 0
     $entry = Add-RemoteBackup "fitminiapp-20261018T120000Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-one")) "2026-10-18T12:00:00Z"
     Write-RemoteIndex @($entry)
     Invoke-PullCase "success" 0 ""
+    $persistedSuccess = Get-Content -LiteralPath $config.status_file -Raw | ConvertFrom-Json
+    if ($persistedSuccess.status_write_result -ne "SUCCESS") { throw "successful status write must persist SUCCESS in the status file" }
     Invoke-PullCase "repeat-is-idempotent" 0 ""
     Remove-Item -LiteralPath (Join-Path $local $entry.manifest_name) -Force
     Invoke-PullCase "orphan-archive-recovery" 0 ""
@@ -318,11 +320,15 @@ exit 0
     Invoke-PullCase "failed-status-write" 22 "NETWORK"
     $failedStatusWrite = Get-OutputStatus
     if ($failedStatusWrite.status_write_result -ne "FAILED") { throw "failed status write must be visible in the pull result" }
+    $failureSidecarPath = "$($config.status_file).failure"
+    if (-not (Test-Path -LiteralPath $failureSidecarPath -PathType Leaf)) { throw "failed status write must preserve a failure sidecar" }
+    $failureSidecar = Get-Content -LiteralPath $failureSidecarPath -Raw | ConvertFrom-Json
+    if ($failureSidecar.last_run_result -ne "FAILED" -or $failureSidecar.last_failure_code -ne "NETWORK") { throw "failure sidecar must preserve the failed pull" }
     $statusAfterWriteFailure = Invoke-StatusCase "failed-status-write-retains-error" 22
     if ($statusAfterWriteFailure.state -ne "NETWORK" -or $statusAfterWriteFailure.last_failure_code -ne "NETWORK") { throw "status sidecar did not preserve the failed pull when the primary status write failed" }
     Invoke-PullCase "successful-status-write-failure" 27 ""
     $successfulStatusWriteFailure = Get-OutputStatus
-    if ($successfulStatusWriteFailure.state -ne "UNEXPECTED" -or $successfulStatusWriteFailure.last_run_result -ne "FAILED" -or $successfulStatusWriteFailure.last_failure_code -ne "UNEXPECTED") {
+    if ($successfulStatusWriteFailure.state -ne "UNEXPECTED" -or $successfulStatusWriteFailure.last_run_result -ne "FAILED" -or $successfulStatusWriteFailure.last_failure_code -ne "UNEXPECTED" -or $successfulStatusWriteFailure.status_write_result -ne "FAILED") {
         throw "a successful sync with a failed status write must report an UNEXPECTED persisted failure"
     }
     $statusAfterSuccessfulWriteFailure = Invoke-StatusCase "successful-status-write-failure-retains-error" 27

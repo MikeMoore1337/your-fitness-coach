@@ -19,7 +19,7 @@ VPS не подключается к Windows-ПК. На VPS использует
 
 В Phase A намеренно не включены: production credentials, реальные дампы, Windows Task
 Scheduler registration, изменение VPS, платное хранилище, WAL/PITR и восстановление с
-production DNS. XML в `deploy/backup/windows-pull-task.example.xml` — только шаблон для
+production DNS. XML в `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull-task.example.xml` — только шаблон для
 отдельного owner-approved шага.
 
 ## 2. Что именно считается опубликованной копией
@@ -74,7 +74,7 @@ digests не переданы доверенным окружением, identit
 
 ## 4. Конфигурация Windows pull
 
-Начальная форма: `deploy/backup/windows-pull.config.example.json`. Перед реальным запуском
+Начальная форма: `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json`. Перед реальным запуском
 владелец должен заменить placeholders, предоставить ключ, pinned host key и документ
 восстановления ключа. Поле `encryption_at_rest` по умолчанию имеет
 `mode=OWNER_APPROVAL_REQUIRED` и `approved=false`; Pull с ним завершается `CONFIG_INVALID`.

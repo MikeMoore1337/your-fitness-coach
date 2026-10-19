@@ -755,12 +755,11 @@ function Invoke-Pull {
         $status.last_run_at_utc = $runAt
         $status.last_successful_sync_at_utc = $runAt
         if ($downloaded -gt 0) { $status.last_successful_copy_received_at_utc = $runAt }
-        $status.status_write_result = "PENDING"
+        $status.status_write_result = "SUCCESS"
         $status.downloaded_count = $downloaded
         $status.rotated_count = $removed
         try {
             Write-AtomicStatus $Config $status
-            $status.status_write_result = "SUCCESS"
         }
         catch {
             $status.state = "UNEXPECTED"
@@ -793,7 +792,11 @@ function Invoke-Pull {
         if ($lockAcquired) {
             try { Write-AtomicFailureRecord $Config $status } catch {
             }
-            try { Write-AtomicStatus $Config $status; $status.status_write_result = "SUCCESS" } catch {
+            try {
+                $status.status_write_result = "SUCCESS"
+                Write-AtomicStatus $Config $status
+            }
+            catch {
                 $status.status_write_result = "FAILED"
             }
             Write-SanitizedLog $Config $code
