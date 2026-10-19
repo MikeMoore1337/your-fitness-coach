@@ -146,6 +146,17 @@ function errorDetail(body: unknown): unknown {
   return (detail as { message?: unknown }).message;
 }
 
+export function apiErrorDetailIncludes(error: unknown, phrase: string): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const normalizedPhrase = phrase.trim().toLowerCase();
+  const detail = errorDetail(error.body);
+  return Boolean(
+    normalizedPhrase &&
+    typeof detail === 'string' &&
+    detail.toLowerCase().includes(normalizedPhrase),
+  );
+}
+
 function statusErrorMessage(status: number): string {
   if (status >= 500 && status <= 599) return SERVER_ERROR_MESSAGE;
   return STATUS_ERROR_MESSAGES[status] ?? DEFAULT_USER_FACING_ERROR;

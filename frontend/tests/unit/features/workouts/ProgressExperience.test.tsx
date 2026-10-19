@@ -633,7 +633,9 @@ describe('ProgressExperience', () => {
     installApi({ failSummary: true });
     renderExperience('?section=progress&progress_view=training');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Сводка временно недоступна');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Сервис временно недоступен. Попробуйте ещё раз.',
+    );
     const history = screen
       .getByRole('heading', { name: 'История упражнений' })
       .closest('.progress-subsection');
