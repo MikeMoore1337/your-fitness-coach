@@ -211,6 +211,14 @@ exit 0
     Write-JsonFile $configPath $config
     Invoke-PullCase "plain-folder-explicit-opt-in" 0 ""
 
+    $originalLocalRoot = $config.local_root
+    $missingPlainRoot = Join-Path $root "plain-root-not-created"
+    $config.local_root = $missingPlainRoot
+    Write-JsonFile $configPath $config
+    Invoke-PullCase "plain-folder-must-exist-before-pull" 25 ""
+    if (Test-Path -LiteralPath $missingPlainRoot) { throw "plain-folder pull created an unauthorized directory" }
+    $config.local_root = $originalLocalRoot
+
     $config.encryption_at_rest.plaintext_risk_acknowledged = $false
     Write-JsonFile $configPath $config
     Invoke-PullCase "plain-folder-without-risk-ack-is-blocked" 25 ""
