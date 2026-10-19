@@ -78,7 +78,6 @@ function isPublicLandingRoute(path: string): boolean {
 
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
-const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const LandingV10AthletePage = lazy(() => import('./pages/landing/LandingV10AthletePage'));
 const LandingV10CoachPage = lazy(() => import('./pages/landing/LandingV10CoachPage'));
@@ -108,9 +107,9 @@ const AuthenticatedRoute = lazy(() =>
     default: module.AuthenticatedRoute,
   })),
 );
-const AuthenticatedAppRoute = lazy(() =>
-  import('./app/AuthenticatedRoutes').then((module) => ({
-    default: module.AuthenticatedAppRoute,
+const AuthenticatedAppPage = lazy(() =>
+  import('./app/AuthenticatedAppPage').then((module) => ({
+    default: module.AuthenticatedAppPage,
   })),
 );
 function loadTelegramSdk(): Promise<void> {
@@ -204,14 +203,7 @@ function AppRoutes() {
       );
     }
   }
-  if (path === '/app')
-    return (
-      <AuthenticatedRoute>
-        <AuthenticatedAppRoute>
-          <MiniAppPage />
-        </AuthenticatedAppRoute>
-      </AuthenticatedRoute>
-    );
+  if (path === '/app') return <AuthenticatedAppPage />;
   if (path === '/app/report')
     return (
       <AuthenticatedRoute>
