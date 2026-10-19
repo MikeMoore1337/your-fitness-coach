@@ -1,4 +1,4 @@
-# Product V11-03 - frontend performance: implementation evidence
+# Product V11-03 - frontend performance: final profiling evidence
 
 Issue: [#818](https://github.com/MikeMoore1337/your-fitness-coach/issues/818) ·
 PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
@@ -6,69 +6,126 @@ PR: [#1126](https://github.com/MikeMoore1337/your-fitness-coach/pull/1126) ·
 
 ## Revisions and measurement method
 
-- Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` (`origin/master` at measurement time).
-- Matched AFTER application code: `4e6b85235bb425ab7bcbcc81659149fa2af244d3` (PR #1126 head before this evidence-only documentation commit).
-- The follow-up security unblock changes only `uv.lock`, refreshing `aiohttp` from `3.14.3` to `3.14.5`; it does not change backend source or the measured frontend application code.
-- Both revisions used the same `npm ci --ignore-scripts --no-audit --no-fund`, Node `24.14.0`, npm `11.11.1`, Vite `7.3.6`, Windows runner and existing lockfile.
-- Browser lab used the existing Playwright Chromium harness with mocked API fixtures, reduced motion, mobile `390x844` and desktop `1440x900`. This is synthetic local evidence, not a physical-device or production measurement.
-- Historical #815 values remain useful context, but are not used as the #818 BEFORE.
+- Matched BEFORE: `42a75a5f1fbea025204c5d1e1a928bfd6581b1a1` (`origin/master`).
+- Previous PR application head: `1cb669bc91aab8390ae4cd16568f710688a85df0`.
+- Final measured application source: `b516f9ca` (`perf(frontend): preserve private route chunk split`).
+- The parent PR follow-up after the measured application code is the lockfile-only `aiohttp`
+  security refresh; it does not change backend source or the measured frontend behavior.
+- Both builds used Node `24.14.0`, npm `11.11.1`, Vite `7.3.6`, Windows and the existing
+  lockfile. The browser lab used Playwright Chromium `151.0.7922.34`, mocked
+  `platform-api` fixtures, reduced motion, desktop `1440x900` and mobile `390x844`.
+- Mobile throttling was CPU `4x`, `150 ms` latency, `1.5 Mbps` down / `750 Kbps` up.
+- The full route profiler used three runs per route/cache state and five runs for Coach OS;
+  the canonical `performance-hardening.spec.ts` remains the CI regression suite.
+- This is synthetic local evidence. It is not a physical-device, Telegram WebView, CrUX,
+  RUM or production measurement.
 
-## Comparable bundle results
+## Bundle results and CoachPage investigation
 
-| Metric | BEFORE `42a75a5f` | AFTER `4e6b8523` | Change | Result |
+| Metric | BEFORE `42a75a5f` | Previous PR app `1cb669bc` | Final `b516f9ca` | Final result |
 | --- | ---: | ---: | ---: | --- |
-| Entry JS raw | 310,971 B | 295,379 B | -15,592 B | PASS |
-| Entry JS gzip | 97,485 B | 92,773 B | -4,712 B | PASS; 3,227 B below 96,000 B |
-| Entry JS gzip budget | 96,000 B | 96,000 B | unchanged | unchanged contract |
-| Entry CSS raw | 64,478 B | 64,478 B | 0 B | PASS |
-| Entry CSS gzip | 13,216 B | 13,216 B | 0 B | PASS |
-| Public assets | 31 / 647,377 B | 31 / 647,377 B | 0 B | PASS |
-| Largest public asset | 100,570 B | 100,570 B | 0 B | PASS |
-| Performance guard | FAIL: +1,485 B gzip and +971 B raw | PASS | budget recovered | verified |
+| Entry JS raw | 310,971 B | 295,379 B | 295,985 B | PASS |
+| Entry JS gzip | 97,485 B | 92,773 B | 92,971 B | PASS; 3,029 B below 96,000 B |
+| Entry CSS raw / gzip | 64,478 / 13,216 B | 64,478 / 13,216 B | 64,478 / 13,216 B | unchanged |
+| Public assets | 31 / 647,377 B | 31 / 647,377 B | 31 / 647,377 B | unchanged |
+| Largest public asset | 100,570 B | 100,570 B | 100,570 B | unchanged |
+| `CoachPage` raw / gzip | 186,512 / 45,771 B | 386,984 / 97,795 B | 186,586 / 45,799 B | returned to baseline-sized route chunk |
+| `perf:check` | expected FAIL | PASS | PASS | budget unchanged |
 
-The BEFORE failure is the current-master fact that the existing guard exposed. The AFTER entry reduction comes from deferring Telegram demo-only session code and moving authenticated route internals behind an auth-only lazy boundary. No budget was raised.
+The earlier `CoachPage` growth was a Rollup dependency-ownership effect, not new Coach OS
+business logic. Moving `MiniAppPage` under the new lazy `AuthenticatedRoutes` boundary made
+private feature modules attach to the CoachPage dynamic entry. The final narrow fix keeps
+`MiniAppPage` as a top-level dynamic import and passes it through `AuthenticatedAppRoute`;
+the auth boundary, route decisions and child behavior stay unchanged. This restores the
+private route split without returning authenticated code to the public entry.
 
-Key chunk observation: `CoachPage` moved from 186.51 kB raw / 45.77 kB gzip to 386.98 kB raw / 97.80 kB gzip because authenticated dependencies now remain with the private route. That is an intentional route-local trade-off for a smaller public entry; authenticated route performance was not claimed improved without a route timing profile. New auth chunks were emitted separately: `AuthenticatedRoutes` 3.80 kB raw / 1.86 kB gzip, `AuthProvider` 9.86 kB raw / 3.57 kB gzip and `OnboardingGate` 0.13 kB raw / 0.13 kB gzip.
+The final build emits `AuthenticatedRoutes` at 3,028 raw / 1,498 gzip and `AuthProvider` at
+9,858 raw / 3,570 gzip. No performance budget was raised.
 
-## Comparable browser-lab observations
+## Final route-lab matrix
 
-The same `performance-hardening.spec.ts` scenarios passed on both revisions (BEFORE 7/7, AFTER 8/8; AFTER includes the new Telegram demo handoff regression).
+`ready` is the time to the scenario's visible synthetic locator, not a field UX metric.
+`TBT` and Long Tasks are browser-lab observations. Resource-timing transfer bytes are
+diagnostic only; build artifact sizes above are the authoritative bundle measurements.
 
-| Lab observation, one run per revision | BEFORE | AFTER | Interpretation |
-| --- | ---: | ---: | --- |
-| Mobile `/` LCP | 504 ms | 564 ms | within 2,500 ms guard; single-run variance, no improvement claim |
-| Mobile `/login` LCP | 368 ms | 368 ms | unchanged in this run |
-| Desktop `/` LCP | 448 ms | 444 ms | within guard; single-run variance |
-| Desktop `/` CLS | 0.022907 | 0.022907 | unchanged |
-| Desktop `/` INP | 32 ms | 32 ms | unchanged |
-| Today API requests | 11 expected paths × 1 | 11 expected paths × 1 | no duplicate fetch in either run |
-| Web/TMA resource graph | equal | equal | no dedicated TMA bundle or public-content chunk in the app flow |
+| Scenario | Cache/profile | BEFORE ready p50 | Final ready p50 | BEFORE → final TBT p50 | API duplicate paths |
+| --- | --- | ---: | ---: | ---: | --- |
+| Landing | cold desktop | 443 ms | 459 ms | 0 → 0 ms | none |
+| Today | cold desktop | 874 ms | 875 ms | 0 → 0 ms | none |
+| Active Workout | cold desktop | 960 ms | 973 ms | 0 → 0 ms | same `progress/summary`, `week` |
+| Nutrition | cold desktop | 447 ms* | 875 ms | 0 → 0 ms | same `/api/v1/me` |
+| Exercise Encyclopedia | cold desktop | 867 ms | 887 ms | 0 → 0 ms | none |
+| Programs | cold desktop | 875 ms | 871 ms | 0 → 0 ms | none |
+| Coach OS | cold desktop | 873 ms | 873 ms | 0 → 0 ms | none |
+| Today | cold mobile-throttled | 2,005 ms | 2,105 ms | 11 → 143 ms | none |
+| Active Workout | cold mobile-throttled | 2,343 ms | 2,839 ms | 117 → 124 ms | same `progress/summary`, `week` |
+| Nutrition | cold mobile-throttled | 2,053 ms | 2,275 ms | 121 → 212 ms | same `/api/v1/me` |
+| Exercise Encyclopedia | cold mobile-throttled | 1,993 ms | 1,973 ms | 12 → 101 ms | none |
+| Programs | cold mobile-throttled | 1,739 ms | 2,011 ms | 10 → 95 ms | none |
+| Coach OS | cold mobile-throttled | 1,983 ms | 2,152 ms | 37 → 12 ms | none |
 
-The Playwright LCP/CLS/INP values are laboratory observations from mocked Chromium, not CrUX, RUM, production field data or a physical Telegram WebView. Route-switch timing, React Profiler cost, low-end device CPU/memory and real resume behavior remain `NO_DATA`.
+`*` The BEFORE Nutrition p50 has a wide `436–860 ms` range; it is not treated as a
+stable improvement or regression. The final mobile matrix shows a remaining synthetic
+private-route cost from the auth-only boundary and the resulting route graph. The narrow
+source fix resolves the confirmed CoachPage chunk-growth problem, but it does not prove a
+private mobile route performance budget. A stricter private-route budget or a real-device
+calibration would need a separate scoped decision; no broader routing or cache rewrite is
+introduced here.
+
+### Coach transitions
+
+The final same-context transition profile measured three runs per profile:
+
+- `/app → /coach`: desktop p50 `872 ms`, mobile-throttled p50 `609 ms`; 12 new JS
+  resources and five expected Coach API calls.
+- `/coach → /app`: desktop p50 `389 ms`, mobile-throttled p50 `622 ms`; four new JS
+  resources and nine expected Today API calls.
+- `/login → /coach`: `NO_DATA`. The authenticated synthetic fixture did not expose a
+  valid login-start state consistently; the run only observed the immediate synthetic
+  redirect in some attempts. This is not OAuth or real login evidence.
+- Background/resume and Telegram WebView lifecycle: `NO_DATA`.
+
+The repeated Active Workout and Nutrition duplicate paths are present in BEFORE and final
+under the same fixture; they are not attributed to this change and were not “fixed” by
+adding retries, cache tuning or weakened assertions.
 
 ## Source-confirmed bounded changes
 
-1. `main.tsx` now loads demo session code only for Telegram `/demo`, while cleanup still completes before React render.
-2. `ExerciseGuideVideo` keeps its existing approved HD source and poster, but keeps observing visibility so looping video pauses offscreen and on document hide, then resumes without a second source load.
-3. The existing authenticated wrapper, coach-vs-personal navigation decision and trainer-intent routing moved into an auth-only lazy module. Private behavior is unchanged; public bootstrap no longer carries those dependencies.
-4. The existing `frontend-checks` group now runs `npm run perf:check` immediately after the production build. The strict budget is unchanged.
-5. No global Query cache tuning, broad memoization, router replacement, media re-encoding, CSS/design change, backend source change or production infrastructure change was justified by the available evidence. The only follow-up outside frontend source is the lockfile-only `aiohttp` security refresh required by the repository audit.
+1. Telegram demo-only session code remains deferred until Telegram `/demo`; cleanup still
+   completes before React renders.
+2. `ExerciseGuideVideo` keeps the approved HD source/poster and pauses offscreen or when the
+   document is hidden, then resumes without a second source load.
+3. Authenticated route internals remain outside the public bootstrap. `MiniAppPage` is kept
+   as a top-level private dynamic entry so Rollup can share feature chunks instead of placing
+   them in the CoachPage chunk.
+4. The existing `frontend-checks` group keeps the strict `perf:check` immediately after the
+   production build.
+5. No global Query cache tuning, broad memoization, router replacement, media re-encoding,
+   CSS/design change, backend source change or production infrastructure change was justified.
+   The `aiohttp` security follow-up remains lockfile-only.
 
 ## Verification
 
-- `npm run build`: PASS on both matched revisions; 568 modules BEFORE, 569 AFTER.
-- `npm run perf:check`: FAIL on BEFORE with the recorded budget breach; PASS on AFTER.
-- `npm run typecheck`: PASS.
+- `npm run build`: PASS on final `b516f9ca`; 569 modules, entry `295,985 / 92,971 B`.
+- `npm run perf:check`: PASS; the unchanged BEFORE guard failure remains `310,971 / 97,485 B`.
+- `npm run test -- --run`: PASS, 157 files / 962 tests.
 - `npm run lint`: PASS, including Russian UI and thick-lime-edge guards.
-- CI-compatible format command `npx prettier --check . --end-of-line auto`: PASS.
-- Full `npm run test`: **157 files / 962 tests passed** on AFTER.
-- Targeted Chromium Playwright: BEFORE 7 passed; AFTER 8 passed.
-- `uv audit --locked --no-group dev --no-group scheduled-report`: PASS after the lockfile-only `aiohttp` refresh; no known vulnerabilities reported.
-- Exact code-head GitHub Actions run [39290956448](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39290956448) for `4e6b8523`: required checks reported green, including frontend checks, unit, smoke, Chromium/WebKit mobile regression, security and aggregate `checks`.
-- The plain local `npm run format:check` command reports pre-existing line-ending formatting differences across 539 files; the repository CI contract uses `--end-of-line auto`, which passed. No broad formatting rewrite was made.
+- Canonical Chromium Playwright: PASS, 8/8 `performance-hardening.spec.ts` tests.
+- Pre-commit hooks for the source commit: PASS.
+- Plain local `npm run format:check`: baseline failure across 539 files from existing
+  line-ending formatting differences. No broad formatting rewrite was made; the repository
+  CI contract uses `--end-of-line auto`.
+- Full route and transition aggregates are retained as ignored local diagnostics under
+  `.artifacts/runtime/tmp/profile-final.json` and `transitions-final.json`; this report is
+  the committed summary.
 
 ## Evidence boundaries and release status
 
-- Real mobile devices, real Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, production API traces, React Profiler recordings and memory/CPU profiles: `NO_DATA`.
-- No visual composition, design token, HD media asset, animation duration/FPS, workout/nutrition business rule, authorization policy, backend source or production infrastructure changed; the follow-up dependency change is lockfile-only.
-- Status: `READY_FOR_RELEASE_APPROVAL` for the scoped implementation and evidence. Merge, production deploy and Issue closure remain separate owner-authorized gates.
+- Real mobile devices, real Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP,
+  production API traces, React Profiler recordings and reliable CPU/heap field profiles:
+  `NO_DATA`.
+- The final source evidence is technically complete for the scoped public-entry and
+  CoachPage chunk work. Because the synthetic mobile private-route matrix still shows a
+  route-graph/auth-boundary cost without an owner-approved private-route budget, status is
+  `NEEDS_WORK` for release approval rather than an unsupported `READY_FOR_RELEASE_APPROVAL`.
+- Merge, production deploy and Issue closure remain separate owner-authorized gates.
