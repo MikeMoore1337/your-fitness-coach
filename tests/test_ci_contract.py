@@ -126,7 +126,12 @@ def test_python_shard_collects_and_runs_only_its_node_ids(monkeypatch, tmp_path:
 
     assert len(calls) == 2  # uv lock + one pytest invocation, no collect-only subprocess.
     assert "--collect-only" not in calls[1]
-    assert calls[1][2:4] == ["backend/tests", "bot/tests"]
+    assert calls[1][2:6] == [
+        "backend/tests",
+        "bot/tests",
+        "tests/test_backup_manifest.py",
+        "tests/test_db_maintenance.py",
+    ]
     assert calls[1][-4:] == ["-p", "scripts.pytest_shard", "--yfc-shard", "2/4"]
 
 
@@ -432,6 +437,12 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
             "backend",
             {"python-dependency-audit", "container-contract"},
             {"frontend-e2e", "migrated-stack"},
+        ),
+        (
+            ["scripts/backup_manifest.py", "tests/test_backup_manifest.py"],
+            "cross-stack",
+            {"python-tests", "policy", "workflow-config", "deployment-contract"},
+            set(),
         ),
         (
             [".github/workflows/ci.yml"],
