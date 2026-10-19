@@ -234,11 +234,21 @@ servers and browser contexts isolated; do not publish trace files or fixture cre
   BEFORE. No functional, safe-area or geometry failure was introduced.
 - Opt-in cold, warm and transition profiles completed for both revisions as documented above.
 - Pre-commit hooks for the source commit: PASS.
+- Exact-head GitHub Actions run [39319719804](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39319719804)
+  completed on `98be9222b7d510c8a0af02ff18370a09aa6b2cf9` with aggregate `checks: failure`.
+  Attempt 1 reported four unrelated E2E failures; the failed-shard rerun (attempt 2) left only
+  the existing reduced-motion assertion in `progress-experience.spec.ts:2992` failing twice:
+  expected `0s`, received `1e-05s`. The test is unchanged by this PR, and all other attempt-2
+  jobs passed. This is a CI acceptance blocker, not evidence of a private-route performance
+  regression; it remains `NEEDS_WORK` until the repository check is resolved or owner-approved
+  as baseline noise.
 - Real devices, Telegram clients/WebViews, CrUX/RUM, production LCP/CLS/INP, React Profiler,
   CPU/heap field data and production API traces: `NO_DATA`.
 
 The confirmed PR regression was the `/app` lazy waterfall. The selected fix is implemented
 and measured, while the remaining small lab residual and the proposed runtime convention are
 explicitly not treated as owner-approved SLAs. Merge, production deploy and Issue closure
-remain separate owner-authorized gates. Final status: `READY_FOR_RELEASE_APPROVAL` after
-exact-head required CI is green.
+remain separate owner-authorized gates. Final status: `NEEDS_WORK` because the exact-head
+aggregate `checks` is not green; the performance investigation and code fix are otherwise
+complete. Release approval must wait for that CI blocker to be resolved or explicitly classified
+by the owner.
