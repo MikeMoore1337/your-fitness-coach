@@ -65,16 +65,16 @@ describe('ExerciseGuideVideo', () => {
     expect(observe).toHaveBeenCalledTimes(1);
 
     intersect(true);
-    expect(video?.getAttribute('src')).toBe(sources[0].url);
+    expect(video?.getAttribute('src')).toBe(sources[0]?.url);
     expect(video).toHaveAttribute('autoplay');
     intersect(false);
     expect(pause).toHaveBeenCalled();
-    expect(video?.getAttribute('src')).toBe(sources[0].url);
+    expect(video?.getAttribute('src')).toBe(sources[0]?.url);
     expect(disconnect).not.toHaveBeenCalled();
 
     intersect(true);
     expect(play).toHaveBeenCalled();
-    expect(video?.getAttribute('src')).toBe(sources[0].url);
+    expect(video?.getAttribute('src')).toBe(sources[0]?.url);
 
     unmount();
     expect(disconnect).toHaveBeenCalledTimes(1);
