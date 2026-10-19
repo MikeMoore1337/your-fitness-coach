@@ -723,6 +723,7 @@ backend = [
 ]
 bot = [
     { name = "aiogram" },
+    { name = "aiohttp" },
     { name = "aiohttp-socks" },
     { name = "httpx" },
     { name = "pydantic-settings" },
@@ -745,6 +746,7 @@ scheduled-report = [
 [package.metadata]
 requires-dist = [
     { name = "aiogram", marker = "extra == 'bot'" },
+    { name = "aiohttp", marker = "extra == 'bot'", specifier = ">=3.14.4,<4" },
     { name = "aiohttp-socks", marker = "extra == 'bot'" },
     { name = "alembic", marker = "extra == 'backend'" },
     { name = "authlib", marker = "extra == 'backend'" },
