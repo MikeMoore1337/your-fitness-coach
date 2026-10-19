@@ -273,14 +273,28 @@ function Read-Config {
     }
     $encryptionApproved = [bool]$encryptionApprovedValue
     $keyRecoveryDocument = [string](Get-PropertyValue $encryption "key_recovery_document")
-    if ([string]::IsNullOrWhiteSpace($keyRecoveryDocument)) {
-        Throw-BackupPullError "CONFIG_INVALID" "key_recovery_document is required"
+    # Plain folders are an explicitly acknowledged risk, never a claim of encryption.
+    $plaintextRiskValue = Get-PropertyValue $encryption "plaintext_risk_acknowledged"
+    $plaintextRiskAcknowledged = $false
+    if ($encryptionMode -eq "none") {
+        if ($encryptionApproved -or $keyRecoveryDocument -ne "NOT_APPLICABLE") {
+            Throw-BackupPullError "CONFIG_INVALID" "plain folder cannot claim encryption approval or key recovery"
+        }
+        if ($plaintextRiskValue -isnot [bool]) {
+            Throw-BackupPullError "CONFIG_INVALID" "plaintext_risk_acknowledged must be a JSON boolean"
+        }
+        $plaintextRiskAcknowledged = [bool]$plaintextRiskValue
     }
-    if ($encryptionApproved -and $keyRecoveryDocument -match "REPLACE_WITH|OWNER_APPROVAL_REQUIRED") {
-        Throw-BackupPullError "CONFIG_INVALID" "approved encryption requires a concrete key recovery reference"
-    }
-    if ($encryptionMode -notin @("bitlocker", "file_encryption", "OWNER_APPROVAL_REQUIRED")) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest mode is unsupported"
+    else {
+        if ($encryptionMode -notin @("bitlocker", "file_encryption", "OWNER_APPROVAL_REQUIRED")) {
+            Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest mode is unsupported"
+        }
+        if ([string]::IsNullOrWhiteSpace($keyRecoveryDocument)) {
+            Throw-BackupPullError "CONFIG_INVALID" "key_recovery_document is required"
+        }
+        if ($encryptionApproved -and $keyRecoveryDocument -match "REPLACE_WITH|OWNER_APPROVAL_REQUIRED") {
+            Throw-BackupPullError "CONFIG_INVALID" "approved encryption requires a concrete key recovery reference"
+        }
     }
     $localValue = [string](Get-PropertyValue $raw "local_root")
     if ([string]::IsNullOrWhiteSpace($localValue)) {
@@ -307,7 +321,7 @@ function Read-Config {
     [void](Assert-SafeFileName $remoteIndex "remote_index")
     $port = if ($null -eq (Get-PropertyValue $ssh "port")) { 22 } else { [int](Get-PropertyValue $ssh "port") }
     $timeout = if ($null -eq (Get-PropertyValue $ssh "connect_timeout_seconds")) { 20 } else { [int](Get-PropertyValue $ssh "connect_timeout_seconds") }
-    $retentionDays = if ($null -eq (Get-PropertyValue $raw "retention_days")) { 30 } else { [int](Get-PropertyValue $raw "retention_days") }
+    $retentionDays = if ($null -eq (Get-PropertyValue $raw "retention_days")) { 7 } else { [int](Get-PropertyValue $raw "retention_days") }
     $minimumValid = if ($null -eq (Get-PropertyValue $raw "minimum_valid_backups")) { 2 } else { [int](Get-PropertyValue $raw "minimum_valid_backups") }
     $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 36 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
     $minimumFree = if ($null -eq (Get-PropertyValue $raw "minimum_free_bytes")) { 104857600 } else { [int64](Get-PropertyValue $raw "minimum_free_bytes") }
@@ -340,6 +354,7 @@ function Read-Config {
         LogFile = $logFile
         EncryptionAtRestMode = $encryptionMode
         EncryptionAtRestApproved = $encryptionApproved
+        PlaintextRiskAcknowledged = $plaintextRiskAcknowledged
         KeyRecoveryDocument = $keyRecoveryDocument
     }
 }
@@ -677,7 +692,15 @@ function Invoke-Pull {
     $downloaded = 0
     $attemptAt = Get-UtcString
     try {
-        if (-not $Config.EncryptionAtRestApproved -or $Config.EncryptionAtRestMode -eq "OWNER_APPROVAL_REQUIRED") {
+        if ($Config.EncryptionAtRestMode -eq "none") {
+            if (-not $Config.PlaintextRiskAcknowledged) {
+                Throw-BackupPullError "CONFIG_INVALID" "plain-folder data exposure risk must be explicitly acknowledged"
+            }
+            if (-not (Test-Path -LiteralPath $Config.LocalRoot -PathType Container)) {
+                Throw-BackupPullError "CONFIG_INVALID" "plain-folder backup directory must be created and access-restricted before the first pull"
+            }
+        }
+        elseif (-not $Config.EncryptionAtRestApproved -or $Config.EncryptionAtRestMode -eq "OWNER_APPROVAL_REQUIRED") {
             Throw-BackupPullError "CONFIG_INVALID" "encryption-at-rest owner approval is not complete"
         }
         Assert-SshFiles $Config
