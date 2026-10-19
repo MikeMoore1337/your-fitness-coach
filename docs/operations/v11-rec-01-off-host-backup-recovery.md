@@ -272,4 +272,3 @@ transfer ещё не выполнен и SFTP/encryption gates не закрыт
 Пока эти факты не получены, Phase B остаётся BLOCKED_OWNER_FACTS, Phase C не запускается,
 а Issue #849 не закрывается. Этот документ не выдаёт разрешение на transfer, restore, merge
 или deploy.
-
