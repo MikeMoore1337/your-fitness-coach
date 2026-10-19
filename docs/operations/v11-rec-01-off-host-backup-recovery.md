@@ -272,3 +272,56 @@ transfer ещё не выполнен и SFTP/encryption gates не закрыт
 Пока эти факты не получены, Phase B остаётся BLOCKED_OWNER_FACTS, Phase C не запускается,
 а Issue #849 не закрывается. Этот документ не выдаёт разрешение на transfer, restore, merge
 или deploy.
+
+## 10. Phase B.1 — protected Windows storage и secure SFTP preparation (2026-10-19)
+
+Этот addendum сохраняет предыдущий runbook и фиксирует только read-only/synthetic подготовку после выбора владельцем `D:\YFC-Backups`. Физическая юрисдикция VPS и Windows-ПК указана владельцем как Россия; независимая юридическая проверка не выполнялась. Production payload, production SSH, BitLocker, Task Scheduler и реальный SFTP endpoint не использовались.
+
+### 10.1 Windows storage inventory
+
+| Контроль | Наблюдение | Состояние |
+| --- | --- | --- |
+| `D:` | NTFS; total `1,000,203,087,872` bytes; free `195,896,864,768` bytes | `PASS` для read-only inventory |
+| `D:\YFC-Backups` | Каталог отсутствует; существующее содержимое не изменялось; production payload не записывался | `NOT_CREATED` |
+| ACL/owner | ACL целевого каталога отсутствует; текущая сессия не повышена; отдельная runner identity не выбрана; parent D: имеет более широкое наследование | `BLOCKED_OWNER_FACTS` |
+| BitLocker | `Get-BitLockerVolume`, `manage-bde -status D:` и `fsutil` получили access denied | `NOT_VERIFIED` |
+| Recovery key | Key material не читался; custody/escrow и recovery test не подтверждены | `NOT_VERIFIED` |
+| Sync/share | Путь не находится под известным OneDrive root; процесс OneDrive и target reparse point не обнаружены; SMB query получил отказ | Частичная проверка; отсутствие всех sync/share механизмов не доказано |
+
+Каталог и ACL намеренно не создавались: при отсутствии elevated owner/runner identity это могло бы закрепить неподходящее наследование. Предложенный следующий шаг — отдельный BitLocker-encrypted VHDX/container, смонтированный под backup root, либо отдельно одобренный encrypted file/container с recoverable key; шифрование всего D: не предлагается.
+
+### 10.2 SFTP security state и план hardening
+
+Предыдущая read-only VPS-инвентаризация в разделе 9.2 не подтверждала dedicated hardened read-only endpoint: наблюдались глобальные password authentication/forwarding, отсутствие подтверждённых `chroot`/`ForceCommand` и secrets-likely `.env` в широком backup root. Содержимое `.env` не читалось. В этом addendum endpoint не подключался, SSH/VPS не изменялись, поэтому состояние остаётся `BLOCKED_OWNER_FACTS / NOT_VERIFIED`.
+
+Owner-approved план, не применённый:
+
+1. Выделить отдельный read-only export root, в котором разрешены только `index.json`, проверенные dump archives и их manifest-файлы. Не предоставлять весь каталог, где обнаружен `.env`; template path использовать только после allowlist-проверки, а при конфликте выбрать отдельный путь вида `/srv/yfc-sftp/yfc-backup-readonly/export`.
+2. Использовать `yfc-backup-readonly` с public-key-only authentication, `nologin`, без TTY, shell, agent/X11/TCP forwarding и записи; ограничение выполнить через `Match User`, `ForceCommand internal-sftp` и chroot. Глобальные SSH defaults не менять.
+3. На Windows использовать отдельный pinned `known_hosts` и `StrictHostKeyChecking=yes`; fingerprint подтвердить вне канала копирования. Remote path — абсолютный, без `..`.
+4. Негативными тестами проверить `cd ..`, `get ../../...`, `put`, `rename`, доступ к соседним production paths и отсутствие `.env`/secrets. Успешный list/download не является доказательством restore.
+5. До reload сохранить rollback copy drop-in, выполнить `sshd -t`, проверить действующую admin session, затем сделать reversible reload; при ошибке удалить только новый drop-in, повторить `sshd -t` и reload. Ни один пункт не выполнялся.
+
+### 10.3 Task Scheduler readiness
+
+В проверенной среде `schtasks /query` вернул `The network address is invalid`, служба `Schedule` не обнаружена, а production task не регистрировался. Доступ к отдельному backup private key и работа без интерактивного входа не подтверждены; существующие production-labeled identities не использовались.
+
+После закрытия storage/SFTP gates нужен отдельный runner identity с доступом только к script/config/private key и `Log on as a batch job`. Existing template сохраняет `MultipleInstancesPolicy=IgnoreNew`, `StartWhenAvailable=true`, `RunOnlyIfNetworkAvailable=true`, bounded execution time, sanitized logs и exit codes. Reboot/catch-up и фактический scheduled pull остаются `NOT_VERIFIED`.
+
+### 10.4 Synthetic evidence
+
+В изолированном self-test без production payload: PowerShell 7 — 28/28, Windows PowerShell 5.1 — 28/28. Покрыты success/repeat/orphan recovery, checksum mismatch, missing/corrupt metadata, pinned host key/auth/network failures, low disk, atomic promotion, preservation of a valid previous copy, failed-pull recovery, status-write failure и concurrent Pull. Это не доказывает protocol-level SFTP authentication, физическое шифрование, Task Scheduler, production permissions или clean-host restore.
+
+### 10.5 Owner proposals и remaining gates
+
+| Решение | Предложение, не утверждение | Нужное подтверждение |
+| --- | --- | --- |
+| Cadence | Проверенный dump публикуется раз в сутки; Windows pull опрашивает новый `index.json` раз в час | Фактическое расписание VPS publisher и нагрузка |
+| Retention | 30 дней, минимум 2 valid copies, резерв свободного места 1 GiB | Рост dump и размер persistent assets |
+| RPO | Не хуже 24 часов | Последний успешный pull и время публикации |
+| RTO | Первичная цель 8 часов | Измеренный clean-host restore |
+| Encryption | Dedicated BitLocker VHDX/container на D:, не whole-disk encryption | Elevated BitLocker evidence и recovery-key drill |
+| Key recovery | Две независимые owner-controlled custody locations и recovery test | Фактическое custody и успешное восстановление |
+| Clean host | Disposable non-public Linux VM/host, независимый от VPS и Windows-ПК, matching PostgreSQL major/revision, без внешнего egress | Exact image/revision и approved non-production inputs |
+
+До подтверждения elevated storage/ACL identity, recovery-key custody, отдельного hardened SFTP endpoint, non-interactive key access, scheduler checks и owner targets вердикт остаётся `BLOCKED_OWNER_FACTS`. `PHASE_B_1_READY_FOR_ACTIVATION` не заявляется.
