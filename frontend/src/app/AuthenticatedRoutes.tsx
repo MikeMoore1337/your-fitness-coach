@@ -10,7 +10,6 @@ import {
 import { hasExplicitAppDestination } from '../shared/auth/redirects';
 import { isTrainerIntentLocation } from '../shared/auth/trainerIntent';
 
-const MiniAppPage = lazy(() => import('../pages/miniapp/MiniAppPage'));
 const TrainerIntentFlow = lazy(() =>
   import('../features/trainer/TrainerIntentFlow').then((module) => ({
     default: module.TrainerIntentFlow,
@@ -26,7 +25,7 @@ export function AuthenticatedRoute({ children }: { children: ReactNode }) {
   );
 }
 
-export function AuthenticatedAppRoute() {
+export function AuthenticatedAppRoute({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { search, path } = useNavigation();
   if (isTrainerIntentLocation(path, search, window.location.hash)) {
@@ -42,8 +41,6 @@ export function AuthenticatedAppRoute() {
     return <Redirect to="/coach" />;
   }
   return (
-    <OnboardingGate>
-      <MiniAppPage />
-    </OnboardingGate>
+    <OnboardingGate>{children}</OnboardingGate>
   );
 }

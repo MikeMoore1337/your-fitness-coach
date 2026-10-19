@@ -78,6 +78,7 @@ function isPublicLandingRoute(path: string): boolean {
 
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
+const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 const LandingV10AthletePage = lazy(() => import('./pages/landing/LandingV10AthletePage'));
 const LandingV10CoachPage = lazy(() => import('./pages/landing/LandingV10CoachPage'));
@@ -206,7 +207,9 @@ function AppRoutes() {
   if (path === '/app')
     return (
       <AuthenticatedRoute>
-        <AuthenticatedAppRoute />
+        <AuthenticatedAppRoute>
+          <MiniAppPage />
+        </AuthenticatedAppRoute>
       </AuthenticatedRoute>
     );
   if (path === '/app/report')
