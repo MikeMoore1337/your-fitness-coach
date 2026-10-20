@@ -138,8 +138,14 @@ def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
     raw_margin = _deployment_setting("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "").strip()
     if not re.fullmatch(r"[1-9][0-9]{0,5}", raw_margin):
         raise DeploymentError("PostgreSQL connection budget safety margin is not configured")
-    from scripts.connection_budget_preflight import Verdict
-    from scripts.trusted_runtime_collector import CollectorPolicy, collect_runtime_snapshot
+    try:
+        from scripts.connection_budget_preflight import Verdict
+        from scripts.trusted_runtime_collector import CollectorPolicy, collect_runtime_snapshot
+    except ModuleNotFoundError:
+        # The deploy helper runs both as python -m scripts.zero_downtime_deploy
+        # and directly as python scripts/zero_downtime_deploy.py.
+        from connection_budget_preflight import Verdict
+        from trusted_runtime_collector import CollectorPolicy, collect_runtime_snapshot
 
     policy = CollectorPolicy(
         safety_headroom_connections=int(raw_margin),
