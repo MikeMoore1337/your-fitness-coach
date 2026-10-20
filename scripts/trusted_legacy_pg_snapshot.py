@@ -52,10 +52,12 @@ SELECT
     pg_has_role(current_user, 'pg_read_all_stats', 'member'),
     current_setting('is_superuser')::boolean
 """
-    with psycopg.connect(connect_url, connect_timeout=5, options=options) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(sql)
-            row = cursor.fetchone()
+    with (
+        psycopg.connect(connect_url, connect_timeout=5, options=options) as connection,
+        connection.cursor() as cursor,
+    ):
+        cursor.execute(sql)
+        row = cursor.fetchone()
     if not isinstance(row, (tuple, list)) or len(row) != 10:
         raise ValueError("invalid snapshot shape")
     if row[8] is not True or row[9] is not False:
@@ -64,8 +66,7 @@ SELECT
     if any(value is None and index != 3 for index, value in enumerate(values)):
         raise ValueError("incomplete observation")
     if any(
-        isinstance(value, bool)
-        or (value is not None and (not isinstance(value, int) or value < 0))
+        isinstance(value, bool) or (value is not None and (not isinstance(value, int) or value < 0))
         for value in values
     ):
         raise ValueError("invalid observation")
