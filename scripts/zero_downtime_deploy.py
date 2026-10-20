@@ -128,6 +128,37 @@ def _deployment_setting(key: str, default: str) -> str:
     return value
 
 
+def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
+    """Block connection-increasing rollout operations until runtime capacity is proven.
+
+    The safety margin has no repository default. An explicit, reviewed
+    production setting and a fresh in-process trusted collector verdict are
+    required. Failure details remain sanitized and cannot disclose DB secrets.
+    """
+    raw_margin = _deployment_setting("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "").strip()
+    if not re.fullmatch(r"[1-9][0-9]{0,5}", raw_margin):
+        raise DeploymentError("PostgreSQL connection budget safety margin is not configured")
+    from scripts.connection_budget_preflight import Verdict
+    from scripts.trusted_runtime_collector import CollectorPolicy, collect_runtime_snapshot
+
+    policy = CollectorPolicy(
+        safety_headroom_connections=int(raw_margin),
+        safety_headroom_source="owner-reviewed production deployment setting",
+    )
+    try:
+        evidence = collect_runtime_snapshot(
+            release_path=config.root,
+            compose_file=config.root / "docker-compose.yml",
+            policy=policy,
+        )
+    except Exception:
+        raise DeploymentError("trusted PostgreSQL capacity evidence is unavailable") from None
+    if evidence.result.status is not Verdict.PASS:
+        raise DeploymentError("trusted PostgreSQL connection capacity is not proven")
+    if config.target_revision not in evidence.context.revisions:
+        raise DeploymentError("trusted PostgreSQL capacity revision does not match target")
+
+
 def configured_timeout(key: str, default: int) -> int:
     raw = _deployment_setting(key, str(default)).strip()
     match = re.fullmatch(r"([1-9][0-9]*)(?:s)?", raw)
@@ -916,6 +947,7 @@ def rollback(config: DeployConfig) -> None:
         else os.environ.copy()
     )
     rollback_backend = _slot_service("backend", state.rollback_slot)
+    _trusted_connection_budget_preflight(config)
     if state.rollback_slot == "legacy":
         _compose("start", rollback_backend)
     else:
@@ -1065,6 +1097,9 @@ def deploy(config: DeployConfig) -> Evidence:
     persistent_images_updated = False
 
     try:
+        with _stage(evidence, "connection_budget_preflight"):
+            _trusted_connection_budget_preflight(config)
+
         with _stage(evidence, "preflight"):
             evidence.capacity = _capacity()
             _compose("config", "--quiet")
@@ -1503,6 +1538,9 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     persistent_images_updated = False
 
     try:
+        with _stage(evidence, "connection_budget_preflight"):
+            _trusted_connection_budget_preflight(config)
+
         with _stage(evidence, "single_slot_legacy_provenance"):
             if not repair_mode:
                 old_backend = _legacy_image_digest("backend", active_revision)
