@@ -693,5 +693,139 @@
       "https://example.org/study"
     ],
     "must_avoid": []
+  },
+  {
+    "id": "ss-direct-opening",
+    "profile": "general",
+    "mode": "edit",
+    "input": "А теперь самое интересное: резервная копия сохранена 21.10.2026.",
+    "must_keep": [
+      "резервная копия сохранена",
+      "21.10.2026"
+    ],
+    "must_avoid": [
+      "А теперь самое интересное"
+    ]
+  },
+  {
+    "id": "ss-unwarranted-reveal",
+    "profile": "general",
+    "mode": "edit",
+    "input": "Вот что нужно понимать: Анна проверила 7 файлов. И это меняет всё!",
+    "must_keep": [
+      "Анна",
+      "7 файлов"
+    ],
+    "must_avoid": [
+      "Вот что нужно понимать",
+      "это меняет всё"
+    ]
+  },
+  {
+    "id": "ss-valid-passive",
+    "profile": "general",
+    "mode": "unchanged",
+    "input": "Отчёт подписан 21.10.2026. Автор подписи неизвестен.",
+    "must_keep": [
+      "Отчёт подписан",
+      "21.10.2026",
+      "Автор подписи неизвестен"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-useful-question",
+    "profile": "general",
+    "mode": "unchanged",
+    "input": "Какие файлы приложить к заявке? `report.pdf` и `hashes.txt`.",
+    "must_keep": [
+      "Какие файлы",
+      "report.pdf",
+      "hashes.txt"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-factual-contrast",
+    "profile": "general",
+    "mode": "unchanged",
+    "input": "Нельзя писать в `main`. Нужно открыть PR в `master`.",
+    "must_keep": [
+      "Нельзя писать",
+      "main",
+      "PR",
+      "master"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-yfc-empty-hype",
+    "profile": "yfc",
+    "mode": "edit",
+    "input": "Не просто тренировка, а революция! План на 3 недели готов, но результат не гарантирован.",
+    "must_keep": [
+      "План на 3 недели готов",
+      "результат не гарантирован"
+    ],
+    "must_avoid": [
+      "Не просто тренировка, а революция"
+    ]
+  },
+  {
+    "id": "ss-yfc-useful-short-ui",
+    "profile": "yfc",
+    "mode": "unchanged",
+    "input": "Отдых 2 минуты. Добавить 30 секунд?",
+    "must_keep": [
+      "2 минуты",
+      "30 секунд"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-vault-quoted-uncertainty",
+    "profile": "second-brain",
+    "mode": "unchanged",
+    "input": "В заметке сказано: «возможно». Не заменяй это на «точно».",
+    "must_keep": [
+      "«возможно»",
+      "«точно»"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-vault-unknown-actor",
+    "profile": "second-brain",
+    "mode": "unchanged",
+    "input": "Запись №42 создана автоматически. Кто её создал, не установлено.",
+    "must_keep": [
+      "№42",
+      "не установлено"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-hermes-no-causality",
+    "profile": "hermes",
+    "mode": "unchanged",
+    "input": "В исследовании участвовали 24 человека; причинная связь не установлена.",
+    "must_keep": [
+      "24 человека",
+      "причинная связь не установлена"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-hermes-claim-correction",
+    "profile": "hermes",
+    "mode": "edit",
+    "input": "Исследование доказывает улучшение на 18%. Авторы сообщили лишь корреляцию.",
+    "must_keep": [
+      "18%",
+      "Авторы сообщили лишь корреляцию"
+    ],
+    "must_avoid": [
+      "доказывает улучшение"
+    ]
   }
 ]
