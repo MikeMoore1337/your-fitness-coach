@@ -98,3 +98,51 @@ rollout. CI on master triggers automatic production deploy; do not merge
 PR #1131 until the independent trusted budget gate and headroom are verified
 and active. No direct production query, migration, index change or new
 paid infrastructure is authorized here.
+
+
+## Phase 3: representative API request-cost diagnostics (synthetic PG16)
+
+The test \`backend/tests/test_v11_backend_route_profile.py\` exercises **six
+real authenticated GET routes**, three repetitions each, against the existing
+PostgreSQL 16 test fixtures:
+
+| Area | Method/path | Actor |
+|---|---|---|
+| Authentication/profile | GET /api/v1/me | athlete |
+| Today/active workout | GET /api/v1/workouts/today | athlete |
+| Programs | GET /api/v1/programs/templates/mine | athlete |
+| Nutrition | GET /api/v1/nutrition/diary?diary_date=... | athlete |
+| Coach OS client list | GET /api/v1/coach/clients | trainer |
+| Coach OS aggregated inbox | GET /api/v1/coach/inbox | trainer |
+
+This does not manufacture data or attempt production authentication. The
+test signs in using the repository's existing **development-only test login**,
+checks HTTP 200, immutable route templates, the X-Request-ID response
+contract and existing structured request-log fields. It prints only route
+names, actor category, requests per route, HTTP median, SQL median, SQL query
+count range and serialized response byte size; no response body, identity,
+JWT, customer records or database connection details.
+
+~~~
+TEST_DATABASE_URL="<isolated-test-db-connection-string>" \
+  uv run pytest -q -s backend/tests/test_v11_backend_route_profile.py
+~~~
+
+The values are intentionally **diagnostics**, not hidden CI pass/fail timing
+thresholds. Only an independently reproduced controlled comparison with a
+fixed fixture and execution profile should be promoted to a benchmark.
+Production latency/percentiles, actual user traffic mixes, connected devices,
+pool wait/overflow and non-YFC connection attribution remain \`NO_DATA\`.
+
+## Final disposition guidance
+
+If the PostgreSQL regression suite passes, a bounded code-quality change can
+be declared *technically verified* and retained in PR #1131. That is **not**
+sufficient to call the whole #817 closed: the child contract still asks for
+ranking hot API calls with real or representative load, query plans, index
+usage, migrations' online compatibility and validation against effective #848
+capacity. These must either be evidenced or explicitly documented as
+deferred/not proven under the owner's acceptance decision.
+
+Issue #817 remains OPEN until exact-head checks, performance evidence,
+controlled release under #848, and subsequent post-deploy smoke are reconciled.
