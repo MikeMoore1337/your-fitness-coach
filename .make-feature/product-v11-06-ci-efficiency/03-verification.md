@@ -1,8 +1,8 @@
 # Product V11-06 / Issue #821 — verification receipt
 
-Status: final receipt exact-head green; PR remains open for owner merge/release gates
+Status: final exact-head run green after one targeted diagnostic rerun; PR remains open for owner merge/release gates
 PR: [#1136](https://github.com/MikeMoore1337/your-fitness-coach/pull/1136)
-Final receipt HEAD: `328875bdbe615ca651ab6af5525c92a68441ccbd`
+Final receipt HEAD: `50065f8c5e5c6f5e1a4df8fa8c741cf890155cf8`
 
 ## Local verification
 
@@ -23,23 +23,26 @@ were not hidden or weakened.
 
 ## Exact-head GitHub Actions
 
-Final run [39458428445](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39458428445)
-completed successfully for `328875bdbe615ca651ab6af5525c92a68441ccbd`. The preceding implementation
-run [39457145434](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39457145434)
-also completed successfully for the prior code-only SHA.
+Final run [39459853008](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39459853008)
+completed successfully on attempt 2 for `50065f8c5e5c6f5e1a4df8fa8c741cf890155cf8`. Its initial
+attempt failed only in `Frontend smoke (2/5)` at `icon-system-review.spec.ts:63`, where the
+Escape/focus assertion failed twice in the same job. The targeted failed-job rerun passed without
+changing the test or product code; this matches the known historical focus-flake pattern and is
+recorded as instability evidence, not as a fixed regression.
 
-- Run wall: 524 seconds (`2026-10-20T16:33:04Z` to `2026-10-20T16:41:48Z`).
-- Observable run-level queue component: 0 seconds (`created_at == run_started_at`). The first
-  router job started at 16:24:27Z; later runner allocation is visible in job timestamps, but
-  GitHub exposes no processor/billing CPU seconds: `PROCESSOR_TIME=NO_DATA`.
-- Actions job API: 31 jobs; 28 success, 3 expected skipped, 0 failed. Skips were the PR-inapplicable
-  extended mobile, weekly cross-browser and scheduled report jobs.
-- Aggregate `checks`: success at 16:41:47Z, 18 seconds.
+- Initial attempt wall: approximately 395 seconds (`2026-10-20T16:42:50Z` to 16:49:25Z).
+- Targeted rerun attempt: approximately 367 seconds (16:49:58Z to 16:56:05Z).
+- The combined elapsed time is not a comparable full-CI baseline because it includes the diagnostic
+  rerun. Observable run-level queue for the initial attempt was 0 seconds; GitHub exposes no
+  processor/billing CPU seconds: `PROCESSOR_TIME=NO_DATA`.
+- Latest Actions job API: 31 jobs; 28 success, 3 expected skipped, 0 failed. Skips were the
+  PR-inapplicable extended mobile, weekly cross-browser and scheduled report jobs.
+- Aggregate `checks`: success at 16:56:04Z, 24 seconds.
 - CodeQL Python and JavaScript/TypeScript: success.
 - Free PR security audit / Trivy: success.
 - Dependency audit: success, one job, 28 seconds.
-- Five Python shards: 245, 262, 281, 294, 309 seconds.
-- Five frontend smoke shards: 261, 281, 312, 313, 366 seconds.
+- Latest required jobs, including the rerun, are green; shard timings from the failed initial
+  attempt are not used as an AFTER speed claim.
 - PostgreSQL migrated stack, mobile regression, workflow contracts, policy, critical smoke and
   all four container jobs: success.
 - Artifacts: 8 artifacts, 67.09 MiB; this is not an upload CPU measurement. Docker/container
