@@ -447,15 +447,17 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
 PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     "frontend": (
         "quality",
+        "dependency-audit",
         "frontend-checks",
         "frontend-unit",
         "frontend-e2e",
         "frontend-mobile-regression",
         "critical-smoke",
     ),
-    "backend": ("quality", "python-tests", "critical-smoke"),
+    "backend": ("quality", "dependency-audit", "python-tests", "critical-smoke"),
     "migration": (
         "quality",
+        "dependency-audit",
         "policy",
         "python-tests",
         "migrated-stack",
@@ -481,12 +483,13 @@ PROFILE_GROUPS: dict[str, tuple[str, ...]] = {
     ),
     "workflow-platform": (
         "quality",
+        "dependency-audit",
         "policy",
         "workflow-config",
         "image-contract",
         "deployment-contract",
     ),
-    "documentation": ("quality", "workflow-config"),
+    "documentation": ("quality", "dependency-audit", "workflow-config"),
 }
 
 PROFILE_GROUPS["daily-regression"] = (
@@ -873,9 +876,17 @@ def classify_scope(paths: Sequence[str]) -> dict[str, object]:
         container_security,
     ) = _profile_for_paths(normalized)
     groups = list(PROFILE_GROUPS[profile])
-    if frontend_dependency and "frontend-dependency-audit" not in groups:
+    if (
+        frontend_dependency
+        and "dependency-audit" not in groups
+        and "frontend-dependency-audit" not in groups
+    ):
         groups.append("frontend-dependency-audit")
-    if python_dependency and "dependency-audit" not in groups:
+    if (
+        python_dependency
+        and "dependency-audit" not in groups
+        and "python-dependency-audit" not in groups
+    ):
         groups.append("python-dependency-audit")
     if runtime_dependency and "container-contract" not in groups:
         groups.append("container-contract")
@@ -1014,6 +1025,10 @@ def verify_results(expected_jobs: Sequence[str], results: Mapping[str, str]) -> 
     """Fail unless every expected job completed successfully."""
 
     expected = list(dict.fromkeys(expected_jobs))
+    if not expected:
+        raise CIContractError("Expected CI job set is empty")
+    if "scope-router" not in expected:
+        raise CIContractError("Expected CI job set must include scope-router")
     unknown_expected = sorted(set(expected) - set(ROUTER_JOB_NAMES))
     if unknown_expected:
         raise CIContractError(f"Unknown expected CI jobs: {unknown_expected}")

@@ -765,13 +765,11 @@ jobs:
 
   dependency-audit:
     name: Dependency audit
-    needs: [scope-router, quality]
+    needs: scope-router
     if: >-
       always() &&
       needs.scope-router.result == 'success' &&
-      needs.scope-router.outputs.run_dependency_audit == 'true' &&
-      (needs.quality.result == 'success' ||
-       (github.event_name == 'push' && needs.quality.result == 'skipped'))
+      needs.scope-router.outputs.run_dependency_audit == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -1250,23 +1248,6 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9
-        with:
-          version: "0.11.32"
-          enable-cache: true
-          cache-dependency-glob: uv.lock
-          cache-local-path: ${{ env.UV_CACHE_DIR }}
-          cache-suffix: pr-security-audit
-      - name: Audit runtime dependencies
-        run: python scripts/ci_contract.py run-group dependency-audit
       - name: Scan repository vulnerabilities, misconfiguration and secrets
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
