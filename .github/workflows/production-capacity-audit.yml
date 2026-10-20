@@ -337,6 +337,16 @@ jobs:
                   address.rsplit(":", 1)[-1] == "5678" for address in listeners
               ) else "FREE"
 
+          def read_session_counts(raw):
+              unknown = ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+              parts = raw.split(",")
+              if len(parts) != 3 or any(not x.isascii() or not x.isdigit() for x in parts):
+                  return unknown
+              total, declared_yfc, unattributed = map(int, parts)
+              if declared_yfc > total or unattributed > total - declared_yfc:
+                  return unknown
+              return str(declared_yfc), str(total - declared_yfc), str(unattributed)
+
           postgres = {
               "version_major": "UNAVAILABLE",
               "max_connections": "UNAVAILABLE",
@@ -419,13 +429,11 @@ jobs:
                       postgres["reserved_connections"] = "0"
                   elif parsed.get("reserved_connections", "").isdigit():
                       postgres["reserved_connections"] = parsed["reserved_connections"]
-                  counts = parsed.get("session_counts", "").split(",")
-                  if len(counts) == 3 and all(value.isdigit() for value in counts):
-                      total, declared_yfc, unattributed = map(int, counts)
-                      if declared_yfc <= total and unattributed <= total - declared_yfc:
-                          postgres["declared_yfc_sessions"] = str(declared_yfc)
-                          postgres["non_yfc_sessions"] = str(total - declared_yfc)
-                          postgres["unattributed_sessions"] = str(unattributed)
+                  (
+                      postgres["declared_yfc_sessions"],
+                      postgres["non_yfc_sessions"],
+                      postgres["unattributed_sessions"],
+                  ) = read_session_counts(parsed.get("session_counts", ""))
                   if postgres["max_connections"].isdigit() and postgres["current_connections"].isdigit():
                       postgres["connection_headroom"] = str(
                           int(postgres["max_connections"]) - int(postgres["current_connections"])
