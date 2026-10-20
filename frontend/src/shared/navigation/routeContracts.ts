@@ -188,6 +188,8 @@ export function focusedContextReturn(search: string, origin: string): string | n
   if (
     !hasNoDuplicateParams(params, [
       'workout_id',
+      'comment_id',
+      'workout_exercise_id',
       'section',
       'return_to',
       'progress_view',

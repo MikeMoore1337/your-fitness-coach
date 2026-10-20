@@ -59,4 +59,11 @@ describe('navigation route contracts', () => {
       ),
     ).toBe('/app?section=progress');
   });
+
+  it('rejects duplicate workout feedback identifiers before deriving a return path', () => {
+    expect(focusedContextReturn('?workout_id=43&comment_id=7&comment_id=8', ORIGIN)).toBeNull();
+    expect(
+      focusedContextReturn('?workout_id=43&workout_exercise_id=55&workout_exercise_id=56', ORIGIN),
+    ).toBeNull();
+  });
 });
