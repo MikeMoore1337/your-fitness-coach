@@ -178,4 +178,20 @@ describe('NavigationProvider Telegram BackButton', () => {
     expect(safeTrainerReturnPath('/coach?tab=clients&tab=programs')).toBeNull();
     expect(safeTrainerReturnPath('https://evil.example/coach?tab=clients')).toBeNull();
   });
+
+  it('отклоняет неоднозначные и небезопасные query-параметры навигации', () => {
+    expect(coachTabFromSearch('?client_id=42&client_id=bad')).toBe('today');
+    expect(demoReturnPathFromLogin('?from=demo&scenario=nutrition&scenario=trainer')).toBeNull();
+    expect(
+      progressReportReturn(
+        '?handoff_id=9007199254740992&return_to=%2Fapp%3Fsection%3Dprofile%23profile-notifications',
+      ),
+    ).toBe('/app?section=progress');
+    expect(focusedContextReturn('?workout_id=9007199254740992')).toBeNull();
+    expect(
+      focusedContextReturn(
+        `?workout_id=43&return_to=${encodeURIComponent('/app?section=profile&section=profile#profile-notifications')}`,
+      ),
+    ).toBe('/app?section=progress');
+  });
 });

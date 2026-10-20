@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { hideTelegramBackButtonWhenIdle, registerTelegramBackButton } from '../telegram/backButton';
 import { getApiRuntime, useRuntime } from '../runtime/runtime';
+import * as routeContracts from './routeContracts';
 
 interface NavigationContextValue {
   path: string;
@@ -18,65 +19,15 @@ interface NavigationContextValue {
 }
 
 const NavigationContext = createContext<NavigationContextValue | null>(null);
-export type CoachTab = 'today' | 'clients' | 'programs' | 'tools';
-
-const COACH_TABS = new Set<CoachTab>(['today', 'clients', 'programs', 'tools']);
+export type { CoachTab } from './routeContracts';
 export const PERSONAL_WORKSPACE_RETURN_STATE = 'yfcPersonalWorkspaceReturn';
-const DEMO_SCENARIOS = new Set(['self_training', 'nutrition', 'trainer']);
-const DEMO_CABINET_SECTIONS = new Set([
-  'today',
-  'plan',
-  'nutrition',
-  'progress',
-  'profile',
-  'trainer',
-]);
-const PROGRESS_DETAIL_VIEWS = new Set([
-  'body',
-  'training',
-  'nutrition',
-  'cardio',
-  'wellbeing',
-  'history',
-]);
 
-export function coachTabFromSearch(search: string): CoachTab {
-  const params = new URLSearchParams(search);
-  const requestedTab = params.get('tab');
-  const clientId = params.get('client_id');
-  if (params.getAll('tab').length > 1) return 'today';
-  if (clientId !== null) {
-    const parsedClientId = Number(clientId);
-    const validClientId =
-      /^\d+$/.test(clientId) && Number.isSafeInteger(parsedClientId) && parsedClientId > 0;
-    if (!validClientId) return 'today';
-    return !requestedTab || requestedTab === 'clients' ? 'clients' : 'today';
-  }
-  return requestedTab && COACH_TABS.has(requestedTab as CoachTab)
-    ? (requestedTab as CoachTab)
-    : 'today';
-}
-
-export function coachPathForTab(tab: CoachTab): string {
-  return tab === 'today' ? '/coach' : `/coach?tab=${tab}`;
-}
+export const coachTabFromSearch = routeContracts.coachTabFromSearch;
+export const coachPathForTab = routeContracts.coachPathForTab;
+export const demoReturnPathFromLogin = routeContracts.demoReturnPathFromLogin;
 
 export function safeTrainerReturnPath(value: string | null | undefined): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    if (parsed.origin !== window.location.origin || parsed.pathname !== '/coach' || parsed.hash) {
-      return null;
-    }
-    const keys = Array.from(parsed.searchParams.keys());
-    if (keys.length > 1 || keys.some((key) => key !== 'tab')) return null;
-    const requestedTab = parsed.searchParams.get('tab');
-    if (!requestedTab) return '/coach';
-    if (!COACH_TABS.has(requestedTab as CoachTab) || requestedTab === 'today') return null;
-    return coachPathForTab(requestedTab as CoachTab);
-  } catch {
-    return null;
-  }
+  return routeContracts.safeTrainerReturnPath(value, window.location.origin);
 }
 
 function resolveNavigationPath(to: string): string {
@@ -84,134 +35,12 @@ function resolveNavigationPath(to: string): string {
   return runtime.kind === 'demo' ? runtime.mapNavigationPath(to) : to;
 }
 
-export function demoReturnPathFromLogin(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const scenario = params.get('scenario');
-  if (params.get('from') !== 'demo' || !scenario || !DEMO_SCENARIOS.has(scenario)) return null;
-  const cabinet = params.get('cabinet') === '1';
-  const section = params.get('section');
-  if (cabinet) {
-    const safeSection =
-      section &&
-      DEMO_CABINET_SECTIONS.has(section) &&
-      (section !== 'trainer' || scenario === 'trainer')
-        ? section
-        : scenario === 'trainer'
-          ? 'trainer'
-          : 'today';
-    return `/demo?cabinet=1&scenario=${scenario}&section=${safeSection}`;
-  }
-  return `/demo?scenario=${scenario}`;
-}
-
-function programHistoryReturn(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    const programId = parsed.searchParams.get('program_history');
-    if (
-      parsed.origin !== window.location.origin ||
-      parsed.pathname !== '/app' ||
-      parsed.searchParams.get('section') !== 'programs' ||
-      !programId ||
-      !/^\d+$/.test(programId) ||
-      Number(programId) <= 0
-    ) {
-      return null;
-    }
-    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-  } catch {
-    return null;
-  }
-}
-
-function notificationCenterReturn(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    return parsed.origin === window.location.origin &&
-      parsed.pathname === '/app' &&
-      parsed.searchParams.get('section') === 'profile' &&
-      parsed.hash === '#profile-notifications'
-      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function todayReturn(value: string | null): string | null {
-  if (!value) return null;
-  try {
-    const parsed = new URL(value, window.location.origin);
-    return parsed.origin === window.location.origin &&
-      parsed.pathname === '/app' &&
-      parsed.searchParams.get('section') === 'today'
-      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
-      : null;
-  } catch {
-    return null;
-  }
-}
-
 export function progressReportReturn(search: string): string {
-  const params = new URLSearchParams(search);
-  const handoffId = params.get('handoff_id');
-  if (handoffId && /^\d+$/.test(handoffId) && Number(handoffId) > 0) {
-    return notificationCenterReturn(params.get('return_to')) ?? '/app?section=progress';
-  }
-  const clientId = params.get('client_id');
-  if (clientId && /^\d+$/.test(clientId) && Number(clientId) > 0) {
-    return `/coach?client_id=${clientId}`;
-  }
-  const view = params.get('progress_view');
-  const target = new URLSearchParams({ section: 'progress' });
-  if (view && ['body', 'training', 'nutrition', 'cardio', 'wellbeing', 'history'].includes(view))
-    target.set('progress_view', view);
-  const period = params.get('period');
-  if (period && ['days_7', 'days_30', 'days_90'].includes(period))
-    target.set('progress_period', period.slice(5));
-  if (period === 'custom') {
-    const from = params.get('date_from');
-    const to = params.get('date_to');
-    if (from && to && /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)) {
-      target.set('progress_period', 'custom');
-      target.set('progress_from', from);
-      target.set('progress_to', to);
-    }
-  }
-  return `/app?${target}`;
-}
-
-function progressOverviewReturn(search: string): string {
-  const current = new URLSearchParams(search);
-  const params = new URLSearchParams({ section: 'progress' });
-  for (const key of ['progress_period', 'progress_from', 'progress_to']) {
-    const value = current.get(key);
-    if (value) params.set(key, value);
-  }
-  return `/app?${params.toString()}`;
+  return routeContracts.progressReportReturn(search, window.location.origin);
 }
 
 export function focusedContextReturn(search: string): string | null {
-  const params = new URLSearchParams(search);
-  const workoutId = params.get('workout_id');
-  if (workoutId && /^\d+$/.test(workoutId) && Number(workoutId) > 0) {
-    return (
-      notificationCenterReturn(params.get('return_to')) ??
-      programHistoryReturn(params.get('return_to')) ??
-      todayReturn(params.get('return_to')) ??
-      (params.get('section') === 'programs' ? '/app?section=programs' : '/app?section=progress')
-    );
-  }
-  if (
-    params.get('section') === 'progress' &&
-    PROGRESS_DETAIL_VIEWS.has(params.get('progress_view') ?? '')
-  ) {
-    return progressOverviewReturn(search);
-  }
-  if (params.get('weekly_review') === '1') return '/app';
-  return null;
+  return routeContracts.focusedContextReturn(search, window.location.origin);
 }
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
