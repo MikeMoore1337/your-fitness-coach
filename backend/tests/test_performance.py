@@ -1,8 +1,10 @@
+import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, timedelta
 
-from sqlalchemy import event
+import pytest
+from sqlalchemy import and_, event, func, or_
 
 from fitminiapp_api.api.v1.me import _build_user_response
 from fitminiapp_api.core.timezone import today_for_user
@@ -178,6 +180,152 @@ def test_coach_client_latest_weight_respects_distinct_local_days() -> None:
     assert len(weight_queries) == 1
     # Two local days require two groups, preserving the individual cutoff.
     assert weight_queries[0][0].count("measured_on <=") == 2
+
+
+@pytest.mark.skipif(
+    engine.dialect.name != "postgresql",
+    reason="SQL plan benchmarking requires isolated PostgreSQL fixtures",
+)
+@pytest.mark.parametrize("client_count", (10, 30, 100))
+def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
+    client_count: int,
+) -> None:
+    """Synthetic PostgreSQL 16 comparison; never a production latency claim."""
+    with get_session_context() as db:
+        coach = User(
+            telegram_user_id=9_500_000 + client_count,
+            username=f"perf_weight_coach_{client_count}",
+            is_coach=True,
+        )
+        db.add(coach)
+        db.flush()
+        clients = []
+        timezones = ("UTC", "Pacific/Honolulu", "Pacific/Kiritimati")
+        for index in range(client_count):
+            user = User(
+                telegram_user_id=9_600_000 + client_count * 1000 + index,
+                username=f"perf_weight_{client_count}_{index}",
+                profile=UserProfile(timezone=timezones[index % len(timezones)]),
+            )
+            clients.append(user)
+        db.add_all(clients)
+        db.flush()
+        db.add_all(
+            [
+                CoachClient(coach_user_id=coach.id, client_user_id=user.id)
+                for user in clients
+            ]
+        )
+        for index, user in enumerate(clients):
+            local_today = today_for_user(user)
+            for days_ago in range(12):
+                db.add(
+                    BodyMeasurement(
+                        user_id=user.id,
+                        measured_on=local_today - timedelta(days=days_ago + 1),
+                        weight_kg=70.0 + index / 10 + days_ago / 100,
+                    )
+                )
+            db.add(
+                BodyMeasurement(
+                    user_id=user.id,
+                    measured_on=local_today + timedelta(days=1),
+                    weight_kg=250.0,
+                )
+            )
+        db.commit()
+        db.refresh(coach)
+
+        with capture_ranked_measurement_queries() as final_capture:
+            final_clients = list_clients(db, coach)
+        assert len(final_clients) == client_count
+        assert len(final_capture) == 1
+
+        # Preserve the original exact per-user cutoff query for the controlled
+        # BEFORE comparison. Run it only on this isolated synthetic test DB.
+        client_ids = [user.id for user in clients]
+        ranked = (
+            db.query(
+                BodyMeasurement.user_id.label("user_id"),
+                BodyMeasurement.weight_kg.label("weight_kg"),
+                func.row_number()
+                .over(
+                    partition_by=BodyMeasurement.user_id,
+                    order_by=(
+                        BodyMeasurement.measured_on.desc(),
+                        BodyMeasurement.id.desc(),
+                    ),
+                )
+                .label("rank"),
+            )
+            .filter(
+                BodyMeasurement.user_id.in_(client_ids),
+                BodyMeasurement.weight_kg.is_not(None),
+                or_(
+                    *[
+                        and_(
+                            BodyMeasurement.user_id == user.id,
+                            BodyMeasurement.measured_on <= today_for_user(user),
+                        )
+                        for user in clients
+                    ]
+                ),
+            )
+            .subquery()
+        )
+        with capture_ranked_measurement_queries() as before_capture:
+            old_weight_rows = (
+                db.query(ranked.c.user_id, ranked.c.weight_kg)
+                .filter(ranked.c.rank == 1)
+                .all()
+            )
+        assert len(before_capture) == 1
+
+        old_weights = dict(old_weight_rows)
+        assert old_weights == {
+            item["id"]: item["weight_kg"] for item in final_clients
+        }
+        assert all(value < 250.0 for value in old_weights.values())
+
+        before_sql, before_params = before_capture[0]
+        final_sql, final_params = final_capture[0]
+        day_count = len({today_for_user(user) for user in clients})
+        assert before_sql.count("measured_on <=") == client_count
+        assert final_sql.count("measured_on <=") == day_count
+        assert isinstance(before_params, (dict, tuple, list))
+        assert isinstance(final_params, (dict, tuple, list))
+        assert len(before_params) == client_count * 3 + 1
+        assert len(final_params) == client_count + day_count + 1
+        assert len(final_sql) < len(before_sql)
+
+        # EXPLAIN ANALYZE runs only read-only SELECT statements against the
+        # isolated PostgreSQL test database. Use a transaction-scoped timeout
+        # and do not assert fragile absolute time/cost thresholds.
+        db.connection().exec_driver_sql("SET LOCAL statement_timeout = '5000ms'")
+        plan_times = []
+        for statement, params in (before_capture[0], final_capture[0]):
+            plan_value = db.connection().exec_driver_sql(
+                "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + statement,
+                params,
+            ).scalar_one()
+            plan = json.loads(plan_value) if isinstance(plan_value, str) else plan_value
+            assert isinstance(plan, list) and len(plan) == 1
+            details = plan[0]
+            assert isinstance(details, dict)
+            assert details["Plan"]["Node Type"]
+            assert float(details["Execution Time"]) >= 0
+            plan_times.append(float(details["Execution Time"]))
+
+        # Opt-in "pytest -s" prints machine-independent diagnostics. An isolated
+        # three-sample/one-order EXPLAIN is not a robust speedup estimate.
+        print(
+            "V11_02_SYNTHETIC_POSTGRES"
+            f" clients={client_count} local_days={day_count}"
+            f" before_bindings={len(before_params)} final_bindings={len(final_params)}"
+            f" before_sql_chars={len(before_sql)} final_sql_chars={len(final_sql)}"
+            f" before_explain_ms={plan_times[0]:.3f}"
+            f" final_explain_ms={plan_times[1]:.3f}"
+        )
 
 
 def test_me_response_needs_six_queries_after_authentication() -> None:
