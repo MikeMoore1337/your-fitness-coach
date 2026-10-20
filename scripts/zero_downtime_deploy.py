@@ -1782,7 +1782,7 @@ def _config(args: argparse.Namespace) -> DeployConfig:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("deploy", "bootstrap", "rollback", "single-slot"):
+    for command in ("deploy", "bootstrap", "rollback", "single-slot", "capacity-check"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("target_revision")
         subparser.add_argument("base_url")
@@ -1790,7 +1790,10 @@ def main() -> int:
     args = parser.parse_args()
     try:
         config = _config(args)
-        if args.command == "bootstrap":
+        if args.command == "capacity-check":
+            _trusted_connection_budget_preflight(config)
+            print("Trusted PostgreSQL capacity preflight: PASS")
+        elif args.command == "bootstrap":
             bootstrap_state(config)
         elif args.command == "rollback":
             rollback(config)
