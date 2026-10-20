@@ -251,8 +251,16 @@ def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
         db.refresh(coach)
 
         with capture_ranked_measurement_queries() as final_capture:
-            final_clients = list_clients(db, coach)
+            token = begin_sql_metrics()
+            try:
+                final_clients = list_clients(db, coach)
+                final_metrics = current_sql_metrics()
+            finally:
+                reset_sql_metrics(token)
         assert len(final_clients) == client_count
+        # Coach's full read path must remain bounded at 10/30/100 clients.
+        assert final_metrics.query_count == 5
+        assert final_metrics.duration_ms >= 0
         assert len(final_capture) == 1
 
         # Preserve the original exact per-user cutoff query for the controlled
@@ -337,6 +345,8 @@ def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
             f" clients={client_count} local_days={day_count}"
             f" before_bindings={len(before_params)} final_bindings={len(final_params)}"
             f" before_sql_chars={len(before_sql)} final_sql_chars={len(final_sql)}"
+            f" final_full_route_sql_count={final_metrics.query_count}"
+            f" final_full_route_sql_ms={final_metrics.duration_ms:.3f}"
             f" before_explain_ms={plan_times[0]:.3f}"
             f" final_explain_ms={plan_times[1]:.3f}"
         )
