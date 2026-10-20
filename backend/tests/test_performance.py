@@ -1,12 +1,11 @@
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date, timedelta
-from typing import Iterator
 
 from sqlalchemy import event
 
-from fitminiapp_api.core.timezone import today_for_user
-
 from fitminiapp_api.api.v1.me import _build_user_response
+from fitminiapp_api.core.timezone import today_for_user
 from fitminiapp_api.db.performance import (
     begin_sql_metrics,
     current_sql_metrics,
