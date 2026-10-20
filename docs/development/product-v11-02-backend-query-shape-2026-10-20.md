@@ -14,7 +14,7 @@ Issue: [#817](https://github.com/MikeMoore1337/your-fitness-coach/issues/817), p
 - Drop the redundant outer `user_id IN (...)` because every group already covers precisely the same authorized client IDs.
 - Keep the existing `row_number() OVER (PARTITION BY user_id ORDER BY measured_on DESC, id DESC)` ranking and all other response construction, security filters and nutrition relations unchanged.
 
-For 25 clients with one common local date, the complete SQLAlchemy bound-value count (including the final `rank == 1` value) changes from **76** (25 outer IDs + 25 per-client IDs + 25 per-client dates + rank) to **27** (25 grouped IDs + one date + rank). The local-day comparison branch count changes **25 → 1**. A separate simplified SQLAlchemy/SQLite compilation check showed 2,288 versus 524 SQL characters and 76 versus 27 positional bindings; those figures describe a reduced query model, not a captured production query plan or latency result. The integration regression test checks the real query shape and bound count. These are **not** SQL execution-time measurements. A two-local-day fixture additionally asserts separate cutoffs; future measurements remain excluded.
+For 25 clients with one common local date, the complete SQLAlchemy bound-value count (including the final `rank == 1` value) changes from **76** (25 outer IDs + 25 per-client IDs + 25 per-client dates + rank) to **27** (25 grouped IDs + one date + rank). The local-day comparison branch count changes **25 → 1**. Actual statement length, parameter count, and PostgreSQL query plans must be obtained by the new isolated benchmark; no SQL-text length or plan-time figure is asserted until it has been captured and reviewed. The integration regression test checks the real query shape and bound count. These are **not** SQL execution-time measurements. A two-local-day fixture additionally asserts separate cutoffs; future measurements remain excluded.
 
 ## Verification
 
@@ -32,3 +32,69 @@ For 25 clients with one common local date, the complete SQLAlchemy bound-value c
 ## Release boundary
 
 PR remains Draft while technical verification is pending. Owner has authorized normal merge in general, but merging this application-code PR into `master` would trigger automatic production deployment. Respect Product V11 P0 #848: no affected rollout before the trusted capacity preflight is proven and active. No forced merge, no production query, deploy, migration or Issue closure from this phase.
+
+
+## Phase 2: PostgreSQL 16 trainer-scale reproducibility
+
+An opt-in synthetic PostgreSQL profile is implemented in
+\`backend/tests/test_performance.py::test_coach_weight_query_postgres_profile_is_bounded_and_equivalent\`,
+parameterized for **10, 30 and 100 clients**. It runs on the repo's existing
+isolated \`TEST_DATABASE_URL\` fixture and skips on SQLite.
+
+- Each synthetic client has twelve historical daily body-weight measurements
+  plus one future-dated measurement that must remain invisible.
+- Time zones rotate between UTC, Pacific/Honolulu and Pacific/Kiritimati.
+  The historical, per-client BEFORE query is reconstructed locally and compared
+  to the optimized list_clients results, so authorization and user-specific
+  local-day cutoffs are protected.
+- Both SELECT statements undergo \`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)\` with
+  a transaction-local 5-second timeout. Neither statement changes production
+  data or invokes any migration.
+- The test requires equivalent results, one ranked query, bounded date
+  predicates, fewer SQL characters, and 3N+1 versus N+distinct_days+1 SQL
+  parameter bindings.
+- The test reports \`V11_02_SYNTHETIC_POSTGRES\` lines when executed with \`pytest -s\`.
+  Individual execution-time figures are diagnostics, not performance budgets.
+  This paired sample is too small and too cache-sensitive to claim a causal
+  p95/p99 improvement.
+
+Reproduce with a separately provisioned PostgreSQL 16 test database and
+the repository's normal test environment settings:
+
+~~~bash
+TEST_DATABASE_URL="<isolated-test-db-connection-string>" \
+  uv run pytest -q -s backend/tests/test_performance.py \
+  -k coach_weight_query_postgres_profile
+~~~
+
+Do not paste the connection string into public CI output, PRs or a shell log;
+the placeholder above is not a real secret.
+
+The normal GitHub Python test matrix already uses PostgreSQL 16 for its
+\`TEST_DATABASE_URL\` when the scope router includes Python tests. Passing
+that CI validates the PostgreSQL fixture/code path, but **measured BEFORE/
+AFTER request-level p95/p99 latency and actual production PostgreSQL metrics
+remain NO_DATA**.
+
+## Cross-surface coverage and stop rules
+
+Existing narrow regression tests already cover constant/near-constant query
+count for Coach client lists, Coach inbox, Coach attention, nutrition diary,
+training analytics and trainer summaries. These tests are *not* evidence that
+all route latencies are fast. No N+1 across other endpoints or missing index
+was confirmed by this #817 change; refrain from inventing an index migration.
+
+The remaining #817 performance investigation must use a representative
+isolated PostgreSQL 16 dataset and capture exact route SQL counts, SQL time,
+response payload size and total request duration for authentication,
+Today/Workout, Nutrition, Programs and Coach OS. Postgres plan costs and
+effective PostgreSQL headroom must be distinguished from actual production
+observations. Treat an unmeasured hotspot as NOT_PROVEN rather than as fixed.
+
+### Release gate unchanged
+
+#848 P0 production capacity preflight is a blocking predecessor for affected
+rollout. CI on master triggers automatic production deploy; do not merge
+PR #1131 until the independent trusted budget gate and headroom are verified
+and active. No direct production query, migration, index change or new
+paid infrastructure is authorized here.
