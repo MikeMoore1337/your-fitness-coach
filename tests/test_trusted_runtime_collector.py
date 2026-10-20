@@ -514,7 +514,15 @@ def test_legacy_probe_source_absent_or_oversized_fails_closed(
         _legacy_child_source(tmp_path)
 
     (tmp_path / "scripts").mkdir()
-    (tmp_path / "scripts" / "trusted_legacy_pg_snapshot.py").write_bytes(b"x" * 16_385)
+    source_path = tmp_path / "scripts" / "trusted_legacy_pg_snapshot.py"
+    source_path.write_bytes(b"x" * 16_385)
+    with pytest.raises(CollectorFailure, match="legacy_probe_source_invalid"):
+        _legacy_child_source(tmp_path)
+
+    source_path.unlink()
+    outside = tmp_path / "not-the-bundle.py"
+    outside.write_text("print('unsafe')", encoding="utf-8")
+    source_path.symlink_to(outside)
     with pytest.raises(CollectorFailure, match="legacy_probe_source_invalid"):
         _legacy_child_source(tmp_path)
 
