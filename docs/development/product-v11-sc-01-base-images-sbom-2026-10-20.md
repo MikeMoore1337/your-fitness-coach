@@ -7,10 +7,10 @@ Issue: [#851](https://github.com/MikeMoore1337/your-fitness-coach/issues/851)
 
 ## Статус
 
-- `IMPLEMENTED_LOCALLY`: Dockerfile-контракт, CI-генерация CycloneDX/SPDX и проверка
-  provenance добавлены в отдельной ветке.
-- `TECHNICALLY_READY`: выставляется только после успешного exact-head PR Checks и проверки
-  реальных артефактов сборки. До этого локальная оценка — `NOT_VERIFIED`.
+- `IMPLEMENTED_AND_EXACT_HEAD_VERIFIED`: Dockerfile-контракт, CI-генерация CycloneDX/SPDX,
+  provenance и реальные backend/bot SBOM проверены на exact-head CI run `39477264926`.
+- `READY_FOR_RELEASE_APPROVAL`: технические критерии #851 выполнены на текущем exact head;
+  это не меняет Draft-состояние PR и не заменяет owner/release approval.
 - `PRODUCTION_NOT_VERIFIED`: production deploy в рамках #851 не выполняется. Gate #848,
   owner approval, merge и release остаются отдельными условиями.
 
@@ -27,6 +27,19 @@ Issue: [#851](https://github.com/MikeMoore1337/your-fitness-coach/issues/851)
 5. PR [#1122](https://github.com/MikeMoore1337/your-fitness-coach/pull/1122) затрагивает
    `backend/Dockerfile` и deploy workflow. Поэтому контракт образов добавлен в общий
    `deployment_contract.py`, а SBOM-изменения изолированы в `ci.yml` и новом валидаторе.
+
+## Совместимость с PR #1122
+
+- Read-only `git merge-tree` для текущих голов PR показывает, что изменения в
+  `backend/Dockerfile` объединяются автоматически: сохраняются digest и запрет mutable
+  `apt-get upgrade` из #1137 и `COPY` trusted collector из #1122.
+- Изменения #1122 в `.github/workflows/deploy.yml` добавляют trusted runtime tooling и не
+  пересекаются с SBOM-steps #1137. PostgreSQL safety gate #848 не ослабляется.
+- Есть обычный текстовый конфликт в `tests/test_deployment_contract.py`: обе ветки добавляют
+  свои группы тестов. При интеграции нужно сохранить обе группы; переносить весь Draft #1122
+  в #1137 не требуется.
+- Совместимость подтверждена как анализ веток, а не как объединённый или production-запуск:
+  PR #1122 остаётся Draft, Issue #848 — открытым owner-gated условием.
 
 ## Проверенные базовые образы
 
@@ -67,7 +80,8 @@ Issue: [#851](https://github.com/MikeMoore1337/your-fitness-coach/issues/851)
 Для `backend` и `bot` job `containers` теперь:
 
 1. загружает финальный образ локально через BuildKit и проверяет его digest, image ID,
-   `linux/amd64` и `org.opencontainers.image.revision == github.sha`;
+   `linux/amd64` и `org.opencontainers.image.revision == github.sha`. В PR-контексте
+   `github.sha` — проверяемый merge commit; PR head фиксируется отдельно в evidence ниже;
 2. сохраняет существующее блокирующее Trivy-сканирование `CRITICAL,HIGH` до публикации;
 3. тем же pinned Trivy action `v0.73.0` создаёт:
    - `.artifacts/runtime/sbom/<image>/sbom.cyclonedx.json`;
@@ -102,6 +116,32 @@ Issue: [#851](https://github.com/MikeMoore1337/your-fitness-coach/issues/851)
 5. Merge/deploy выполняются только обычным GitHub flow после всех применимых gates; #848
    не заменяется этой проверкой.
 
+## Exact-head CI и реальные артефакты
+
+Проверка выполнена 2026-10-20 на [CI run `39477264926`](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39477264926):
+
+- PR head: `dc261707c60149fcb8cdca4c434e7911cc05955c`;
+- base `master`: `09ea49ac7a2ea441815c100e8d6ac078cde122aa`;
+- проверяемый PR merge commit и `github.sha` сборки: `7209bf5b5e9874f7f6b249a81b31850a874a8a57`;
+- aggregate `checks`: `SUCCESS`; Python/frontend, Docker backend/bot, Trivy, deployment/workflow
+  contracts, CodeQL, security audit и smoke checks: `SUCCESS`. Неприменимые weekly/extended
+  cross-browser и private Allure jobs были `SKIPPED` по scope-router, а не скрыты.
+
+| Image | BuildKit digest | Local image ID | Components/packages | CycloneDX SHA-256 | SPDX SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| backend | `sha256:151609441c425eeb5036a0cc56eaa40946f57fb977687720e455ca1b4afba6b8` | `sha256:282ddcd9299f802124482a68253198838624ebb3369f91adc2836a5e3d0279d0` | 1299 / 1300 | `80aedda0b3c4b981ecd8c27cd2962a52abd74f80e2e4b7345c58330b2c581d62` | `fde8fd75c0876a344f3bc48f5478210cf26787541df5a576e637294c43571f99` |
+| bot | `sha256:c4c32f3bcf21b81c2e6e9cf2c6e8a3f04d9520e1993ce68a59ce74bab28e6b3f` | `sha256:4c48d4afa70d97562e31e4b9ba16dfe78fe24b374bf6121bcc79de29c9432fc0` | 1135 / 1136 | `88189481d02e8d8e58d80f631ef39cb2c2686668bc162262e85ee79306147406` | `07e31e692c4613999d2b68db9a4ae7dac5576c58ec60025d2f45221f63f0dfd9` |
+
+В обеих SBOM `source_revision` и `oci_revision` равны merge commit `7209bf5…`, архитектура
+`linux/amd64`, а `provenance.json` повторно провалидирован локально на скачанных файлах.
+Артефакты: [backend SBOM](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39477264926/artifacts/12291185053),
+[bot SBOM](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39477264926/artifacts/12288724500).
+Проверка secret-shaped полей/значений не выявила credential-shaped entries; совпадения
+`secret-service` являются именами пакетов. Blocking Trivy `CRITICAL,HIGH` завершился успешно.
+
+PR CI не публикует GHCR-образы, поэтому published registry digest для production — `NOT_RUN`,
+а приведённые digest — реальные BuildKit digest локально загруженных образов CI.
+
 ## Экстренное обновление и откат
 
 Экстренное обновление следует тем же шагам, но с приоритетным PR и полным exact-head CI.
@@ -118,13 +158,15 @@ workflow сам проверяет provenance и digest образов пере�
 
 Локально в изолированной ветке выполнены:
 
-- `15 passed` для deployment/image/SBOM contract tests;
+- `115 passed` для deployment/image/SBOM contract tests;
 - Ruff format/check для изменённых Python-файлов;
 - `scripts/ci_contract.py run-group image-contract`;
 - `scripts/ci_contract.py run-group deployment-contract`;
-- YAML parse `.github/workflows/ci.yml`.
+- повторная валидация реальных backend/bot CycloneDX/SPDX файлов и их SHA-256 provenance.
 
-`NOT_VERIFIED` до exact-head GitHub run: реальная Docker-сборка backend/bot, фактическое
-содержимое CycloneDX/SPDX artifacts, published GHCR digest и успешные обязательные GitHub
-Actions. Локальный Docker Engine в среде разработки недоступен. Production smoke,
-production compatibility и release approval намеренно не выполнялись.
+Расширенный локальный набор дал `147 passed` и один environment-specific failure в
+`tests/test_production_provenance.py::test_reconcile_changes_only_existing_metadata` на
+Windows/sandbox; этот файл не изменён PR, а соответствующий exact-head Python job прошёл.
+Локальный Docker Engine недоступен, поэтому локальная сборка не выполнялась; реальная сборка
+и Trivy подтверждены exact-head CI. Production smoke, published GHCR verification, live
+PostgreSQL capacity, merge и release approval намеренно не выполнялись.
