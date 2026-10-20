@@ -14,7 +14,7 @@ Issue: [#817](https://github.com/MikeMoore1337/your-fitness-coach/issues/817), p
 - Drop the redundant outer `user_id IN (...)` because every group already covers precisely the same authorized client IDs.
 - Keep the existing `row_number() OVER (PARTITION BY user_id ORDER BY measured_on DESC, id DESC)` ranking and all other response construction, security filters and nutrition relations unchanged.
 
-For 25 clients with one common local date, the SQLAlchemy bound-value model changes from **75** values (25 outer IDs + 25 per-client IDs + 25 per-client dates) to **26** values (25 grouped IDs + one date). The local-day comparison branch count changes **25 → 1**. These counts are derived from the predicates and covered by a test; they are **not** SQL execution-time measurements. A two-local-day fixture additionally asserts separate cutoffs; future measurements remain excluded.
+For 25 clients with one common local date, the complete SQLAlchemy bound-value count (including the final `rank == 1` value) changes from **76** (25 outer IDs + 25 per-client IDs + 25 per-client dates + rank) to **27** (25 grouped IDs + one date + rank). The local-day comparison branch count changes **25 → 1**. A separate simplified SQLAlchemy/SQLite compilation check showed 2,288 versus 524 SQL characters and 76 versus 27 positional bindings; those figures describe a reduced query model, not a captured production query plan or latency result. The integration regression test checks the real query shape and bound count. These are **not** SQL execution-time measurements. A two-local-day fixture additionally asserts separate cutoffs; future measurements remain excluded.
 
 ## Verification
 
