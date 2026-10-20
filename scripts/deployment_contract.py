@@ -13,6 +13,17 @@ REGISTRY = "ghcr.io"
 IMAGE_KINDS = ("backend", "bot", "hermes-discovery", "hermes-worker")
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 REPOSITORY_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+FROM_RE = re.compile(r"^\s*FROM\s+(?:--[^\s]+\s+)*(?P<ref>[^\s]+)", re.MULTILINE)
+
+APPLICATION_BASE_IMAGES = {
+    "backend/Dockerfile": (
+        "node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f",
+        "python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170",
+    ),
+    "bot/Dockerfile": (
+        "python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170",
+    ),
+}
 
 
 class DeploymentContractError(RuntimeError):
@@ -54,6 +65,33 @@ def refs(repository: str, kind: str, revision: str) -> dict[str, str]:
     }
 
 
+def validate_application_base_images(root: Path) -> None:
+    """Keep application runtime generations and immutable base-image refs explicit."""
+
+    errors: list[str] = []
+    for relative_path, expected_refs in APPLICATION_BASE_IMAGES.items():
+        path = root / relative_path
+        if not path.is_file():
+            errors.append(f"missing application Dockerfile: {relative_path}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        from_refs = tuple(match.group("ref") for match in FROM_RE.finditer(text))
+        for expected_ref in expected_refs:
+            if expected_ref not in from_refs:
+                errors.append(f"{relative_path} must use {expected_ref}")
+        for image_ref in from_refs:
+            if (
+                image_ref.startswith(("node:24-alpine", "python:3.14-slim"))
+                and "@sha256:" not in image_ref
+            ):
+                errors.append(f"{relative_path} has a mutable base-image ref: {image_ref}")
+        for line in text.splitlines():
+            if re.search(r"\bapt-get\s+upgrade\b", line.split("#", 1)[0]):
+                errors.append(f"{relative_path} contains a mutable apt-get upgrade")
+    if errors:
+        raise DeploymentContractError("; ".join(errors))
+
+
 def validate_files(
     *,
     ci_workflow: Path,
@@ -85,6 +123,12 @@ def validate_files(
         errors.append("deploy workflow contains the removed dev synchronization lane")
     if "fit-mini-app-backend" in ci or "fit-mini-app-bot" in ci:
         errors.append("CI contains legacy hardcoded application image names")
+    repository_root = ci_workflow.resolve().parents[2]
+    if any((repository_root / path).exists() for path in APPLICATION_BASE_IMAGES):
+        try:
+            validate_application_base_images(repository_root)
+        except DeploymentContractError as error:
+            errors.append(str(error))
     if deploy_script is not None:
         script = deploy_script.read_text(encoding="utf-8")
         if "BACKEND_IMAGE" not in script or "BOT_IMAGE" not in script:
