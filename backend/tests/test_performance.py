@@ -71,11 +71,13 @@ def test_coach_client_list_query_count_is_constant() -> None:
         db.flush()
 
         local_today = today_for_user(clients[0])
-        db.add(BodyMeasurement(
-            user_id=outsider.id,
-            measured_on=local_today,
-            weight_kg=310.0,
-        ))
+        db.add(
+            BodyMeasurement(
+                user_id=outsider.id,
+                measured_on=local_today,
+                weight_kg=310.0,
+            )
+        )
         db.add_all(
             [
                 BodyMeasurement(
@@ -226,10 +228,7 @@ def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
         db.add_all(clients)
         db.flush()
         db.add_all(
-            [
-                CoachClient(coach_user_id=coach.id, client_user_id=user.id)
-                for user in clients
-            ]
+            [CoachClient(coach_user_id=coach.id, client_user_id=user.id) for user in clients]
         )
         for index, user in enumerate(clients):
             local_today = today_for_user(user)
@@ -290,16 +289,12 @@ def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
         )
         with capture_ranked_measurement_queries() as before_capture:
             old_weight_rows = (
-                db.query(ranked.c.user_id, ranked.c.weight_kg)
-                .filter(ranked.c.rank == 1)
-                .all()
+                db.query(ranked.c.user_id, ranked.c.weight_kg).filter(ranked.c.rank == 1).all()
             )
         assert len(before_capture) == 1
 
         old_weights = dict(old_weight_rows)
-        assert old_weights == {
-            item["id"]: item["weight_kg"] for item in final_clients
-        }
+        assert old_weights == {item["id"]: item["weight_kg"] for item in final_clients}
         assert all(value < 250.0 for value in old_weights.values())
 
         before_sql, before_params = before_capture[0]
@@ -319,10 +314,14 @@ def test_coach_weight_query_postgres_profile_is_bounded_and_equivalent(
         db.connection().exec_driver_sql("SET LOCAL statement_timeout = '5000ms'")
         plan_times = []
         for statement, params in (before_capture[0], final_capture[0]):
-            plan_value = db.connection().exec_driver_sql(
-                "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + statement,
-                params,
-            ).scalar_one()
+            plan_value = (
+                db.connection()
+                .exec_driver_sql(
+                    "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + statement,
+                    params,
+                )
+                .scalar_one()
+            )
             plan = json.loads(plan_value) if isinstance(plan_value, str) else plan_value
             assert isinstance(plan, list) and len(plan) == 1
             details = plan[0]
