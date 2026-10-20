@@ -503,3 +503,74 @@ def test_predeploy_single_slot_uses_last_successful_revision(
     state_root.mkdir(parents=True)
     state_root.joinpath("last-successful-revision").write_text(REVISION, encoding="utf-8")
     assert _active_revision(tmp_path) == REVISION
+
+
+def test_collect_snapshot_binds_active_image_and_candidate_provenance(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The full collector passes the *running* SHA to OCI inspection."""
+    monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
+    active_revision = REVISION
+    candidate_revision = "b" * 40
+    state_root = tmp_path / ".artifacts" / "operations" / "deployments"
+    state_root.mkdir(parents=True)
+    state_root.joinpath("last-successful-revision").write_text(
+        active_revision + "\n", encoding="utf-8"
+    )
+    state_root.joinpath("state.json").write_text(
+        json.dumps({"active_revision": active_revision, "active_slot": "blue"}),
+        encoding="utf-8",
+    )
+    tmp_path.joinpath(".deployment-sha").write_text(
+        candidate_revision + "\n", encoding="utf-8"
+    )
+    inspected: list[str] = []
+
+    def fake_run(command, *, cwd, policy):
+        del cwd, policy
+        if command[-3:] == ["config", "--format", "json"]:
+            return json.dumps(_compose()).encode()
+        if command[-4:] == ["ps", "--all", "--format", "json"]:
+            return json.dumps(_ps()).encode()
+        assert command[-4:] == [
+            "scripts.trusted_runtime_collector",
+            "postgres-child",
+            "--json",
+        ][-4:] or command[-1] == "--json"
+        return b"{}"
+
+    def verify_running_revision(_items, *, cwd, policy, expected_revision):
+        del cwd, policy
+        inspected.append(expected_revision)
+        assert expected_revision == active_revision
+        return (active_revision,)
+
+    from scripts import trusted_runtime_collector as collector
+
+    monkeypatch.setattr(collector, "_now", lambda: CAPTURED_AT)
+    monkeypatch.setattr(collector, "_host_fingerprint", lambda: "host-fingerprint")
+    monkeypatch.setattr(collector, "_run_bounded", fake_run)
+    monkeypatch.setattr(collector, "_inspect_runtime_environments", lambda *args, **kwargs: {})
+    monkeypatch.setattr(collector, "_inspect_revisions", verify_running_revision)
+    monkeypatch.setattr(
+        collector, "_running_container_ids", lambda *args, **kwargs: ("active-container",)
+    )
+    monkeypatch.setattr(
+        collector,
+        "build_topology_observation",
+        lambda compose, ps, context, **kwargs: _topology(context=context),
+    )
+    monkeypatch.setattr(
+        collector,
+        "_parse_child_snapshot",
+        lambda payload, context: _postgres(context),
+    )
+
+    actual = collector.collect_runtime_snapshot(
+        release_path=tmp_path,
+        compose_file=tmp_path / "docker-compose.yml",
+        policy=_approved_policy(),
+    )
+    assert inspected == [active_revision]
+    assert actual.context.revisions == tuple(sorted((active_revision, candidate_revision)))
+    assert actual.result.status == Verdict.PASS
