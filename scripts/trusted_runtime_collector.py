@@ -1158,6 +1158,22 @@ def _inspect_revisions(
     return tuple(sorted(revisions))
 
 
+def _legacy_child_source(release_path: Path) -> str:
+    """Load fixed source for a read-only probe in a pre-collector backend.
+
+    The source comes from the immutable candidate release, is only passed
+    to python -c inside the independently verified ACTIVE backend, and
+    contains no secrets or runtime-substituted values.
+    """
+    try:
+        source = (release_path / "scripts" / "trusted_legacy_pg_snapshot.py").read_bytes()
+        if not 0 < len(source) <= 16_384:
+            raise CollectorFailure("legacy_probe_source_invalid", Verdict.BLOCKED)
+        return source.decode("utf-8", errors="strict")
+    except (OSError, UnicodeError) as exc:
+        raise CollectorFailure("legacy_probe_source_unavailable", Verdict.UNKNOWN) from exc
+
+
 def collect_runtime_snapshot(
     *,
     release_path: Path,
@@ -1212,16 +1228,17 @@ def collect_runtime_snapshot(
     if topology.active_backend_service is None:
         raise CollectorFailure("runtime_active_upstream_unknown", Verdict.UNKNOWN)
     active_container_id = _running_container_ids(ps_items, topology.active_backend_service)[0]
+    # The active image may predate the current collector module. Execute
+    # audited, self-contained read-only source inside that active process;
+    # DATABASE_URL never leaves the container, and no files are copied.
     child_output = _run_bounded(
         [
             "docker",
             "exec",
             active_container_id,
             "python",
-            "-m",
-            "scripts.trusted_runtime_collector",
-            "postgres-child",
-            "--json",
+            "-c",
+            _legacy_child_source(release_path),
         ],
         cwd=release_path,
         policy=policy,
