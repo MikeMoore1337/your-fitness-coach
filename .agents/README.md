@@ -87,3 +87,8 @@ UI visual/product audit остаётся отдельным `$ui-audit`.
 ## Impeccable: основной дизайн-критик
 
 `impeccable` - project-scoped первичная UX/UI-критика для YFC, а не новый controller. Canonical `SKILL.md` находится в `skills/impeccable/`, upstream pinned 4.7.0 в `../.impeccable/`. Для рисования и улучшения UI сначала этот skill, для наблюдаемой QA-регрессии - `ui-audit`, для motion - `motion-design-engineer`, по фактической нужде. Подробности: `../docs/development/impeccable-adoption.md`. Вопросы согласования дизайна решает владелец.
+
+
+## UX/UI Design Orchestra (режим аудита по умолчанию)
+
+При запросе нескольких экспертных проверок **одного экрана** выбери `ux-ui-design-orchestra` как координирующую методику, затем `impeccable`, `ui-audit`, `accessibility-engineer` и `motion-design-engineer` строго по необходимости. Это не новая lifecycle-роль. Схема и приёмка: `../docs/development/ux-ui-design-orchestra.md`. До согласованной визуальной версии - только чтение приложения и концепты, не коммиты UI. Отсутствие доступных subagents = последовательный запуск, не утверждать обратное.
