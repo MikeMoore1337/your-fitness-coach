@@ -70,13 +70,50 @@ def test_coach_client_list_query_count_is_constant() -> None:
         db.add(outsider)
         db.flush()
 
+        # Regress access boundaries: a former client and a deactivated
+        # account must never be included in the weight list.
+        ended_client = User(
+            telegram_user_id=911_997,
+            username="ended_scale_client",
+            profile=UserProfile(full_name="Former Client"),
+        )
+        disabled_client = User(
+            telegram_user_id=911_998,
+            username="disabled_scale_client",
+            is_active=False,
+            profile=UserProfile(full_name="Disabled Client"),
+        )
+        db.add_all([ended_client, disabled_client])
+        db.flush()
+        db.add_all(
+            [
+                CoachClient(
+                    coach_user_id=coach.id,
+                    client_user_id=ended_client.id,
+                    status="ended",
+                ),
+                CoachClient(
+                    coach_user_id=coach.id,
+                    client_user_id=disabled_client.id,
+                    status="active",
+                ),
+            ]
+        )
+
         local_today = today_for_user(clients[0])
-        db.add(
-            BodyMeasurement(
-                user_id=outsider.id,
-                measured_on=local_today,
-                weight_kg=310.0,
-            )
+        db.add_all(
+            [
+                BodyMeasurement(
+                    user_id=user.id,
+                    measured_on=local_today,
+                    weight_kg=weight,
+                )
+                for user, weight in (
+                    (outsider, 310.0),
+                    (ended_client, 311.0),
+                    (disabled_client, 312.0),
+                )
+            ]
         )
         db.add_all(
             [
@@ -87,6 +124,16 @@ def test_coach_client_list_query_count_is_constant() -> None:
                 )
                 for index, user in enumerate(clients)
             ]
+        )
+        # A newer non-weight body measurement must not mask the latest
+        # actual weight: NULL weights are intentionally filtered before rank.
+        db.add(
+            BodyMeasurement(
+                user_id=clients[1].id,
+                measured_on=local_today,
+                weight_kg=None,
+                waist_cm=90.0,
+            )
         )
         # Tomorrow's weight must not leak into a client's local-today snapshot.
         db.add(
@@ -137,7 +184,10 @@ def test_coach_client_list_query_count_is_constant() -> None:
                 reset_sql_metrics(token)
 
     assert len(result) == 25
-    assert all(item["telegram_user_id"] != 911_999 for item in result)
+    assert all(
+        item["telegram_user_id"] not in {911_997, 911_998, 911_999}
+        for item in result
+    )
     assert metrics.query_count == 5
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
     assert result[-1]["weight_kg"] == 80.0
