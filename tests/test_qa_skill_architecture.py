@@ -71,7 +71,9 @@ def test_agent_manifest_matches_all_skill_directories() -> None:
     """Ensure conditional reference skills are counted without duplicates."""
     manifest = json.loads((ROOT / ".agents/MANIFEST.json").read_text(encoding="utf-8"))
     skills_root = ROOT / ".agents" / "skills"
-    present = {p.name for p in skills_root.iterdir() if p.is_dir() and (p / "SKILL.md").is_file()}
+    present = {
+        p.name for p in skills_root.iterdir() if p.is_dir() and (p / "SKILL.md").is_file()
+    }
     listed = manifest["skills"]
     assert len(listed) == len(set(listed))
     assert manifest["skill_count"] == len(listed)
@@ -81,5 +83,5 @@ def test_agent_manifest_matches_all_skill_directories() -> None:
             "requirements-traceability"} <= present
     for name in present:
         source = (skills_root / name / "SKILL.md").read_text(encoding="utf-8")
-        assert source.startswith("---\\n")
+        assert source.splitlines()[0] == "---"
         assert f"name: {name}" in source.split("---", 2)[1]
