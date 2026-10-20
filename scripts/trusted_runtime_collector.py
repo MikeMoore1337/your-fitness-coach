@@ -1237,6 +1237,7 @@ def collect_runtime_snapshot(
             "exec",
             active_container_id,
             "python",
+            "-B",
             "-c",
             _legacy_child_source(release_path),
         ],
