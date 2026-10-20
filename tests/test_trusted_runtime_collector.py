@@ -573,4 +573,5 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
     )
     assert inspected == [active_revision]
     assert actual.context.revisions == tuple(sorted((active_revision, candidate_revision)))
+    assert actual.candidate_revision == candidate_revision
     assert actual.result.status == Verdict.PASS
