@@ -521,9 +521,7 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
         json.dumps({"active_revision": active_revision, "active_slot": "blue"}),
         encoding="utf-8",
     )
-    tmp_path.joinpath(".deployment-sha").write_text(
-        candidate_revision + "\n", encoding="utf-8"
-    )
+    tmp_path.joinpath(".deployment-sha").write_text(candidate_revision + "\n", encoding="utf-8")
     inspected: list[str] = []
 
     def fake_run(command, *, cwd, policy):
