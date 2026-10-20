@@ -23,7 +23,7 @@
   stale/future/mixed context and sanitized failures.
 - Ruff check/format passed for changed Python files.
 - `uv audit --locked --no-group dev --no-group scheduled-report`: `PASS` after the
-  security-fixed `certifi` lock update.
+  security-fixed `certifi` and `Pillow` lock updates.
 - The exact pre-commit `mypy-backend` hook: `PASS` (`284` source files). A direct
   project-venv invocation of `scripts/run_mypy.py` independently reports `122` errors
   in `15` untouched backend modules; no error points to the changed config/migration
