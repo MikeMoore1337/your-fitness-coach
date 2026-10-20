@@ -1,4 +1,5 @@
 """Guard the read-only UX/UI orchestra routing contract from accidental deletion."""
+
 import json
 from pathlib import Path
 
