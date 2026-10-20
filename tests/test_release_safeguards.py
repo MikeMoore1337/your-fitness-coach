@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
+import pytest
 import yaml
 
 
@@ -334,8 +335,16 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
         "DOCKER_MEMORY_MAX_MIB=",
         "DOCKER_MEMORY_AVG_MIB=",
         "POSTGRES_MAX_CONNECTIONS=",
+        "POSTGRES_SUPERUSER_RESERVED_CONNECTIONS=",
+        "POSTGRES_RESERVED_CONNECTIONS=",
+        "POSTGRES_USABLE_NON_RESERVED_CONNECTIONS=",
         "POSTGRES_CURRENT_CONNECTIONS=",
         "POSTGRES_CONNECTION_HEADROOM=",
+        "POSTGRES_UNRESERVED_HEADROOM=",
+        "POSTGRES_DECLARED_YFC_SESSIONS=",
+        "POSTGRES_NON_YFC_SESSIONS=",
+        "POSTGRES_UNATTRIBUTED_SESSIONS=",
+        "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED",
         "PORT_5678=",
         "BACKEND_MODE=",
         "WORKER_MODE=",
@@ -386,6 +395,9 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
     assert "time.sleep(10)" in workflow_text
     assert "SELECT 'version_major='" in workflow_text
     assert "SELECT 'current_connections='" in workflow_text
+    assert "SELECT 'superuser_reserved_connections='" in workflow_text
+    assert "SELECT 'reserved_connections='" in workflow_text
+    assert "SELECT 'session_counts='" in workflow_text
     assert "POSTGRES_USER" not in workflow_text
     assert "POSTGRES_DB" not in workflow_text
     assert 'DEPLOYMENT_ROOT.glob("*/summary.json")' in workflow_text
@@ -396,6 +408,29 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
         "RAM_AVAILABLE_MAX=",
     ):
         assert legacy_field not in workflow_text
+
+
+def test_capacity_audit_session_counts_fail_closed_without_revealing_identity() -> None:
+    workflow_text = _sources()["capacity_audit"]
+    read_session_counts = _embedded_function(workflow_text, "read_session_counts")
+
+    assert read_session_counts("20,8,3") == ("8", "12", "3")
+    assert read_session_counts("0,0,0") == ("0", "0", "0")
+    unknown = ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+    for invalid in (
+        "",
+        "20,8",
+        "20,8,3,2",
+        "20,21,0",
+        "20,8,13",
+        "20,-1,0",
+        "20,3,∞",
+        "20, 3,1",
+    ):
+        assert read_session_counts(invalid) == unknown
+    assert "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED" in workflow_text
+    assert "application_name IN" in workflow_text
+    assert "FROM pg_stat_activity" in workflow_text
 
 
 def test_capacity_audit_preserves_docker_min_avg_max_semantics() -> None:
@@ -472,6 +507,56 @@ def test_capacity_audit_historical_metrics_are_bounded_allowlisted_and_worst_cas
     assert "str(min(record[0] for record in records))" in workflow_text
     assert "str(min(record[1] for record in records))" in workflow_text
     assert "str(min(record[2] for record in records))" in workflow_text
+
+
+def test_capacity_audit_postgres_reserved_and_attribution_diagnostics_are_read_only() -> None:
+    workflow_text = _sources()["capacity_audit"]
+
+    for field in (
+        "POSTGRES_SUPERUSER_RESERVED_CONNECTIONS=",
+        "POSTGRES_RESERVED_CONNECTIONS=",
+        "POSTGRES_USABLE_NON_RESERVED_CONNECTIONS=",
+        "POSTGRES_UNRESERVED_HEADROOM=",
+        "POSTGRES_DECLARED_YFC_SESSIONS=",
+        "POSTGRES_NON_YFC_SESSIONS=",
+        "POSTGRES_UNATTRIBUTED_SESSIONS=",
+        "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED",
+    ):
+        assert field in workflow_text
+
+    assert "current_setting('superuser_reserved_connections')" in workflow_text
+    assert "current_setting('reserved_connections', true)" in workflow_text
+    assert "SELECT 'session_counts='" in workflow_text
+    assert "FROM pg_stat_activity;" in workflow_text
+    assert "SELECT application_name" not in workflow_text
+    assert "pg_stat_activity.client_addr" not in workflow_text
+    assert "pg_stat_activity.query" not in workflow_text
+    assert "docker exec" not in workflow_text
+    assert '"docker",\n                          "exec",' in workflow_text
+    # Counts are diagnostics; the owner-only read probe is not the deployment gate.
+    assert "POSTGRES_BUDGET_VERDICT=PASS" not in workflow_text
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    (
+        ("20,8,3", ("8", "12", "3")),
+        ("0,0,0", ("0", "0", "0")),
+        ("2,3,0", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("2,1,2", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("2,-1,0", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("2,0", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("2,0,0,0", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("1,0,٠", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+        ("1,0,0;select", ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")),
+    ),
+)
+def test_capacity_audit_session_counts_fail_closed_on_invalid_data(
+    raw: str, expected: tuple[str, str, str]
+) -> None:
+    fn = _embedded_function(_sources()["capacity_audit"], "read_session_counts")
+    assert fn(raw) == expected
 
 
 def test_capacity_audit_cleans_ephemeral_ssh_material_on_every_exit() -> None:
