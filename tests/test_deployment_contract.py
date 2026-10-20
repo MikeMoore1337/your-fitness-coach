@@ -68,7 +68,7 @@ def test_trusted_postgres_preflight_runs_before_any_production_config_mutation()
     root = Path(__file__).resolve().parents[1]
     wrapper = (root / "scripts" / "deploy_production.sh").read_text(encoding="utf-8")
     orchestrator = (root / "scripts" / "zero_downtime_deploy.py").read_text(encoding="utf-8")
-    marker = 'python3 scripts/zero_downtime_deploy.py capacity-check'
+    marker = "python3 scripts/zero_downtime_deploy.py capacity-check"
     assert wrapper.count(marker) == 1
     first_mutation = 'echo "Enabling browser OAuth'
     assert wrapper.index(marker) < wrapper.index(first_mutation)
@@ -78,7 +78,7 @@ def test_trusted_postgres_preflight_runs_before_any_production_config_mutation()
     )
     assert 'if args.command == "capacity-check":' in orchestrator
     assert 'with _stage(evidence, "connection_budget_preflight"):' in orchestrator
-    assert orchestrator.count('_trusted_connection_budget_preflight(config)') >= 4
+    assert orchestrator.count("_trusted_connection_budget_preflight(config)") >= 4
 
 
 def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> None:
