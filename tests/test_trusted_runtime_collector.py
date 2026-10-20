@@ -429,7 +429,9 @@ def test_running_image_revision_must_match_release_sha(tmp_path: Path, monkeypat
         )
 
 
-def test_predeploy_running_revision_uses_active_state_not_candidate(tmp_path: Path, monkeypatch) -> None:
+def test_predeploy_running_revision_uses_active_state_not_candidate(
+    tmp_path: Path, monkeypatch
+) -> None:
     """A valid upgrade has active=A while immutable candidate bundle=B."""
     monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
     state_root = tmp_path / ".artifacts" / "operations" / "deployments"
@@ -495,9 +497,7 @@ def test_predeploy_active_revision_missing_marker_is_unknown(tmp_path: Path, mon
     assert raised.value.status == Verdict.UNKNOWN
 
 
-def test_predeploy_single_slot_uses_last_successful_revision(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_predeploy_single_slot_uses_last_successful_revision(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
     state_root = tmp_path / ".artifacts" / "operations" / "deployments"
     state_root.mkdir(parents=True)
