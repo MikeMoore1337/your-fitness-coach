@@ -340,8 +340,15 @@ jobs:
           postgres = {
               "version_major": "UNAVAILABLE",
               "max_connections": "UNAVAILABLE",
+              "superuser_reserved_connections": "UNAVAILABLE",
+              "reserved_connections": "UNAVAILABLE",
+              "usable_non_reserved_connections": "UNAVAILABLE",
               "current_connections": "UNAVAILABLE",
               "connection_headroom": "UNAVAILABLE",
+              "unreserved_headroom": "UNAVAILABLE",
+              "declared_yfc_sessions": "UNAVAILABLE",
+              "non_yfc_sessions": "UNAVAILABLE",
+              "unattributed_sessions": "UNAVAILABLE",
               "total_database_size_mib": "UNAVAILABLE",
               "shared_buffers_mib": "UNAVAILABLE",
           }
@@ -366,7 +373,14 @@ jobs:
               if len(db_ids) == 1:
                   sql = """SELECT 'version_major=' || (current_setting('server_version_num')::int / 10000);
           SELECT 'max_connections=' || current_setting('max_connections')::int;
+          SELECT 'superuser_reserved_connections=' || current_setting('superuser_reserved_connections')::int;
+          SELECT 'reserved_connections=' || COALESCE(NULLIF(current_setting('reserved_connections', true), ''), 'UNAVAILABLE');
           SELECT 'current_connections=' || count(*) FROM pg_stat_activity;
+          SELECT 'session_counts=' || count(*) || ',' ||
+            count(*) FILTER (WHERE application_name IN
+              ('yfc-backend', 'yfc-worker', 'yfc-setup', 'yfc-migration', 'yfc-connection-budget-collector')) || ',' ||
+            count(*) FILTER (WHERE COALESCE(btrim(application_name), '') = '')
+            FROM pg_stat_activity;
           SELECT 'total_database_size_bytes=' || COALESCE(sum(pg_database_size(datname)), 0) FROM pg_database WHERE datallowconn;
           SELECT 'shared_buffers=' || current_setting('shared_buffers');"""
                   pg_result = command(
@@ -399,10 +413,42 @@ jobs:
                   for key in ("version_major", "max_connections", "current_connections"):
                       if parsed.get(key, "").isdigit():
                           postgres[key] = parsed[key]
+                  if parsed.get("superuser_reserved_connections", "").isdigit():
+                      postgres["superuser_reserved_connections"] = parsed["superuser_reserved_connections"]
+                  if postgres["version_major"].isdigit() and int(postgres["version_major"]) < 16:
+                      postgres["reserved_connections"] = "0"
+                  elif parsed.get("reserved_connections", "").isdigit():
+                      postgres["reserved_connections"] = parsed["reserved_connections"]
+                  counts = parsed.get("session_counts", "").split(",")
+                  if len(counts) == 3 and all(value.isdigit() for value in counts):
+                      total, declared_yfc, unattributed = map(int, counts)
+                      if declared_yfc <= total and unattributed <= total - declared_yfc:
+                          postgres["declared_yfc_sessions"] = str(declared_yfc)
+                          postgres["non_yfc_sessions"] = str(total - declared_yfc)
+                          postgres["unattributed_sessions"] = str(unattributed)
                   if postgres["max_connections"].isdigit() and postgres["current_connections"].isdigit():
                       postgres["connection_headroom"] = str(
                           int(postgres["max_connections"]) - int(postgres["current_connections"])
                       )
+                  if all(
+                      postgres[key].isdigit()
+                      for key in (
+                          "max_connections",
+                          "superuser_reserved_connections",
+                          "reserved_connections",
+                      )
+                  ):
+                      usable = (
+                          int(postgres["max_connections"])
+                          - int(postgres["superuser_reserved_connections"])
+                          - int(postgres["reserved_connections"])
+                      )
+                      if usable >= 0:
+                          postgres["usable_non_reserved_connections"] = str(usable)
+                          if postgres["current_connections"].isdigit():
+                              postgres["unreserved_headroom"] = str(
+                                  usable - int(postgres["current_connections"])
+                              )
                   if parsed.get("total_database_size_bytes", "").isdigit():
                       postgres["total_database_size_mib"] = str(
                           round(int(parsed["total_database_size_bytes"]) / 1024**2)
@@ -518,8 +564,16 @@ jobs:
                   f"BOT_MODE={bot_mode}",
                   f"POSTGRES_VERSION_MAJOR={postgres['version_major']}",
                   f"POSTGRES_MAX_CONNECTIONS={postgres['max_connections']}",
+                  f"POSTGRES_SUPERUSER_RESERVED_CONNECTIONS={postgres['superuser_reserved_connections']}",
+                  f"POSTGRES_RESERVED_CONNECTIONS={postgres['reserved_connections']}",
+                  f"POSTGRES_USABLE_NON_RESERVED_CONNECTIONS={postgres['usable_non_reserved_connections']}",
                   f"POSTGRES_CURRENT_CONNECTIONS={postgres['current_connections']}",
                   f"POSTGRES_CONNECTION_HEADROOM={postgres['connection_headroom']}",
+                  f"POSTGRES_UNRESERVED_HEADROOM={postgres['unreserved_headroom']}",
+                  f"POSTGRES_DECLARED_YFC_SESSIONS={postgres['declared_yfc_sessions']}",
+                  f"POSTGRES_NON_YFC_SESSIONS={postgres['non_yfc_sessions']}",
+                  f"POSTGRES_UNATTRIBUTED_SESSIONS={postgres['unattributed_sessions']}",
+                  "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED",
                   f"POSTGRES_TOTAL_DATABASE_SIZE_MIB={postgres['total_database_size_mib']}",
                   f"POSTGRES_SHARED_BUFFERS_MIB={postgres['shared_buffers_mib']}",
                   f"PORT_5678={port_5678}",
