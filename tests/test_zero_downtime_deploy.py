@@ -453,6 +453,51 @@ def test_trusted_db_gate_sanitizes_collector_failure(tmp_path: Path, monkeypatch
     assert "credentials" not in str(raised.value)
 
 
+def test_trusted_db_gate_blocks_zero_downtime_before_any_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    _state(config)
+    calls = _patch_runtime(monkeypatch)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.deploy(config)
+
+    assert calls["compose"] == []
+    assert calls["run"] == []
+    assert calls["switch"] == []
+    assert calls["consumer_start"] == []
+    assert calls["consumer_stop"] == []
+
+
+def test_trusted_db_gate_blocks_single_slot_before_reclaim_and_stop(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    reclaim_calls = []
+    monkeypatch.setattr(
+        deploy, "_reclaim_single_slot_docker_space", lambda: reclaim_calls.append("reclaim")
+    )
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.single_slot_deploy(config)
+
+    assert reclaim_calls == []
+    assert calls["compose"] == []
+    assert calls["stops"] == []
+    assert calls["backend_starts"] == []
+    assert calls["consumer_starts"] == []
+
+
 def test_successful_rollout_updates_state_only_after_observation(
     tmp_path: Path, monkeypatch
 ) -> None:
