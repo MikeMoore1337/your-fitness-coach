@@ -505,6 +505,20 @@ def test_predeploy_single_slot_uses_last_successful_revision(tmp_path: Path, mon
     assert _active_revision(tmp_path) == REVISION
 
 
+def test_legacy_probe_source_absent_or_oversized_fails_closed(
+    tmp_path: Path,
+) -> None:
+    from scripts.trusted_runtime_collector import _legacy_child_source
+
+    with pytest.raises(CollectorFailure, match="legacy_probe_source_unavailable"):
+        _legacy_child_source(tmp_path)
+
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "trusted_legacy_pg_snapshot.py").write_bytes(b"x" * 16_385)
+    with pytest.raises(CollectorFailure, match="legacy_probe_source_invalid"):
+        _legacy_child_source(tmp_path)
+
+
 def test_collect_snapshot_binds_active_image_and_candidate_provenance(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -522,6 +536,10 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
         encoding="utf-8",
     )
     tmp_path.joinpath(".deployment-sha").write_text(candidate_revision + "\n", encoding="utf-8")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "trusted_legacy_pg_snapshot.py").write_text(
+        "print('sanitized')\n", encoding="utf-8"
+    )
     inspected: list[str] = []
 
     def fake_run(command, *, cwd, policy):
@@ -530,13 +548,7 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
             return json.dumps(_compose()).encode()
         if command[-4:] == ["ps", "--all", "--format", "json"]:
             return json.dumps(_ps()).encode()
-        assert command[-5:] == [
-            "python",
-            "-m",
-            "scripts.trusted_runtime_collector",
-            "postgres-child",
-            "--json",
-        ]
+        assert command[-3:] == ["python", "-c", "print('sanitized')\n"]
         return b"{}"
 
     def verify_running_revision(_items, *, cwd, policy, expected_revision):
