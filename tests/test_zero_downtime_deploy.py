@@ -99,7 +99,7 @@ def test_persist_application_image_refs_replaces_duplicates_and_preserves_file_c
     tmp_path: Path,
 ) -> None:
     environment_file = tmp_path / ".env"
-    fd = os.open(environment_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+    fd = os.open(environment_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as stream:
         stream.write(
             "# keep this comment\n"
@@ -109,8 +109,8 @@ def test_persist_application_image_refs_replaces_duplicates_and_preserves_file_c
             "BOT_IMAGE=registry/bot:old\n"
             "OTHER=value\n"
         )
-    os.chmod(environment_file, 0o640)
     expected_mode = os.stat(environment_file).st_mode & 0o777
+    assert expected_mode == 0o600
     backend_image = "registry/backend@sha256:" + "1" * 64
     bot_image = "registry/bot@sha256:" + "2" * 64
 
