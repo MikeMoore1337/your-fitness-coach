@@ -89,7 +89,10 @@ def test_v11_representative_read_paths_emit_bounded_sanitized_metrics(
             started = perf_counter()
             response = client.get(request_path, headers=headers)
             elapsed_ms.append((perf_counter() - started) * 1000)
-            assert response.status_code == 200, (path, response.status_code)
+            # In this seeded fixture Today can legitimately have no assigned
+            # workout; the route returns 404 rather than an empty 200 response.
+            allowed_statuses = {200, 404} if path == "/api/v1/workouts/today" else {200}
+            assert response.status_code in allowed_statuses, (path, response.status_code)
             assert response.headers.get("X-Request-ID")
             response_sizes.append(len(response.content))
             records = [
@@ -101,7 +104,7 @@ def test_v11_representative_read_paths_emit_bounded_sanitized_metrics(
             ]
             assert len(records) == 1, (path, len(records))
             record = records[0]
-            assert record.status_code == 200
+            assert record.status_code == response.status_code
             # FastAPI exposes registered route templates: nested routers can
             # log /templates/mine, and the root /me subrouter logs an empty
             # local route. Both are valid sanitized template identifiers.
@@ -126,6 +129,7 @@ def test_v11_representative_read_paths_emit_bounded_sanitized_metrics(
         f"V11_02_SYNTHETIC_ROUTE path={path}"
         f" athlete_or_coach={actor}"
         f" requests={len(elapsed_ms)}"
+        f" response_status={response.status_code}"
         f" http_p50_ms={median(elapsed_ms):.3f}"
         f" sql_p50_ms={median(sql_ms):.3f}"
         f" sql_min_queries={min(sql_queries)}"
