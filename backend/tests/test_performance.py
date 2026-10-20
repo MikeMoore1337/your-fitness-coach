@@ -61,7 +61,21 @@ def test_coach_client_list_query_count_is_constant() -> None:
             )
             clients.append(user)
 
+        # An unrelated account with a newer weight must not enter Coach OS.
+        outsider = User(
+            telegram_user_id=911_999,
+            username="unlinked_scale_client",
+            profile=UserProfile(full_name="Unlinked Client"),
+        )
+        db.add(outsider)
+        db.flush()
+
         local_today = today_for_user(clients[0])
+        db.add(BodyMeasurement(
+            user_id=outsider.id,
+            measured_on=local_today,
+            weight_kg=310.0,
+        ))
         db.add_all(
             [
                 BodyMeasurement(
@@ -121,6 +135,7 @@ def test_coach_client_list_query_count_is_constant() -> None:
                 reset_sql_metrics(token)
 
     assert len(result) == 25
+    assert all(item["telegram_user_id"] != 911_999 for item in result)
     assert metrics.query_count == 5
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
     assert result[-1]["weight_kg"] == 80.0
