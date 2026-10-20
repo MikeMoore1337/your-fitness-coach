@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import runpy
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -114,6 +117,46 @@ def test_legacy_probe_accepts_pg15_absent_reserved_connections(monkeypatch) -> N
     result = legacy.collect()
     assert result["postgres"]["reserved_connections"] is None
     assert result["postgres"]["server_version_major"] == 15
+
+
+def test_legacy_probe_output_is_accepted_by_main_trusted_snapshot_parser(monkeypatch) -> None:
+    from scripts.trusted_runtime_collector import (
+        RuntimeContext,
+        _parse_child_snapshot,
+    )
+
+    _fake_driver(monkeypatch, VALID_ROW)
+    report = legacy.collect()
+    observed = _parse_child_snapshot(
+        report,
+        RuntimeContext(
+            environment="production",
+            host_fingerprint="synthetic-host",
+            revisions=("a" * 40,),
+            captured_at=datetime.now(UTC),
+        ),
+    )
+    assert observed.capacity.max_connections == 300
+    assert observed.capacity.observed_non_yfc_connections == 12
+
+
+def test_legacy_probe_cli_failure_never_prints_database_secrets(
+    monkeypatch, capsys
+) -> None:
+    def refuse_connection(*_args, **_kwargs):
+        raise RuntimeError("password=top-secret uri=postgresql://private")
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://test:password-secret@db/app")
+    monkeypatch.setitem(
+        sys.modules, "psycopg", SimpleNamespace(connect=refuse_connection)
+    )
+    with pytest.raises(SystemExit) as raised:
+        runpy.run_path(str(Path(legacy.__file__)), run_name="__main__")
+    assert raised.value.code == 1
+    output = capsys.readouterr().out
+    assert json.loads(output) == {"status": "BLOCKED"}
+    assert "secret" not in output
+    assert "postgresql://" not in output
 
 
 def test_legacy_probe_without_database_url_is_blocked(monkeypatch) -> None:
