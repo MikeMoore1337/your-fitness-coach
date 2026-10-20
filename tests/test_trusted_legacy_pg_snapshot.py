@@ -60,9 +60,7 @@ def _fake_driver(monkeypatch, row):
     return calls, cursor
 
 
-def test_legacy_probe_collects_only_sanitized_counts_in_read_only_transaction(
-    monkeypatch,
-) -> None:
+def test_legacy_probe_collects_only_sanitized_counts_in_read_only_transaction(monkeypatch) -> None:
     calls, cursor = _fake_driver(monkeypatch, VALID_ROW)
     data = legacy.collect()
 
@@ -120,10 +118,7 @@ def test_legacy_probe_accepts_pg15_absent_reserved_connections(monkeypatch) -> N
 
 
 def test_legacy_probe_output_is_accepted_by_main_trusted_snapshot_parser(monkeypatch) -> None:
-    from scripts.trusted_runtime_collector import (
-        RuntimeContext,
-        _parse_child_snapshot,
-    )
+    from scripts.trusted_runtime_collector import RuntimeContext, _parse_child_snapshot
 
     _fake_driver(monkeypatch, VALID_ROW)
     report = legacy.collect()
@@ -140,16 +135,12 @@ def test_legacy_probe_output_is_accepted_by_main_trusted_snapshot_parser(monkeyp
     assert observed.capacity.observed_non_yfc_connections == 12
 
 
-def test_legacy_probe_cli_failure_never_prints_database_secrets(
-    monkeypatch, capsys
-) -> None:
+def test_legacy_probe_cli_failure_never_prints_database_secrets(monkeypatch, capsys) -> None:
     def refuse_connection(*_args, **_kwargs):
         raise RuntimeError("password=top-secret uri=postgresql://private")
 
     monkeypatch.setenv("DATABASE_URL", "postgresql://test:password-secret@db/app")
-    monkeypatch.setitem(
-        sys.modules, "psycopg", SimpleNamespace(connect=refuse_connection)
-    )
+    monkeypatch.setitem(sys.modules, "psycopg", SimpleNamespace(connect=refuse_connection))
     with pytest.raises(SystemExit) as raised:
         runpy.run_path(str(Path(legacy.__file__)), run_name="__main__")
     assert raised.value.code == 1
