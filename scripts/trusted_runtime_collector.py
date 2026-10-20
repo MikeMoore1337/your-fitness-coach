@@ -222,12 +222,45 @@ def _host_fingerprint() -> str:
 
 
 def _release_revision(release_path: Path) -> str:
+    """Read the immutable candidate bundle revision, not the running revision."""
     try:
         revision = (release_path / ".deployment-sha").read_text(encoding="utf-8").strip()
     except OSError as exc:
         raise CollectorFailure("release_revision_unavailable", Verdict.UNKNOWN) from exc
     if FULL_REVISION.fullmatch(revision) is None:
         raise CollectorFailure("release_revision_invalid", Verdict.BLOCKED)
+    return revision
+
+
+def _active_revision(release_path: Path) -> str:
+    """Independently bind running image labels to the current release state.
+
+    The bundle .deployment-sha identifies the *candidate*. Before rollout,
+    the active backend necessarily runs an older SHA. Never pass the candidate
+    revision to the runtime image provenance check.
+    """
+    raw_root = os.environ.get("DEPLOY_STATE_ROOT")
+    state_root = Path(raw_root).resolve() if raw_root else (
+        release_path / ".artifacts" / "operations" / "deployments"
+    )
+    try:
+        revision = (state_root / "last-successful-revision").read_text(
+            encoding="utf-8"
+        ).strip()
+    except OSError as exc:
+        raise CollectorFailure("active_revision_unavailable", Verdict.UNKNOWN) from exc
+    if FULL_REVISION.fullmatch(revision) is None:
+        raise CollectorFailure("active_revision_invalid", Verdict.BLOCKED)
+    state_file = state_root / "state.json"
+    if state_file.exists():
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise CollectorFailure("active_state_invalid", Verdict.BLOCKED) from exc
+        if not isinstance(state, dict) or state.get("active_revision") != revision:
+            raise CollectorFailure("active_revision_state_mismatch", Verdict.BLOCKED)
+        if state.get("active_slot") not in {"legacy", "blue", "green"}:
+            raise CollectorFailure("active_state_invalid", Verdict.BLOCKED)
     return revision
 
 
@@ -1130,7 +1163,8 @@ def collect_runtime_snapshot(
     """Collect the host/runtime pair and evaluate it without accepting JSON trust flags."""
 
     _validate_policy(policy)
-    expected_revision = _release_revision(release_path)
+    candidate_revision = _release_revision(release_path)
+    active_revision = _active_revision(release_path)
     config_output = _run_bounded(
         _compose_command(compose_file, "config", "--format", "json"),
         cwd=release_path,
@@ -1154,9 +1188,11 @@ def collect_runtime_snapshot(
         ps_items,
         cwd=release_path,
         policy=policy,
-        expected_revision=expected_revision,
+        expected_revision=active_revision,
     )
-    revisions = tuple(sorted({expected_revision, *inspected_revisions}))
+    # Report both candidate and running revisions, while individually
+    # checking every running image against the current active marker.
+    revisions = tuple(sorted({candidate_revision, active_revision, *inspected_revisions}))
     context = RuntimeContext(
         environment=policy.environment,
         host_fingerprint=_host_fingerprint(),
