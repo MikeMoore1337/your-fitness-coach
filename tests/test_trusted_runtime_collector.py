@@ -548,7 +548,7 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
             return json.dumps(_compose()).encode()
         if command[-4:] == ["ps", "--all", "--format", "json"]:
             return json.dumps(_ps()).encode()
-        assert command[-3:] == ["python", "-c", "print('sanitized')\n"]
+        assert command[-4:] == ["python", "-B", "-c", "print('sanitized')\n"]
         return b"{}"
 
     def verify_running_revision(_items, *, cwd, policy, expected_revision):
