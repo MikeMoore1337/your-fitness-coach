@@ -49,6 +49,21 @@ def test_deploy_bundle_includes_migration_sources() -> None:
     assert "backend/alembic/versions" in deploy
 
 
+def test_repair_bundle_includes_the_complete_trusted_capacity_gate() -> None:
+    root = Path(__file__).resolve().parents[1]
+    deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+    repair_bundle = deploy.split("tooling_paths=(", 1)[1].split(")", 1)[0]
+
+    # The host orchestrator must never be copied from a newer tooling
+    # revision without its trusted collector and preflight implementation.
+    for path in (
+        "scripts/zero_downtime_deploy.py",
+        "scripts/connection_budget_preflight.py",
+        "scripts/trusted_runtime_collector.py",
+    ):
+        assert path in repair_bundle
+
+
 def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> None:
     root = Path(__file__).resolve().parents[1]
     deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
