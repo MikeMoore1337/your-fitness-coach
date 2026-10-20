@@ -117,8 +117,10 @@ PostgreSQL 16 test fixtures:
 
 This does not manufacture data or attempt production authentication. The
 test signs in using the repository's existing **development-only test login**,
-checks HTTP 200, immutable route templates, the X-Request-ID response
-contract and existing structured request-log fields. It prints only route
+checks expected read-route status (including the existing 404 empty-state
+when no workout is assigned to Today), X-Request-ID, and existing sanitized
+structured request-log fields. FastAPI's local registered route template
+may legitimately be empty for the root /me subrouter. It prints only route
 names, actor category, requests per route, HTTP median, SQL median, SQL query
 count range and serialized response byte size; no response body, identity,
 JWT, customer records or database connection details.
