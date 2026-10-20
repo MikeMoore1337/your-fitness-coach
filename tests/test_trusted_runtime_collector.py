@@ -532,11 +532,13 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
             return json.dumps(_compose()).encode()
         if command[-4:] == ["ps", "--all", "--format", "json"]:
             return json.dumps(_ps()).encode()
-        assert command[-4:] == [
+        assert command[-5:] == [
+            "python",
+            "-m",
             "scripts.trusted_runtime_collector",
             "postgres-child",
             "--json",
-        ][-4:] or command[-1] == "--json"
+        ]
         return b"{}"
 
     def verify_running_revision(_items, *, cwd, policy, expected_revision):
