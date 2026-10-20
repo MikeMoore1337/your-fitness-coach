@@ -37,6 +37,8 @@ backend = [
 ]
 bot = [
     "aiogram",
+    # Минимальная версия с исправлениями GHSA для aiohttp в bot runtime.
+    "aiohttp>=3.14.4,<4",
     "aiohttp-socks",
     "httpx",
     "pydantic-settings",
