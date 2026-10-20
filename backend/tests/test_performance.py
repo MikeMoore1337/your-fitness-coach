@@ -166,12 +166,13 @@ def test_coach_client_latest_weight_respects_distinct_local_days() -> None:
         db.commit()
         db.refresh(coach)
 
+        client_ids = [user.id for user in clients]
         with capture_ranked_measurement_queries() as weight_queries:
             result = list_clients(db, coach)
 
     assert {row["id"]: row["weight_kg"] for row in result} == {
-        clients[0].id: 70.0,
-        clients[1].id: 71.0,
+        client_ids[0]: 70.0,
+        client_ids[1]: 71.0,
     }
     assert len(weight_queries) == 1
     # Two local days require two groups, preserving the individual cutoff.
