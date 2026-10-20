@@ -392,22 +392,24 @@ def test_capacity_check_cli_uses_read_only_gate_and_never_starts_rollout(
 ) -> None:
     config = _config(tmp_path)
     called = []
-    monkeypatch.setattr(sys, "argv", [
-        "zero_downtime_deploy.py",
-        "capacity-check",
-        NEW_SHA,
-        config.base_url,
-        config.public_base_url,
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "zero_downtime_deploy.py",
+            "capacity-check",
+            NEW_SHA,
+            config.base_url,
+            config.public_base_url,
+        ],
+    )
     monkeypatch.setattr(deploy, "_config", lambda _args: config)
     monkeypatch.setattr(
         deploy,
         "_trusted_connection_budget_preflight",
         lambda current: called.append(current),
     )
-    monkeypatch.setattr(
-        deploy, "deploy", lambda _config: pytest.fail("rollout must not run")
-    )
+    monkeypatch.setattr(deploy, "deploy", lambda _config: pytest.fail("rollout must not run"))
     monkeypatch.setattr(
         deploy, "single_slot_deploy", lambda _config: pytest.fail("single-slot must not run")
     )
@@ -420,13 +422,17 @@ def test_capacity_check_cli_denial_is_nonzero_and_sanitized(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
     config = _config(tmp_path)
-    monkeypatch.setattr(sys, "argv", [
-        "zero_downtime_deploy.py",
-        "capacity-check",
-        NEW_SHA,
-        config.base_url,
-        config.public_base_url,
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "zero_downtime_deploy.py",
+            "capacity-check",
+            NEW_SHA,
+            config.base_url,
+            config.public_base_url,
+        ],
+    )
     monkeypatch.setattr(deploy, "_config", lambda _args: config)
 
     def reject(_config):
