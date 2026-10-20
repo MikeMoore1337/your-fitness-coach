@@ -143,7 +143,7 @@ def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
 
     policy = CollectorPolicy(
         safety_headroom_connections=int(raw_margin),
-        safety_headroom_source="owner-reviewed production deployment setting",
+        safety_headroom_source="explicit DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS production setting",
     )
     try:
         evidence = collect_runtime_snapshot(
