@@ -462,16 +462,20 @@ def test_trusted_db_gate_rejects_invalid_margin(tmp_path: Path, monkeypatch, val
 
 
 @pytest.mark.parametrize(
-    ("verdict", "reported_revisions", "should_pass"),
+    ("verdict", "reported_revisions", "candidate_revision", "should_pass"),
     (
-        (Verdict.PASS, (NEW_SHA,), True),
-        (Verdict.BLOCKED, (NEW_SHA,), False),
-        (Verdict.UNKNOWN, (NEW_SHA,), False),
-        (Verdict.PASS, (OLD_SHA,), False),
+        (Verdict.PASS, (NEW_SHA,), NEW_SHA, True),
+        (Verdict.BLOCKED, (NEW_SHA,), NEW_SHA, False),
+        (Verdict.UNKNOWN, (NEW_SHA,), NEW_SHA, False),
+        (Verdict.PASS, (OLD_SHA,), OLD_SHA, False),
+        # The active revision may equal the requested SHA while the bundle
+        # identifies a different candidate. Union membership must not pass.
+        (Verdict.PASS, (NEW_SHA, OLD_SHA), OLD_SHA, False),
+        (Verdict.PASS, (NEW_SHA, OLD_SHA), NEW_SHA, True),
     ),
 )
 def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
-    tmp_path: Path, monkeypatch, verdict, reported_revisions, should_pass
+    tmp_path: Path, monkeypatch, verdict, reported_revisions, candidate_revision, should_pass
 ) -> None:
     monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
     config = _config(tmp_path)
@@ -482,6 +486,7 @@ def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
         return SimpleNamespace(
             result=SimpleNamespace(status=verdict),
             context=SimpleNamespace(revisions=reported_revisions),
+            candidate_revision=candidate_revision,
         )
 
     monkeypatch.setattr("scripts.trusted_runtime_collector.collect_runtime_snapshot", fake_collect)
