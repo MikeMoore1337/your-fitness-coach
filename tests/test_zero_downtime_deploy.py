@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from scripts import zero_downtime_deploy as deploy
+from scripts.connection_budget_preflight import Verdict
 
 OLD_SHA = "a" * 40
 NEW_SHA = "b" * 40
@@ -356,6 +357,7 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
         assert config.worker_drain_seconds == 120
         calls["consumer_stop"].append(slot)
 
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", lambda _config: None)
     monkeypatch.setattr(deploy, "_capacity", lambda: {"cpu_count": 4})
     monkeypatch.setattr(deploy, "_compose", compose)
     monkeypatch.setattr(deploy, "_run", run)
@@ -381,6 +383,74 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
     monkeypatch.setattr(deploy, "_stop_slot_consumers", stop_consumers)
     monkeypatch.setattr(deploy, "_start_slot_consumers", start_consumers)
     return calls
+
+
+def test_trusted_db_gate_has_no_implicit_safety_margin(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", raising=False)
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "")
+    config = _config(tmp_path)
+    with pytest.raises(deploy.DeploymentError, match="margin is not configured"):
+        deploy._trusted_connection_budget_preflight(config)
+
+
+@pytest.mark.parametrize("value", ("0", "-5", "1.5", "ten", "9999999"))
+def test_trusted_db_gate_rejects_invalid_margin(
+    tmp_path: Path, monkeypatch, value: str
+) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", value)
+    with pytest.raises(deploy.DeploymentError, match="margin is not configured"):
+        deploy._trusted_connection_budget_preflight(_config(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("verdict", "reported_revisions", "should_pass"),
+    (
+        (Verdict.PASS, (NEW_SHA,), True),
+        (Verdict.BLOCKED, (NEW_SHA,), False),
+        (Verdict.UNKNOWN, (NEW_SHA,), False),
+        (Verdict.PASS, (OLD_SHA,), False),
+    ),
+)
+def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
+    tmp_path: Path, monkeypatch, verdict, reported_revisions, should_pass
+) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+    config = _config(tmp_path)
+    captured = []
+
+    def fake_collect(*, release_path, compose_file, policy):
+        captured.append((release_path, compose_file, policy))
+        return SimpleNamespace(
+            result=SimpleNamespace(status=verdict),
+            context=SimpleNamespace(revisions=reported_revisions),
+        )
+
+    monkeypatch.setattr(
+        "scripts.trusted_runtime_collector.collect_runtime_snapshot", fake_collect
+    )
+    if should_pass:
+        deploy._trusted_connection_budget_preflight(config)
+    else:
+        with pytest.raises(deploy.DeploymentError, match="capacity|revision"):
+            deploy._trusted_connection_budget_preflight(config)
+    assert len(captured) == 1
+    assert captured[0][0] == config.root
+    assert captured[0][1] == config.root / "docker-compose.yml"
+    assert captured[0][2].safety_headroom_connections == 10
+
+
+def test_trusted_db_gate_sanitizes_collector_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+
+    def fail_collect(**kwargs):
+        raise RuntimeError("private DB credentials should never reach deployment logs")
+
+    monkeypatch.setattr(
+        "scripts.trusted_runtime_collector.collect_runtime_snapshot", fail_collect
+    )
+    with pytest.raises(deploy.DeploymentError, match="evidence is unavailable") as raised:
+        deploy._trusted_connection_budget_preflight(_config(tmp_path))
+    assert "credentials" not in str(raised.value)
 
 
 def test_successful_rollout_updates_state_only_after_observation(
@@ -766,6 +836,7 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     active_revision_path.parent.mkdir(parents=True)
     active_revision_path.write_text(OLD_SHA + "\n", encoding="utf-8")
     monkeypatch.setenv("DEPLOY_SINGLE_SLOT_CONFIRMED_SHA", NEW_SHA)
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", lambda _config: None)
     monkeypatch.setattr(deploy, "_reclaim_single_slot_docker_space", lambda: None)
     monkeypatch.setattr(
         deploy,
