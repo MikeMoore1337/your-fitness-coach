@@ -52,7 +52,9 @@ isolated \`TEST_DATABASE_URL\` fixture and skips on SQLite.
   data or invokes any migration.
 - The test requires equivalent results, one ranked query, bounded date
   predicates, fewer SQL characters, and 3N+1 versus N+distinct_days+1 SQL
-  parameter bindings.
+  parameter bindings. It also measures the **full** `list_clients` service
+  SQL statement count and SQL time and asserts the established five-query
+  regression budget separately for each 10/30/100-client fixture.
 - The test reports \`V11_02_SYNTHETIC_POSTGRES\` lines when executed with \`pytest -s\`.
   Individual execution-time figures are diagnostics, not performance budgets.
   This paired sample is too small and too cache-sensitive to claim a causal
