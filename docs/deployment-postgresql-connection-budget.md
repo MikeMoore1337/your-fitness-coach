@@ -1,10 +1,10 @@
 # V11-DB-01 Phase B: trusted PostgreSQL connection budget
 
-Документ описывает trusted runtime collector, fail-closed расчёт и подготовленную точку подключения rollout gate для #848. Collector и application markers реализованы, но production deployment пока не вызывает новый gate: live snapshot, owner-approved safety headroom, dry run и release approval не подтверждены.
+Документ описывает trusted runtime collector и fail-closed rollout gate для #848. Gate подключён к production wrapper и deployment helper, но это ещё не production activation: live snapshot, owner-approved safety headroom, dry run и release approval не подтверждены.
 
 ## Что подтверждено в репозитории
 
-Проверено относительно merge commit `bc48d09c3415c4b146a0400efc18cb9031413d18` (`origin/master` на начало Phase B):
+Проверено относительно актуального `origin/master`, смёрженного в ветку PR 20.10.2026:
 
 | Область | Подтверждённый факт | Статус |
 |---|---|---|
@@ -15,8 +15,8 @@
 | Compose topology | legacy `backend`/`worker` и blue/green `backend-*`/`worker-*`; bot — отдельные consumers без найденного SQLAlchemy engine | `VERIFIED` по исходнику |
 | Rollout order | существующий helper имеет `preflight`, `backup`, `migration`, candidate start, consumer handoff, observation и rollback/single-slot paths | `VERIFIED` по исходнику |
 | Existing capacity audit | текущий manual audit снимает только часть host/PostgreSQL metrics и не считает rollout budget с reserved slots и attribution | `VERIFIED` по workflow |
-| Trusted runtime collector | `scripts/trusted_runtime_collector.py` связывает rendered Compose, running container IDs, allowlisted runtime env, matching OCI revision labels и read-only PostgreSQL child snapshot из exact active container | `IMPLEMENTED`, live run `NOT_VERIFIED` |
-| Connection attribution | backend/worker/setup/Alembic получают фиксированные `application_name`; runtime marker drift, неизвестные sessions и unattributed connections не становятся YFC | `IMPLEMENTED`, production attribution `NOT_PROVEN` |
+| Trusted runtime collector | `scripts/trusted_runtime_collector.py` связывает rendered Compose, running container IDs, allowlisted runtime env, matching OCI revision labels, live Caddy admin config и read-only PostgreSQL child snapshot из exact active container | `IMPLEMENTED`, live run `NOT_VERIFIED` |
+| Connection attribution | backend/worker/setup/Alembic получают фиксированные `application_name`; collector session считается non-YFC, runtime marker drift, неизвестные sessions и unattributed connections не становятся YFC | `IMPLEMENTED`, production attribution `NOT_PROVEN` |
 
 `30` — это не production budget. Он не учитывает фактическое число процессов, blue/green overlap, pooler, внешние сессии и PostgreSQL reservations.
 
@@ -38,6 +38,8 @@
   допустимое значение;
 - OCI labels работающих YFC контейнеров сравниваются с SHA **активного** релиза,
   не с SHA кандидата; итоговая provenance context включает оба SHA;
+- active backend выбирается по проверенному `active_slot` и фактической live-конфигурации
+  Caddy Admin API; stale `YFC_ACTIVE_UPSTREAM` из rendered Compose не выбирает контейнер;
 - неизвестный/повреждённый маркер, несогласованное состояние, неожиданная
   работающая OCI revision — **не PASS**;
 - если на синем/зелёном хосте остаётся работающий контейнер прежней rollback
@@ -47,12 +49,13 @@
 
 Это **исправление исходного контракта по коду**, подтверждаемое отрицательными
 и положительными тестами, не подтверждение production capacity и не
-автоматическое разрешение релиза. Collector всё ещё требует отдельно
-утверждённый положительный safety headroom и реальные trusted runtime/DB
-значения. Legacy runtime может не содержать модуль `postgres-child` или
-новые application_name markers: первый upgrade по-прежнему может закономерно
-блокироваться до отдельно авторизованного и проверенного способа bootstrap.
-Никакой silent bootstrap или fail-open path не добавлялся.
+автоматическое разрешение релиза. Collector считает собственную read-only
+сессию как non-YFC, требует отдельно утверждённый положительный safety headroom
+и реальные trusted runtime/DB значения. Legacy runtime может не содержать
+модуль `postgres-child` или новые application_name markers: совместимый probe
+запускается внутри проверенного active-контейнера, но отсутствие полномочий,
+live gateway state, атрибуции или topology закономерно блокирует gate. Никакого
+silent bootstrap или fail-open path не добавлялось.
 
 ## Что остаётся `NO_DATA` / `NOT_PROVEN`
 
@@ -266,21 +269,36 @@ maximum measured slack = usable - worst_case_required
 
 4. Для attribution получить только counts по заранее owner-approved allowlist role/application identifiers. Нельзя угадывать владельца соединения по похожему имени или складывать весь `pg_stat_activity` поверх projected YFC cap. Любая неразрешённая/неатрибутированная сессия остаётся в `UNKNOWN`.
 
-Операционный collector должен записать в sanitized JSON только числовые значения и фиксированные метаданные: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps, topology applicability, snapshot provenance/freshness и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены. Поля `synthetic=false`, `environment`, `source` и `captured_at` — декларации, а не независимое доказательство. Будущий deployment adapter должен получать данные от trusted collector-а, проверять источник и owner-approved freshness bound до передачи evidence в preflight; standalone JSON этого trust boundary не закрывает.
+Операционный collector должен записать в sanitized JSON только числовые значения и фиксированные метаданные: version, max/reserved values, current/YFC/non-YFC counts, effective pool settings, process counts, phase overlap, migration/setup/other additions, pooler mode/caps, topology applicability, snapshot provenance/freshness и источник safety headroom. Connection strings, usernames, SQL dumps и personal data запрещены. Поля `synthetic=false`, `environment`, `source` и `captured_at` — декларации, а не независимое доказательство. Deployment gate получает данные только от trusted collector-а и проверяет источник и freshness bound до передачи evidence в preflight; standalone JSON этого trust boundary не закрывает.
 
 ## Точка подключения rollout gate
 
-После отдельного owner approval future adapter должен получить effective sanitized input от `trusted_runtime_collector.py`, проверить источник, freshness bound и rendered steady-state topology, затем выполнить:
+`trusted_runtime_collector.py` получает effective sanitized input, проверяет источник,
+freshness bound, active slot, live Caddy gateway и rendered/runtime topology, затем
+передаёт модель в gate перед защищёнными этапами:
 
 ```text
 connection_budget_preflight -> backup -> migration -> candidate_start -> traffic_switch -> consumer_handoff
 ```
 
-Для rollback preflight должен быть отдельным predecessor до запуска rollback candidate. Для single-slot он должен быть до backup/migration и до запуска восстановленного application process. `scripts/connection_budget_preflight.py` уже проверяет этот ordering contract, но в текущем PR этот контракт дополнительно реализован в deployment helper; код не активирован на production и требует exact-head CI и owner-reviewed live verification.
+Для rollback preflight является отдельным predecessor до запуска rollback candidate.
+Для single-slot он стоит до backup/migration и запуска восстановленного application
+process. Legacy bootstrap и idempotent paths также проходят тот же gate до первой
+production mutation. `scripts/connection_budget_preflight.py` проверяет ordering
+contract, а deployment helper и wrapper вызывают trusted collector; production
+activation и live verification остаются отдельными owner gates.
 
 `PASS` продолжает существующий stage. `BLOCKED` или `UNKNOWN` завершают stage с non-zero result до backup/migration/candidate mutation. PostgreSQL unreachable, missing attribution и missing headroom не являются warning. Incident recovery не использует CLI bypass: owner-authorized native GitHub `workflow_dispatch` rollback/repair/verify path остаётся отдельным разрешением и не превращает failed preflight в `PASS`.
 
-Точки подключения в текущем Draft PR: `connection_budget_preflight` перед штатным `preflight`/pull/backup/migration/candidate в `deploy()`, перед первым start rollback-backend в `rollback()` и перед legacy provenance/reclaim/backup/migration в `single_slot_deploy()`. Это **код подготовленной блокировки**, а не production activation: до проверенной ёмкости, числового запаса и корректного bootstrap установленный код может законно остановить развёртывание. `.github/workflows/deploy.yml` не изменён.
+Точки подключения в текущем Draft PR: `connection_budget_preflight` перед штатным
+`preflight`/pull/backup/migration/candidate в `deploy()`, перед первым start
+rollback-backend в `rollback()`, перед legacy provenance/reclaim в
+`single_slot_deploy()`, а также до service inspection в `bootstrap_state()` и до
+idempotent gateway/marker operations. `deploy_production.sh` выполняет отдельный
+read-only `capacity-check` до записи production-конфигурации. Это **код
+подготовленной блокировки**, а не production activation: до проверенной ёмкости,
+числового запаса и live verification установленный код может законно остановить
+развёртывание.
 
 ## Rollback и failure behavior
 
@@ -298,11 +316,11 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 |---|---|---|---|
 | Trusted collector | `IMPLEMENTED` | bounded host/child flow in `scripts/trusted_runtime_collector.py`; 300-second trusted policy | owner-authorized live dry run |
 | PostgreSQL snapshot | `IMPLEMENTED` | read-only aggregate query, PG16 reserved slots, non-superuser visibility check | real production values and role verification |
-| Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, exact `docker inspect` env/OCI labels, configured-vs-running replica inventory, pool/phase inventory | production rendered output |
+| Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, exact `docker inspect` env/OCI labels, live Caddy admin config, configured-vs-running replica inventory, pool/phase inventory | production rendered output |
 | Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers, runtime marker drift block and unattributed fail-closed path | live `pg_stat_activity` attribution |
 | Safety headroom | `NOT_PROVEN` | evaluator requires explicit positive source; default collector policy leaves it unset | owner-approved number and rationale |
-| Synthetic regressions | `PASS` | targeted pytest: 317 passed, включая runtime drift, scaled candidate/all-slots, revision, host/timestamp, trust and timeout negatives | exact-head CI |
-| Deployment gate integration | `IMPLEMENTED_IN_DRAFT / NOT_ACTIVATED` | `scripts/zero_downtime_deploy.py`: guarded three rollout paths, missing-margin/BLOCKED/UNKNOWN tests | exact-head CI, trusted live dry run, owner-approved numeric margin, safe bootstrap before merge |
+| Synthetic regressions | `PASS` | focused post-fix pytest: 153 passed; three Windows-specific baseline tests were excluded from this local run | exact-head CI |
+| Deployment gate integration | `IMPLEMENTED_IN_DRAFT / NOT_ACTIVATED` | `scripts/zero_downtime_deploy.py`: trusted gate covers rollout, rollback, bootstrap and idempotent paths; wrapper performs early read-only check | exact-head CI, trusted live dry run, owner-approved numeric margin |
 | Production dry run | `NOT_VERIFIED` | no SSH/DB/docker production command executed | authorized read-only dry run |
 | Owner approval | `BLOCKED` | no Phase C activation decision in this request | explicit release/gate approval |
 
@@ -320,11 +338,11 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 
 ## Phase C: подключение блокирующей проверки (Draft, 20.10.2026)
 
-В этом Draft PR интегрирована `_trusted_connection_budget_preflight` в три маршрута `scripts/zero_downtime_deploy.py`. Он получает доверенную `CollectorPolicy` и вызывает `collect_runtime_snapshot` в одном процессе. Verdict `PASS` и **строгое совпадение SHA пакета-кандидата** с запрошенным релизом — необходимые условия продолжения; любые `UNKNOWN`, `BLOCKED`, исключение сборщика или несогласованная версия прерывают операцию до защищённых действий. Диагностика ошибок фиксирована, без исходных сообщений драйвера или URL базы данных. Событие сохраняется в stage history обычного развёртывания.
+В этом Draft PR интегрирована `_trusted_connection_budget_preflight` в маршруты `scripts/zero_downtime_deploy.py`: rollout, rollback, legacy bootstrap и оба idempotent входа. Он получает доверенную `CollectorPolicy` и вызывает `collect_runtime_snapshot` в одном процессе. Verdict `PASS` и **строгое совпадение SHA пакета-кандидата** с запрошенным релизом — необходимые условия продолжения; любые `UNKNOWN`, `BLOCKED`, исключение сборщика или несогласованная версия прерывают операцию до защищённых действий. Диагностика ошибок фиксирована, без исходных сообщений драйвера или URL базы данных. Wrapper выполняет тот же read-only check до записи production-конфигурации.
 
 Запас задаётся **только явно**, положительным целым `DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS` из штатного production deployment environment; значения по умолчанию **нет**, предел числа — 999999. Это источник конфигурации, **не свидетельство согласования владельцем**. Значение нельзя считать утверждённым, пока владелец не согласует число по реальным показателям и оно не будет внесено в защищённую конфигурацию. Пока оно отсутствует, gate обязан прерывать развёртывание. Тесты закрывают отсутствие, 0, отрицательное, дробное, нечисловое, слишком большое значение, ошибку сборщика, `UNKNOWN`/`BLOCKED`, несовпадение SHA и успешный фиктивный `PASS` без каких-либо production-запросов.
 
-**Первое обновление:** старый образ может не содержать `postgres-child` и новые маркеры. Технически подготовлен совместимый read-only запуск исходника из проверенного пакета кандидата внутри активного контейнера (см. ниже). Это не гарантирует `PASS`: полномочия роли, актуальная маркировка сессий и фактический запас соединений остаются неизвестны до реального dry run. Никакого fail-open обхода нет.
+**Первое обновление:** старый образ может не содержать `postgres-child` и новые маркеры. Технически подготовлен совместимый read-only запуск исходника из проверенного пакета кандидата внутри active-контейнера, найденного по state и live Caddy Admin API (см. ниже). Это не гарантирует `PASS`: полномочия роли, актуальная маркировка сессий, фактический запас соединений и topology остаются неизвестны до реального dry run. Никакого fail-open обхода нет.
 
 Существующие автоматические тесты развёртывания используют mock collector PASS исключительно внутри CI. Окончательный production verdict, фактические подключённые процессы и резервные слоты **НЕ ИЗМЕРЕНЫ**. CI после этих изменений должен быть проверен на *финальном* SHA и он не заменяет независимый runtime dry run.
 
@@ -346,9 +364,10 @@ single-slot — перед освобождением пространства, 
 Это исправление замечания CodeQL, не исключение из сканера.
 
 **Эти изменения не означают, что собраны данные production или запущен
-реальный preflight.** Отсутствует безопасный bootstrap к старому активному
-образу и утверждённое число `DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS`.
-`NOT_PROVEN` остаётся блокирующим результатом.
+реальный preflight.** Bootstrap теперь сам защищён тем же gate до service
+inspection и первой мутации; всё ещё отсутствуют live snapshot и утверждённое
+число `DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS`. `NOT_PROVEN` остаётся
+блокирующим результатом.
 
 ### Проверка SHA кандидата без ложного совпадения с active
 
@@ -358,8 +377,8 @@ single-slot — перед освобождением пространства, 
 
 Для первого обновления теперь не требуется наличие
 `scripts.trusted_runtime_collector` **внутри старого образа**. Сборщик на
-хосте сначала проверяет текущую версию по state/OCI labels, находит активный
-backend через rendered Compose и затем выполняет команду
+хосте сначала проверяет текущую версию по state/OCI labels, находит active
+backend по verified `active_slot` и live Caddy Admin API, а затем выполняет команду
 `docker exec <проверенный active-container> python -c <проверенный source>`.
 Источник `scripts/trusted_legacy_pg_snapshot.py` берётся из неподменённого
 пакета релиза кандидата с ограничением 16 КиБ. Он выполняет **один**

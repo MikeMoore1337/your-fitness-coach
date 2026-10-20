@@ -9,14 +9,18 @@ from pathlib import Path
 import pytest
 from scripts.connection_budget_preflight import PostgresCapacity, Verdict, evaluate
 from scripts.trusted_runtime_collector import (
+    COLLECTOR_APPLICATION_NAME,
     POOL_KEYS,
+    YFC_APPLICATION_NAMES,
     CollectorFailure,
     CollectorPolicy,
     ContainerEnvironment,
     PostgresObservation,
     RuntimeContext,
     _active_revision,
+    _active_state,
     _failure_payload,
+    _gateway_active_upstream,
     _inspect_revisions,
     _merge_diagnostics,
     _parse_child_snapshot,
@@ -130,6 +134,35 @@ def _approved_policy() -> CollectorPolicy:
         safety_headroom_connections=10,
         safety_headroom_source="owner-approved-headroom-record",
     )
+
+
+def test_collector_session_is_counted_as_non_yfc_capacity_demand() -> None:
+    assert COLLECTOR_APPLICATION_NAME not in YFC_APPLICATION_NAMES
+
+
+def test_gateway_active_upstream_reads_live_reverse_proxy_config() -> None:
+    payload = {
+        "apps": {
+            "http": {
+                "servers": {
+                    "srv0": {
+                        "routes": [
+                            {
+                                "handle": [
+                                    {
+                                        "handler": "reverse_proxy",
+                                        "upstreams": [{"dial": "backend-blue:8000"}],
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    }
+
+    assert _gateway_active_upstream(payload) == "backend-blue:8000"
 
 
 def test_verified_collector_model_carries_runtime_context_and_evaluates_all_phases() -> None:
@@ -308,6 +341,97 @@ def test_pooler_mode_requires_and_propagates_a_backend_cap() -> None:
     assert all(phase.pooler_backend_connections == 60 for phase in topology.phases)
 
 
+def test_multiple_poolers_fail_closed_instead_of_using_the_first() -> None:
+    compose = _compose()
+    services = compose["services"]
+    assert isinstance(services, dict)
+    services["pgbouncer"] = {
+        "environment": {
+            "YFC_POOLER_MODE": "transaction",
+            "YFC_POOLER_BACKEND_CAP": "60",
+        }
+    }
+    services["pgbouncer-secondary"] = {
+        "environment": {
+            "YFC_POOLER_MODE": "transaction",
+            "YFC_POOLER_BACKEND_CAP": "60",
+        }
+    }
+
+    topology = build_topology_observation(compose, _ps(), _context())
+
+    assert topology.pooler.mode is None
+    assert any(item.code == "pooler_topology_unknown" for item in topology.diagnostics)
+
+
+def test_runtime_pooler_settings_are_checked_against_rendered_configuration() -> None:
+    compose = _compose()
+    services = compose["services"]
+    assert isinstance(services, dict)
+    services["pgbouncer"] = {
+        "environment": {
+            "YFC_POOLER_MODE": "transaction",
+            "YFC_POOLER_BACKEND_CAP": "60",
+        }
+    }
+    runtime = {
+        "pgbouncer": (
+            ContainerEnvironment(
+                values={"YFC_POOLER_MODE": "transaction", "YFC_POOLER_BACKEND_CAP": "100"},
+                has_database_url=True,
+            ),
+        )
+    }
+
+    topology = build_topology_observation(
+        compose,
+        _ps(),
+        _context(),
+        runtime_environments=runtime,
+    )
+
+    assert topology.pooler.mode == "transaction"
+    assert all(phase.pooler_backend_connections == 100 for phase in topology.phases)
+    assert any(
+        item.code == "runtime_container_environment_mismatch" and item.status == Verdict.BLOCKED
+        for item in topology.diagnostics
+    )
+
+
+def test_runtime_active_slot_wins_over_stale_rendered_upstream() -> None:
+    ps = [
+        *_ps(),
+        {"Service": "backend-blue", "State": "running"},
+        {"Service": "worker-blue", "State": "running"},
+    ]
+
+    topology = build_topology_observation(
+        _compose(),
+        ps,
+        _context(),
+        active_gateway_upstream="backend-blue:8000",
+        active_slot="blue",
+    )
+
+    assert topology.active_backend_service == "backend-blue"
+    assert not any(item.code == "runtime_active_upstream_mismatch" for item in topology.diagnostics)
+
+
+def test_runtime_active_slot_mismatch_is_blocked() -> None:
+    topology = build_topology_observation(
+        _compose(),
+        _ps(),
+        _context(),
+        active_gateway_upstream="backend-green:8000",
+        active_slot="blue",
+    )
+
+    assert any(
+        item.code == "runtime_active_slot_mismatch" and item.status == Verdict.BLOCKED
+        for item in topology.diagnostics
+    )
+
+
 def test_runtime_environment_drift_blocks_rendered_topology() -> None:
     runtime = {
         "backend": (_runtime_environment("yfc-worker"),),
@@ -447,6 +571,7 @@ def test_predeploy_running_revision_uses_active_state_not_candidate(
 
     assert _release_revision(tmp_path) == "b" * 40
     assert _active_revision(tmp_path) == REVISION
+    assert _active_state(tmp_path) == (REVISION, "blue")
 
     def fake_run(command, *, cwd, policy):
         del cwd, policy
@@ -556,6 +681,29 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
             return json.dumps(_compose()).encode()
         if command[-4:] == ["ps", "--all", "--format", "json"]:
             return json.dumps(_ps()).encode()
+        if "2019/config/" in command:
+            return json.dumps(
+                {
+                    "apps": {
+                        "http": {
+                            "servers": {
+                                "srv0": {
+                                    "routes": [
+                                        {
+                                            "handle": [
+                                                {
+                                                    "handler": "reverse_proxy",
+                                                    "upstreams": [{"dial": "backend-blue:8000"}],
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            ).encode()
         assert command[-4:] == ["python", "-B", "-c", "print('sanitized')\n"]
         return b"{}"
 

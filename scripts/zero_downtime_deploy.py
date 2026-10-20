@@ -902,6 +902,7 @@ def bootstrap_state(config: DeployConfig) -> None:
     state_path = config.state_root / "state.json"
     if state_path.exists():
         raise DeploymentError(f"deployment state already exists: {state_path}")
+    _trusted_connection_budget_preflight(config)
     for service in ("backend", "worker", "bot", "edge"):
         if not _service_is_running(service):
             raise DeploymentError(f"legacy bootstrap requires running service {service}")
@@ -1065,6 +1066,7 @@ def deploy(config: DeployConfig) -> Evidence:
         )
     state = ReleaseState.from_path(state_path)
     if state.active_revision == config.target_revision:
+        _trusted_connection_budget_preflight(config)
         _switch_gateway(state.active_slot, state.active_slot)
         if state.rollback_slot is not None:
             _compose("stop", "-t", "45", _slot_service("backend", state.rollback_slot))
@@ -1536,6 +1538,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     evidence_path = config.state_root / deployment_id / "summary.json"
 
     if active_revision == config.target_revision:
+        _trusted_connection_budget_preflight(config)
         _switch_gateway("legacy", "legacy")
         _public_smoke(config, require_progress_report_shell=True)
         evidence.verdict = "active"

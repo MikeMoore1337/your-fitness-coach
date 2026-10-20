@@ -534,6 +534,24 @@ def test_trusted_db_gate_blocks_zero_downtime_before_any_mutation(
     assert calls["consumer_stop"] == []
 
 
+def test_trusted_db_gate_blocks_idempotent_zero_downtime_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    _state(config, revision=NEW_SHA)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy, "_switch_gateway", lambda *_args: pytest.fail("gateway must not switch")
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.deploy(config)
+
+
 def test_trusted_db_gate_blocks_single_slot_before_reclaim_and_stop(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -556,6 +574,47 @@ def test_trusted_db_gate_blocks_single_slot_before_reclaim_and_stop(
     assert calls["stops"] == []
     assert calls["backend_starts"] == []
     assert calls["consumer_starts"] == []
+
+
+def test_trusted_db_gate_blocks_idempotent_single_slot_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(NEW_SHA, encoding="utf-8")
+    monkeypatch.setenv("DEPLOY_SINGLE_SLOT_CONFIRMED_SHA", NEW_SHA)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy, "_switch_gateway", lambda *_args: pytest.fail("gateway must not switch")
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.single_slot_deploy(config)
+
+
+def test_trusted_db_gate_blocks_legacy_bootstrap_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(OLD_SHA, encoding="utf-8")
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy,
+        "_service_is_running",
+        lambda _service: pytest.fail("bootstrap must gate before runtime inspection"),
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.bootstrap_state(config)
 
 
 def test_successful_rollout_updates_state_only_after_observation(

@@ -2,14 +2,15 @@
 
 ## Local evidence
 
-- Exact local HEAD: `HEAD` is the commit reported by `git log -1` at PR handoff;
-  the immutable SHA and exact-head Checks URL are recorded in the PR/Issue evidence
-  after push.
+- Exact local HEAD: current post-fix `HEAD` is recorded in the PR/Issue evidence
+  after push; exact-head Checks are still required for this revision.
 - `tests/test_connection_budget_preflight.py`,
   `tests/test_trusted_runtime_collector.py`, backend marker/Alembic tests and the
-  deployment regression set: `317 passed` in the combined targeted run; deployment
-  and rollback subset: `60 passed`.
-- Collector-specific coverage: `20 passed`, including future/host/revision mismatch,
+  deployment regression set: `153 passed` in the focused post-fix run; three
+  pre-existing Windows-specific tests were excluded from that local run.
+- Collector-specific coverage includes self-session attribution, live gateway/active-slot
+  mismatch, runtime pooler drift and multiple-pooler fail-closed behavior, as well as
+  future/host/revision mismatch,
   runtime env drift, inconsistent pool overrides, scaled candidate/all-slots,
   unexpected runtime database consumers, sanitized env parsing and bounded timeout.
 - Frontend `AiCoachExperience.test.tsx`: `30 passed`; full Vitest: `949 passed`.
@@ -43,7 +44,7 @@
 ## Explicit non-claims
 
 No production PostgreSQL budget, production attribution, safety-headroom approval,
-production dry run, gate activation, merge or deploy is claimed by this record.
+production dry run, release activation, merge or deploy is claimed by this record.
 
 ## Security review result
 
@@ -56,6 +57,11 @@ Confirmed defects corrected in this Phase B revision:
   exact child `docker exec` target;
 - running OCI revision drift is blocked against `.deployment-sha`;
 - bounded commands terminate the process tree and close parent pipes;
+- collector self-connections are counted as non-YFC demand;
+- active backend selection is bound to verified state and live Caddy config rather
+  than stale rendered upstream values;
+- runtime pooler settings are checked and multiple/unexpected poolers fail closed;
+- trusted capacity preflight protects bootstrap and idempotent deployment paths;
 - Alembic uses the fixed `yfc-migration` PostgreSQL marker;
 - the unrelated frontend unit assertion is scoped to its failure panel and keeps the
   user text, safety category, retry action and successful retry assertions.

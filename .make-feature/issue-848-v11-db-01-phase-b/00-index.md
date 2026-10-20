@@ -2,10 +2,10 @@
 
 - Issue: https://github.com/MikeMoore1337/your-fitness-coach/issues/848
 - Previous PR: https://github.com/MikeMoore1337/your-fitness-coach/pull/1118 (merged)
-- Base: `bc48d09c3415c4b146a0400efc18cb9031413d18`
+- Base: current `origin/master`, merged into this branch on 20.10.2026
 - Branch: `codex/848-v11-db-01-phase-b`
 - Scope: trusted runtime collector, production-shaped evidence boundary, attribution markers, tests and runbook.
-- Explicit exclusion: no production query, restart, DB/config mutation, credential work, gate activation, merge or deploy.
+- Explicit exclusion: no production query, restart, DB/config mutation, credential work, merge, deploy or release activation.
 
 | Stage | Status |
 |---|---|

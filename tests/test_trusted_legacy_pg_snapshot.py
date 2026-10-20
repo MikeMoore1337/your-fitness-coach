@@ -81,6 +81,7 @@ def test_legacy_probe_collects_only_sanitized_counts_in_read_only_transaction(mo
     assert "FROM pg_stat_activity" in sql
     assert "pg_read_all_stats" in sql
     assert "application_name" in sql
+    assert "yfc-connection-budget-collector" not in sql
     assert "INSERT " not in sql and "UPDATE " not in sql and "DELETE " not in sql
     assert calls[0][0] == "postgresql://test:secret@db/app"
     assert calls[0][1] == 5

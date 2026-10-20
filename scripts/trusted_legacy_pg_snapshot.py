@@ -16,7 +16,6 @@ APPLICATION_NAMES = (
     "yfc-worker",
     "yfc-setup",
     "yfc-migration",
-    "yfc-connection-budget-collector",
 )
 
 

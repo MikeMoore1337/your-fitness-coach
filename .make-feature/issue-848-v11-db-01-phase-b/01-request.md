@@ -17,8 +17,9 @@ Required outcomes:
    future, partial, mixed or contradictory evidence fails closed.
 4. Existing budget math remains authoritative, including observed non-YFC sessions,
    no double-counting observed YFC sessions, reserved capacity and explicit headroom.
-5. Gate integration is prepared and stage order is tested, but `deploy.yml` and
-   `zero_downtime_deploy.py` remain unwired until separate owner approval.
+5. Gate integration is fail-closed and stage order is tested in the deployment
+   wrapper/helper; production activation still requires separate live evidence,
+   owner approval and release approval.
 6. Deterministic tests, release-scope evidence and technical documentation.
 
 Acceptance boundary:

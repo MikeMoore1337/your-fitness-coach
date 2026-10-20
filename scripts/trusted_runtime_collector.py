@@ -86,7 +86,6 @@ YFC_APPLICATION_NAMES: Final = (
     "yfc-worker",
     "yfc-setup",
     "yfc-migration",
-    COLLECTOR_APPLICATION_NAME,
 )
 BACKEND_SERVICES: Final = ("backend", "backend-blue", "backend-green")
 WORKER_SERVICES: Final = ("worker", "worker-blue", "worker-green")
@@ -236,7 +235,7 @@ def _release_revision(release_path: Path) -> str:
     return revision
 
 
-def _active_revision(release_path: Path) -> str:
+def _active_state(release_path: Path) -> tuple[str, str]:
     """Independently bind running image labels to the current release state.
 
     The bundle .deployment-sha identifies the *candidate*. Before rollout,
@@ -256,6 +255,7 @@ def _active_revision(release_path: Path) -> str:
     if FULL_REVISION.fullmatch(revision) is None:
         raise CollectorFailure("active_revision_invalid", Verdict.BLOCKED)
     state_file = state_root / "state.json"
+    active_slot = "legacy"
     if state_file.exists():
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))
@@ -263,9 +263,15 @@ def _active_revision(release_path: Path) -> str:
             raise CollectorFailure("active_state_invalid", Verdict.BLOCKED) from exc
         if not isinstance(state, dict) or state.get("active_revision") != revision:
             raise CollectorFailure("active_revision_state_mismatch", Verdict.BLOCKED)
-        if state.get("active_slot") not in {"legacy", "blue", "green"}:
+        candidate_slot = state.get("active_slot")
+        if candidate_slot not in {"legacy", "blue", "green"}:
             raise CollectorFailure("active_state_invalid", Verdict.BLOCKED)
-    return revision
+        active_slot = cast(str, candidate_slot)
+    return revision, active_slot
+
+
+def _active_revision(release_path: Path) -> str:
+    return _active_state(release_path)[0]
 
 
 def _run_bounded(
@@ -486,7 +492,14 @@ def _running_container_ids(
 def _parse_container_environment(payload: object) -> ContainerEnvironment:
     if not isinstance(payload, list):
         raise CollectorFailure("runtime_environment_inventory_invalid", Verdict.UNKNOWN)
-    allowed = {"APP_ENV", "YFC_DB_APPLICATION_NAME", *POOL_KEYS}
+    allowed = {
+        "APP_ENV",
+        "YFC_ACTIVE_UPSTREAM",
+        "YFC_DB_APPLICATION_NAME",
+        "YFC_POOLER_BACKEND_CAP",
+        "YFC_POOLER_MODE",
+        *POOL_KEYS,
+    }
     values: dict[str, str | None] = dict.fromkeys(allowed)
     seen: set[str] = set()
     has_database_url = False
@@ -629,15 +642,60 @@ def _max_effective_replicas(
     return max(cast(list[int], values))
 
 
-def _active_backend_service(services: Mapping[str, Mapping[str, object]]) -> str | None:
-    edge = services.get("edge")
-    if edge is None:
-        return None
-    upstream = _service_environment(edge).get("YFC_ACTIVE_UPSTREAM")
+def _backend_service_from_upstream(upstream: object) -> str | None:
     if not isinstance(upstream, str):
         return None
     candidate = upstream.split(":", 1)[0].strip()
     return candidate if candidate in BACKEND_SERVICES else None
+
+
+def _gateway_active_upstream(payload: object) -> str | None:
+    if isinstance(payload, Mapping):
+        if payload.get("handler") == "reverse_proxy":
+            upstreams = payload.get("upstreams")
+            if isinstance(upstreams, list) and upstreams:
+                first = upstreams[0]
+                if isinstance(first, Mapping) and isinstance(first.get("dial"), str):
+                    return first["dial"]
+        for value in payload.values():
+            active = _gateway_active_upstream(value)
+            if active is not None:
+                return active
+    elif isinstance(payload, list):
+        for value in payload:
+            active = _gateway_active_upstream(value)
+            if active is not None:
+                return active
+    return None
+
+
+def _active_backend_service(
+    services: Mapping[str, Mapping[str, object]],
+    *,
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
+    active_gateway_upstream: str | None = None,
+    active_slot: str | None = None,
+) -> str | None:
+    edge = services.get("edge")
+    if edge is None:
+        return None
+    if active_gateway_upstream is not None:
+        candidate = _backend_service_from_upstream(active_gateway_upstream)
+    else:
+        environment = _service_environment(edge)
+        if runtime_environments is not None and "edge" in runtime_environments:
+            runtime_values = _runtime_environment_values(runtime_environments, "edge")
+            if runtime_values is None or not runtime_values:
+                return None
+            environment = {**environment, **runtime_values}
+        candidate = _backend_service_from_upstream(environment.get("YFC_ACTIVE_UPSTREAM"))
+    if candidate is None:
+        return None
+    if active_slot is not None:
+        expected = "backend" if active_slot == "legacy" else f"backend-{active_slot}"
+        if candidate != expected:
+            return None
+    return candidate
 
 
 def _paired_worker(service_name: str | None) -> str | None:
@@ -679,6 +737,7 @@ def _pool_spec(
 
 def _pooler(
     services: Mapping[str, Mapping[str, object]],
+    runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
 ) -> tuple[PoolerTopology, int | None]:
     pooler_names = [
         name
@@ -687,7 +746,14 @@ def _pooler(
     ]
     if not pooler_names:
         return PoolerTopology(mode="none"), None
+    if len(pooler_names) != 1:
+        return PoolerTopology(mode=None), None
     environment = _service_environment(services[pooler_names[0]])
+    if runtime_environments is not None:
+        runtime_values = _runtime_environment_values(runtime_environments, pooler_names[0])
+        if runtime_values is None or not runtime_values:
+            return PoolerTopology(mode=None), None
+        environment = {**environment, **runtime_values}
     mode = environment.get("YFC_POOLER_MODE")
     cap = _parse_nonnegative_int(environment.get("YFC_POOLER_BACKEND_CAP"))
     return (
@@ -745,6 +811,8 @@ def build_topology_observation(
     context: RuntimeContext,
     *,
     runtime_environments: Mapping[str, Sequence[ContainerEnvironment]] | None = None,
+    active_gateway_upstream: str | None = None,
+    active_slot: str | None = None,
 ) -> TopologyObservation:
     """Reduce rendered Compose and `ps` data to an allowlisted runtime model."""
 
@@ -755,7 +823,12 @@ def build_topology_observation(
         if isinstance(name, str) and isinstance(raw, Mapping):
             services[name] = cast(Mapping[str, object], raw)
     items = _ps_items(ps_payload)
-    active = _active_backend_service(services)
+    active = _active_backend_service(
+        services,
+        runtime_environments=runtime_environments,
+        active_gateway_upstream=active_gateway_upstream,
+        active_slot=active_slot,
+    )
     active_worker = _paired_worker(active)
     candidate_backend_slots = tuple(
         name for name in BACKEND_SERVICES if name in services and name != active
@@ -797,7 +870,14 @@ def build_topology_observation(
             if any(
                 any(
                     observation.values.get(key) != rendered.get(key)
-                    for key in (*POOL_KEYS, "APP_ENV", "YFC_DB_APPLICATION_NAME")
+                    for key in (
+                        *POOL_KEYS,
+                        "APP_ENV",
+                        "YFC_ACTIVE_UPSTREAM",
+                        "YFC_DB_APPLICATION_NAME",
+                        "YFC_POOLER_BACKEND_CAP",
+                        "YFC_POOLER_MODE",
+                    )
                 )
                 for observation in observations
             ):
@@ -818,6 +898,25 @@ def build_topology_observation(
                         "Running instances of one service do not share effective runtime settings",
                     )
                 )
+    if active_slot is not None:
+        expected_active = "backend" if active_slot == "legacy" else f"backend-{active_slot}"
+        live_active = _backend_service_from_upstream(active_gateway_upstream)
+        if live_active is None:
+            diagnostics.append(
+                Diagnostic(
+                    "runtime_active_upstream_unknown",
+                    Verdict.UNKNOWN,
+                    "Live gateway configuration does not identify a valid active backend",
+                )
+            )
+        elif live_active != expected_active:
+            diagnostics.append(
+                Diagnostic(
+                    "runtime_active_slot_mismatch",
+                    Verdict.BLOCKED,
+                    "Live gateway configuration does not match the verified active slot",
+                )
+            )
     if active is None or active_worker is None:
         diagnostics.append(
             Diagnostic(
@@ -886,6 +985,19 @@ def build_topology_observation(
         for name in services
         if any(token in name.casefold() for token in ("pgbouncer", "pooler", "odyssey"))
     }
+    runtime_pooler_names = {
+        name
+        for name in (runtime_environments or {})
+        if any(token in name.casefold() for token in ("pgbouncer", "pooler", "odyssey"))
+    }
+    if runtime_pooler_names - pooler_service_names:
+        diagnostics.append(
+            Diagnostic(
+                "pooler_topology_unknown",
+                Verdict.UNKNOWN,
+                "Running runtime contains a pooler absent from rendered Compose",
+            )
+        )
     known_db_consumers = (
         set(BACKEND_SERVICES)
         | set(WORKER_SERVICES)
@@ -929,7 +1041,7 @@ def build_topology_observation(
     all_slots = phase_counts(all_backend_count, all_worker_count)
     handoff = phase_counts(candidate_backend_count, candidate_worker_count)
     single = phase_counts(active_backend_count, active_worker_count)
-    pooler, pooler_cap = _pooler(services)
+    pooler, pooler_cap = _pooler(services, runtime_environments)
     phase_pooler_cap = pooler_cap if pooler.mode in {"session", "transaction"} else None
     phases = (
         PhaseDemand(
@@ -1187,7 +1299,7 @@ def collect_runtime_snapshot(
 
     _validate_policy(policy)
     candidate_revision = _release_revision(release_path)
-    active_revision = _active_revision(release_path)
+    active_revision, active_slot = _active_state(release_path)
     config_output = _run_bounded(
         _compose_command(compose_file, "config", "--format", "json"),
         cwd=release_path,
@@ -1202,6 +1314,24 @@ def collect_runtime_snapshot(
     )
     ps_payload = _json_ps_bytes(ps_output or b"[]")
     ps_items = _ps_items(ps_payload)
+    gateway_output = _run_bounded(
+        _compose_command(
+            compose_file,
+            "exec",
+            "-T",
+            "edge",
+            "wget",
+            "-qO-",
+            "http://127.0.0.1:2019/config/",
+        ),
+        cwd=release_path,
+        policy=policy,
+    )
+    active_gateway_upstream = _gateway_active_upstream(
+        _json_bytes(gateway_output, code="runtime_gateway_config_invalid")
+    )
+    if active_gateway_upstream is None:
+        raise CollectorFailure("runtime_gateway_config_invalid", Verdict.UNKNOWN)
     runtime_environments = _inspect_runtime_environments(
         ps_items,
         cwd=release_path,
@@ -1227,6 +1357,8 @@ def collect_runtime_snapshot(
         ps_payload,
         context,
         runtime_environments=runtime_environments,
+        active_gateway_upstream=active_gateway_upstream,
+        active_slot=active_slot,
     )
     if topology.active_backend_service is None:
         raise CollectorFailure("runtime_active_upstream_unknown", Verdict.UNKNOWN)
