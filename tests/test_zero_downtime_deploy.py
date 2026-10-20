@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
@@ -384,6 +385,59 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
     monkeypatch.setattr(deploy, "_stop_slot_consumers", stop_consumers)
     monkeypatch.setattr(deploy, "_start_slot_consumers", start_consumers)
     return calls
+
+
+def test_capacity_check_cli_uses_read_only_gate_and_never_starts_rollout(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = _config(tmp_path)
+    called = []
+    monkeypatch.setattr(sys, "argv", [
+        "zero_downtime_deploy.py",
+        "capacity-check",
+        NEW_SHA,
+        config.base_url,
+        config.public_base_url,
+    ])
+    monkeypatch.setattr(deploy, "_config", lambda _args: config)
+    monkeypatch.setattr(
+        deploy,
+        "_trusted_connection_budget_preflight",
+        lambda current: called.append(current),
+    )
+    monkeypatch.setattr(
+        deploy, "deploy", lambda _config: pytest.fail("rollout must not run")
+    )
+    monkeypatch.setattr(
+        deploy, "single_slot_deploy", lambda _config: pytest.fail("single-slot must not run")
+    )
+    assert deploy.main() == 0
+    assert called == [config]
+    assert capsys.readouterr().out == "Trusted PostgreSQL capacity preflight: PASS\n"
+
+
+def test_capacity_check_cli_denial_is_nonzero_and_sanitized(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = _config(tmp_path)
+    monkeypatch.setattr(sys, "argv", [
+        "zero_downtime_deploy.py",
+        "capacity-check",
+        NEW_SHA,
+        config.base_url,
+        config.public_base_url,
+    ])
+    monkeypatch.setattr(deploy, "_config", lambda _args: config)
+
+    def reject(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL capacity evidence is unavailable")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", reject)
+    assert deploy.main() == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "capacity evidence is unavailable" in output.err
+    assert "Traceback" not in output.err
 
 
 def test_trusted_db_gate_has_no_implicit_safety_margin(tmp_path: Path, monkeypatch) -> None:
