@@ -1,8 +1,8 @@
 # Product V11-06 / Issue #821 — verification receipt
 
-Status: exact-head first receipt green; this receipt commit must receive its own exact-head rerun
+Status: final receipt exact-head green; PR remains open for owner merge/release gates
 PR: [#1136](https://github.com/MikeMoore1337/your-fitness-coach/pull/1136)
-Implementation HEAD before this receipt: `e4f59eefce50b824c2aedca10136772235e56635`
+Final receipt HEAD: `328875bdbe615ca651ab6af5525c92a68441ccbd`
 
 ## Local verification
 
@@ -23,45 +23,49 @@ were not hidden or weakened.
 
 ## Exact-head GitHub Actions
 
-Run [39457145434](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39457145434)
-completed successfully for `e4f59eefce50b824c2aedca10136772235e56635`.
+Final run [39458428445](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39458428445)
+completed successfully for `328875bdbe615ca651ab6af5525c92a68441ccbd`. The preceding implementation
+run [39457145434](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39457145434)
+also completed successfully for the prior code-only SHA.
 
-- Run wall: 409 seconds (`2026-10-20T16:24:24Z` to `2026-10-20T16:31:13Z`).
+- Run wall: 524 seconds (`2026-10-20T16:33:04Z` to `2026-10-20T16:41:48Z`).
 - Observable run-level queue component: 0 seconds (`created_at == run_started_at`). The first
   router job started at 16:24:27Z; later runner allocation is visible in job timestamps, but
   GitHub exposes no processor/billing CPU seconds: `PROCESSOR_TIME=NO_DATA`.
 - Actions job API: 31 jobs; 28 success, 3 expected skipped, 0 failed. Skips were the PR-inapplicable
   extended mobile, weekly cross-browser and scheduled report jobs.
-- Aggregate `checks`: success at 16:31:12Z.
+- Aggregate `checks`: success at 16:41:47Z, 18 seconds.
 - CodeQL Python and JavaScript/TypeScript: success.
 - Free PR security audit / Trivy: success.
-- Dependency audit: success, one job, 43 seconds.
-- Five Python shards: 228, 261, 306, 321, 324 seconds.
-- Five frontend smoke shards: 262, 267, 285, 286, 326 seconds.
+- Dependency audit: success, one job, 28 seconds.
+- Five Python shards: 245, 262, 281, 294, 309 seconds.
+- Five frontend smoke shards: 261, 281, 312, 313, 366 seconds.
 - PostgreSQL migrated stack, mobile regression, workflow contracts, policy, critical smoke and
   all four container jobs: success.
-- Artifacts: 8 artifacts, 66.00 MiB; this is not an upload CPU measurement. Docker/container
+- Artifacts: 8 artifacts, 67.09 MiB; this is not an upload CPU measurement. Docker/container
   artifacts remain #851 scope.
 
 ## Before/after interpretation
 
 The 20-run pre-change sample had 17 successes, one cancelled scheduled run and two failures; its
 all-event median wall was 468 seconds. Comparable recent 31-job cross-stack PRs ranged from
-372–527 seconds (historical references included 763 seconds), so the 409-second exact-head run
-is within the observed runner/cache variation. The closest same-day 31-job reference
-`39435906918` was 419 seconds; the exact-head run was 409 seconds, but this single comparison does
-not prove a stable wall-time speedup.
+372–527 seconds (historical references included 763 seconds). The two post-change observations
+were 409 seconds for the code-only run and 524 seconds for this final receipt run; the closest
+same-day 31-job reference `39435906918` was 419 seconds. This confirms substantial runner/cache
+variation and does not prove a stable wall-time speedup.
 
 The duplicated operation is proven removed by the final job shape. Before, run `39435906918` had
 `Free PR security audit=136s` with setup plus the shared dependency audit and a separate
-`Dependency audit=33s`; after, `Free PR security audit=29s` contains checkout plus Trivy only and
-`Dependency audit=43s` is the sole npm/uv audit owner. A second baseline (`39245697126`) was
-`34s + 32s`, showing runner/cache variability. Therefore:
+`Dependency audit=33s`; the code-only after run had `Free PR security audit=29s` and
+`Dependency audit=43s`; the final receipt run has `32s` and `28s`. The security job contains
+checkout plus Trivy only, and the dependency job is the sole npm/uv audit owner. A second baseline
+(`39245697126`) was `34s + 32s`, showing runner/cache variability. Therefore:
 
 - confirmed benefit: one duplicate npm/uv audit and its duplicate setup/cache work are removed on
   PR profiles; security coverage remains split between one dependency job and one Trivy job;
-- observed job-wall sum for successful jobs was 4,325s after versus 4,541s in reference run
-  `39435906918`, but this is aggregate job wall, not processor time, and is not a stable speed claim;
+- observed successful-job wall sums were 4,325s in the code-only after run and 4,391s in the final
+  receipt run versus 4,541s in reference `39435906918`; these are aggregate job wall, not processor
+  time, and are not a stable speed claim;
 - stable full-CI acceleration: `NOT_PROVEN` pending more comparable post-change runs;
 - cache hit-rate improvement: `NOT_PROVEN`; GitHub connector did not expose the `cache-hit` log
   values, so no cache-based green shortcut was introduced.
@@ -79,6 +83,5 @@ The duplicated operation is proven removed by the final job shape. Before, run `
 
 ## Remaining gates
 
-The PR is open and unmerged. The receipt commit itself must be pushed and rerun through exact-head
-Checks before final status is reported. Merge, production deploy, release approval and Issue #821
-closure remain separate owner-authorized decisions.
+The PR is open and unmerged. Final exact-head Checks are green. Merge, production deploy, release
+approval and Issue #821 closure remain separate owner-authorized decisions.
