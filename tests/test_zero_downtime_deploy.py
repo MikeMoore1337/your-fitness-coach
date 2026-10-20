@@ -394,9 +394,7 @@ def test_trusted_db_gate_has_no_implicit_safety_margin(tmp_path: Path, monkeypat
 
 
 @pytest.mark.parametrize("value", ("0", "-5", "1.5", "ten", "9999999"))
-def test_trusted_db_gate_rejects_invalid_margin(
-    tmp_path: Path, monkeypatch, value: str
-) -> None:
+def test_trusted_db_gate_rejects_invalid_margin(tmp_path: Path, monkeypatch, value: str) -> None:
     monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", value)
     with pytest.raises(deploy.DeploymentError, match="margin is not configured"):
         deploy._trusted_connection_budget_preflight(_config(tmp_path))
@@ -425,9 +423,7 @@ def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
             context=SimpleNamespace(revisions=reported_revisions),
         )
 
-    monkeypatch.setattr(
-        "scripts.trusted_runtime_collector.collect_runtime_snapshot", fake_collect
-    )
+    monkeypatch.setattr("scripts.trusted_runtime_collector.collect_runtime_snapshot", fake_collect)
     if should_pass:
         deploy._trusted_connection_budget_preflight(config)
     else:
@@ -445,9 +441,7 @@ def test_trusted_db_gate_sanitizes_collector_failure(tmp_path: Path, monkeypatch
     def fail_collect(**kwargs):
         raise RuntimeError("private DB credentials should never reach deployment logs")
 
-    monkeypatch.setattr(
-        "scripts.trusted_runtime_collector.collect_runtime_snapshot", fail_collect
-    )
+    monkeypatch.setattr("scripts.trusted_runtime_collector.collect_runtime_snapshot", fail_collect)
     with pytest.raises(deploy.DeploymentError, match="evidence is unavailable") as raised:
         deploy._trusted_connection_budget_preflight(_config(tmp_path))
     assert "credentials" not in str(raised.value)
@@ -869,9 +863,7 @@ def test_manual_rollback_swaps_only_verified_revisions(tmp_path: Path, monkeypat
     assert "BOT_IMAGE=registry/bot@sha256:" + "2" * 64 in environment
 
 
-def test_trusted_db_gate_blocks_rollback_before_restoration(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_trusted_db_gate_blocks_rollback_before_restoration(tmp_path: Path, monkeypatch) -> None:
     config = _config(tmp_path)
     state = deploy.ReleaseState(
         version=1,
