@@ -153,6 +153,10 @@ class TopologyObservation:
 class RuntimeCollection:
     result: PreflightResult
     context: RuntimeContext
+    # Candidate is read from the bundle marker; active SHA is independently
+    # verified against running OCI images. The union of both is insufficient
+    # to verify the requested deploy target.
+    candidate_revision: str
 
 
 @dataclass(frozen=True)
@@ -1230,6 +1234,7 @@ def collect_runtime_snapshot(
     return RuntimeCollection(
         result=_merge_diagnostics(result, topology.diagnostics),
         context=verified_context,
+        candidate_revision=candidate_revision,
     )
 
 
