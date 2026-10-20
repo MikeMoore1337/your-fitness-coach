@@ -164,7 +164,10 @@ def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
         raise DeploymentError("trusted PostgreSQL capacity evidence is unavailable") from None
     if evidence.result.status is not Verdict.PASS:
         raise DeploymentError("trusted PostgreSQL connection capacity is not proven")
-    if config.target_revision not in evidence.context.revisions:
+    # The reported revision list includes BOTH the active and candidate SHA.
+    # Membership alone would incorrectly accept target=active even when the
+    # immutable candidate bundle contains a different revision.
+    if evidence.candidate_revision != config.target_revision:
         raise DeploymentError("trusted PostgreSQL capacity revision does not match target")
 
 
