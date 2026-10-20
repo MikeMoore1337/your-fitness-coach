@@ -276,11 +276,11 @@ maximum measured slack = usable - worst_case_required
 connection_budget_preflight -> backup -> migration -> candidate_start -> traffic_switch -> consumer_handoff
 ```
 
-Для rollback preflight должен быть отдельным predecessor до запуска rollback candidate. Для single-slot он должен быть до backup/migration и до запуска восстановленного application process. `scripts/connection_budget_preflight.py` уже проверяет этот ordering contract, но текущий deployment helper намеренно не импортирует его.
+Для rollback preflight должен быть отдельным predecessor до запуска rollback candidate. Для single-slot он должен быть до backup/migration и до запуска восстановленного application process. `scripts/connection_budget_preflight.py` уже проверяет этот ordering contract, но в текущем PR этот контракт дополнительно реализован в deployment helper; код не активирован на production и требует exact-head CI и owner-reviewed live verification.
 
 `PASS` продолжает существующий stage. `BLOCKED` или `UNKNOWN` завершают stage с non-zero result до backup/migration/candidate mutation. PostgreSQL unreachable, missing attribution и missing headroom не являются warning. Incident recovery не использует CLI bypass: owner-authorized native GitHub `workflow_dispatch` rollback/repair/verify path остаётся отдельным разрешением и не превращает failed preflight в `PASS`.
 
-Точные точки будущего подключения: existing `preflight` stage в `scripts/zero_downtime_deploy.py` непосредственно перед `backup`, а для single-slot — перед `backup`/migration gate. Этот Phase B не меняет `scripts/zero_downtime_deploy.py` или `.github/workflows/deploy.yml`, поэтому обычный deploy flow не активирует новую блокировку.
+Точки подключения в текущем Draft PR: `connection_budget_preflight` перед штатным `preflight`/pull/backup/migration/candidate в `deploy()`, перед первым start rollback-backend в `rollback()` и перед legacy provenance/reclaim/backup/migration в `single_slot_deploy()`. Это **код подготовленной блокировки**, а не production activation: до проверенной ёмкости, числового запаса и корректного bootstrap установленный код может законно остановить развёртывание. `.github/workflows/deploy.yml` не изменён.
 
 ## Rollback и failure behavior
 
@@ -302,7 +302,7 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 | Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers, runtime marker drift block and unattributed fail-closed path | live `pg_stat_activity` attribution |
 | Safety headroom | `NOT_PROVEN` | evaluator requires explicit positive source; default collector policy leaves it unset | owner-approved number and rationale |
 | Synthetic regressions | `PASS` | targeted pytest: 317 passed, включая runtime drift, scaled candidate/all-slots, revision, host/timestamp, trust and timeout negatives | exact-head CI |
-| Deployment gate integration | `PREPARED` | stage-order contract and documented insertion before backup/migration/candidate | separate owner approval; workflow remains unchanged |
+| Deployment gate integration | `IMPLEMENTED_IN_DRAFT / NOT_ACTIVATED` | `scripts/zero_downtime_deploy.py`: guarded three rollout paths, missing-margin/BLOCKED/UNKNOWN tests | exact-head CI, trusted live dry run, owner-approved numeric margin, safe bootstrap before merge |
 | Production dry run | `NOT_VERIFIED` | no SSH/DB/docker production command executed | authorized read-only dry run |
 | Owner approval | `BLOCKED` | no Phase C activation decision in this request | explicit release/gate approval |
 
@@ -317,3 +317,13 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 5. separate release approval before any production deployment.
 
 До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; standalone provenance и отсутствие production integration — `BLOCKED`, недостающие runtime facts — `UNKNOWN`. Production rollout не разрешён. Production environment changes in this PR: `no`. Code/config changes that would affect the next image/runtime are present and must be deployed only through the existing protected release path; `deployment_scope.py` must report `deploy_required=true` for this diff.
+
+## Phase C: подключение блокирующей проверки (Draft, 20.10.2026)
+
+В этом Draft PR интегрирована `_trusted_connection_budget_preflight` в три маршрута `scripts/zero_downtime_deploy.py`. Он получает доверенную `CollectorPolicy` и вызывает `collect_runtime_snapshot` в одном процессе. Verdict `PASS` и присутствие требуемого SHA — необходимые условия продолжения; любые `UNKNOWN`, `BLOCKED`, исключение сборщика или несогласованная версия прерывают операцию до защищённых действий. Диагностика ошибок фиксирована, без исходных сообщений драйвера или URL базы данных. Событие сохраняется в stage history обычного развёртывания.
+
+Запас задаётся **только явно**, положительным целым `DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS` из штатного production deployment environment; значения по умолчанию **нет**, предел числа — 999999. Это источник конфигурации, **не свидетельство согласования владельцем**. Значение нельзя считать утверждённым, пока владелец не согласует число по реальным показателям и оно не будет внесено в защищённую конфигурацию. Пока оно отсутствует, gate обязан прерывать развёртывание. Тесты закрывают отсутствие, 0, отрицательное, дробное, нечисловое, слишком большое значение, ошибку сборщика, `UNKNOWN`/`BLOCKED`, несовпадение SHA и успешный фиктивный `PASS` без каких-либо production-запросов.
+
+**Критическое ограничение первого обновления:** текущие действующие контейнеры могут не содержать `scripts.trusted_runtime_collector postgres-child` и новые `application_name` markers. В этом случае до появления поддерживаемого приложения нельзя получить trusted `PASS`; встроенный gate обоснованно блокирует даже первое применение Phase B. Не сливать данный Draft PR в `master` до отдельного, документированного и безопасно проверенного bootstrap-пути, который не требует приписывать legacy-контейнеру несуществующие данные. Возврат к обычному workflow при неизвестной ёмкости запрещён; экстренное восстановление допускается только по отдельно авторизованному и проверяемому пути, не меняющему вердикт gate задним числом.
+
+Существующие автоматические тесты развёртывания используют mock collector PASS исключительно внутри CI. Окончательный production verdict, фактические подключённые процессы и резервные слоты **НЕ ИЗМЕРЕНЫ**. CI после этих изменений должен быть проверен на *финальном* SHA и он не заменяет независимый runtime dry run.
