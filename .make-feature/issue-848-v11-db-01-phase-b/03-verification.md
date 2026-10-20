@@ -2,8 +2,8 @@
 
 ## Local evidence
 
-- Exact local HEAD: current post-fix `HEAD` is recorded in the PR/Issue evidence
-  after push; exact-head Checks are still required for this revision.
+- Exact local HEAD: final pushed PR head; exact-head GitHub Actions aggregate `checks`:
+  `PASS`.
 - `tests/test_connection_budget_preflight.py`,
   `tests/test_trusted_runtime_collector.py`, backend marker/Alembic tests and the
   deployment regression set: `153 passed` in the focused post-fix run; three
@@ -22,6 +22,8 @@
   attribution failures, topology gaps, pooler, extra consumers, trust forgery,
   stale/future/mixed context and sanitized failures.
 - Ruff check/format passed for changed Python files.
+- `uv audit --locked --no-group dev --no-group scheduled-report`: `PASS` after the
+  security-fixed `certifi` lock update.
 - The exact pre-commit `mypy-backend` hook: `PASS` (`284` source files). A direct
   project-venv invocation of `scripts/run_mypy.py` independently reports `122` errors
   in `15` untouched backend modules; no error points to the changed config/migration
@@ -32,13 +34,13 @@
   deploy paths are Dockerfile, Compose and backend runtime setup. Tooling/docs/tests
   remain no-deploy paths.
 - Container build/migrated PostgreSQL stack and production collector run: `NOT_VERIFIED`
-  locally; required exact-head CI is the review gate.
+  locally; exact-head CI passed, but it does not replace the production collector run.
 
 ## Required before review handoff
 
 - `git diff --check` and full changed-path review.
 - `scripts/deployment_scope.py --base origin/master --head HEAD --json`.
-- Exact-head GitHub Checks on the Draft PR.
+- Exact-head GitHub Checks on the final Draft PR head: `PASS`.
 - Issue #848 comment with PR, SHA, test evidence and explicit remaining owner gates.
 
 ## Explicit non-claims

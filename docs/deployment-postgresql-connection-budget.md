@@ -319,8 +319,8 @@ read-only `capacity-check` до записи production-конфигурации
 | Effective topology | `IMPLEMENTED` | rendered Compose, `ps --all`, exact `docker inspect` env/OCI labels, live Caddy admin config, configured-vs-running replica inventory, pool/phase inventory | production rendered output |
 | Attribution | `IMPLEMENTED` / `NOT_PROVEN` | fixed application markers, runtime marker drift block and unattributed fail-closed path | live `pg_stat_activity` attribution |
 | Safety headroom | `NOT_PROVEN` | evaluator requires explicit positive source; default collector policy leaves it unset | owner-approved number and rationale |
-| Synthetic regressions | `PASS` | focused post-fix pytest: 153 passed; three Windows-specific baseline tests were excluded from this local run | exact-head CI |
-| Deployment gate integration | `IMPLEMENTED_IN_DRAFT / NOT_ACTIVATED` | `scripts/zero_downtime_deploy.py`: trusted gate covers rollout, rollback, bootstrap and idempotent paths; wrapper performs early read-only check | exact-head CI, trusted live dry run, owner-approved numeric margin |
+| Synthetic regressions | `PASS` | focused post-fix pytest: 153 passed; three Windows-specific baseline tests were excluded from this local run; exact-head CI on the final PR head passed | trusted live dry run |
+| Deployment gate integration | `IMPLEMENTED_IN_DRAFT / NOT_ACTIVATED` | `scripts/zero_downtime_deploy.py`: trusted gate covers rollout, rollback, bootstrap and idempotent paths; wrapper performs early read-only check; exact-head CI on the final PR head passed | trusted live dry run, owner-approved numeric margin |
 | Production dry run | `NOT_VERIFIED` | no SSH/DB/docker production command executed | authorized read-only dry run |
 | Owner approval | `BLOCKED` | no Phase C activation decision in this request | explicit release/gate approval |
 
@@ -344,7 +344,7 @@ read-only `capacity-check` до записи production-конфигурации
 
 **Первое обновление:** старый образ может не содержать `postgres-child` и новые маркеры. Технически подготовлен совместимый read-only запуск исходника из проверенного пакета кандидата внутри active-контейнера, найденного по state и live Caddy Admin API (см. ниже). Это не гарантирует `PASS`: полномочия роли, актуальная маркировка сессий, фактический запас соединений и topology остаются неизвестны до реального dry run. Никакого fail-open обхода нет.
 
-Существующие автоматические тесты развёртывания используют mock collector PASS исключительно внутри CI. Окончательный production verdict, фактические подключённые процессы и резервные слоты **НЕ ИЗМЕРЕНЫ**. CI после этих изменений должен быть проверен на *финальном* SHA и он не заменяет независимый runtime dry run.
+Существующие автоматические тесты развёртывания используют mock collector PASS исключительно внутри CI. Окончательный production verdict, фактические подключённые процессы и резервные слоты **НЕ ИЗМЕРЕНЫ**. Exact-head CI на финальном PR head прошёл и не заменяет независимый runtime dry run.
 
 ### Обязательная ранняя проверка (перед записью конфигурации)
 
