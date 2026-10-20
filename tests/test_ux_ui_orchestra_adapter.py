@@ -14,4 +14,4 @@ def test_orchestra_skill_registered_and_read_only():
     assert "READ_ONLY" in skill
     assert "SEQUENTIAL" in skill
     assert "Принимаю" in skill
-    assert "до согласования" in (ROOT / "docs/development/ux-ui-design-orchestra.md").read_text(encoding="utf-8").lower()
+    assert "до моего" in (ROOT / "docs/development/ux-ui-design-orchestra.md").read_text(encoding="utf-8").lower()
