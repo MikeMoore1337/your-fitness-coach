@@ -128,7 +128,8 @@ def test_coach_client_list_query_count_is_constant() -> None:
     # One shared local-day predicate, not 25 per-client predicates.
     assert weight_sql.count("measured_on <=") == 1
     assert isinstance(weight_params, (tuple, list, dict))
-    assert len(weight_params) == len(clients) + 1
+    # Client-ID values, one local-date cutoff, and the rank == 1 filter.
+    assert len(weight_params) == len(clients) + 2
 
 
 def test_coach_client_latest_weight_respects_distinct_local_days() -> None:
