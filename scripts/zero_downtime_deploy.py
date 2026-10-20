@@ -139,7 +139,11 @@ def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
     if not re.fullmatch(r"[1-9][0-9]{0,5}", raw_margin):
         raise DeploymentError("PostgreSQL connection budget safety margin is not configured")
     try:
-        from scripts.trusted_runtime_collector import CollectorPolicy, Verdict, collect_runtime_snapshot
+        from scripts.trusted_runtime_collector import (
+            CollectorPolicy,
+            Verdict,
+            collect_runtime_snapshot,
+        )
     except ModuleNotFoundError:
         # The deploy helper also runs directly as python scripts/zero_downtime_deploy.py.
         # Import Verdict from the *same collector module* to avoid duplicated
