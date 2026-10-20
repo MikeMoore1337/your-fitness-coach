@@ -869,6 +869,40 @@ def test_manual_rollback_swaps_only_verified_revisions(tmp_path: Path, monkeypat
     assert "BOT_IMAGE=registry/bot@sha256:" + "2" * 64 in environment
 
 
+def test_trusted_db_gate_blocks_rollback_before_restoration(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    state = deploy.ReleaseState(
+        version=1,
+        active_slot="green",
+        active_revision=NEW_SHA,
+        active_backend_image="registry/backend@sha256:" + "3" * 64,
+        active_bot_image="registry/bot@sha256:" + "4" * 64,
+        rollback_slot="blue",
+        rollback_revision=OLD_SHA,
+        rollback_backend_image="registry/backend@sha256:" + "1" * 64,
+        rollback_bot_image="registry/bot@sha256:" + "2" * 64,
+    )
+    deploy._atomic_json(config.state_root / "state.json", asdict(state))
+    calls = _patch_runtime(monkeypatch)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.rollback(config)
+
+    assert calls["compose"] == []
+    assert calls["switch"] == []
+    assert calls["consumer_stop"] == []
+    assert calls["consumer_start"] == []
+    unchanged = deploy.ReleaseState.from_path(config.state_root / "state.json")
+    assert unchanged.active_revision == NEW_SHA
+    assert unchanged.rollback_revision == OLD_SHA
+
+
 def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     calls: dict[str, list] = {
         "compose": [],
