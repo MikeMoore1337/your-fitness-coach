@@ -1,4 +1,10 @@
-from datetime import date
+from contextlib import contextmanager
+from datetime import date, timedelta
+from typing import Iterator
+
+from sqlalchemy import event
+
+from fitminiapp_api.core.timezone import today_for_user
 
 from fitminiapp_api.api.v1.me import _build_user_response
 from fitminiapp_api.db.performance import (
@@ -6,12 +12,27 @@ from fitminiapp_api.db.performance import (
     current_sql_metrics,
     reset_sql_metrics,
 )
-from fitminiapp_api.db.session import get_session_context
+from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.program import ProgramTemplate, UserProgram, UserWorkout
-from fitminiapp_api.models.user import CoachClient, User, UserProfile
+from fitminiapp_api.models.user import BodyMeasurement, CoachClient, User, UserProfile
 from fitminiapp_api.services.program_versioning import list_program_import_targets
 from fitminiapp_api.services.programs import list_clients
+
+
+@contextmanager
+def capture_ranked_measurement_queries() -> Iterator[list[tuple[str, object]]]:
+    queries: list[tuple[str, object]] = []
+
+    def capture(_conn, _cursor, statement: str, parameters: object, _context, _many) -> None:
+        if "body_measurements" in statement and "row_number" in statement.lower():
+            queries.append((statement, parameters))
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        yield queries
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
 
 
 def test_coach_client_list_query_count_is_constant() -> None:
@@ -38,6 +59,26 @@ def test_coach_client_list_query_count_is_constant() -> None:
                 )
             )
             clients.append(user)
+
+        local_today = today_for_user(clients[0])
+        db.add_all(
+            [
+                BodyMeasurement(
+                    user_id=user.id,
+                    measured_on=local_today - timedelta(days=1),
+                    weight_kg=80.0 + index,
+                )
+                for index, user in enumerate(clients)
+            ]
+        )
+        # Tomorrow's weight must not leak into a client's local-today snapshot.
+        db.add(
+            BodyMeasurement(
+                user_id=clients[0].id,
+                measured_on=local_today + timedelta(days=1),
+                weight_kg=250.0,
+            )
+        )
 
         db.add(
             NutritionTarget(
@@ -70,16 +111,72 @@ def test_coach_client_list_query_count_is_constant() -> None:
         db.commit()
         db.refresh(coach)
 
-        token = begin_sql_metrics()
-        try:
-            result = list_clients(db, coach)
-            metrics = current_sql_metrics()
-        finally:
-            reset_sql_metrics(token)
+        with capture_ranked_measurement_queries() as weight_queries:
+            token = begin_sql_metrics()
+            try:
+                result = list_clients(db, coach)
+                metrics = current_sql_metrics()
+            finally:
+                reset_sql_metrics(token)
 
     assert len(result) == 25
     assert metrics.query_count == 5
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
+    assert result[-1]["weight_kg"] == 80.0
+    assert result[0]["weight_kg"] == 104.0
+    assert len(weight_queries) == 1
+    weight_sql, weight_params = weight_queries[0]
+    # One shared local-day predicate, not 25 per-client predicates.
+    assert weight_sql.count("measured_on <=") == 1
+    assert isinstance(weight_params, (tuple, list, dict))
+    assert len(weight_params) == len(clients) + 1
+
+
+def test_coach_client_latest_weight_respects_distinct_local_days() -> None:
+    with get_session_context() as db:
+        coach = User(telegram_user_id=920_000, username="timezone_coach", is_coach=True)
+        db.add(coach)
+        db.flush()
+        clients: list[User] = []
+        for index, timezone in enumerate(("Pacific/Honolulu", "Pacific/Kiritimati")):
+            user = User(telegram_user_id=920_100 + index, username=f"timezone_client_{index}")
+            db.add(user)
+            db.flush()
+            db.add(UserProfile(user_id=user.id, timezone=timezone))
+            db.add(CoachClient(coach_user_id=coach.id, client_user_id=user.id))
+            clients.append(user)
+        db.flush()
+
+        local_dates = [today_for_user(user) for user in clients]
+        assert local_dates[0] != local_dates[1]
+        for index, user in enumerate(clients):
+            db.add(
+                BodyMeasurement(
+                    user_id=user.id,
+                    measured_on=local_dates[index] - timedelta(days=1),
+                    weight_kg=70.0 + index,
+                )
+            )
+            db.add(
+                BodyMeasurement(
+                    user_id=user.id,
+                    measured_on=local_dates[index] + timedelta(days=1),
+                    weight_kg=200.0 + index,
+                )
+            )
+        db.commit()
+        db.refresh(coach)
+
+        with capture_ranked_measurement_queries() as weight_queries:
+            result = list_clients(db, coach)
+
+    assert {row["id"]: row["weight_kg"] for row in result} == {
+        clients[0].id: 70.0,
+        clients[1].id: 71.0,
+    }
+    assert len(weight_queries) == 1
+    # Two local days require two groups, preserving the individual cutoff.
+    assert weight_queries[0][0].count("measured_on <=") == 2
 
 
 def test_me_response_needs_six_queries_after_authentication() -> None:
