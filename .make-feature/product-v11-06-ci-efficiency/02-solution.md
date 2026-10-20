@@ -1,6 +1,6 @@
 # Product V11-06 / Issue #821 — measured decision and change plan
 
-Status: baseline measured; implementation selected; exact-head after receipt pending
+Status: implementation complete; exact-head receipt recorded; stable wall-time improvement remains unproven
 
 ## Baseline evidence
 

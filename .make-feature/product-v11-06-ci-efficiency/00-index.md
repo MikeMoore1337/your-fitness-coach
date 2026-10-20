@@ -1,6 +1,6 @@
 # Make Feature index — Product V11-06 / Issue #821
 
-Status: implementation in progress; exact-head PR and post-change Actions receipt pending
+Status: implementation complete; PR open with exact-head CI green; merge/release gates pending
 Mode: normal — evidence-bounded CI efficiency and regression-truth change; no application, PostgreSQL or production delivery mutation.
 Branch: `codex/821-ci-efficiency`
 Current base: `847ba6dea37c300cbd6a2389584c71cf2e25bad4` (`origin/master`)
