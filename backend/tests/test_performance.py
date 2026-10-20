@@ -184,10 +184,7 @@ def test_coach_client_list_query_count_is_constant() -> None:
                 reset_sql_metrics(token)
 
     assert len(result) == 25
-    assert all(
-        item["telegram_user_id"] not in {911_997, 911_998, 911_999}
-        for item in result
-    )
+    assert all(item["telegram_user_id"] not in {911_997, 911_998, 911_999} for item in result)
     assert metrics.query_count == 5
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
     assert result[-1]["weight_kg"] == 80.0
