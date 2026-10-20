@@ -99,15 +99,16 @@ def test_persist_application_image_refs_replaces_duplicates_and_preserves_file_c
     tmp_path: Path,
 ) -> None:
     environment_file = tmp_path / ".env"
-    environment_file.write_text(
-        "# keep this comment\n"
-        "APP_ENV=prod\n"
-        "BACKEND_IMAGE=registry/backend:old\n"
-        "BACKEND_IMAGE=registry/backend:duplicate\n"
-        "BOT_IMAGE=registry/bot:old\n"
-        "OTHER=value\n",
-        encoding="utf-8",
-    )
+    fd = os.open(environment_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write(
+            "# keep this comment\n"
+            "APP_ENV=prod\n"
+            "BACKEND_IMAGE=registry/backend:old\n"
+            "BACKEND_IMAGE=registry/backend:duplicate\n"
+            "BOT_IMAGE=registry/bot:old\n"
+            "OTHER=value\n"
+        )
     os.chmod(environment_file, 0o640)
     expected_mode = os.stat(environment_file).st_mode & 0o777
     backend_image = "registry/backend@sha256:" + "1" * 64
