@@ -1166,7 +1166,10 @@ def _legacy_child_source(release_path: Path) -> str:
     contains no secrets or runtime-substituted values.
     """
     try:
-        source = (release_path / "scripts" / "trusted_legacy_pg_snapshot.py").read_bytes()
+        source_path = release_path / "scripts" / "trusted_legacy_pg_snapshot.py"
+        if source_path.parent.is_symlink() or source_path.is_symlink():
+            raise CollectorFailure("legacy_probe_source_invalid", Verdict.BLOCKED)
+        source = source_path.read_bytes()
         if not 0 < len(source) <= 16_384:
             raise CollectorFailure("legacy_probe_source_invalid", Verdict.BLOCKED)
         return source.decode("utf-8", errors="strict")
