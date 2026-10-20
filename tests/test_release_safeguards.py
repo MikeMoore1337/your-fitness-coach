@@ -6,6 +6,7 @@ import textwrap
 import tomllib
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -344,7 +345,11 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
         "POSTGRES_DECLARED_YFC_SESSIONS=",
         "POSTGRES_NON_YFC_SESSIONS=",
         "POSTGRES_UNATTRIBUTED_SESSIONS=",
+        "POSTGRES_METRICS=",
+        "POSTGRES_DIAGNOSTIC_CODE=",
+        "POSTGRES_CONFIG_SOURCE=",
         "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED",
+        "AUDIT_WORKFLOW=",
         "PORT_5678=",
         "BACKEND_MODE=",
         "WORKER_MODE=",
@@ -398,8 +403,12 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
     assert "SELECT 'superuser_reserved_connections='" in workflow_text
     assert "SELECT 'reserved_connections='" in workflow_text
     assert "SELECT 'session_counts='" in workflow_text
-    assert "POSTGRES_USER" not in workflow_text
-    assert "POSTGRES_DB" not in workflow_text
+    assert "{{range .Config.Env}}" in workflow_text
+    assert 'f"--username={db_user}"' in workflow_text
+    assert 'f"--dbname={db_name}"' in workflow_text
+    assert "POSTGRES_PASSWORD" not in workflow_text
+    assert "DATABASE_URL" not in workflow_text
+    assert "raise SystemExit(2)" in workflow_text
     assert 'DEPLOYMENT_ROOT.glob("*/summary.json")' in workflow_text
     assert ")[:5]" in workflow_text
     for legacy_field in (
@@ -431,6 +440,119 @@ def test_capacity_audit_session_counts_fail_closed_without_revealing_identity() 
     assert "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED" in workflow_text
     assert "application_name IN" in workflow_text
     assert "FROM pg_stat_activity" in workflow_text
+
+
+def test_capacity_audit_uses_running_container_database_identity() -> None:
+    workflow_text = _sources()["capacity_audit"]
+    select_db_container = _embedded_function(workflow_text, "select_db_container")
+    parse_runtime_env = _embedded_function(workflow_text, "parse_postgres_runtime_env")
+    build_psql_command = _embedded_function(workflow_text, "build_psql_command")
+
+    assert select_db_container("") == (None, "POSTGRES_DB_CONTAINER_NOT_FOUND")
+    assert select_db_container("db-a\ndb-b\n") == (None, "POSTGRES_DB_CONTAINER_MULTIPLE")
+    assert select_db_container("db-a\n") == ("db-a", "OK")
+
+    assert parse_runtime_env(
+        "POSTGRES_USER=reporter\nPOSTGRES_DB=production\nPOSTGRES_PASSWORD=secret"
+    ) == {"POSTGRES_USER": "reporter", "POSTGRES_DB": "production"}
+    assert parse_runtime_env("POSTGRES_USER=reporter") == {"POSTGRES_USER": "reporter"}
+    assert parse_runtime_env("POSTGRES_DB=production") == {"POSTGRES_DB": "production"}
+    assert parse_runtime_env("POSTGRES_USER=\nPOSTGRES_DB=production") is None
+
+    command = build_psql_command("db-a", "reporter", "production", "SELECT 1")
+    assert "--username=reporter" in command
+    assert "--dbname=production" in command
+    assert "--username=postgres" not in command
+    assert "--dbname=postgres" not in command
+    assert "-w" in command
+
+
+@pytest.mark.parametrize(
+    ("stderr", "expected"),
+    (
+        ("psql: command not found", "POSTGRES_CLIENT_UNAVAILABLE"),
+        ("Error: No such container: db-a", "POSTGRES_DOCKER_EXEC_FAILED"),
+        ("FATAL: password authentication failed", "POSTGRES_AUTHENTICATION_FAILED"),
+        ("permission denied", "POSTGRES_PERMISSION_DENIED"),
+        ("could not connect to server: Connection refused", "POSTGRES_CONNECTION_FAILED"),
+        ("ERROR: syntax error", "POSTGRES_SQL_EXECUTION_FAILED"),
+    ),
+)
+def test_capacity_audit_postgres_errors_are_allowlisted_and_secret_safe(
+    stderr: str, expected: str
+) -> None:
+    classify_postgres_error = _embedded_function(
+        _sources()["capacity_audit"], "classify_postgres_error"
+    )
+    secret = "password=must-not-be-printed"
+    code = classify_postgres_error(SimpleNamespace(returncode=1, stderr=f"{stderr} {secret}"))
+
+    assert code == expected
+    assert secret not in code
+    assert classify_postgres_error(None) == "POSTGRES_CLIENT_UNAVAILABLE"
+    assert classify_postgres_error(SimpleNamespace(returncode=0, stderr="")) == "OK"
+
+
+def test_capacity_audit_validates_pg15_pg16_counts_and_rejects_false_success() -> None:
+    workflow_text = _sources()["capacity_audit"]
+    parse_response = _embedded_function(workflow_text, "parse_postgres_response")
+    read_session_counts = _embedded_function(workflow_text, "read_session_counts")
+    validate_metrics = _embedded_function(
+        workflow_text,
+        "validate_postgres_metrics",
+        read_session_counts=read_session_counts,
+    )
+    metrics_state = _embedded_function(workflow_text, "postgres_metrics_state")
+    audit_status = _embedded_function(workflow_text, "audit_workflow_status")
+
+    def response(version: str, reserved: str, current: str = "20") -> str:
+        return "\n".join(
+            (
+                f"version_major={version}",
+                "max_connections=100",
+                "superuser_reserved_connections=10",
+                f"reserved_connections={reserved}",
+                f"current_connections={current}",
+                "session_counts=20,8,3",
+                "total_database_size_bytes=2097152",
+                "shared_buffers=128MB",
+            )
+        )
+
+    parsed15, parse_code15 = parse_response(response("15", "UNAVAILABLE"))
+    metrics15, validation15 = validate_metrics(parsed15)
+    assert parse_code15 == "OK"
+    assert validation15 == "OK"
+    assert metrics15["reserved_connections"] == "0"
+    assert metrics15["usable_non_reserved_connections"] == "90"
+
+    parsed16, parse_code16 = parse_response(response("16", "5"))
+    metrics16, validation16 = validate_metrics(parsed16)
+    assert parse_code16 == "OK"
+    assert validation16 == "OK"
+    assert metrics16["reserved_connections"] == "5"
+    assert metrics16["usable_non_reserved_connections"] == "85"
+
+    partial, partial_parse_code = parse_response("version_major=16\nmax_connections=100")
+    partial_metrics, partial_code = validate_metrics(partial)
+    assert partial_parse_code == "OK"
+    assert partial_code == "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+    assert metrics_state(partial_metrics, partial_code) == "PARTIAL"
+    assert audit_status("PARTIAL") == "NEEDS_WORK"
+
+    malformed, malformed_parse_code = parse_response("version_major=16\nsecret=not-output")
+    assert malformed == {}
+    assert malformed_parse_code == "POSTGRES_MALFORMED_SQL_RESPONSE"
+
+    contradictory, contradictory_parse_code = parse_response(response("16", "5", current="21"))
+    contradictory_metrics, contradictory_code = validate_metrics(contradictory)
+    assert contradictory_parse_code == "OK"
+    assert contradictory_code == "POSTGRES_METRIC_CONFLICT"
+    assert metrics_state(contradictory_metrics, contradictory_code) == "PARTIAL"
+    assert audit_status("NO_DATA") == "NEEDS_WORK"
+    assert audit_status("VERIFIED") == "PASS"
+    assert "AUDIT_WORKFLOW=" in workflow_text
+    assert "POSTGRES_BUDGET_VERDICT=PASS" not in workflow_text
 
 
 def test_capacity_audit_preserves_docker_min_avg_max_semantics() -> None:
@@ -532,7 +654,7 @@ def test_capacity_audit_postgres_reserved_and_attribution_diagnostics_are_read_o
     assert "pg_stat_activity.client_addr" not in workflow_text
     assert "pg_stat_activity.query" not in workflow_text
     assert "docker exec" not in workflow_text
-    assert '"docker",\n                          "exec",' in workflow_text
+    assert '"docker",\n                  "exec",' in workflow_text
     # Counts are diagnostics; the owner-only read probe is not the deployment gate.
     assert "POSTGRES_BUDGET_VERDICT=PASS" not in workflow_text
 
