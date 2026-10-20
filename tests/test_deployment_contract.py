@@ -60,6 +60,7 @@ def test_repair_bundle_includes_the_complete_trusted_capacity_gate() -> None:
         "scripts/zero_downtime_deploy.py",
         "scripts/connection_budget_preflight.py",
         "scripts/trusted_runtime_collector.py",
+        "scripts/trusted_legacy_pg_snapshot.py",
     ):
         assert path in repair_bundle
 
