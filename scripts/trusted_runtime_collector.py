@@ -240,13 +240,13 @@ def _active_revision(release_path: Path) -> str:
     revision to the runtime image provenance check.
     """
     raw_root = os.environ.get("DEPLOY_STATE_ROOT")
-    state_root = Path(raw_root).resolve() if raw_root else (
-        release_path / ".artifacts" / "operations" / "deployments"
+    state_root = (
+        Path(raw_root).resolve()
+        if raw_root
+        else (release_path / ".artifacts" / "operations" / "deployments")
     )
     try:
-        revision = (state_root / "last-successful-revision").read_text(
-            encoding="utf-8"
-        ).strip()
+        revision = (state_root / "last-successful-revision").read_text(encoding="utf-8").strip()
     except OSError as exc:
         raise CollectorFailure("active_revision_unavailable", Verdict.UNKNOWN) from exc
     if FULL_REVISION.fullmatch(revision) is None:
