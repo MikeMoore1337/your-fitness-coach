@@ -428,7 +428,7 @@ def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
     if should_pass:
         deploy._trusted_connection_budget_preflight(config)
     else:
-        with pytest.raises(deploy.DeploymentError, match="capacity|revision"):
+        with pytest.raises(deploy.DeploymentError, match=r"capacity|revision"):
             deploy._trusted_connection_budget_preflight(config)
     assert len(captured) == 1
     assert captured[0][0] == config.root
