@@ -85,6 +85,11 @@ def test_export_job_is_current_user_only_zip_and_replaces_previous_artifact(clie
         headers=other_headers,
     )
     assert denied.status_code == 404
+    denied_link = client.post(
+        f"/api/v1/me/exports/{status['export_id']}/download-link",
+        headers=other_headers,
+    )
+    assert denied_link.status_code == 404
     downloaded = client.get(
         f"/api/v1/me/exports/{status['export_id']}/download",
         headers=owner_headers,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, getUserFacingErrorMessage } from '../../shared/api/client';
 import { crossContextCoordinator } from '../../shared/browser/crossContextLock';
 import type { Workout, WorkoutStatus } from '../../shared/api/types';
 import { YFC_PLATFORM_ACTIVATED_EVENT } from '../../shared/telegram/layout';
@@ -230,9 +230,10 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
           }
           setSyncState('conflict');
           setMessage(
-            typeof detail?.message === 'string'
-              ? detail.message
-              : 'Серверная тренировка уже изменилась. Локальные данные сохранены на устройстве.',
+            getUserFacingErrorMessage(
+              reason,
+              'Серверная тренировка уже изменилась. Локальные данные сохранены на устройстве.',
+            ),
           );
           return false;
         }
@@ -245,9 +246,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
           !storageAvailable.current
             ? 'Изменения ещё не сохранены. Хранилище устройства недоступно. Не закрывайте приложение.'
             : navigator.onLine
-              ? reason instanceof Error
-                ? reason.message
-                : 'Не удалось синхронизировать тренировку.'
+              ? getUserFacingErrorMessage(reason, 'Не удалось синхронизировать тренировку.')
               : 'Нет сети. Изменения сохранены на этом устройстве.',
         );
         return false;
@@ -268,9 +267,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
         return await crossContextCoordinator.run(lockName, runQueue);
       } catch (reason) {
         setSyncState('error');
-        setMessage(
-          reason instanceof Error ? reason.message : 'Не удалось синхронизировать очередь.',
-        );
+        setMessage(getUserFacingErrorMessage(reason, 'Не удалось синхронизировать очередь.'));
         return false;
       }
     })();
@@ -330,7 +327,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
             : true;
         } catch (reason) {
           setSyncState('error');
-          setMessage(reason instanceof Error ? reason.message : 'Не удалось сохранить изменение.');
+          setMessage(getUserFacingErrorMessage(reason, 'Не удалось сохранить изменение.'));
           return false;
         }
       } finally {

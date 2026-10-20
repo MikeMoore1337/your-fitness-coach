@@ -2422,7 +2422,7 @@ for (const width of [360, 393, 430]) {
         await dialog.getByRole('checkbox', { name: 'Скамья', exact: true }).check();
         await dialog.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
         await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
-        await expect(error).toContainText('Временная ошибка сервера');
+        await expect(error).toContainText('Сервис временно недоступен. Попробуйте ещё раз.');
         await expect(error).toBeFocused();
         await expect(error).toBeInViewport();
         await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
@@ -2520,7 +2520,13 @@ test('V9-01 desktop smoke keeps replacement scoped to the current workout', asyn
   await page.getByRole('radio', { name: /Жим гантелей лёжа/ }).check();
   await page.getByRole('button', { name: 'Показать изменения' }).click();
   await page.getByRole('button', { name: 'Применить только сегодня' }).click();
-  await expect(page.getByRole('heading', { name: 'Жим гантелей лёжа' })).toBeVisible();
+  await expect(
+    page
+      .locator('.active-workout-exercise')
+      .filter({ hasText: 'Жим гантелей лёжа' })
+      .first()
+      .getByRole('heading', { name: 'Жим гантелей лёжа', exact: true }),
+  ).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
@@ -2702,7 +2708,9 @@ for (const [theme, state] of [
         route.fulfill({ status: 503, json: { detail: 'Временная ошибка сервера' } }),
       );
       await dialog.getByRole('button', { name: 'Показать изменения', exact: true }).click();
-      await expect(dialog.getByRole('alert')).toContainText('Временная ошибка сервера');
+      await expect(dialog.getByRole('alert')).toContainText(
+        'Сервис временно недоступен. Попробуйте ещё раз.',
+      );
     } else if (state === 'offline') {
       await page.context().setOffline(true);
       await page.evaluate(() => {

@@ -1984,7 +1984,7 @@ test('notification empty and error states keep compact profile rhythm', async ({
   await page.getByRole('button', { name: 'Клиент' }).click();
   await openAppDestination(page, 'Профиль');
   await page.goto('/app?section=profile#profile-notifications');
-  await expect(page.getByText('Настройки временно недоступны')).toBeVisible();
+  await expect(page.getByText('Сервис временно недоступен. Попробуйте ещё раз.')).toBeVisible();
   const notificationCenter = page.locator('details.notification-center');
   await expect(
     notificationCenter.locator('summary').getByText('Уведомлений пока нет'),

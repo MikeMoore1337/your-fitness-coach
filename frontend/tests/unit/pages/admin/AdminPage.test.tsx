@@ -367,7 +367,9 @@ describe('AdminPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Найти' }));
 
     const alert = await screen.findByRole('alert');
-    expect(within(alert).getByText('Сервис поиска временно недоступен')).toBeInTheDocument();
+    expect(
+      within(alert).getByText('Сервис временно недоступен. Попробуйте ещё раз.'),
+    ).toBeInTheDocument();
     fireEvent.click(within(alert).getByRole('button', { name: 'Повторить' }));
 
     expect(

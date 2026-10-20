@@ -307,7 +307,9 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   tmaApi.failNextCardioSave();
   await saveCardio.click();
   await expect.poll(() => tmaApi.cardioSaveCalls()).toBe(1);
-  await expect(tmaCardio.getByRole('alert')).toContainText('Временная ошибка сохранения');
+  await expect(tmaCardio.getByRole('alert')).toContainText(
+    'Сервис временно недоступен. Попробуйте ещё раз.',
+  );
   await expect(duration).toHaveValue('35');
   await expect(tmaCardio.getByLabel('Заметка')).toHaveValue('Ровный темп, без часов');
 
