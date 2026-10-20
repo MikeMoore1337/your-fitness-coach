@@ -72,7 +72,10 @@ def test_trusted_postgres_preflight_runs_before_any_production_config_mutation()
     assert wrapper.count(marker) == 1
     first_mutation = 'echo "Enabling browser OAuth'
     assert wrapper.index(marker) < wrapper.index(first_mutation)
-    assert 'for command in ("deploy", "bootstrap", "rollback", "single-slot", "capacity-check"):' in orchestrator
+    assert (
+        'for command in ("deploy", "bootstrap", "rollback", "single-slot", "capacity-check"):'
+        in orchestrator
+    )
     assert 'if args.command == "capacity-check":' in orchestrator
     assert 'with _stage(evidence, "connection_budget_preflight"):' in orchestrator
     assert orchestrator.count('_trusted_connection_budget_preflight(config)') >= 4
