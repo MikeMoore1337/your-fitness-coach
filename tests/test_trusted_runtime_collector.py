@@ -15,6 +15,7 @@ from scripts.trusted_runtime_collector import (
     ContainerEnvironment,
     PostgresObservation,
     RuntimeContext,
+    _active_revision,
     _failure_payload,
     _inspect_revisions,
     _merge_diagnostics,
@@ -426,3 +427,79 @@ def test_running_image_revision_must_match_release_sha(tmp_path: Path, monkeypat
             policy=CollectorPolicy(),
             expected_revision=REVISION,
         )
+
+
+def test_predeploy_running_revision_uses_active_state_not_candidate(tmp_path: Path, monkeypatch) -> None:
+    """A valid upgrade has active=A while immutable candidate bundle=B."""
+    monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
+    state_root = tmp_path / ".artifacts" / "operations" / "deployments"
+    state_root.mkdir(parents=True)
+    state_root.joinpath("last-successful-revision").write_text(REVISION + "\n", encoding="utf-8")
+    state_root.joinpath("state.json").write_text(
+        json.dumps({"active_revision": REVISION, "active_slot": "blue"}),
+        encoding="utf-8",
+    )
+    tmp_path.joinpath(".deployment-sha").write_text("b" * 40 + "\n", encoding="utf-8")
+
+    from scripts.trusted_runtime_collector import _release_revision
+
+    assert _release_revision(tmp_path) == "b" * 40
+    assert _active_revision(tmp_path) == REVISION
+
+    def fake_run(command, *, cwd, policy):
+        del cwd, policy
+        assert command[-1] == "active-container"
+        return json.dumps({"org.opencontainers.image.revision": REVISION}).encode() + b"\n"
+
+    monkeypatch.setattr("scripts.trusted_runtime_collector._run_bounded", fake_run)
+    assert _inspect_revisions(
+        [{"Service": "backend-blue", "State": "running", "ID": "active-container"}],
+        cwd=tmp_path,
+        policy=CollectorPolicy(),
+        expected_revision=_active_revision(tmp_path),
+    ) == (REVISION,)
+
+
+@pytest.mark.parametrize(
+    ("state_revision", "state_slot", "marker", "error"),
+    (
+        ("b" * 40, "blue", REVISION, "active_revision_state_mismatch"),
+        (REVISION, "unknown", REVISION, "active_state_invalid"),
+        (REVISION, "blue", "not-a-full-sha", "active_revision_invalid"),
+    ),
+)
+def test_predeploy_active_revision_fails_closed_for_invalid_state(
+    tmp_path: Path,
+    monkeypatch,
+    state_revision: str,
+    state_slot: str,
+    marker: str,
+    error: str,
+) -> None:
+    monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
+    state_root = tmp_path / ".artifacts" / "operations" / "deployments"
+    state_root.mkdir(parents=True)
+    state_root.joinpath("last-successful-revision").write_text(marker, encoding="utf-8")
+    state_root.joinpath("state.json").write_text(
+        json.dumps({"active_revision": state_revision, "active_slot": state_slot}),
+        encoding="utf-8",
+    )
+    with pytest.raises(CollectorFailure, match=error):
+        _active_revision(tmp_path)
+
+
+def test_predeploy_active_revision_missing_marker_is_unknown(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
+    with pytest.raises(CollectorFailure, match="active_revision_unavailable") as raised:
+        _active_revision(tmp_path)
+    assert raised.value.status == Verdict.UNKNOWN
+
+
+def test_predeploy_single_slot_uses_last_successful_revision(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("DEPLOY_STATE_ROOT", raising=False)
+    state_root = tmp_path / ".artifacts" / "operations" / "deployments"
+    state_root.mkdir(parents=True)
+    state_root.joinpath("last-successful-revision").write_text(REVISION, encoding="utf-8")
+    assert _active_revision(tmp_path) == REVISION
