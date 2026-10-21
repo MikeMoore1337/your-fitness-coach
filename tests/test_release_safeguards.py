@@ -2,9 +2,11 @@ import ast
 import json
 import os
 import re
+import sqlite3
 import textwrap
 import tomllib
 from collections.abc import Callable
+from contextlib import closing
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -402,7 +404,7 @@ def test_capacity_audit_has_bounded_safe_output_and_no_production_mutation_path(
     assert "SELECT 'current_connections='" in workflow_text
     assert "SELECT 'superuser_reserved_connections='" in workflow_text
     assert "SELECT 'reserved_connections='" in workflow_text
-    assert "SELECT 'session_counts='" in workflow_text
+    assert "'session_counts='" in workflow_text
     assert "{{range .Config.Env}}" in workflow_text
     assert 'f"--username={db_user}"' in workflow_text
     assert 'f"--dbname={db_name}"' in workflow_text
@@ -513,7 +515,10 @@ def test_capacity_audit_validates_pg15_pg16_counts_and_rejects_false_success() -
                 "superuser_reserved_connections=10",
                 f"reserved_connections={reserved}",
                 f"current_connections={current}",
-                "session_counts=20,8,3",
+                "session_counts=20,8,0",
+                "background_processes=5",
+                "unsupported_backends=0",
+                "statistics_visible=1",
                 "total_database_size_bytes=2097152",
                 "shared_buffers=128MB",
             )
@@ -648,8 +653,8 @@ def test_capacity_audit_postgres_reserved_and_attribution_diagnostics_are_read_o
 
     assert "current_setting('superuser_reserved_connections')" in workflow_text
     assert "current_setting('reserved_connections', true)" in workflow_text
-    assert "SELECT 'session_counts='" in workflow_text
-    assert "FROM pg_stat_activity;" in workflow_text
+    assert "'session_counts='" in workflow_text
+    assert "FROM pg_stat_activity" in workflow_text
     assert "SELECT application_name" not in workflow_text
     assert "pg_stat_activity.client_addr" not in workflow_text
     assert "pg_stat_activity.query" not in workflow_text
@@ -764,3 +769,101 @@ def test_edge_serves_canonical_robots_without_backend_dependency() -> None:
         assert directive in edge
     assert "respond <<ROBOTS" in edge
     assert "ROBOTS 200" in edge
+
+
+@pytest.mark.parametrize(
+    ("activity", "expected", "code"),
+    (
+        ([], "0,0,0", "OK"),
+        ([("client backend", "yfc-backend")], "1,1,0", "OK"),
+        ([("client backend", "other")], "1,0,0", "OK"),
+        ([("client backend", "yfc-connection-budget-collector")], "1,0,0", "OK"),
+        (
+            [("client backend", ""), ("client backend", None)],
+            "2,0,2",
+            "POSTGRES_ATTRIBUTION_INCOMPLETE",
+        ),
+        ([("background writer", ""), ("autovacuum worker", "yfc-backend")], "0,0,0", "OK"),
+        (
+            [("client backend", "yfc-worker"), ("client backend", "other"), ("checkpointer", "")],
+            "2,1,0",
+            "OK",
+        ),
+        ([("walsender", "replica")], "0,0,0", "POSTGRES_UNSUPPORTED_BACKEND_TYPE"),
+        ([("walreceiver", "")], "0,0,0", "POSTGRES_UNSUPPORTED_BACKEND_TYPE"),
+        ([("background worker", "")], "0,0,0", "POSTGRES_UNSUPPORTED_BACKEND_TYPE"),
+        ([("logical replication worker", "")], "0,0,0", "POSTGRES_UNSUPPORTED_BACKEND_TYPE"),
+        ([(None, "")], "0,0,0", "POSTGRES_UNSUPPORTED_BACKEND_TYPE"),
+    ),
+)
+def test_capacity_audit_executes_client_accounting_sql(activity, expected, code):
+    workflow = _sources()["capacity_audit"]
+    match = re.search(r'sql = """(.*?)"""', workflow, re.S)
+    query = match.group(1)
+    query = query[query.index("WITH activity") : query.index("SELECT 'total_database_size_bytes='")]
+    assert query.count("FROM pg_stat_activity") == 1
+    query = query.replace("::int", "").replace("current_user", "'reader'").replace("E'", "'")
+    with closing(sqlite3.connect(":memory:")) as db:
+        db.execute("CREATE TABLE pg_stat_activity (backend_type TEXT, application_name TEXT)")
+        db.executemany("INSERT INTO pg_stat_activity VALUES (?, ?)", activity)
+        db.create_function("btrim", 1, lambda value: value.strip() if value is not None else None)
+        db.create_function("pg_has_role", 3, lambda *args: 1)
+        raw = db.execute(query).fetchone()[0].replace("\\n", "\n")
+    parse = _embedded_function(workflow, "parse_postgres_response")
+    sessions = _embedded_function(workflow, "read_session_counts")
+    validate = _embedded_function(
+        workflow, "validate_postgres_metrics", read_session_counts=sessions
+    )
+    parsed, parse_code = parse(raw)
+    assert parse_code == "OK"
+    assert parsed["session_counts"] == expected
+    parsed.update(
+        version_major="16",
+        max_connections="100",
+        superuser_reserved_connections="3",
+        reserved_connections="2",
+    )
+    metrics, diagnostic = validate(parsed)
+    assert diagnostic == code
+    if code == "OK":
+        assert int(metrics["declared_yfc_sessions"]) + int(metrics["non_yfc_sessions"]) == int(
+            metrics["current_connections"]
+        )
+    else:
+        state = _embedded_function(workflow, "postgres_metrics_state")(metrics, diagnostic)
+        assert state != "VERIFIED"
+        assert _embedded_function(workflow, "audit_workflow_status")(state) == "NEEDS_WORK"
+
+
+@pytest.mark.parametrize(
+    "changes,code",
+    (
+        ({"statistics_visible": "0"}, "POSTGRES_STATISTICS_VISIBILITY_REQUIRED"),
+        ({"statistics_visible": "2"}, "POSTGRES_MALFORMED_SQL_RESPONSE"),
+        ({"unsupported_backends": ""}, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"),
+        ({"background_processes": "-1"}, "POSTGRES_MALFORMED_SQL_RESPONSE"),
+        ({"current_connections": "3"}, "POSTGRES_METRIC_CONFLICT"),
+        ({"version_major": "15", "reserved_connections": "2"}, "POSTGRES_METRIC_CONFLICT"),
+    ),
+)
+def test_capacity_audit_never_verifies_incomplete_or_conflicting_counts(changes, code):
+    workflow = _sources()["capacity_audit"]
+    sessions = _embedded_function(workflow, "read_session_counts")
+    validate = _embedded_function(
+        workflow, "validate_postgres_metrics", read_session_counts=sessions
+    )
+    parsed = {
+        "version_major": "16",
+        "max_connections": "100",
+        "superuser_reserved_connections": "3",
+        "reserved_connections": "2",
+        "current_connections": "2",
+        "session_counts": "2,1,0",
+        "background_processes": "5",
+        "unsupported_backends": "0",
+        "statistics_visible": "1",
+    }
+    parsed.update(changes)
+    metrics, diagnostic = validate(parsed)
+    assert diagnostic == code
+    assert _embedded_function(workflow, "postgres_metrics_state")(metrics, diagnostic) != "VERIFIED"

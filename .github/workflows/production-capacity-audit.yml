@@ -374,6 +374,9 @@ jobs:
                   "reserved_connections",
                   "current_connections",
                   "session_counts",
+                  "background_processes",
+                  "unsupported_backends",
+                  "statistics_visible",
                   "total_database_size_bytes",
                   "shared_buffers",
               }
@@ -461,6 +464,8 @@ jobs:
                   "reserved_connections": "UNAVAILABLE",
                   "usable_non_reserved_connections": "UNAVAILABLE",
                   "current_connections": "UNAVAILABLE",
+                  "background_processes": "UNAVAILABLE",
+                  "unsupported_backends": "UNAVAILABLE",
                   "connection_headroom": "UNAVAILABLE",
                   "unreserved_headroom": "UNAVAILABLE",
                   "declared_yfc_sessions": "UNAVAILABLE",
@@ -503,6 +508,21 @@ jobs:
                   if reserved_status == "missing":
                       return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
 
+              background, background_status = parse_nonnegative("background_processes")
+              unsupported, unsupported_status = parse_nonnegative("unsupported_backends")
+              visible, visible_status = parse_nonnegative("statistics_visible")
+              if "missing" in (background_status, unsupported_status, visible_status):
+                  return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+              if "invalid" in (background_status, unsupported_status, visible_status) or visible not in (0, 1):
+                  return metrics, "POSTGRES_MALFORMED_SQL_RESPONSE"
+              if visible != 1:
+                  return metrics, "POSTGRES_STATISTICS_VISIBILITY_REQUIRED"
+              if unsupported:
+                  return metrics, "POSTGRES_UNSUPPORTED_BACKEND_TYPE"
+              if version < 10 or max_connections <= 0:
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              if version < 16 and parsed.get("reserved_connections") not in (None, "", "0", "UNAVAILABLE"):
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
               session_raw = parsed.get("session_counts")
               if session_raw is None or session_raw == "":
                   return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
@@ -520,6 +540,8 @@ jobs:
                   metrics["non_yfc_sessions"],
                   metrics["unattributed_sessions"],
               ) = session_counts
+              if int(metrics["unattributed_sessions"]):
+                  return metrics, "POSTGRES_ATTRIBUTION_INCOMPLETE"
               if session_total != current_connections:
                   return metrics, "POSTGRES_METRIC_CONFLICT"
               if superuser_reserved + reserved_connections > max_connections:
@@ -560,6 +582,8 @@ jobs:
               "reserved_connections": "UNAVAILABLE",
               "usable_non_reserved_connections": "UNAVAILABLE",
               "current_connections": "UNAVAILABLE",
+              "background_processes": "UNAVAILABLE",
+              "unsupported_backends": "UNAVAILABLE",
               "connection_headroom": "UNAVAILABLE",
               "unreserved_headroom": "UNAVAILABLE",
               "declared_yfc_sessions": "UNAVAILABLE",
@@ -594,12 +618,26 @@ jobs:
           SELECT 'max_connections=' || current_setting('max_connections')::int;
           SELECT 'superuser_reserved_connections=' || current_setting('superuser_reserved_connections')::int;
           SELECT 'reserved_connections=' || COALESCE(NULLIF(current_setting('reserved_connections', true), ''), 'UNAVAILABLE');
-          SELECT 'current_connections=' || count(*) FROM pg_stat_activity;
-          SELECT 'session_counts=' || count(*) || ',' ||
-            count(*) FILTER (WHERE application_name IN
-              ('yfc-backend', 'yfc-worker', 'yfc-setup', 'yfc-migration', 'yfc-connection-budget-collector')) || ',' ||
-            count(*) FILTER (WHERE COALESCE(btrim(application_name), '') = '')
-            FROM pg_stat_activity;
+          WITH activity AS MATERIALIZED (
+            SELECT
+              count(*) FILTER (WHERE backend_type = 'client backend') AS total,
+              count(*) FILTER (WHERE backend_type = 'client backend' AND application_name IN
+                ('yfc-backend', 'yfc-worker', 'yfc-setup', 'yfc-migration')) AS yfc,
+              count(*) FILTER (WHERE backend_type = 'client backend'
+                AND COALESCE(btrim(application_name), '') = '') AS unattributed,
+              count(*) FILTER (WHERE backend_type <> 'client backend') AS background,
+              count(*) FILTER (WHERE backend_type IS NULL OR backend_type NOT IN (
+                'client backend', 'autovacuum launcher', 'autovacuum worker',
+                'background writer', 'checkpointer', 'archiver', 'walwriter',
+                'logical replication launcher', 'parallel worker')) AS unsupported
+            FROM pg_stat_activity
+          )
+          SELECT 'current_connections=' || total || E'\n' ||
+            'session_counts=' || total || ',' || yfc || ',' || unattributed || E'\n' ||
+            'background_processes=' || background || E'\n' ||
+            'unsupported_backends=' || unsupported || E'\n' ||
+            'statistics_visible=' || pg_has_role(current_user, 'pg_read_all_stats', 'member')::int
+          FROM activity;
           SELECT 'total_database_size_bytes=' || COALESCE(sum(pg_database_size(datname)), 0) FROM pg_database WHERE datallowconn;
           SELECT 'shared_buffers=' || current_setting('shared_buffers');"""
                   runtime_env_result = command(
@@ -765,6 +803,8 @@ jobs:
                   f"POSTGRES_RESERVED_CONNECTIONS={postgres['reserved_connections']}",
                   f"POSTGRES_USABLE_NON_RESERVED_CONNECTIONS={postgres['usable_non_reserved_connections']}",
                   f"POSTGRES_CURRENT_CONNECTIONS={postgres['current_connections']}",
+                  f"POSTGRES_BACKGROUND_PROCESSES={postgres['background_processes']}",
+                  f"POSTGRES_UNSUPPORTED_BACKENDS={postgres['unsupported_backends']}",
                   f"POSTGRES_CONNECTION_HEADROOM={postgres['connection_headroom']}",
                   f"POSTGRES_UNRESERVED_HEADROOM={postgres['unreserved_headroom']}",
                   f"POSTGRES_DECLARED_YFC_SESSIONS={postgres['declared_yfc_sessions']}",
