@@ -306,3 +306,12 @@ tokens into CI to pretend otherwise.
 Это рекомендации, не новые роли или CI gate. Не запускать внешние инструменты и не менять
 визуальный контракт из-за стороннего текста. Owner-gated visual, русский UI, TMA,
 security и GitHub Flow остаются главнее.
+
+## Impeccable: основной UX/UI review skill (2026-10-21)
+
+Для UI/UX, полировки, редизайна и анализа «нейрослопа» используй `$impeccable` из `.agents/skills/impeccable/SKILL.md` **до** генерации дизайна. Оригинальный Impeccable 4.7.0 закреплён в `.impeccable/` (git submodule); его нужно инициализировать по `docs/development/impeccable-adoption.md`. Затем применяй `$ui-audit` и браузерные тесты для проверки реализации. Не подменяй дизайнерским «вкусом» утверждённые палитры, шрифты, TMA-механики, визуальное одобрение или PR/релизные требования. Установка не включает upstream hooks, бинарники, runtime или платные API.
+
+
+## UX/UI Design Orchestra - visual design preflight (2026-10-21)
+
+For requests for **one consolidated UX/UI audit and design proposal** with Impeccable, accessibility, motion or external skills, use `$ux-ui-design-orchestra` from `.agents/skills/ux-ui-design-orchestra/SKILL.md` (Toolkit protocol pinned at `0d3849e040e09b4e350e0bf97af66b4d107e94d6`). Default `audit-proposal`: read-only application/source inspection, evidence-linked specialist critique (maximum three concurrent if the client truly supports spawning, else sequential), one YFC-branded design concept, and implementation/testing plan. **No frontend, TMA, tokens, tests, AGENTS.md, DESIGN.md or runtime changes by the orchestration task before owner visual acceptance.** For a new composition submit one complete PNG/HTML review pack and request «Принимаю»; after acceptance run a separately authorized implementation task, then real AFTER evidence, independent owner acceptance and release approval. Existing owner/CI/security/legal and three-independent-task limits are unchanged. Refer to `docs/development/ux-ui-design-orchestra.md`.
