@@ -17,6 +17,7 @@ Task = scope и результат.
 | Существенный motion | `$motion-design-engineer` + implementation skill | `$apple-design` при Apple-like physical/gesture trigger; `$performance-engineer` при подтверждённой стоимости; `$accessibility-engineer` при сложном reduced-motion/a11y |
 | Design exploration | `$product-designer` + explicit `$ui-prototyper` | `$landing-art-director` для Landing; `$apple-design` при Apple/Liquid Glass/native-feel direction; `$motion-design-engineer` если motion является частью концепции |
 | Landing | `$landing-art-director` + `$product-designer` | `$frontend-engineer` при реализации; SEO/performance только по scope |
+| Combined UX/UI audit + single design proposal | `$ux-ui-design-orchestra` -> `$impeccable` -> `$ui-audit` по необходимости | `accessibility-engineer` / `motion-design-engineer` только при реальных проблемах; максимум 3 независимых read-only анализа, без изменений UI до owner approval |
 | UI audit | `$ui-audit` | `$apple-design` только при аудите Apple/Liquid Glass/native-feel contract; `$motion-design-engineer` при существенном motion review; a11y/perf по риску |
 | Backend/API | `$backend-engineer` | `$python-engineer` при Python implementation; data/security/privacy по границе |
 | Python | `$python-engineer` | domain skill по фактическому коду |
@@ -29,6 +30,8 @@ Task = scope и результат.
 | Security-sensitive diff | `$security-engineer` в режиме `diff` | `$privacy-engineer`, `$platform-engineer`, `$llm-engineer` только по затронутой boundary |
 | Dedicated full security audit | `$security-engineer` в режиме `full` | профильные skills последовательно, без отдельного reviewer role/subagent |
 | QA strategy | `$qa-engineer` | обычно 1-2 QA/domain skills по фактическому риску |
+| Shared-contract or migration change | `$qa-engineer` + `$change-impact-analysis` | `$contract-testing` for producer/consumer contracts; `$requirements-traceability` for multi-criteria Issue |
+| Reproduced cross-layer error | relevant implementation skill + `$cross-layer-debugging` | `$qa-engineer` for focused regressions; do not use without reproduction |
 | Playwright/Web/TMA tests | `$qa-engineer` + `$playwright-testing` | `$e2e-review` для critical/new/AI-generated E2E trust review |
 | pytest tests | `$qa-engineer` + `$pytest-test-design` | test-data/API/DB/Pydantic по boundary |
 | API verification | `$qa-engineer` + `$api-testing` | Pydantic/DB/security/privacy по risk |
@@ -156,3 +159,7 @@ Skill готовит `SAFE / BALANCED / ACCEPT_RISK / AVOID`, recommendation, о
 - review/QA: base skill роли + 1-2 профильных;
 - audit/release: последовательные streams;
 - не загружать одинаковые общие правила из нескольких skills, если один уже владеет областью.
+
+## Toolkit methods: conditional only
+
+The four Toolkit methods are pinned to [AI Development Toolkit](https://github.com/MikeMoore1337/ai-development-toolkit/tree/3a9bf14772ab579d37c6f4f9615db505ab6ac259) at `3a9bf14772ab579d37c6f4f9615db505ab6ac259`. YFC `qa-engineer` remains the QA router and existing `orchestrator` owns lifecycle. Use 1-2 relevant skills per task; never activate all, create a parallel workflow, or weaken GitHub/visual/security gates.

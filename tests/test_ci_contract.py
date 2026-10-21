@@ -216,10 +216,13 @@ def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> N
     root = Path(__file__).parents[1]
     workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
-    required = ci_contract.expected_jobs_for_groups(("quality",), event="pull_request")
+    required = ci_contract.expected_jobs_for_groups(
+        ci_contract.PROFILE_GROUPS["frontend"], event="pull_request"
+    )
     assert "task-provenance" not in required
     assert "codeql-security" in required
     assert "security-audit" in required
+    assert "dependency-audit" in required
     assert "review-contract" not in required
     assert "pull_request_review:" not in workflow
     assert "review-contract:" not in workflow
@@ -234,6 +237,45 @@ def test_pr_ci_requires_free_deterministic_security_audit_without_llm_api() -> N
     assert "SECURITY_AUDIT_RESULT: ${{ needs.security-audit.result }}" in workflow
     assert "openai/codex-action" not in workflow
     assert "OPENAI_API_KEY" not in workflow
+
+
+def test_pr_dependency_audit_has_one_owner_and_keeps_trivy_security_gate() -> None:
+    root = Path(__file__).parents[1]
+    workflow = (root / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    dependency_job = workflow.split("  dependency-audit:\n", maxsplit=1)[1].split(
+        "  critical-smoke:\n", maxsplit=1
+    )[0]
+    security_job = workflow.split("  security-audit:\n", maxsplit=1)[1].split(
+        "  checks:\n", maxsplit=1
+    )[0]
+
+    assert "needs: scope-router" in dependency_job
+    assert "needs.quality" not in dependency_job
+    assert dependency_job.count("run-group dependency-audit") == 1
+    assert "run-group dependency-audit" not in security_job
+    assert "actions/setup-node@v4" not in security_job
+    assert "actions/setup-python@v5" not in security_job
+    assert "astral-sh/setup-uv@" not in security_job
+    assert "aquasecurity/trivy-action@" in security_job
+    assert "scanners: vuln,misconfig,secret" in security_job
+
+
+def test_all_pr_profiles_require_dependency_audit_once() -> None:
+    profiles = (
+        "frontend",
+        "backend",
+        "migration",
+        "cross-stack",
+        "workflow-platform",
+        "documentation",
+    )
+
+    for profile in profiles:
+        groups = ci_contract.PROFILE_GROUPS[profile]
+        assert "dependency-audit" in groups
+        expected = ci_contract.expected_jobs_for_groups(groups, event="pull_request")
+        assert expected.count("dependency-audit") == 1
+        assert "security-audit" in expected
 
 
 def test_workflow_uses_lockfile_download_cache_without_audit_installation() -> None:
@@ -368,37 +410,41 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
         (
             ["docs/release-flow.md", "codex-backlog/tasks/140-scope.md"],
             "documentation",
-            {"quality", "workflow-config"},
+            {"quality", "workflow-config", "dependency-audit"},
             {
                 "frontend-e2e",
                 "python-tests",
                 "migrated-stack",
-                "dependency-audit",
                 "container-contract",
             },
         ),
         (
             ["security/README.md"],
             "documentation",
-            {"quality", "workflow-config"},
-            {"container-contract", "dependency-audit", "frontend-e2e", "python-tests"},
+            {"quality", "workflow-config", "dependency-audit"},
+            {"container-contract", "frontend-e2e", "python-tests"},
         ),
         (
             ["frontend/src/App.tsx"],
             "frontend",
-            {"frontend-checks", "frontend-unit", "frontend-e2e", "critical-smoke"},
-            {"python-tests", "migrated-stack", "dependency-audit", "container-contract"},
+            {
+                "frontend-checks",
+                "frontend-unit",
+                "frontend-e2e",
+                "critical-smoke",
+                "dependency-audit",
+            },
+            {"python-tests", "migrated-stack", "container-contract"},
         ),
         (
             ["backend/fitminiapp_api/services/example.py"],
             "backend",
-            {"python-tests", "critical-smoke"},
+            {"python-tests", "critical-smoke", "dependency-audit"},
             {
                 "frontend-checks",
                 "frontend-unit",
                 "frontend-e2e",
                 "migrated-stack",
-                "dependency-audit",
                 "container-contract",
             },
         ),
@@ -417,26 +463,32 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
         (
             ["backend/alembic/versions/0040_feature.py"],
             "migration",
-            {"python-tests", "migrated-stack", "critical-smoke", "deployment-contract"},
-            {"frontend-e2e", "dependency-audit", "container-contract"},
+            {
+                "python-tests",
+                "migrated-stack",
+                "critical-smoke",
+                "deployment-contract",
+                "dependency-audit",
+            },
+            {"frontend-e2e", "container-contract"},
         ),
         (
             ["frontend/package-lock.json"],
             "frontend",
-            {"frontend-dependency-audit"},
-            {"python-dependency-audit", "container-contract"},
+            {"dependency-audit"},
+            {"frontend-dependency-audit", "python-dependency-audit", "container-contract"},
         ),
         (
             ["uv.lock"],
             "backend",
-            {"python-dependency-audit", "container-contract"},
-            {"frontend-e2e", "migrated-stack"},
+            {"dependency-audit", "container-contract"},
+            {"python-dependency-audit", "frontend-e2e", "migrated-stack"},
         ),
         (
             ["pyproject.toml"],
             "backend",
-            {"python-dependency-audit", "container-contract"},
-            {"frontend-e2e", "migrated-stack"},
+            {"dependency-audit", "container-contract"},
+            {"python-dependency-audit", "frontend-e2e", "migrated-stack"},
         ),
         (
             ["scripts/backup_manifest.py", "tests/test_backup_manifest.py"],
@@ -447,12 +499,17 @@ def test_daily_and_weekly_profiles_have_bounded_expansion() -> None:
         (
             [".github/workflows/ci.yml"],
             "workflow-platform",
-            {"policy", "workflow-config", "image-contract", "deployment-contract"},
+            {
+                "policy",
+                "workflow-config",
+                "image-contract",
+                "deployment-contract",
+                "dependency-audit",
+            },
             {
                 "frontend-e2e",
                 "python-tests",
                 "migrated-stack",
-                "dependency-audit",
                 "container-contract",
             },
         ),
@@ -613,11 +670,12 @@ def test_post_merge_container_gate_allows_intentional_skipped_quality() -> None:
     audit_end = workflow.index("\n  critical-smoke:", audit_start)
     audit_job = workflow[audit_start:audit_end]
 
-    for job in (container_job, audit_job):
-        assert "needs: [scope-router, quality]" in job
-        assert "always()" in job
-        assert "github.event_name == 'push' && needs.quality.result == 'skipped'" in job
-        assert "needs.quality.result == 'success'" in job
+    assert "needs: [scope-router, quality]" in container_job
+    assert "always()" in container_job
+    assert "github.event_name == 'push' && needs.quality.result == 'skipped'" in container_job
+    assert "needs.quality.result == 'success'" in container_job
+    assert "needs: scope-router" in audit_job
+    assert "needs.quality" not in audit_job
 
     assert "needs.scope-router.outputs.run_containers == 'true'" in container_job
 
@@ -635,6 +693,10 @@ def test_expected_result_set_rejects_missing_or_skipped_required_jobs() -> None:
             expected,
             {"scope-router": "success", "quality": "success", "policy": "success"},
         )
+    with pytest.raises(ci_contract.CIContractError, match="Expected CI job set is empty"):
+        ci_contract.verify_results([], {})
+    with pytest.raises(ci_contract.CIContractError, match="must include scope-router"):
+        ci_contract.verify_results(["quality"], {"quality": "success"})
 
 
 def test_transient_dependency_failure_retries_with_bounded_backoff(
