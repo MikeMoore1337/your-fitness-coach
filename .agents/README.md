@@ -84,6 +84,14 @@ UI visual/product audit остаётся отдельным `$ui-audit`.
 
 Существующие условные справочники `apple-design` и `clear-voice` теперь также перечислены в `MANIFEST.json`; их содержимое не изменялось.
 
+## Ограниченная оркестрация задач
+
+Для сложных cross-stack задач см. [playbook разработки и QA](../docs/development/feature-delivery-playbook.md#адаптивная-оркестрация-разработки-и-qa).
+Он использует существующие роли без нового controller/runtime: один исполнитель в
+одной Issue/PR, максимум три действительно независимых направления, последовательный
+режим без субагентов и evidence по фактическому SHA. Для обычной правки
+`orchestrator` не запускается; статус запуска агентов нельзя выводить из наличия skills.
+
 ## Impeccable: основной дизайн-критик
 
 `impeccable` - project-scoped первичная UX/UI-критика для YFC, а не новый controller. Canonical `SKILL.md` находится в `skills/impeccable/`, upstream pinned 4.7.0 в `../.impeccable/`. Для рисования и улучшения UI сначала этот skill, для наблюдаемой QA-регрессии - `ui-audit`, для motion - `motion-design-engineer`, по фактической нужде. Подробности: `../docs/development/impeccable-adoption.md`. Вопросы согласования дизайна решает владелец.
