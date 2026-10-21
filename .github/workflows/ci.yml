@@ -929,11 +929,64 @@ jobs:
         env:
           LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
         run: |
-          docker run --rm --network none \
+          docker run --rm -i --network none \
+            --read-only --cap-drop ALL --security-opt no-new-privileges:true \
+            --mount type=volume,destination=/var/lock/fitminiapp-bot \
             --env TELEGRAM_BOT_TOKEN=ci-image-contract-token \
             --env BOT_INTERNAL_TOKEN=ci-image-contract-internal-token \
-            "$LOCAL_TAG" \
-            python -c "import fitminiapp_bot.profile_sync; import fitminiapp_bot.public_profile; import fitminiapp_bot.telegram_client"
+            "$LOCAL_TAG" python - <<'PY'
+          import asyncio
+          import errno
+          import fcntl
+          import json
+          import os
+          from pathlib import Path
+
+          import fitminiapp_bot.profile_sync
+          import fitminiapp_bot.public_profile
+          import fitminiapp_bot.telegram_client
+          from fitminiapp_bot.bot import PollingFileLock
+
+          assert os.getuid() == 10001
+          status = dict(line.split(":", 1) for line in Path("/proc/self/status").read_text().splitlines() if ":" in line)
+          assert int(status["CapEff"], 16) == int(status["CapPrm"], 16) == int(status["CapBnd"], 16) == 0
+          assert status["NoNewPrivs"].strip() == "1"
+          for directory in (Path.home(), Path("/app/fitminiapp_bot"), Path("/tmp")):
+              try:
+                  (directory / "read-only-probe").write_text("must fail")
+              except OSError as exc:
+                  assert exc.errno == errno.EROFS, exc
+              else:
+                  raise AssertionError(f"root filesystem is writable: {directory}")
+
+          lock_dir = Path("/var/lock/fitminiapp-bot")
+          state = lock_dir / "profile-sync-state.json"
+          for version in ("first", "replacement"):
+              fitminiapp_bot.profile_sync._write_avatar_state(state, asset_sha256=version, file_unique_id="synthetic")
+              assert json.loads(state.read_text())["asset_sha256"] == version
+          assert not state.with_suffix(".json.tmp").exists()
+
+          async def check_lock():
+              leader = PollingFileLock(str(lock_dir), "synthetic-token")
+              standby = PollingFileLock(str(lock_dir), "synthetic-token")
+              try:
+                  await leader.acquire()
+                  with leader.path.open("a+") as contender:
+                      try:
+                          fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                      except BlockingIOError:
+                          pass
+                      else:
+                          raise AssertionError("polling lock allowed a second owner")
+                  leader.release()
+                  await standby.acquire()
+              finally:
+                  leader.release()
+                  standby.release()
+
+          asyncio.run(check_lock())
+          print("PASS: bot UID, capabilities, no-new-privileges, read-only root, atomic state and polling lock takeover")
+          PY
       - name: Verify Hermes discovery runtime contract
         if: matrix.image == 'hermes-discovery'
         shell: bash
