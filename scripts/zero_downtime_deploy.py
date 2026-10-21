@@ -1774,6 +1774,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                         config.root / ".env", backend_image=old_backend, bot_image=old_bot
                     )
                 _public_smoke(config)
+                _atomic_text(active_revision_path, active_revision + "\n")
                 evidence.verdict = "rolled back"
                 rollback_stage.status = "passed"
             except BaseException as rollback_exc:

@@ -1674,3 +1674,24 @@ def test_sequential_preflight_binds_candidate_and_installed_image_provenance(tmp
     config.root.joinpath(".deployment-sha").write_text(OLD_SHA)
     with pytest.raises(deploy.DeploymentError, match="candidate revision mismatch"):
         deploy._sequential_connection_budget_preflight(config)
+
+
+def test_rollback_restores_revision_when_failure_follows_successful_revision_write(
+    tmp_path, monkeypatch
+):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    config = _config(tmp_path)
+    write = deploy._atomic_text
+
+    def fail_after_revision_write(path, value):
+        write(path, value)
+        if path == config.state_root / "last-successful-revision" and value.strip() == NEW_SHA:
+            raise deploy.DeploymentError("failure after revision write")
+
+    monkeypatch.setattr(deploy, "_atomic_text", fail_after_revision_write)
+    with pytest.raises(deploy.DeploymentError, match="failure after revision write"):
+        deploy.single_slot_deploy(config)
+    assert config.state_root.joinpath("last-successful-revision").read_text().strip() == OLD_SHA
+    summary = json.loads(next(config.state_root.glob("single-slot-*/summary.json")).read_text())
+    assert summary["verdict"] == "rolled back"
+    assert len(calls["backend_starts"]) == 2

@@ -106,6 +106,8 @@ DB/network credentials — обязательное production условие; �
 После подтверждённого drain, успешных migration/seed и отказа приложения helper сначала
 чисто останавливает target, заново доказывает release sessions, повторяет schema gate,
 проверяет бюджет и поднимает старые immutable images: backend → smoke → worker → bot.
+После успешного smoke возвращается прежний last-successful-revision, даже если отказ
+произошёл сразу после записи нового SHA.
 Ошибка любого шага прекращает следующие запуски. Прерванный rollback оставляет
 `manual intervention required`; target автоматически вслед за ним не запускается.
 
@@ -152,7 +154,7 @@ StageRecord сохраняет start/end/duration по этапам. Лимит�
 
 ### Изолированная проверка реализации, 21.10.2026
 
-- Linux / Python 3.14 / psycopg 3.3.6: **351 целевой pytest PASS**, включая три реальных
+- Linux / Python 3.14 / psycopg 3.3.6: **352 целевых pytest PASS**, включая три реальных
   PG16 теста роли, read-only и удерживаемой транзакции; Ruff/format и deployment/image/workflow
   contracts PASS. Fault injection проверяет обычный путь, stuck/нечистый stop, unknown consumer,
   missing observer, unreleased clients, capacity denial, interruption и fail-fast rollback.
