@@ -1,0 +1,29 @@
+name: Temporary audited Python lock refresh
+on:
+  push:
+    branches:
+      - design/impeccable-first-class-20261021
+permissions:
+  contents: write
+jobs:
+  refresh-lock:
+    if: github.ref == 'refs/heads/design/impeccable-first-class-20261021'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: true
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          version: "0.11.32"
+      - name: Regenerate Python uv.lock with constrained security patches
+        run: uv --system-certs lock --upgrade-package pillow --upgrade-package certifi
+      - name: Verify exact project lock without update
+        run: uv --system-certs lock --check
+      - name: Push generated uv.lock to the feature branch only
+        run: |
+          git add -- uv.lock
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="GitHub Actions" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -m "fix(deps): regenerate lock with patched Pillow and certifi"
+          git push origin HEAD:refs/heads/design/impeccable-first-class-20261021
