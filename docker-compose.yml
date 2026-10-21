@@ -175,7 +175,7 @@ services:
   edge:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
     # Deployment copies candidate Caddyfiles to /tmp before validate/reload.
-    cap_drop: [ALL]
+    # Keep image capabilities: dropping ALL prevents executing file-capability Caddy.
     security_opt: [no-new-privileges:true]
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/usr/local/bin/edge-entrypoint.sh"]

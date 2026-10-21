@@ -32,7 +32,6 @@ def test_ci_rebuilds_and_verifies_bot_runtime_sources_before_publish() -> None:
         "bot",
         "bot-blue",
         "bot-green",
-        "edge",
     ],
 )
 def test_application_services_cannot_gain_linux_privileges(name: str) -> None:
@@ -40,6 +39,15 @@ def test_application_services_cannot_gain_linux_privileges(name: str) -> None:
 
     assert service["cap_drop"] == ["ALL"]
     assert service["security_opt"] == ["no-new-privileges:true"]
+
+
+def test_edge_preserves_caddy_file_capabilities_and_deployment_scratch_path() -> None:
+    service = yaml.safe_load((ROOT / "docker-compose.yml").read_text())["services"]["edge"]
+
+    assert service["security_opt"] == ["no-new-privileges:true"]
+    assert "cap_drop" not in service
+    assert not service.get("read_only", False)
+    assert "edge_config:/config" in service["volumes"]
 
 
 @pytest.mark.parametrize("name", ["bot", "bot-blue", "bot-green"])
