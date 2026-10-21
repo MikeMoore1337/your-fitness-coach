@@ -604,3 +604,14 @@ def test_mapping_parser_does_not_supply_missing_production_defaults() -> None:
 
     assert result.status == Verdict.UNKNOWN
     assert result.worst_case_connections is None
+
+
+@pytest.mark.parametrize("unknown", (0, 3))
+def test_inclusive_unknown_count_is_not_added_twice(unknown) -> None:
+    model = _model()
+    model = replace(model, postgres=replace(model.postgres, unattributed_connections=unknown))
+    result = _evaluate(model)
+    assert result.status == Verdict.PASS
+    assert result.worst_case_connections == 132
+    invalid = replace(model, postgres=replace(model.postgres, unattributed_connections=13))
+    assert _evaluate(invalid).status == Verdict.BLOCKED

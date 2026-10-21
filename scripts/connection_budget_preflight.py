@@ -17,6 +17,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Final, TypeGuard, cast
 
+try:
+    from scripts.trusted_legacy_pg_snapshot import snapshot_sql
+except ModuleNotFoundError:
+    from trusted_legacy_pg_snapshot import snapshot_sql
+
 
 class Verdict(StrEnum):
     PASS = "PASS"
@@ -168,7 +173,13 @@ SELECT
     current_setting('max_connections')::int,
     current_setting('superuser_reserved_connections')::int,
     NULLIF(current_setting('reserved_connections', true), '')::int,
-    (SELECT count(*)::int FROM pg_stat_activity)
+    count(*) FILTER (WHERE backend_type = 'client backend')::int
+FROM pg_stat_activity
+HAVING count(*) FILTER (WHERE backend_type IS NULL OR backend_type NOT IN (
+    'client backend', 'autovacuum launcher', 'autovacuum worker',
+    'background writer', 'checkpointer', 'archiver', 'walwriter',
+    'logical replication launcher', 'parallel worker'
+)) = 0
 """
 _APPLICATION_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,63}$")
 _ALLOWED_POOLER_MODES: Final = {"none", "session", "transaction"}
@@ -467,23 +478,7 @@ def read_postgres_runtime_snapshot(
     """Read a complete, aggregated session snapshot without exposing session data."""
 
     names_sql = _sql_application_names(application_names)
-    query = f"""
-SELECT
-    current_setting('server_version_num')::int,
-    current_setting('max_connections')::int,
-    current_setting('superuser_reserved_connections')::int,
-    NULLIF(current_setting('reserved_connections', true), '')::int,
-    (SELECT count(*)::int FROM pg_stat_activity),
-    (SELECT count(*)::int FROM pg_stat_activity WHERE application_name IN ({names_sql})),
-    (SELECT count(*)::int FROM pg_stat_activity
-       WHERE application_name IS NULL OR btrim(application_name) = ''),
-    (SELECT count(*)::int FROM pg_stat_activity
-       WHERE application_name IS NOT NULL
-         AND btrim(application_name) <> ''
-         AND application_name NOT IN ({names_sql})),
-    pg_has_role(current_user, 'pg_read_all_stats', 'member'),
-    current_setting('is_superuser')::boolean
-"""
+    query = snapshot_sql(names_sql)
     cursor = None
     try:
         cursor = connection.cursor()  # type: ignore[attr-defined]
@@ -504,21 +499,11 @@ SELECT
                     )
                 parsed.append(value)
                 continue
-            if isinstance(value, bool):
+            if not _is_int(value) or value < 0:
                 raise PostgresSnapshotError(
                     "read-only PostgreSQL runtime snapshot returned invalid numeric data"
                 )
-            try:
-                numeric = int(value)
-            except (TypeError, ValueError) as exc:
-                raise PostgresSnapshotError(
-                    "read-only PostgreSQL runtime snapshot returned invalid numeric data"
-                ) from exc
-            if numeric < 0:
-                raise PostgresSnapshotError(
-                    "read-only PostgreSQL runtime snapshot returned invalid numeric data"
-                )
-            parsed.append(numeric)
+            parsed.append(value)
 
         (
             version_num,
@@ -553,6 +538,12 @@ SELECT
             )
         if is_superuser is True:
             raise PostgresSnapshotError("runtime collector must not use a superuser role")
+        if version_num < 100000 or max_connections <= 0:
+            raise PostgresSnapshotError("read-only PostgreSQL runtime snapshot invalid settings")
+        if version_num >= 160000 and reserved is None:
+            raise PostgresSnapshotError("PostgreSQL 16 reserved capacity is unknown")
+        if version_num < 160000 and reserved not in (None, 0):
+            raise PostgresSnapshotError("invalid legacy reserved capacity")
         if observed_yfc + unattributed + observed_non_yfc != current:
             raise PostgresSnapshotError(
                 "read-only PostgreSQL runtime snapshot attribution does not reconcile"
@@ -1136,6 +1127,13 @@ def evaluate(
             Verdict.UNKNOWN,
             "connection_attribution_incomplete",
             "Unattributed PostgreSQL sessions are conservatively counted as non-YFC",
+        )
+    if _is_int(unattributed) and _is_int(observed_non_yfc) and unattributed > observed_non_yfc:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "connection_attribution_inconsistent",
+            "Unattributed sessions exceed the inclusive non-YFC count",
         )
     for name, value in (
         ("observed_non_yfc_connections", observed_non_yfc),

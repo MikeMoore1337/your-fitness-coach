@@ -681,7 +681,7 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
             return json.dumps(_compose()).encode()
         if command[-4:] == ["ps", "--all", "--format", "json"]:
             return json.dumps(_ps()).encode()
-        if "2019/config/" in command:
+        if "http://127.0.0.1:2019/config/" in command:
             return json.dumps(
                 {
                     "apps": {
@@ -704,7 +704,8 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
                     }
                 }
             ).encode()
-        assert command[-4:] == ["python", "-B", "-c", "print('sanitized')\n"]
+        assert command[-4:-1] == ["python", "-B", "-c"]
+        assert command[-1].splitlines() == ["print('sanitized')"]
         return b"{}"
 
     def verify_running_revision(_items, *, cwd, policy, expected_revision):

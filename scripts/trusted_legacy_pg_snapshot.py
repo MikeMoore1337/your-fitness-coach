@@ -19,6 +19,34 @@ APPLICATION_NAMES = (
 )
 
 
+def snapshot_sql(literals: str) -> str:
+    """One activity scan; unmodelled replication/extension backends refuse a row."""
+
+    return f"""
+SELECT
+    current_setting('server_version_num')::int,
+    current_setting('max_connections')::int,
+    current_setting('superuser_reserved_connections')::int,
+    NULLIF(current_setting('reserved_connections', true), '')::int,
+    count(*) FILTER (WHERE backend_type = 'client backend')::int,
+    count(*) FILTER (WHERE backend_type = 'client backend'
+        AND application_name IN ({literals}))::int,
+    count(*) FILTER (WHERE backend_type = 'client backend'
+        AND COALESCE(btrim(application_name), '') = '')::int,
+    count(*) FILTER (WHERE backend_type = 'client backend'
+        AND COALESCE(btrim(application_name), '') <> ''
+        AND application_name NOT IN ({literals}))::int,
+    pg_has_role(current_user, 'pg_read_all_stats', 'member'),
+    current_setting('is_superuser')::boolean
+FROM pg_stat_activity
+HAVING count(*) FILTER (WHERE backend_type IS NULL OR backend_type NOT IN (
+    'client backend', 'autovacuum launcher', 'autovacuum worker',
+    'background writer', 'checkpointer', 'archiver', 'walwriter',
+    'logical replication launcher', 'parallel worker'
+)) = 0
+"""
+
+
 def collect() -> dict[str, object]:
     import psycopg
 
@@ -34,23 +62,7 @@ def collect() -> dict[str, object]:
     )
     # The names are fixed reviewed constants, never user or database input.
     literals = ", ".join(f"'{name}'" for name in APPLICATION_NAMES)
-    sql = f"""
-SELECT
-    current_setting('server_version_num')::int,
-    current_setting('max_connections')::int,
-    current_setting('superuser_reserved_connections')::int,
-    NULLIF(current_setting('reserved_connections', true), '')::int,
-    (SELECT count(*)::int FROM pg_stat_activity),
-    (SELECT count(*)::int FROM pg_stat_activity WHERE application_name IN ({literals})),
-    (SELECT count(*)::int FROM pg_stat_activity
-       WHERE application_name IS NULL OR btrim(application_name) = ''),
-    (SELECT count(*)::int FROM pg_stat_activity
-       WHERE application_name IS NOT NULL
-         AND btrim(application_name) <> ''
-         AND application_name NOT IN ({literals})),
-    pg_has_role(current_user, 'pg_read_all_stats', 'member'),
-    current_setting('is_superuser')::boolean
-"""
+    sql = snapshot_sql(literals)
     with (
         psycopg.connect(connect_url, connect_timeout=5, options=options) as connection,
         connection.cursor() as cursor,

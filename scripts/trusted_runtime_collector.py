@@ -1223,6 +1223,12 @@ def _parse_child_snapshot(payload: object, context: RuntimeContext) -> PostgresO
         if parsed_value is None:
             raise CollectorFailure("postgres_snapshot_invalid", Verdict.BLOCKED)
         parsed[key] = parsed_value
+    if (
+        parsed["observed_yfc_connections"] + parsed["observed_non_yfc_connections"]
+        != parsed["current_connections"]
+        or parsed["unattributed_connections"] > parsed["observed_non_yfc_connections"]
+    ):
+        raise CollectorFailure("postgres_snapshot_inconsistent", Verdict.BLOCKED)
     return PostgresObservation(
         context=replace(context, captured_at=captured_at),
         capacity=PostgresCapacity(**parsed),
