@@ -6,8 +6,10 @@ $ErrorActionPreference = "Stop"
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pullScript = Join-Path $scriptRoot "windows_backup_pull.ps1"
-$pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue).Source
-if ([string]::IsNullOrWhiteSpace($pwsh)) { $pwsh = (Get-Command powershell).Source }
+$shellName = if ($PSVersionTable.PSEdition -eq "Desktop") { "powershell.exe" } else { "pwsh.exe" }
+$pwsh = Join-Path $PSHOME $shellName
+$fixtureTime = [DateTimeOffset]::UtcNow.AddHours(-1)
+Write-Host "Runtime: $($PSVersionTable.PSVersion) ($pwsh)"
 $runtimeRoot = Join-Path (Split-Path -Parent $scriptRoot) ".artifacts\runtime\tests"
 $root = Join-Path $runtimeRoot ("yfc-backup-selftest-" + [guid]::NewGuid().ToString("N"))
 $remote = Join-Path $root "remote"
@@ -89,13 +91,19 @@ function Write-RemoteIndex {
     Write-JsonFile (Join-Path $remote "index.json") ([ordered]@{
             schema_version = 1
             kind = "yfc-backup-index"
-            generated_at_utc = "2026-10-18T12:00:00Z"
+            generated_at_utc = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
             backups = @($Entries)
         })
 }
 
 function Invoke-PullCase {
     param([Parameter(Mandatory = $true)][string]$Name, [Parameter(Mandatory = $true)][int]$ExpectedCode, [string]$Failure)
+    $before = @{}
+    if ($ExpectedCode -ge 11) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.dump" -or $_.Name -like "*.manifest.json" })) {
+            $before[$file.FullName] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
+        }
+    }
     $env:YFC_FAKE_SFTP_FAILURE = $Failure
     & $pwsh "-NoProfile" "-File" $pullScript "-Mode" "Pull" "-ConfigPath" $configPath "-SftpPath" $fakeSftp 1> $outputPath 2> $errorPath
     $exitCode = $LASTEXITCODE
@@ -104,6 +112,11 @@ function Invoke-PullCase {
         $statusPath = Join-Path $local "backup-status.json"
         $logPath = Join-Path $local "backup-pull.log"
         throw "$Name expected exit code $ExpectedCode, got ${exitCode}: stdout=$(Get-Content $outputPath -Raw) stderr=$(Get-Content $errorPath -Raw) status=$(if (Test-Path $statusPath) { Get-Content $statusPath -Raw }) log=$(if (Test-Path $logPath) { Get-Content $logPath -Raw })"
+    }
+    foreach ($path in $before.Keys) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $before[$path]) {
+            throw "$Name deleted or changed a pre-existing backup: $path"
+        }
     }
     Write-Host "PASS $Name ($ExpectedCode)"
 }
@@ -146,6 +159,9 @@ exit /b %ERRORLEVEL%
 '@
     $fakeHelperSource = @'
 param()
+foreach ($required in @("-F", "NUL", "-oBatchMode=yes", "-oStrictHostKeyChecking=yes", "-oGlobalKnownHostsFile=NUL", "-oIdentitiesOnly=yes", "-oIdentityAgent=none")) {
+    if ($args -notcontains $required) { throw "missing SSH isolation option: $required" }
+}
 $batch = $args[([array]::IndexOf($args, "-b") + 1)]
 $remoteRoot = $env:YFC_FAKE_REMOTE_ROOT
 foreach ($line in @(Get-Content -LiteralPath $batch)) {
@@ -196,7 +212,7 @@ exit 0
     }
     Write-JsonFile $configPath $config
 
-    $entry = Add-RemoteBackup "fitminiapp-20261018T120000Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-one")) "2026-10-18T12:00:00Z"
+    $entry = Add-RemoteBackup "fitminiapp-20261018T120000Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-one")) ($fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($entry)
     Invoke-PullCase "success" 0 ""
     $persistedSuccess = Get-Content -LiteralPath $config.status_file -Raw | ConvertFrom-Json
@@ -240,9 +256,14 @@ exit 0
     Remove-Item -LiteralPath (Join-Path $local $entry.manifest_name) -Force
     Invoke-PullCase "orphan-archive-recovery" 0 ""
 
-    $badEntry = Add-RemoteBackup "fitminiapp-20261018T120100Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-two")) "2026-10-18T12:01:00Z" ("0" * 64)
+    $badEntry = Add-RemoteBackup "fitminiapp-20261018T120100Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-two")) ($fixtureTime.AddMinutes(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")) ("0" * 64)
     Write-RemoteIndex @($badEntry, $entry)
     Invoke-PullCase "checksum-mismatch-preserves-valid-copy" 12 ""
+
+    $truncated = Add-RemoteBackup "truncated.dump" ([Text.Encoding]::UTF8.GetBytes("complete-archive")) ($fixtureTime.AddMinutes(2).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    [IO.File]::WriteAllText((Join-Path $remote $truncated.archive_name), "short")
+    Write-RemoteIndex @($truncated, $entry)
+    Invoke-PullCase "truncated-transfer-preserves-sole-copy" 12 ""
 
     $missingEntry = [ordered]@{
         manifest_name = "fitminiapp-20261018T120200Z.dump.manifest.json"
@@ -277,7 +298,7 @@ exit 0
     $lockStream = [IO.File]::Open($config.lock_file, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     try { Invoke-PullCase "concurrent-lock" 24 "" } finally { $lockStream.Dispose() }
 
-    $concurrentEntry = Add-RemoteBackup "fitminiapp-20261018T121000Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-concurrent")) "2026-10-18T12:10:00Z"
+    $concurrentEntry = Add-RemoteBackup "fitminiapp-20261018T121000Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-concurrent")) ($fixtureTime.AddMinutes(10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($concurrentEntry, $entry)
     [IO.File]::WriteAllText($holdPath, "hold", (New-Object Text.UTF8Encoding($false)))
     Remove-Item -LiteralPath $startedPath -Force -ErrorAction SilentlyContinue
@@ -287,7 +308,7 @@ exit 0
     $firstProcess = $null
     try {
         $statusBefore = (Get-FileHash -LiteralPath $config.status_file -Algorithm SHA256).Hash
-        $firstProcess = Start-Process -FilePath $pwsh -ArgumentList $firstArguments -PassThru -RedirectStandardOutput $firstOutputPath -RedirectStandardError $firstErrorPath
+        $firstProcess = Start-Process -FilePath $pwsh -ArgumentList $firstArguments -WindowStyle Hidden -PassThru -RedirectStandardOutput $firstOutputPath -RedirectStandardError $firstErrorPath
         Wait-ForFile $startedPath
         $incomingDirs = @(Get-ChildItem -LiteralPath $local -Directory -Filter ".incoming-*" -ErrorAction SilentlyContinue)
         if ($incomingDirs.Count -ne 1) { throw "expected one isolated incoming directory while the first pull is held" }
@@ -311,7 +332,7 @@ exit 0
         if ($null -ne $firstProcess -and -not $firstProcess.HasExited) { $firstProcess.Kill() }
     }
 
-    $diskEntry = Add-RemoteBackup "fitminiapp-20261018T120300Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-three")) "2026-10-18T12:03:00Z"
+    $diskEntry = Add-RemoteBackup "fitminiapp-20261018T120300Z.dump" ([Text.Encoding]::UTF8.GetBytes("synthetic-three")) ($fixtureTime.AddMinutes(3).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($diskEntry, $entry)
     $config.minimum_free_bytes = [int64]1000000000000000
     Write-JsonFile $configPath $config
@@ -390,6 +411,42 @@ exit 0
     $corruptStatus = Invoke-StatusCase "corrupted-local-copy" 12
     if ($corruptStatus.state -ne "CORRUPTED" -or $corruptStatus.invalid_backup_count -lt 1) { throw "a damaged local archive must be CORRUPTED" }
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.archive_name) -Destination $corruptArchivePath -Force
+
+    foreach ($days in @(9, 8, 6)) {
+        $old = Add-RemoteBackup "retention-$days.dump" ([Text.Encoding]::UTF8.GetBytes("retention-$days")) ($fixtureTime.AddDays(-$days).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+        Copy-Item -LiteralPath (Join-Path $remote $old.archive_name) -Destination (Join-Path $local $old.archive_name)
+        Copy-Item -LiteralPath (Join-Path $remote $old.manifest_name) -Destination (Join-Path $local $old.manifest_name)
+    }
+    Invoke-PullCase "seven-day-rotation" 0 ""
+    $rotated = Get-OutputStatus
+    if ($rotated.rotated_count -ne 2 -or $rotated.valid_backup_count -ne 3) { throw "rotation must remove exactly the two expired copies" }
+    foreach ($days in @(9, 8)) {
+        foreach ($suffix in @(".dump", ".dump.manifest.json")) {
+            if (Test-Path -LiteralPath (Join-Path $local "retention-$days$suffix")) { throw "expired backup was not removed" }
+        }
+    }
+    if (-not (Test-Path -LiteralPath (Join-Path $local "retention-6.dump"))) { throw "rotation removed an in-window backup" }
+
+    # Advance archive age without running a pull: models the interval while the PC is off.
+    $statusBeforeOffline = (Get-FileHash -LiteralPath $config.status_file -Algorithm SHA256).Hash
+    foreach ($manifestPath in @(Get-ChildItem -LiteralPath $local -Filter "*.manifest.json" -File)) {
+        $offline = Get-Content -LiteralPath $manifestPath.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+        $offline.created_at_utc = $fixtureTime.AddDays(-10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+        $offline.published_at_utc = $offline.created_at_utc
+        Write-JsonFile $manifestPath.FullName $offline
+    }
+    $offlineStatus = Invoke-StatusCase "pc-offline-stale-without-pull" 10
+    if ($offlineStatus.valid_backup_count -ne 3 -or $offlineStatus.freshness_state -ne "STALE") { throw "offline copies must remain valid but stale" }
+    if ((Get-FileHash -LiteralPath $config.status_file -Algorithm SHA256).Hash -ne $statusBeforeOffline) { throw "Status must not rewrite the last pull receipt" }
+    Invoke-PullCase "offline-vps-failure-preserves-expired-copies" 22 "NETWORK"
+
+    $catchup = Add-RemoteBackup "catchup.dump" ([Text.Encoding]::UTF8.GetBytes("after-offline")) ($fixtureTime.AddMinutes(15).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    Write-RemoteIndex @($catchup, $concurrentEntry, $entry)
+    Invoke-PullCase "pc-restart-catchup-and-minimum-two" 0 ""
+    $caughtUp = Get-OutputStatus
+    if ($caughtUp.downloaded_count -ne 1 -or $caughtUp.rotated_count -ne 2 -or $caughtUp.valid_backup_count -ne 2 -or $caughtUp.newest_archive_name -ne $catchup.archive_name) {
+        throw "catchup must download the new archive and preserve two verified copies even outside retention"
+    }
 
     foreach ($backupPath in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.dump" -or $_.Name -like "*.manifest.json" })) {
         Remove-Item -LiteralPath $backupPath.FullName -Force

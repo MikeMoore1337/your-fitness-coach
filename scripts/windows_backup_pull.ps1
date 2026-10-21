@@ -423,9 +423,14 @@ function Invoke-SftpGet {
         "get $RemoteName `"$localEscaped`""
     ) | Set-Content -LiteralPath $batchPath -Encoding ASCII
     $arguments = @(
+        "-F"
+        "NUL"
         "-oBatchMode=yes"
         "-oStrictHostKeyChecking=yes"
         "-oUserKnownHostsFile=$($Config.KnownHostsFile)"
+        "-oGlobalKnownHostsFile=NUL"
+        "-oIdentitiesOnly=yes"
+        "-oIdentityAgent=none"
         "-oConnectTimeout=$($Config.ConnectTimeoutSeconds)"
         "-i"
         $Config.IdentityFile
@@ -435,12 +440,18 @@ function Invoke-SftpGet {
         $batchPath
         "$($Config.User)@$($Config.Host)"
     )
+    $previousErrorAction = $ErrorActionPreference
     try {
+        # Windows PowerShell turns native stderr into errors before we can classify it.
+        $ErrorActionPreference = "Continue"
         & $Config.SftpPath @arguments 1> $stdoutPath 2> $stderrPath
         $exitCode = $LASTEXITCODE
     }
     catch {
         $exitCode = 255
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
     }
     $diagnostic = ""
     if (Test-Path -LiteralPath $stderrPath) {
