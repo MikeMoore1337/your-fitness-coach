@@ -77,8 +77,13 @@ digests не переданы доверенным окружением, identit
 
 Начальная форма: `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json`. Перед реальным запуском
 владелец должен заменить placeholders, предоставить ключ, pinned host key и документ
-восстановления ключа. Поле `encryption_at_rest` по умолчанию имеет
-`mode=OWNER_APPROVAL_REQUIRED` и `approved=false`; Pull с ним завершается `CONFIG_INVALID`.
+восстановления ключа. В связанном PR #1125 пример соответствует выбранной обычной папке:
+`mode=none`, `approved=false`, `plaintext_risk_acknowledged=false`; Pull по умолчанию
+завершается `CONFIG_INVALID`. Только JSON boolean `true` подтверждает риск plaintext;
+это не подтверждение шифрования, ACL или разрешение передавать production-данные.
+Папка должна быть отдельно подготовлена оператором. Retention — семь суток,
+`minimum_valid_backups=2`: при длительном сбое две последние проверенные копии могут
+оставаться старше семи суток. Такое исключение требует разбора, а не удаления последней копии.
 
 Runner:
 
@@ -123,6 +128,7 @@ Runner:
 
 ```powershell
 pwsh -NoProfile -File scripts/windows_backup_pull_selftest.ps1
+powershell.exe -NoProfile -File scripts/windows_backup_pull_selftest.ps1
 ```
 
 Проверяются: успешный Pull, повторная идемпотентность, checksum mismatch с сохранением
@@ -189,8 +195,8 @@ DNS и фоновые writer processes должны быть остановле�
 | Фаза | Требование | Состояние в этом PR |
 | --- | --- | --- |
 | Phase A | Контракт, manifest/index, VPS helper, Windows pull, docs, synthetic checks | Реализовано; merged master revision 499b189d |
-| Phase B | Owner decision по encryption/key custody/retention, независимый off-host объект, реальный SFTP pull, clean non-prod restore | BLOCKED_OWNER_FACTS / NOT_VERIFIED |
-| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | NOT_VERIFIED + NOT_AUTHORIZED / не запускалось |
+| Phase B | Решения storage/privacy/key custody, защищённый SFTP, расписания и независимая off-host копия | BLOCKED_OWNER_FACTS / NOT_VERIFIED |
+| Phase C | Отдельно разрешённый clean-host restore из Windows-копии, invariants/application smoke, RPO/RTO | NOT_VERIFIED + NOT_AUTHORIZED для пользовательских данных |
 
 Issue #849 остаётся открытым до независимой off-host копии и clean-host restore evidence.
 
@@ -257,7 +263,7 @@ transfer ещё не выполнен и SFTP/encryption gates не закрыт
 До любой реальной передачи или изменения VPS нужно зафиксировать:
 
 1. физическую страну/юрисдикцию storage, допустимые PII-категории и решение по privacy
-   dependency #108;
+   dependencies #707 и #711;
 2. retention/deletion policy и минимальный набор данных, который допустимо хранить off-host;
 3. target RPO/RTO и критерии свежести;
 4. выбранный encryption-at-rest режим, место хранения recovery key и отдельный тест его
@@ -331,3 +337,206 @@ Owner-approved план, не применённый:
 Владелец **утвердил только частоту создания и срок хранения**: один архив в день, retention 7 суток. Ранее предложенные 30 дней и вариант VHDX/container отвергнуты; обычная целевая папка — `D:\YFC-Backups`. Windows disk evidence: `D:` BitLocker Off / FullyDecrypted; Task Scheduler Running; задач YFC нет. Опрос Windows каждый час, RPO 24 часа и RTO 8 часов пока **не утверждены и не измерены**. Ежедневный архив сам по себе не доказывает RPO ≤24 ч при недоступном ПК. Безопасная очистка должна сохранять последнюю проверенную копию при сбое очередного создания/скачивания и показывать stale alert.
 
 Отказ от шифрованного контейнера **не является доказательством** выполнения исходного encryption-at-rest acceptance #849: физическая защита отсутствует, и до передачи реальных персональных данных требуется отдельное privacy/security решение. Hardened SFTP, реальный dump/transfer, планировщик и isolated restore также не авторизованы этим решением. Состояние остаётся `BLOCKED_OWNER_FACTS`; PR остаётся Draft, Issue OPEN. Исправленный privacy/legal контекст: [#707](https://github.com/MikeMoore1337/your-fitness-coach/issues/707) и [#711](https://github.com/MikeMoore1337/your-fitness-coach/issues/711); GitHub Issue #108 — другая задача, не privacy gate.
+
+## 11. Техническое завершение подготовки (2026-10-21)
+
+Этот раздел уточняет текущие условия; инвентаризация 19 октября выше является исторической.
+В этом прогоне VPS, реальная папка `D:\YFC-Backups`, SSH identities, ACL и Task Scheduler
+не изменялись. Phase A не переоткрывалась. PR #1123 содержит инструкции и evidence,
+PR #1125 — скрипт, конфигурацию и синтетические тесты. Оба синхронизированы с master;
+точные финальные SHA и CI публикуются в этих PR и Issue #849.
+
+### 11.1 Проверенные сценарии и ограничения
+
+Self-test запускает дочерние процессы из того же `$PSHOME`, а не всегда выбирает pwsh.
+Время свежих фикстур вычисляется от UTC начала теста. В PowerShell 5.1 исправлена потеря
+native stderr при `ErrorActionPreference=Stop`: диагностика сохраняется, после чего ненулевой
+exit code по-прежнему обрабатывается как ошибка. Параметры SSH исключают пользовательский
+config, глобальные known_hosts и SSH agent; действуют выделенные identity и pinned known_hosts.
+
+| Проверка | Доказательство | Ограничение |
+| --- | --- | --- |
+| Передача и повтор | Новый архив/manifest, SHA-256 и размер; повтор без повторной загрузки | Подменённый локальный transport, не реальный SFTP |
+| Неверный SHA / усечённый архив | `CORRUPTED=12`, существующие dump/manifest неизменны побайтно | Не проверяет злонамеренный VPS, способный подменить и manifest |
+| Недоступный VPS, host key, auth | `NETWORK=22`, `HOST_KEY=20`, `AUTHENTICATION=21`; предыдущая копия сохранена | Ошибки инжектируются; production endpoint не использован |
+| Недостаток места | `DISK_FULL=23` до загрузки нового архива; старая копия сохранена | Синтетический запас места, не физическое заполнение диска |
+| Выключенный ПК | Возраст копий увеличен без Pull; Status возвращает `STALE=10`, не переписывая receipt | Реальное выключение ПК и работа Scheduler не проверялись |
+| Возврат после простоя | Загружается новая копия; после ротации остаются минимум две валидные | Нельзя восстановить пропущенные дни, уже удалённые на VPS |
+| Семь суток | Удаляются пары старше семи суток; копия возрастом шесть суток остаётся | Две последние валидные пары сохраняются и за пределами срока |
+| Блокировка/status/повреждение | Concurrency, failure sidecar, recovery, future timestamp, повреждённая локальная копия | Не доказывает физическую защиту устройства |
+
+Полный синтетический self-test (38 сценариев в каждой оболочке) прошёл в PowerShell 7.6.6
+и Windows PowerShell 5.1.26100.9444 на source PR #1125
+[`faaa87245168feae82024c436631520734cced79`](https://github.com/MikeMoore1337/your-fitness-coach/commit/faaa87245168feae82024c436631520734cced79).
+Целевые Python tests: 26 passed (`test_backup_manifest`, `test_db_maintenance`, `test_deployment_scope`).
+
+Отдельно реально восстановлен **только синтетический** PostgreSQL 16 custom dump (2 934 bytes)
+из Windows-файла в новый контейнер без сети, портов и production mounts, с DB в tmpfs.
+Исходный контейнер удалён до восстановления. Проверены две строки, binary bytes `00017fff`,
+sequence next value `2`, действующий FK и отказ restore усечённого архива в пустую БД.
+Исходный Windows-файл после отрицательного теста сохранил SHA-256.
+Image ID: `sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea`.
+SHA-256 синтетического архива: `cc6f94a2c270e844d92befeb4f34469b310e014450a25d8b3ac5d24bf914588e`.
+Измерено 6,66 s от запуска синтетического source до проверки negative restore; это не RTO YFC.
+Application smoke: `NOT_RUN`. `BACKUP_RECOVERY=NOT_PROVEN` для реальных данных.
+
+### 11.2 Действия оператора после отдельного разрешения
+
+На VPS требуется:
+
+1. Подтвердить export allowlist и отдельный read-only SFTP endpoint из раздела 10.2.
+   В chroot `remote_root` указывается относительно видимого корня, например `/export`,
+   а не автоматически берётся host path из примера config. Проверить отрицательные операции.
+2. Через существующий cron/systemd запускать **один backup в сутки**, с согласованным UTC
+   временем. Штатная команда из корня checkout:
+
+   ```sh
+   python3 scripts/db_maintenance.py backup --publish-dir .artifacts/operations/backups/offhost --retain-published 7
+   ```
+
+   `--retain-published 7` — число архивов, не календарный TTL. При одном успешном архиве
+   в сутки это семь последних успешных дней; сбои могут увеличить их возраст. Не добавлять
+   отдельный `find -delete`/аварийную очистку: при ошибке dump/publication старый index и
+   проверенные копии должны сохраниться. Повторный ручной backup в тот же день требует
+   операторского решения, иначе count-based retention уменьшит окно простоя ПК.
+3. Проверить свободное место для retained + нового/partial dump и metadata, права publisher,
+   noninteractive Docker access, ненулевой exit при сбое и доставку sanitized оповещения.
+
+На Windows требуется:
+
+1. После privacy/security решения подготовить `D:\YFC-Backups` с ACL только для выбранной
+   runner identity и разрешённых администраторов, исключить sync/share и reparse redirects.
+   Не наследовать широкие права D: без проверки. Отдельно защитить scripts/config/keys от записи.
+2. Подготовить выделенный SSH key и pinned host key, проверить доступ вне интерактивного сеанса.
+   Config example из #1125 остаётся fail-closed; не ставить `approved=true` для обычной папки.
+3. Согласовать интервал Pull: XML предлагает один час, но это **не** ещё одно создание архива
+   и пока не утверждённое расписание. Проверить `StartWhenAvailable`, `IgnoreNew`, network
+   availability, deadline и тип входа runner. S4U из шаблона не доказывает доступ к защищённым
+   ключам/сетевым ресурсам. Зарегистрировать задачу только после разрешения и этих проверок.
+4. Выполнить разрешённые проверки после reboot, пропущенного запуска и offline; проверить
+   Task Scheduler exit result и независимую доставку `STALE`/ошибки. Выключенный ПК сам
+   не отправит уведомление. Target freshness 36 h в config — технический default, не RPO SLA.
+5. Подтвердить фактический digest/размер Windows-копии и получить отдельное разрешение на drill.
+
+Production environment keys не меняются: `env change required: no`. Активация потребует
+описанных host-side настроек; они не выполняются merge/deploy приложения автоматически.
+
+### 11.3 Восстановление из Windows-архива в чистую изолированную PostgreSQL
+
+Команды ниже — инструкция, **не разрешение** на использование пользовательских данных.
+Для такого drill заранее согласовать dataset, владельца, RPO/RTO, срок удаления drill-копии,
+изолированный хост и его защиту. Проверить образ и доверенность источника: restore выполняет
+SQL из dump. Не использовать production Compose, `.env`, volumes, network или credentials.
+Архив с Windows сохранять до успешного окончания всех проверок.
+
+На авторизованной Windows-машине выбрать конкретный manifest, а не автоматически latest:
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$backupRoot = 'D:\YFC-Backups'
+$manifestPath = Join-Path $backupRoot 'REPLACE_WITH_ARCHIVE.dump.manifest.json'
+$manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($manifest.kind -ne 'yfc-backup-manifest' -or $manifest.schema_version -ne 1 -or
+    $manifest.verification_status -ne 'format_verified_pg_restore_list' -or
+    $manifest.archive_name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$' -or
+    $manifest.manifest_name -ne "$($manifest.archive_name).manifest.json" -or
+    [IO.Path]::GetFileName($manifestPath) -ne $manifest.manifest_name) { throw 'Invalid manifest' }
+$archive = Join-Path $backupRoot $manifest.archive_name
+if ((Get-Item -LiteralPath $archive).Length -ne [int64]$manifest.archive_size_bytes -or
+    (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $manifest.archive_sha256) {
+    throw 'Archive size/SHA-256 mismatch'
+}
+```
+
+Подготовить заранее локальный PostgreSQL image того же major, что указан в manifest,
+зафиксировать проверенный immutable digest и подставить его вместо placeholder. На хосте
+должно хватать RAM для dump и развёрнутой БД; tmpfs может попасть в swap/pagefile, поэтому
+защита host/pagefile также входит в отдельное решение. Для больших данных выбрать заранее
+согласованное защищённое временное хранилище, не production volume и не новый VHDX.
+
+```powershell
+$image = 'postgres@sha256:REPLACE_WITH_VERIFIED_DIGEST'
+docker image inspect $image
+if ($LASTEXITCODE -ne 0) { throw 'Approved local image missing' }
+$container = 'yfc-recovery-' + [guid]::NewGuid().ToString('N')
+$timer = [Diagnostics.Stopwatch]::StartNew()
+docker run --detach --pull=never --name $container --network=none `
+    --tmpfs /var/lib/postgresql/data:rw --tmpfs /restore:rw,noexec,nosuid `
+    -e POSTGRES_HOST_AUTH_METHOD=trust $image
+if ($LASTEXITCODE -ne 0) { throw 'Isolated container failed to start' }
+# No published ports, no network, no host binds; trust is limited to this disposable container.
+$ready = $false
+for ($attempt = 0; $attempt -lt 60; $attempt++) {
+    docker exec $container pg_isready -U postgres
+    if ($LASTEXITCODE -eq 0) { $ready = $true; break }
+    Start-Sleep -Seconds 1
+}
+if (-not $ready) { throw 'Isolated PostgreSQL not ready' }
+docker cp $archive "${container}:/restore/backup.dump"
+if ($LASTEXITCODE -ne 0) { throw 'Copy to isolated container failed' }
+$isolatedDigest = docker exec $container sha256sum /restore/backup.dump
+if ($LASTEXITCODE -ne 0 -or ($isolatedDigest -split '\s+')[0] -ne $manifest.archive_sha256) {
+    throw 'Isolated copy checksum mismatch'
+}
+$serverVersion = docker exec $container psql -X -A -t -U postgres -d postgres -c 'SHOW server_version_num;'
+if ($LASTEXITCODE -ne 0 -or [math]::Floor([int]$serverVersion / 10000) -ne [int]$manifest.database_major) {
+    throw 'PostgreSQL major mismatch'
+}
+docker exec $container pg_restore --list /restore/backup.dump
+if ($LASTEXITCODE -ne 0) { throw 'Archive not listable' }
+docker exec $container createdb -U postgres --template=template0 yfc_recovery
+if ($LASTEXITCODE -ne 0) { throw 'Empty database creation failed' }
+docker exec $container pg_restore -U postgres --dbname=yfc_recovery --no-owner `
+    --no-privileges --exit-on-error --single-transaction /restore/backup.dump
+if ($LASTEXITCODE -ne 0) { throw 'Restore failed; keep Windows original' }
+$revision = docker exec $container psql -X -A -t -v ON_ERROR_STOP=1 -U postgres -d yfc_recovery `
+    -c 'SELECT version_num FROM alembic_version ORDER BY version_num;'
+if ($LASTEXITCODE -ne 0 -or ($revision -join "`n").Trim() -ne $manifest.schema_revision) {
+    throw 'Schema revision mismatch'
+}
+$timer.Stop()
+$timer.Elapsed.TotalSeconds
+```
+
+В новой пустой БД не нужны `--clean` и `--create`: имя назначения задаётся явно, production
+не затрагивается. Не передавать binary dump через PowerShell text pipeline. При ошибке
+остановиться, не запускать приложение и не менять оригинал. Просмотр списка archive сам
+по себе не проверяет строки.
+
+После restore проверить заранее согласованные aggregate row counts, FK/unique constraints,
+sequence values и binary-column digests, не печатая персональные записи. Сопоставить schema
+revision с manifest **до** миграций, затем выполнять только согласованную последовательность.
+Application smoke требует exact YFC revision/images и отдельного изолированного внутреннего
+контура для backend/DB: без Telegram bot, background writers, публичных портов и provider
+egress; test identity/dataset должны быть разрешены отдельно. Проверить `/health/ready`,
+подключение к БД и согласованный login/workout read сценарий. DB-only тест это не заменяет.
+
+Зафиксировать UTC начала/окончания, digest, image/release/schema, команды и коды, проверки
+инвариантов, application smoke, отклонения. RTO отсчитывать от согласованного сценария потери
+сервиса, включая получение ключей/образов и smoke; elapsed одного pg_restore — лишь часть.
+RPO вычислять от момента сценария до `created_at_utc`, не времени скачивания; targets
+нельзя выбирать после результата. В public evidence — только разрешённые агрегаты/статусы.
+После проверки/фиксации результата удалить **только созданный** `$container` командой
+`docker rm --force $container`, отдельно подтвердить удаление drill-копий по retention;
+Windows original не удалять. DNS/cutover не входит в drill.
+
+Опции сверены с [PostgreSQL 16 pg_restore](https://www.postgresql.org/docs/16/app-pgrestore.html)
+и [pg_dump](https://www.postgresql.org/docs/16/app-pgdump.html). Реальный пользовательский
+restore не выполнялся; `BACKUP_RECOVERY=PASS` не заявляется.
+
+### 11.4 Незашифрованный диск: отдельное решение
+
+Обычная папка и ACL не защищают dump при краже диска, offline-чтении или компрометации
+администратора. Ранее зафиксированное `D: FullyDecrypted` не соответствует исходному
+encryption-at-rest acceptance #849. Нужны решение по privacy/security #707/#711,
+категориям данных, хранению в заявленной юрисдикции, доступу, удалению, custody и recovery keys.
+Checkbox `plaintext_risk_acknowledged` не закрывает эти условия и не даёт права передачи.
+
+Вариант для отдельного решения без оплаты/VHDX — шифровать **отдельные архивы** публичным
+ключом, например [age](https://github.com/FiloSottile/age), до записи в Windows-папку.
+Private decryption key хранить отдельно от диска с копиями; отдельно проверить его recovery.
+Текущий publisher/Pull этот формат **не реализует**: `mode=file_encryption` является лишь
+конфигурационным утверждением, не вызовом шифрования. Понадобятся согласованные изменения
+publish/manifest, ciphertext checksum, rotation и decrypt/restore, включая защиту temporary
+plaintext и swap. Простое шифрование уже скачанного `.dump` с последующим удалением
+не доказывает, что plaintext не сохранился на незашифрованном SSD. Способ хранения не изменён.
