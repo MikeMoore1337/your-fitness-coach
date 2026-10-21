@@ -463,6 +463,46 @@ def test_process_owner_matches_descriptor_and_kernel_inode(proc_evidence):
     assert provenance._bot_process_owner(1234, proc_root=root) == "100"
 
 
+@pytest.mark.parametrize("target", ["/run/lock", "../run/lock", "/../../run/lock"])
+def test_process_owner_resolves_lock_alias_inside_container(proc_evidence, monkeypatch, target):
+    root, process, lock = proc_evidence
+    destination = process / "root/run/lock/fitminiapp-bot"
+    destination.parent.mkdir(parents=True)
+    lock.parent.rename(destination)
+    alias = process / "root/var/lock"
+    is_symlink, readlink = Path.is_symlink, os.readlink
+    monkeypatch.setattr(Path, "is_symlink", lambda path: path == alias or is_symlink(path))
+    monkeypatch.setattr(os, "readlink", lambda path: target if path == alias else readlink(path))
+
+    assert provenance._bot_process_owner(1234, proc_root=root) == "100"
+
+
+def test_process_owner_rejects_container_symlink_loop(proc_evidence, monkeypatch):
+    root, process, _ = proc_evidence
+    alias = process / "root/var/lock"
+    is_symlink, readlink = Path.is_symlink, os.readlink
+    monkeypatch.setattr(Path, "is_symlink", lambda path: path == alias or is_symlink(path))
+    monkeypatch.setattr(
+        os, "readlink", lambda path: "/var/lock" if path == alias else readlink(path)
+    )
+
+    with pytest.raises(provenance.ProvenanceError, match="symlink"):
+        provenance._bot_process_owner(1234, proc_root=root)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires a real absolute POSIX symlink")
+def test_process_owner_resolves_real_absolute_container_symlink(proc_evidence):
+    root, process, lock = proc_evidence
+    destination = process / "root/run/lock/fitminiapp-bot"
+    destination.parent.mkdir(parents=True)
+    lock.parent.rename(destination)
+    alias = process / "root/var/lock"
+    alias.rmdir()
+    alias.symlink_to("/run/lock", target_is_directory=True)
+
+    assert provenance._bot_process_owner(1234, proc_root=root) == "100"
+
+
 @pytest.mark.parametrize(
     "problem",
     [

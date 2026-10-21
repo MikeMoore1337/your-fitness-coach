@@ -21,7 +21,7 @@ import tempfile
 import threading
 from collections.abc import Collection, Sequence
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -197,6 +197,30 @@ def _bot_startup_markers(container_id: str, started_at: str) -> dict[str, bool]:
     return markers
 
 
+def _container_path(root: Path, path: str) -> Path:
+    """Resolve container symlinks without letting absolute targets use the host root."""
+    pending = list(PurePosixPath(path).parts[1:])
+    resolved: list[str] = []
+    symlinks = 0
+    while pending:
+        part = pending.pop(0)
+        if part == "..":
+            resolved = resolved[:-1]
+            continue
+        candidate = root.joinpath(*resolved, part)
+        if candidate.is_symlink():
+            symlinks += 1
+            if symlinks > 40:
+                raise ProvenanceError("bot lock path has too many symlinks")
+            target = PurePosixPath(os.readlink(candidate))
+            if target.is_absolute():
+                resolved = []
+            pending = list(target.parts[1:] if target.is_absolute() else target.parts) + pending
+        else:
+            resolved.append(part)
+    return root.joinpath(*resolved)
+
+
 def _bot_process_owner(pid: int, *, proc_root: Path = Path("/proc")) -> str:
     """Corroborate the current bot's descriptor with host kernel lock ownership."""
     process = proc_root / str(pid)
@@ -218,7 +242,7 @@ def _bot_process_owner(pid: int, *, proc_root: Path = Path("/proc")) -> str:
     if not token or not directory.startswith("/"):
         raise ProvenanceError("bot polling configuration evidence incomplete")
     token_hash = hashlib.sha256(token).hexdigest()[:24]
-    lock_path = process / "root" / directory.lstrip("/") / f"polling-{token_hash}.lock"
+    lock_path = _container_path(process / "root", f"{directory}/polling-{token_hash}.lock")
     lock_stat = lock_path.stat()
     inode = (lock_stat.st_dev, lock_stat.st_ino)
     # Compare device/inode, never report token-derived paths or raw procfs data.
