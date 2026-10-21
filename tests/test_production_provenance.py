@@ -1,4 +1,9 @@
+import hashlib
+import io
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -206,6 +211,7 @@ def _verified_snapshot(runtime_revision: str = SHA_B) -> dict[str, object]:
             "revision": runtime_revision,
             "immutable_image": True,
             "error": None,
+            "polling_owner": {"verified": True} if service == "bot" else None,
         }
         for service in provenance.SERVICES
     }
@@ -299,3 +305,353 @@ def test_deploy_preflight_is_before_bundle_transfer_and_reconcile_is_metadata_on
     assert "application_mutation == false" in reconcile
     assert "deploy_production.sh" not in reconcile
     assert "docker compose" not in reconcile
+
+
+CONTAINER_ID = "c" * 64
+STARTED_AT = "2026-10-21T00:00:00.000000000Z"
+
+
+@pytest.fixture
+def bot_container():
+    return {
+        "Id": CONTAINER_ID,
+        "Image": IMAGE_DIGEST,
+        "State": {"Status": "running", "Pid": 1234, "StartedAt": STARTED_AT},
+    }
+
+
+@pytest.fixture
+def bot_runtime(monkeypatch, bot_container):
+    monkeypatch.setattr(provenance, "_container_id", lambda _service: CONTAINER_ID[:12])
+    monkeypatch.setattr(provenance, "_json_command", lambda _command: [bot_container])
+    monkeypatch.setattr(provenance, "_run", lambda _command: "PID\n1234\n")
+    monkeypatch.setattr(provenance, "_bot_process_owner", lambda _pid: "100")
+    monkeypatch.setattr(
+        provenance,
+        "_bot_startup_markers",
+        lambda *_args: dict.fromkeys(provenance.BOT_RUNTIME_MARKERS, True),
+    )
+
+
+def test_bot_runtime_requires_consistent_live_owner(bot_runtime, bot_container):
+    result = provenance._bot_runtime_snapshot(bot_container)
+    assert result["polling_owner"] == {"verified": True, "pid": 1234}
+
+
+@pytest.mark.parametrize("change", ["restart", "replacement", "image", "duplicate", "pid_reused"])
+def test_bot_runtime_rejects_changed_or_ambiguous_identity(
+    monkeypatch, bot_runtime, bot_container, change
+):
+    current = {**bot_container, "State": dict(bot_container["State"])}
+    if change == "restart":
+        current["State"]["StartedAt"] = "2026-10-21T01:00:00Z"
+    elif change == "image":
+        current["Image"] = "sha256:" + "e" * 64
+    elif change == "replacement":
+        monkeypatch.setattr(provenance, "_container_id", lambda _: "f" * 12)
+    elif change == "duplicate":
+        monkeypatch.setattr(provenance, "_run", lambda _: "PID\n1234\n1235\n")
+    else:
+        identities = iter(["100", "101"])
+        monkeypatch.setattr(provenance, "_bot_process_owner", lambda _: next(identities))
+    monkeypatch.setattr(provenance, "_json_command", lambda _: [current])
+    with pytest.raises(provenance.ProvenanceError, match=r"changed|ambiguous"):
+        provenance._bot_runtime_snapshot(bot_container)
+
+
+@pytest.mark.parametrize("source", ["process", "logs", "docker"])
+def test_bot_runtime_sanitizes_evidence_errors(monkeypatch, bot_runtime, bot_container, source):
+    def fail(*_args):
+        raise PermissionError("secret token-derived polling-name.lock and raw user log")
+
+    target = {
+        "process": "_bot_process_owner",
+        "logs": "_bot_startup_markers",
+        "docker": "_json_command",
+    }[source]
+    monkeypatch.setattr(provenance, target, fail)
+    with pytest.raises(provenance.ProvenanceError) as error:
+        provenance._bot_runtime_snapshot(bot_container)
+    assert str(error.value) == "bot runtime evidence unavailable or malformed"
+
+
+def _marker_line(marker, timestamp=STARTED_AT, **changes):
+    event = {"service": "telegram-bot", "logger": "__main__", "message": marker, **changes}
+    return (timestamp + " " + json.dumps(event) + "\n").encode()
+
+
+def _logs(monkeypatch, content, returncode=0):
+    calls = []
+
+    class Process:
+        stdout = io.BytesIO(content)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            self.stdout.close()
+
+        def wait(self):
+            return returncode
+
+        def kill(self):
+            pass
+
+    def popen(command, **_kwargs):
+        calls.append(command)
+        return Process()
+
+    monkeypatch.setattr(provenance.subprocess, "Popen", popen)
+    return calls
+
+
+def test_long_lived_bot_streams_markers_outside_last_200_lines(monkeypatch):
+    content = b"".join(_marker_line(marker) for marker in provenance.BOT_RUNTIME_MARKERS)
+    content += b"2026-10-21T01:00:00Z ordinary user activity\n" * 10000
+    calls = _logs(monkeypatch, content)
+    assert all(provenance._bot_startup_markers(CONTAINER_ID, STARTED_AT).values())
+    assert calls == [["docker", "logs", "--timestamps", "--since", STARTED_AT, CONTAINER_ID]]
+
+
+@pytest.mark.parametrize(
+    "kind", ["stale", "substring", "wrong_logger", "wrong_service", "missing", "error"]
+)
+def test_bot_startup_evidence_rejects_stale_spoofed_or_unavailable_logs(monkeypatch, kind):
+    timestamp = "2026-10-20T23:00:00Z" if kind == "stale" else STARTED_AT
+    changes = {"logger": "other"} if kind == "wrong_logger" else {}
+    if kind == "wrong_service":
+        changes["service"] = "other"
+    markers = (
+        provenance.BOT_RUNTIME_MARKERS[:1] if kind == "missing" else provenance.BOT_RUNTIME_MARKERS
+    )
+    content = b"".join(_marker_line(marker, timestamp, **changes) for marker in markers)
+    if kind == "substring":
+        content = _marker_line(" ".join(provenance.BOT_RUNTIME_MARKERS))
+    _logs(monkeypatch, content, returncode=1 if kind == "error" else 0)
+    with pytest.raises(provenance.ProvenanceError, match="evidence"):
+        provenance._bot_startup_markers(CONTAINER_ID, STARTED_AT)
+
+
+@pytest.fixture
+def proc_evidence(tmp_path, monkeypatch):
+    root = tmp_path / "proc"
+    process = root / "1234"
+    for directory in ("fd", "fdinfo", "root/var/lock/fitminiapp-bot"):
+        (process / directory).mkdir(parents=True)
+    (process / "stat").write_text("1234 (python) S " + "0 " * 18 + "100\n")
+    (process / "cmdline").write_bytes(b"python\0-m\0fitminiapp_bot.bot\0")
+    token = b"synthetic-test-token"
+    (process / "environ").write_bytes(b"TELEGRAM_BOT_TOKEN=" + token + b"\0")
+    lock = (
+        process
+        / "root/var/lock/fitminiapp-bot"
+        / ("polling-" + hashlib.sha256(token).hexdigest()[:24] + ".lock")
+    )
+    lock.touch()
+    os.link(lock, process / "fd/3")
+    stat = lock.stat()
+    monkeypatch.setattr(provenance.os, "makedev", lambda _major, _minor: stat.st_dev, raising=False)
+    record = f"1: FLOCK ADVISORY WRITE 1234 00:01:{stat.st_ino} 0 EOF\n"
+    (root / "locks").write_text(record)
+    (process / "fdinfo/3").write_text("lock:\t" + record)
+    return root, process, lock
+
+
+def test_process_owner_matches_descriptor_and_kernel_inode(proc_evidence):
+    root, _, _ = proc_evidence
+    assert provenance._bot_process_owner(1234, proc_root=root) == "100"
+
+
+@pytest.mark.parametrize(
+    "problem",
+    [
+        "missing",
+        "wrong_pid",
+        "shared",
+        "posix",
+        "ambiguous",
+        "fdinfo",
+        "descriptor",
+        "wrong_inode",
+        "wrong_command",
+        "zombie",
+    ],
+)
+def test_process_owner_fails_closed(proc_evidence, problem):
+    root, process, lock = proc_evidence
+    record = (root / "locks").read_text()
+    if problem == "missing":
+        record = ""
+    elif problem == "wrong_pid":
+        record = record.replace("WRITE 1234", "WRITE 9999")
+    elif problem == "shared":
+        record = record.replace("WRITE", "READ")
+    elif problem == "posix":
+        record = record.replace("FLOCK", "POSIX")
+    elif problem == "ambiguous":
+        record *= 2
+    elif problem == "fdinfo":
+        (process / "fdinfo/3").write_text("")
+    elif problem == "descriptor":
+        os.link(lock, process / "fd/4")
+    elif problem == "wrong_inode":
+        record = record.replace(str(lock.stat().st_ino), "99999999")
+    elif problem == "wrong_command":
+        (process / "cmdline").write_bytes(b"python\0-m\0other.bot\0")
+    else:
+        (process / "stat").write_text("1234 (python) Z " + "0 " * 18 + "100\n")
+    (root / "locks").write_text(record)
+    with pytest.raises(provenance.ProvenanceError):
+        provenance._bot_process_owner(1234, proc_root=root)
+
+
+def test_invalid_runtime_blocks_cli_verification_and_reconciliation(monkeypatch, tmp_path, capsys):
+    snapshot = _verified_snapshot()
+    snapshot["status"] = "INVALID_RUNTIME"
+    snapshot["services"]["bot"]["polling_owner"] = {"verified": False}
+    monkeypatch.setattr(provenance, "inspect_production", lambda _: snapshot)
+    for command in ("verify", "reconcile"):
+        assert (
+            provenance.main([command, "--app-root", str(tmp_path), "--expected-revision", SHA_B])
+            == 1
+        )
+        assert "INVALID_RUNTIME" in capsys.readouterr().err
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_deploy_workflow_requires_live_owner_and_blocks_invalid_runtime_before_transfer():
+    workflow = (Path(__file__).resolve().parents[1] / ".github/workflows/deploy.yml").read_text()
+    preflight = workflow.split("name: Read the active deployed revision", 1)[1].split(
+        "name: Build immutable deployment bundle", 1
+    )[0]
+    assert 'if [ "$status" != OK ]; then' in preflight
+    assert "exit 1" in preflight
+    assert workflow.count("(.services.bot.polling_owner.verified == true) and") == 2
+
+
+@pytest.mark.parametrize("failure", [None, "flock", "stale", "revision", "access"])
+def test_full_snapshot_combines_container_process_lock_and_startup_evidence(
+    monkeypatch, tmp_path, proc_evidence, bot_container, failure
+):
+    proc_root, _, _ = proc_evidence
+    real_owner = provenance._bot_process_owner
+    monkeypatch.setattr(
+        provenance, "_bot_process_owner", lambda pid: real_owner(pid, proc_root=proc_root)
+    )
+    if failure == "flock":
+        (proc_root / "locks").write_text("")
+    elif failure == "access":
+
+        def denied(_pid):
+            raise PermissionError("secret-lock-name")
+
+        monkeypatch.setattr(provenance, "_bot_process_owner", denied)
+    timestamp = "2026-10-20T00:00:00Z" if failure == "stale" else STARTED_AT
+    _logs(
+        monkeypatch,
+        b"".join(_marker_line(marker, timestamp) for marker in provenance.BOT_RUNTIME_MARKERS),
+    )
+
+    def run(command):
+        if command[:2] == ["docker", "ps"]:
+            service = command[command.index("--filter") + 1].split("=")[-1]
+            return CONTAINER_ID[:12] if service == "bot" else service
+        if command[:2] == ["docker", "top"]:
+            return "PID\n1234\n"
+        if command[:2] == ["docker", "inspect"]:
+            service = "bot" if command[2].startswith(CONTAINER_ID[:12]) else command[2]
+            revision = SHA_B if failure == "revision" and service == "bot" else SHA_A
+            return json.dumps(
+                [
+                    {
+                        **bot_container,
+                        "Config": {"Image": service + ":" + revision},
+                        "State": {**bot_container["State"], "Health": {"Status": "healthy"}},
+                    }
+                ]
+            )
+        if command[:3] == ["docker", "image", "inspect"]:
+            revision = SHA_B if failure == "revision" and command[-1].startswith("bot:") else SHA_A
+            return json.dumps(
+                [
+                    {
+                        "Id": IMAGE_DIGEST,
+                        "Config": {"Labels": {provenance.REVISION_LABEL: revision}},
+                        "RepoDigests": ["repo@" + IMAGE_DIGEST],
+                    }
+                ]
+            )
+        if command[:2] == ["docker", "exec"]:
+            return "0130_workout_rest_sessions (head)"
+        raise AssertionError(command)
+
+    monkeypatch.setattr(provenance, "_run", run)
+    state_root = tmp_path / ".artifacts/operations/deployments"
+    state_root.mkdir(parents=True)
+    (state_root / "last-successful-revision").write_text(SHA_A)
+    release = tmp_path / "releases" / SHA_A
+    release.mkdir(parents=True)
+    (release / ".deployment-sha").write_text(SHA_A)
+    snapshot = provenance.inspect_production(tmp_path)
+    if failure:
+        assert snapshot["status"] == (
+            "MIXED_RUNTIME" if failure == "revision" else "INVALID_RUNTIME"
+        )
+        assert provenance._verification_errors(snapshot, SHA_A)
+        assert "secret-lock-name" not in json.dumps(snapshot)
+    else:
+        assert snapshot["status"] == "OK"
+        assert snapshot["services"]["bot"]["polling_owner"]["verified"] is True
+        assert provenance._verification_errors(snapshot, SHA_A) == []
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires Linux procfs and real kernel FLOCK")
+def test_real_linux_kernel_flock_owner(tmp_path):
+    import select
+
+    package = tmp_path / "fitminiapp_bot"
+    package.mkdir()
+    (package / "__init__.py").touch()
+    (package / "bot.py").write_text(
+        "import fcntl, hashlib, os, pathlib, sys\n"
+        "name = hashlib.sha256(os.environ['TELEGRAM_BOT_TOKEN'].encode()).hexdigest()[:24]\n"
+        "path = pathlib.Path(os.environ['BOT_POLLING_LOCK_DIR']) / f'polling-{name}.lock'\n"
+        "with path.open('a+') as lock:\n"
+        " fcntl.flock(lock, fcntl.LOCK_EX)\n"
+        " print('ready', flush=True)\n"
+        " sys.stdin.readline()\n"
+        " fcntl.flock(lock, fcntl.LOCK_UN)\n"
+        " print('released', flush=True)\n"
+        " sys.stdin.read()\n"
+    )
+    environment = {
+        **os.environ,
+        "TELEGRAM_BOT_TOKEN": "synthetic-kernel-test",
+        "BOT_POLLING_LOCK_DIR": str(tmp_path),
+    }
+    with subprocess.Popen(
+        [sys.executable, "-m", "fitminiapp_bot.bot"],
+        cwd=tmp_path,
+        env=environment,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    ) as process:
+        try:
+            assert select.select([process.stdout], [], [], 10)[0], "lock child did not become ready"
+            assert process.stdout.readline() == b"ready\n"
+            assert provenance._bot_process_owner(process.pid).isdigit()
+            process.stdin.write(b"release\n")
+            process.stdin.flush()
+            assert select.select([process.stdout], [], [], 10)[0]
+            assert process.stdout.readline() == b"released\n"
+            try:
+                provenance._bot_process_owner(process.pid)
+            except provenance.ProvenanceError:
+                pass
+            else:
+                raise AssertionError("a live bot process without FLOCK must be rejected")
+        finally:
+            process.terminate()
+            process.wait(timeout=10)
