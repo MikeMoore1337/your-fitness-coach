@@ -77,6 +77,10 @@ describe('ProgressReportPage', () => {
 
     expect(await screen.findByRole('heading', { name: 'Отчёт о прогрессе' })).toBeVisible();
     expect(screen.getByText('84')).toBeVisible();
+    expect(screen.getByText(/Москв/)).toBeVisible();
+    expect(document.querySelector('.progress-report-document')).not.toHaveTextContent(
+      'Europe/Moscow',
+    );
     expect(screen.getByRole('heading', { name: 'Фактическая сводка' })).toBeVisible();
     expect(screen.getByText('Тренировки — Данных достаточно для оценки')).toBeVisible();
     expect(screen.getByText('Питание — Данных достаточно для оценки')).toBeVisible();
