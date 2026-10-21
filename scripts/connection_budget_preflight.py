@@ -1128,13 +1128,6 @@ def evaluate(
             "connection_attribution_incomplete",
             "Unattributed PostgreSQL sessions are conservatively counted as non-YFC",
         )
-    if _is_int(unattributed) and _is_int(observed_non_yfc) and unattributed > observed_non_yfc:
-        _issue(
-            issues,
-            Verdict.BLOCKED,
-            "connection_attribution_inconsistent",
-            "Unattributed sessions exceed the inclusive non-YFC count",
-        )
     for name, value in (
         ("observed_non_yfc_connections", observed_non_yfc),
         ("observed_yfc_connections", observed_yfc),
@@ -1185,6 +1178,14 @@ def evaluate(
             Verdict.UNKNOWN,
             "connection_attribution_unknown",
             "Current session attribution cannot be verified without occupancy",
+        )
+
+    if _is_int(unattributed) and _is_int(observed_non_yfc) and unattributed > observed_non_yfc:
+        _issue(
+            issues,
+            Verdict.BLOCKED,
+            "connection_attribution_inconsistent",
+            "Unattributed sessions exceed the inclusive non-YFC count",
         )
 
     if usable is not None and observed_non_yfc is not None and observed_non_yfc > usable:

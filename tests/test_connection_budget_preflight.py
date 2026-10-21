@@ -615,3 +615,8 @@ def test_inclusive_unknown_count_is_not_added_twice(unknown) -> None:
     assert result.worst_case_connections == 132
     invalid = replace(model, postgres=replace(model.postgres, unattributed_connections=13))
     assert _evaluate(invalid).status == Verdict.BLOCKED
+    # The subset invariant also applies when inclusive non-YFC is derived from total - YFC.
+    derived = replace(
+        invalid, postgres=replace(invalid.postgres, observed_non_yfc_connections=None)
+    )
+    assert _evaluate(derived).status == Verdict.BLOCKED
