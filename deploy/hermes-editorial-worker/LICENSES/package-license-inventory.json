@@ -19,7 +19,7 @@
   "pythonPackages": [
     {"name": "annotated-types", "version": "0.8.0", "licenses": ["MIT"]},
     {"name": "anyio", "version": "4.15.0", "licenses": ["MIT"]},
-    {"name": "certifi", "version": "2026.5.20", "licenses": ["MPL-2.0"]},
+    {"name": "certifi", "version": "2026.10.19", "licenses": ["MPL-2.0"]},
     {"name": "h11", "version": "0.16.0", "licenses": ["MIT"]},
     {"name": "httpcore", "version": "1.0.9", "licenses": ["BSD-3-Clause"]},
     {"name": "httpx", "version": "0.28.1", "licenses": ["BSD-3-Clause"]},

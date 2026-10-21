@@ -106,6 +106,87 @@ export class ApiError extends Error {
   }
 }
 
+const DEFAULT_USER_FACING_ERROR = 'Не удалось выполнить запрос. Попробуйте ещё раз.';
+const SERVER_ERROR_MESSAGE = 'Сервис временно недоступен. Попробуйте ещё раз.';
+const STATUS_ERROR_MESSAGES: Record<number, string> = {
+  400: 'Не удалось выполнить запрос. Проверьте введённые данные.',
+  401: 'Сессия недействительна или истекла. Войдите снова.',
+  403: 'Недостаточно прав для выполнения этого действия.',
+  404: 'Запрошенные данные не найдены.',
+  409: 'Данные уже изменились. Обновите страницу и повторите попытку.',
+  422: 'Проверьте введённые данные.',
+  429: 'Слишком много запросов. Попробуйте позже.',
+};
+const UNSAFE_DETAIL_PATTERN =
+  /<[^>]*>|traceback|stack trace|exception|\berror\b|\b(?:select|insert|update|delete|drop|alter|create)\b|\bsql\b|postgres|psycopg|sqlalchemy|connection\s*string|\b(?:access\s+|refresh\s+)?token\b|bearer\s+|secret|password|authorization|https?:\/\/|file:\/\/|(?:[A-Za-z]:[\\/])|(?:^|[\s(["'])\/(?:app|usr|var|home|tmp|workspace|etc)(?:[\\/]|$)/i;
+
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some((character) => {
+    const code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+}
+
+function isSafeUserFacingDetail(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const detail = value.trim();
+  if (
+    !detail ||
+    detail.length > 500 ||
+    !/[А-Яа-яЁё]/u.test(detail) ||
+    hasControlCharacters(detail) ||
+    UNSAFE_DETAIL_PATTERN.test(detail) ||
+    /[A-Za-z0-9_-]{24,}/.test(detail)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function errorDetail(body: unknown): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  if (!Object.prototype.hasOwnProperty.call(body, 'detail')) return null;
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === 'string') return detail;
+  if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return null;
+  if (!Object.prototype.hasOwnProperty.call(detail, 'message')) return null;
+  return (detail as { message?: unknown }).message;
+}
+
+export function apiErrorDetailIncludes(error: unknown, phrase: string): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const normalizedPhrase = phrase.trim().toLowerCase();
+  const detail = errorDetail(error.body);
+  return Boolean(
+    normalizedPhrase &&
+    typeof detail === 'string' &&
+    detail.toLowerCase().includes(normalizedPhrase),
+  );
+}
+
+function statusErrorMessage(status: number): string {
+  if (status >= 500 && status <= 599) return SERVER_ERROR_MESSAGE;
+  return STATUS_ERROR_MESSAGES[status] ?? DEFAULT_USER_FACING_ERROR;
+}
+
+function userFacingResponseErrorMessage(status: number, body: unknown): string {
+  if (status >= 500 && status <= 599) return SERVER_ERROR_MESSAGE;
+  const detail = errorDetail(body);
+  return isSafeUserFacingDetail(detail) ? detail.trim() : statusErrorMessage(status);
+}
+
+export function getUserFacingErrorMessage(
+  error: unknown,
+  fallback = DEFAULT_USER_FACING_ERROR,
+): string {
+  if (!(error instanceof ApiError)) return fallback;
+  if (error.status >= 500 && error.status <= 599) return SERVER_ERROR_MESSAGE;
+  if (error.status === 0 || error.body === null) {
+    return isSafeUserFacingDetail(error.message) ? error.message.trim() : fallback;
+  }
+  return userFacingResponseErrorMessage(error.status, error.body);
+}
+
 function migrateLegacyToken(): void {
   const legacy = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (legacy && !sessionStorage.getItem(ACCESS_TOKEN_KEY)) {
@@ -138,32 +219,12 @@ export function clearAccessToken(): void {
 async function responseError(response: Response): Promise<ApiError> {
   const text = await response.text();
   let body: unknown = text;
-  let message = text || `Ошибка ${response.status}`;
   try {
     body = JSON.parse(text);
-    if (body && typeof body === 'object' && 'detail' in body) {
-      const detail = (body as { detail: unknown }).detail;
-      if (typeof detail === 'string') message = detail;
-      if (
-        detail &&
-        typeof detail === 'object' &&
-        'message' in detail &&
-        typeof (detail as { message?: unknown }).message === 'string'
-      ) {
-        message = (detail as { message: string }).message;
-      }
-      if (Array.isArray(detail)) {
-        message = detail
-          .map((item) =>
-            item && typeof item === 'object' && 'msg' in item ? String(item.msg) : String(item),
-          )
-          .join(' ');
-      }
-    }
   } catch {
-    // Non-JSON error bodies remain readable.
+    // Keep the raw body for diagnostics, but do not show non-JSON responses to users.
   }
-  return new ApiError(message.slice(0, 500), response.status, body);
+  return new ApiError(userFacingResponseErrorMessage(response.status, body), response.status, body);
 }
 
 let refreshPromise: Promise<boolean> | null = null;

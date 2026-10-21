@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError } from '../../shared/api/client';
+import { api, ApiError, getUserFacingErrorMessage } from '../../shared/api/client';
 import type {
   WarmupProposalApply,
   WarmupProposalPreview,
@@ -16,17 +16,7 @@ import { createWorkoutMutationId } from './activeWorkoutQueue';
 type DraftRow = { weight: string; reps: string };
 
 function readableError(reason: unknown): string {
-  if (reason instanceof ApiError) {
-    const detail =
-      reason.body && typeof reason.body === 'object' && 'detail' in reason.body
-        ? (reason.body as { detail?: unknown }).detail
-        : null;
-    if (detail && typeof detail === 'object' && 'message' in detail) {
-      const message = (detail as { message?: unknown }).message;
-      if (typeof message === 'string' && message) return message;
-    }
-  }
-  return reason instanceof Error ? reason.message : 'Не удалось выполнить действие.';
+  return getUserFacingErrorMessage(reason, 'Не удалось выполнить действие.');
 }
 
 function toDraftRows(rows: WarmupProposalRow[]): DraftRow[] {

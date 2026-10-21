@@ -65,3 +65,33 @@ def test_ui_audit_remains_separate_from_playwright_testing() -> None:
     assert "$ui-audit" in e2e_review
     assert "UI aesthetics" in e2e_review
     assert "visual" in playwright.lower()
+
+
+def test_agent_manifest_matches_all_skill_directories() -> None:
+    """Ensure conditional reference skills are counted without duplicates."""
+    manifest = json.loads((ROOT / ".agents/MANIFEST.json").read_text(encoding="utf-8"))
+    skills_root = ROOT / ".agents" / "skills"
+    present = {p.name for p in skills_root.iterdir() if p.is_dir() and (p / "SKILL.md").is_file()}
+    listed = manifest["skills"]
+    assert len(listed) == len(set(listed))
+    assert manifest["skill_count"] == len(listed)
+    assert set(listed) == present
+    assert {
+        "apple-design",
+        "clear-voice",
+        "change-impact-analysis",
+        "contract-testing",
+        "cross-layer-debugging",
+        "requirements-traceability",
+    } <= present
+    # Existing project-owned skills may intentionally use legacy Markdown
+    # without Agent Skills frontmatter; validate only imported Toolkit skills.
+    for name in {
+        "change-impact-analysis",
+        "contract-testing",
+        "cross-layer-debugging",
+        "requirements-traceability",
+    }:
+        source = (skills_root / name / "SKILL.md").read_text(encoding="utf-8")
+        assert source.splitlines()[0] == "---"
+        assert f"name: {name}" in source.split("---", 2)[1]

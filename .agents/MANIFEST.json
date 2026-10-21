@@ -2,14 +2,19 @@
   "package": "your-fitness-coach-agents",
   "version": "11",
   "root": ".agents",
-  "skill_count": 43,
+  "skill_count": 51,
   "skills": [
     "accessibility-engineer",
     "allure-reporting",
     "api-testing",
+    "apple-design",
     "backend-engineer",
     "billing-engineer",
+    "change-impact-analysis",
+    "clear-voice",
+    "contract-testing",
     "coverage-analysis",
+    "cross-layer-debugging",
     "data-engineer",
     "database-validation",
     "document-import-engineer",
@@ -19,6 +24,7 @@
     "fitness-domain-reviewer",
     "flaky-analysis",
     "frontend-engineer",
+    "impeccable",
     "landing-art-director",
     "llm-engineer",
     "localization-engineer",
@@ -37,6 +43,7 @@
     "python-engineer",
     "qa-engineer",
     "release-manager",
+    "requirements-traceability",
     "ru-legal-risk",
     "security-engineer",
     "seo-auditor",
@@ -46,7 +53,8 @@
     "test-data-management",
     "ui-audit",
     "ui-prototyper",
-    "ux-researcher"
+    "ux-researcher",
+    "ux-ui-design-orchestra"
   ],
   "roles": [
     "orchestrator",
@@ -83,7 +91,10 @@
     "QA work profiles are modes, not additional lifecycle roles",
     "Security v9 adds repository-native diff/full review, YFC threat model and a separate deterministic Security Audit workflow",
     "Security v10 adds free mandatory PR security jobs (CodeQL, dependency audit, Trivy) while semantic Security Review remains manual/conditional",
-    "Agent Harness v12 keeps optional pytest evals and owner-review learning candidates without lifecycle state"
+    "Agent Harness v12 keeps optional pytest evals and owner-review learning candidates without lifecycle state",
+    "Toolkit methods adapted as conditional QA/fullstack helpers; apple-design and clear-voice tracked as pre-existing references; no new roles or controllers.",
+    "Impeccable 4.7.0 via exact-SHA git submodule is a development-only UX/UI critique skill; incumbent brand and visual gates supersede upstream aesthetic bans.",
+    "UX/UI Design Orchestra: project-scoped read-only audit/proposal coordinator, no runtime UI edits or owner gate bypass."
   ],
   "agent_harness": {
     "script": "scripts/agent_harness.py",
