@@ -210,3 +210,64 @@ connection_budget_preflight -> backup -> migration -> candidate_start -> traffic
 5. separate release approval before any production deployment.
 
 До этих approvals verdict для production остаётся `UNKNOWN`/`BLOCKED`; standalone provenance и отсутствие production integration — `BLOCKED`, недостающие runtime facts — `UNKNOWN`. Production rollout не разрешён. Runtime environment changes in this PR: `no`.
+
+
+## Клиентский учёт #848 (2026-10-21)
+
+`pg_stat_activity` содержит строки серверных процессов, включая фоновые. Поэтому простой
+`count(*)` завышает число обычных клиентов; пустой `application_name` фонового процесса
+создаёт ложную неопределённую атрибуцию.
+Источник: [PostgreSQL pg_stat_activity](https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ACTIVITY-VIEW).
+
+Цепочка: SQL → legacy/runtime parser → trusted child parser → `PostgresCapacity` → `evaluate`
+→ blocking deployment preflight. В #1122 legacy и runtime используют общий `snapshot_sql`.
+Все связанные счётчики получаются одним проходом с `FILTER (WHERE backend_type = 'client backend' ...)`.
+В #1147 `WITH activity AS MATERIALIZED` формирует `current_connections`, `session_counts`
+и backend diagnostics из одного агрегата. Изменение числа сессий между запросами не смешивает
+клиентские значения. Публичный child JSON не меняется; неверные формы отклоняются.
+
+| Тип | Учёт |
+|---|---|
+| `client backend` | Клиентский слот, атрибуция по точному marker |
+| `autovacuum launcher`, `autovacuum worker`, `background writer`, `checkpointer`, `archiver`, `walwriter`, `logical replication launcher` | Известные встроенные процессы, не клиентские слоты |
+| `parallel worker` | Worker pool; клиент-лидер уже учтён, дополнительного клиентского слота нет |
+| `walsender`, `walreceiver`, `logical replication worker` | Неподтверждённая replication topology: BLOCKED |
+| `startup`, `standalone backend`, generic `background worker`, extension-defined, NULL или неизвестный тип | Неподтверждённый resource/runtime contract: BLOCKED |
+
+`max_wal_senders` ограничивает отправителей WAL отдельно. Replication slots — постоянные объекты,
+а не клиентские соединения. Logical/parallel workers используют `max_worker_processes` и частные
+worker limits. Эти процессы нельзя добавлять к клиентским слотам «для перестраховки».
+См. [replication](https://www.postgresql.org/docs/16/runtime-config-replication.html),
+[kernel resources](https://www.postgresql.org/docs/16/kernel-resources.html) и
+[worker limits](https://www.postgresql.org/docs/16/runtime-config-resource.html#RUNTIME-CONFIG-RESOURCE-ASYNC-BEHAVIOR).
+Connection gate не доказывает достаточность CPU/RAM/I/O. Replication и extension workers
+отклоняются до отдельного измерения и документирования их ресурсов и rollout applicability.
+
+YFC markers: только `yfc-backend`, `yfc-worker`, `yfc-setup`, `yfc-migration`.
+Другой непустой marker, включая collector, — external client. NULL, пустая строка или пробелы
+— unattributed client. Marker — клиентская декларация, не криптографическое доказательство;
+OCI/topology/provenance guards сохраняются.
+
+Проверяемые инварианты:
+
+- `client_total = yfc_client + external_client + unattributed_client`;
+- `observed_non_yfc_connections = external_client + unattributed_client`;
+- `current_connections = observed_yfc_connections + observed_non_yfc_connections`;
+- `0 <= unattributed_connections <= observed_non_yfc_connections`;
+- projected phase usage = YFC ceilings + inclusive non-YFC + explicit phase consumers;
+  unattributed и текущие YFC-сессии повторно не прибавляются;
+- `usable = max_connections - superuser_reserved_connections - reserved_connections`;
+  PG15 допускает отсутствие `reserved_connections`, PG16+ требует значение;
+- malformed/partial/contradictory statistics и недостаточные права не дают PASS;
+  unattributed production clients дают UNKNOWN/BLOCKED.
+
+Тесты выполняют сам SQL на фиксированных activity rows и в PostgreSQL integration profile:
+нули, клиентская/фоновая смесь, специальные типы, schema/permissions, reconciliation,
+изменение числа клиентов, положительный и недостаточный headroom. Эти синтетические данные
+не доказывают production capacity. #1147 остаётся owner-only, read-only, no-deploy;
+`POSTGRES_BUDGET_VERDICT=NOT_VERIFIED` сохраняется.
+
+Production metrics: NO_DATA; production safety: BLOCKED. Нужны разрешённый live read-only
+снимок с полной видимостью, реальные attribution/topology/reserved slots, active/candidate
+provenance, pooler/phase overlap, freshness, положительный owner-approved численный headroom
+и независимый dry run. Merge и deploy не разрешены.
