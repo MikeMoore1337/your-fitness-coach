@@ -25,19 +25,21 @@ production DNS. XML в `docs/operations/v11-rec-01-off-host-backup-recovery/wind
 
 ## 2. Что именно считается опубликованной копией
 
-Команда публикации создаёт архив, проверяет его через `pg_restore --list`, затем атомарно
-пишет sidecar manifest и последним заменяет `index.json`. `index.json` — commit marker:
+Команда публикации создаёт dump в закрытом staging вне SFTP-каталога, проверяет его через
+`pg_restore --list`, шифрует закреплённым age и переносит только готовый ciphertext. Затем
+атомарно пишет sidecar manifest и последним заменяет `index.json`. `index.json` — commit marker:
 Windows runner принимает только архивы, перечисленные в нём, и не использует незавершённые
 файлы из временного каталога.
 
 ```text
 .artifacts/operations/backups/offhost/
-  fitminiapp-<UTC>.dump
-  fitminiapp-<UTC>.dump.manifest.json
+  fitminiapp-<UTC>.dump.age
+  fitminiapp-<UTC>.dump.age.manifest.json
   index.json
 ```
 
-Manifest содержит имя, размер и SHA-256 архива, UTC timestamps, PostgreSQL major, Alembic
+Manifest/index v2 содержит `archive_format=age-v1`, `age_version=v1.3.2`, ожидаемый public
+`recipient`, имя, размер и SHA-256 **ciphertext**, UTC timestamps, PostgreSQL major, Alembic
 revision, coverage persistent state и application identity. Если release SHA или image
 digests не переданы доверенным окружением, identity получает статус `not_provided`; это не
 становится доказательством конкретной версии приложения. Index entry повторяет также
@@ -78,12 +80,11 @@ digests не переданы доверенным окружением, identit
 Начальная форма: `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json`. Перед реальным запуском
 владелец должен заменить placeholders, предоставить ключ, pinned host key и документ
 восстановления ключа. В связанном PR #1125 пример соответствует выбранной обычной папке:
-`mode=none`, `approved=false`, `plaintext_risk_acknowledged=false`; Pull по умолчанию
-завершается `CONFIG_INVALID`. Только JSON boolean `true` подтверждает риск plaintext;
-это не подтверждение шифрования, ACL или разрешение передавать production-данные.
-Папка должна быть отдельно подготовлена оператором. Retention — семь суток,
-`minimum_valid_backups=2`: при длительном сбое две последние проверенные копии могут
-оставаться старше семи суток. Такое исключение требует разбора, а не удаления последней копии.
+`mode=age`, `approved=false`, placeholders recipient/recovery. Pull завершается
+`CONFIG_INVALID`, пока оператор не предоставит public recipient, ссылку на проверенную
+offline-процедуру восстановления и отдельное разрешение активации. Режимы `none`,
+`bitlocker`, `file_encryption` и `plaintext_risk_acknowledged` не обходят age-контракт.
+Наличие `approved=true` само по себе не доказывает существование ключа или recoverability.
 
 Runner:
 
@@ -146,8 +147,8 @@ authentication failure, network timeout, low-disk margin, concurrent lock и mal
 Синтетический прогон не доказывает физический BitLocker/file encryption, реальную SFTP
 аутентификацию, сетевой timeout, заполнение диска, VPS filesystem permissions, Task Scheduler,
 production credentials, clean-host restore или production smoke. `encryption_at_rest.approved`
-является только конфигурационным gate и никогда не заменяет проверку BitLocker/file encryption
-и recovery key на физическом Windows-ПК. Проверка Task Scheduler вне интерактивного сеанса
+является только конфигурационным gate и никогда не заменяет проверку ciphertext и recovery
+отдельного age identity. Реальное синтетическое шифрование и восстановление описаны в разделе 12. Проверка Task Scheduler вне интерактивного сеанса
 также остаётся отдельным owner-approved Phase B тестом.
 
 ## 6. CI routing для Python backup-контракта
@@ -172,7 +173,8 @@ DNS и фоновые writer processes должны быть остановле�
    необходимые сервисы без публичного маршрута.
 3. Получить secrets, SSH keys, TLS private keys и environment из отдельно approved источника.
    Не извлекать их из dump, manifest или логов.
-4. Сверить размер и SHA-256 с manifest. Затем проверить читаемость custom archive через
+4. Сверить размер и SHA-256 ciphertext с manifest v2; получить offline age identity и
+   расшифровать копию в разрешённом защищённом staging по разделу 11.3. Затем проверить читаемость custom archive через
    `pg_restore --list`; failure останавливает runbook.
 5. Создать целевую пустую БД, остановить writers и выполнить проверенный restore с
    `--clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction`.
@@ -391,7 +393,7 @@ Application smoke: `NOT_RUN`. `BACKUP_RECOVERY=NOT_PROVEN` для реальны
    временем. Штатная команда из корня checkout:
 
    ```sh
-   python3 scripts/db_maintenance.py backup --publish-dir .artifacts/operations/backups/offhost --retain-published 7
+   python3 scripts/db_maintenance.py backup --publish-dir .artifacts/operations/backups/offhost --retain-published 7 --age-path /opt/yfc-tools/age-v1.3.2/age --age-recipient "$YFC_BACKUP_AGE_RECIPIENT"
    ```
 
    `--retain-published 7` — число архивов, не календарный TTL. При одном успешном архиве
@@ -408,7 +410,8 @@ Application smoke: `NOT_RUN`. `BACKUP_RECOVERY=NOT_PROVEN` для реальны
    runner identity и разрешённых администраторов, исключить sync/share и reparse redirects.
    Не наследовать широкие права D: без проверки. Отдельно защитить scripts/config/keys от записи.
 2. Подготовить выделенный SSH key и pinned host key, проверить доступ вне интерактивного сеанса.
-   Config example из #1125 остаётся fail-closed; не ставить `approved=true` для обычной папки.
+   Config example из #1125 остаётся fail-closed; `approved=true` допустимо только после
+   проверки отдельного offline age key recovery и разрешения на реальные данные.
 3. Согласовать интервал Pull: XML предлагает один час, но это **не** ещё одно создание архива
    и пока не утверждённое расписание. Проверить `StartWhenAvailable`, `IgnoreNew`, network
    availability, deadline и тип входа runner. S4U из шаблона не доказывает доступ к защищённым
@@ -434,9 +437,14 @@ SQL из dump. Не использовать production Compose, `.env`, volumes
 ```powershell
 $ErrorActionPreference = 'Stop'
 $backupRoot = 'D:\YFC-Backups'
-$manifestPath = Join-Path $backupRoot 'REPLACE_WITH_ARCHIVE.dump.manifest.json'
+$manifestPath = Join-Path $backupRoot 'REPLACE_WITH_ARCHIVE.dump.age.manifest.json'
 $manifest = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($manifest.kind -ne 'yfc-backup-manifest' -or $manifest.schema_version -ne 1 -or
+if (($manifest.schema_version -isnot [int] -and $manifest.schema_version -isnot [long]) -or
+    $manifest.kind -cne 'yfc-backup-manifest' -or $manifest.schema_version -ne 2 -or
+    ($manifest.archive_size_bytes -isnot [int] -and $manifest.archive_size_bytes -isnot [long]) -or
+    $manifest.archive_size_bytes -le 0 -or $manifest.archive_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+    $manifest.archive_format -cne 'age-v1' -or $manifest.age_version -cne 'v1.3.2' -or
+    $manifest.archive_name -cnotmatch '\.dump\.age$' -or
     $manifest.verification_status -ne 'format_verified_pg_restore_list' -or
     $manifest.archive_name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$' -or
     $manifest.manifest_name -ne "$($manifest.archive_name).manifest.json" -or
@@ -447,6 +455,35 @@ if ((Get-Item -LiteralPath $archive).Length -ne [int64]$manifest.archive_size_by
     throw 'Archive size/SHA-256 mismatch'
 }
 ```
+
+Получить **копию** offline identity по разделу 12.2 на разрешённом recovery-хосте.
+Не класть identity или plaintext в `D:\YFC-Backups`, Git, CI или синхронизируемый каталог.
+Проверить возраст/size/hash, ожидаемый recipient, закрытые права staging, swap/pagefile,
+доступный объём и отсутствие production mounts. Затем выполнить:
+
+```powershell
+$age = 'C:\YFC-Backup-Tools\age.exe'
+$identity = 'REPLACE_WITH_APPROVED_OFFLINE_IDENTITY_COPY'
+$staging = 'REPLACE_WITH_EXISTING_PROTECTED_RECOVERY_DIRECTORY'
+$expectedRecipient = 'REPLACE_WITH_APPROVED_PUBLIC_RECIPIENT'
+if ($manifest.recipient -cne $expectedRecipient) { throw 'Unexpected recovery recipient' }
+if ((Get-FileHash -LiteralPath $age -Algorithm SHA256).Hash.ToLowerInvariant() -ne
+    '2821a4ed191da07372acd302e5f6feae7a7985e285e1417765ebe74025af45f0') { throw 'Untrusted age binary' }
+$ageVersion = & $age --version
+if ($LASTEXITCODE -ne 0 -or $ageVersion -cne 'v1.3.2') { throw 'Unsupported age version' }
+if (-not (Test-Path -LiteralPath $staging -PathType Container)) { throw 'Protected staging missing' }
+$ciphertext = $archive
+$archive = Join-Path $staging ('restore-' + [guid]::NewGuid().ToString('N') + '.dump')
+& $age --decrypt --identity $identity --output $archive $ciphertext
+if ($LASTEXITCODE -ne 0) {
+    Remove-Item -LiteralPath $archive -Force -ErrorAction SilentlyContinue
+    throw 'Decryption failed; preserve ciphertext and stop'
+}
+$plaintextSha = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+```
+
+Не принимать partial plaintext при любой ошибке age. Windows PULL никогда не выполняет
+этот шаг: закрытый age key не нужен Scheduler. Оригинал `.age` сохраняется.
 
 Подготовить заранее локальный PostgreSQL image того же major, что указан в manifest,
 зафиксировать проверенный immutable digest и подставить его вместо placeholder. На хосте
@@ -475,7 +512,7 @@ if (-not $ready) { throw 'Isolated PostgreSQL not ready' }
 docker cp $archive "${container}:/restore/backup.dump"
 if ($LASTEXITCODE -ne 0) { throw 'Copy to isolated container failed' }
 $isolatedDigest = docker exec $container sha256sum /restore/backup.dump
-if ($LASTEXITCODE -ne 0 -or ($isolatedDigest -split '\s+')[0] -ne $manifest.archive_sha256) {
+if ($LASTEXITCODE -ne 0 -or ($isolatedDigest -split '\s+')[0] -ne $plaintextSha) {
     throw 'Isolated copy checksum mismatch'
 }
 $serverVersion = docker exec $container psql -X -A -t -U postgres -d postgres -c 'SHOW server_version_num;'
@@ -524,19 +561,174 @@ Windows original не удалять. DNS/cutover не входит в drill.
 и [pg_dump](https://www.postgresql.org/docs/16/app-pgdump.html). Реальный пользовательский
 restore не выполнялся; `BACKUP_RECOVERY=PASS` не заявляется.
 
-### 11.4 Незашифрованный диск: отдельное решение
+### 11.4 Историческое решение о диске
 
-Обычная папка и ACL не защищают dump при краже диска, offline-чтении или компрометации
-администратора. Ранее зафиксированное `D: FullyDecrypted` не соответствует исходному
-encryption-at-rest acceptance #849. Нужны решение по privacy/security #707/#711,
-категориям данных, хранению в заявленной юрисдикции, доступу, удалению, custody и recovery keys.
-Checkbox `plaintext_risk_acknowledged` не закрывает эти условия и не даёт права передачи.
+Незашифрованная папка и ACL сами по себе не защищают dump при offline-чтении диска.
+Предложенный ранее plaintext opt-in заменён решением владельца: отдельные age-архивы
+в обычной папке. Текущий контракт и оставшиеся условия приведены ниже.
 
-Вариант для отдельного решения без оплаты/VHDX — шифровать **отдельные архивы** публичным
-ключом, например [age](https://github.com/FiloSottile/age), до записи в Windows-папку.
-Private decryption key хранить отдельно от диска с копиями; отдельно проверить его recovery.
-Текущий publisher/Pull этот формат **не реализует**: `mode=file_encryption` является лишь
-конфигурационным утверждением, не вызовом шифрования. Понадобятся согласованные изменения
-publish/manifest, ciphertext checksum, rotation и decrypt/restore, включая защиту temporary
-plaintext и swap. Простое шифрование уже скачанного `.dump` с последующим удалением
-не доказывает, что plaintext не сохранился на незашифрованном SSD. Способ хранения не изменён.
+## 12. Обязательное age-шифрование: решение владельца, 2026-10-22
+
+Сохраняются обычная `D:\YFC-Backups`, один архив в сутки, семь суток хранения, исходящий
+Windows PULL через SSH/SFTP и Task Scheduler. VHDX, облако и платные сервисы не нужны.
+Реализация — существующий [PR #1125, exact HEAD `f0ad024ef4b486fd99cb41677cf6c6785c6a2571`](https://github.com/MikeMoore1337/your-fitness-coach/tree/f0ad024ef4b486fd99cb41677cf6c6785c6a2571), инструкции — этот PR #1123. Установка на VPS/Windows,
+реальные ключи владельца, ACL, SSH, расписания, production transfer, merge и deploy не выполнены.
+
+### 12.1 Формат и границы защиты
+
+- VPS хранит только public X25519 recipient. `backup --publish-dir` требует явные
+  `--age-recipient` и абсолютный `--age-path`. Исполняемый файл сверяется с закреплённым
+  SHA-256 и `--version` перед запуском. Автоматической загрузки/установки/PATH fallback нет.
+- Dump создаётся с `pg_dump --format=custom` в отдельном временном каталоге с закрытыми
+  правами вне export. После `pg_restore --list` запускается age; при любой ошибке encryption
+  index не меняется и ротация не начинается. Временный plaintext удаляется при штатном выходе
+  и исключении. После kill/power loss он может остаться: оператор проверяет закрытые `.dump-*`
+  staging после перезапуска. Удаление файла не доказывает стирание SSD/swap или host snapshots.
+- В export попадают только готовые `.dump.age`, manifest и index. Index заменяется последним;
+  orphan после сбоя между ciphertext/manifest/index не считается копией. Оператор сверяет
+  его digest/причину и отдельно решает cleanup; runner не восстанавливает index догадкой.
+- Manifest и index принимают только целочисленный `schema_version=2`; manifest содержит
+  `archive_format=age-v1`, `age_version=v1.3.2`, public `recipient`, положительный целочисленный
+  `archive_size_bytes` и lowercase SHA-256 **зашифрованного файла**. Index повторяет эти поля.
+  Размер/хеш проверяются заново при загрузке и локальной ротации. Формат v1 не импортируется.
+- Windows проверяет `.dump.age`, бинарный заголовок age X25519, совпадение recipient с config,
+  manifest/index и фактический размер/SHA. Заголовок — структурная проверка, не доказательство
+  криптографической подлинности. За корректное создание отвечает доверенный publisher с
+  закреплённым age. SHA рядом с архивом не защищает от VPS, способного заменить оба объекта;
+  pinned SSH защищает транспорт. Age при расшифровке проверяет целостность ciphertext.
+- Закрытого age identity на VPS и в Windows runner нет. SSH identity — отдельный ключ для
+  read-only доступа, не ключ расшифровки. Незашифрованные local `.dump` блокируют Pull с
+  `CONFIG_INVALID` и сохраняются для перехода. Старые/чужие manifest не становятся валидными.
+- После простоя скачиваются доступные новые копии; при ошибке передачи ротация не выполняется.
+  Windows удаляет пары старше семи суток, сохраняя минимум две проверенные; VPS хранит семь
+  последних успешных публикаций. При одном архиве в сутки это обычное семидневное окно;
+  сбои могут увеличить возраст двух защищённых копий. Такие исключения требуют оповещения.
+
+Age защищает конфиденциальность копий при отдельном закрытом ключе, но не является защитой
+от удаления копий скомпрометированным администратором Windows. Сам VPS уже имеет исходную БД.
+Физические ACL, private staging, backup/privacy geography и оповещения остаются условиями активации.
+
+### 12.2 Offline identity: создание, восстановление, потеря и смена
+
+Эти действия выполняет владелец после отдельного разрешения, на доверенном offline recovery-хосте.
+В текущей работе создавались и удалялись только одноразовые синтетические identities.
+
+1. Проверить бинарники по разделу 12.3. Подготовить закрытый несинхронизируемый staging вне
+   репозитория, CI, VPS и backup-каталога; проверить права и отсутствие записи секретов в
+   transcripts/логах/скриншотах. Выполнить `age-keygen -o <private-identity-file>`; не выводить
+   файл с `AGE-SECRET-KEY-...` в терминал. `age-keygen -y <private-identity-file>` выдаёт public
+   recipient: только его передать publisher и Windows config по проверенному каналу.
+2. Сделать две независимо хранимые offline recovery-копии identity, например запечатанные
+   бумажные копии с проверенным полным текстом в разных защищённых физических местах.
+   Допустим имеющийся защищённый offline носитель; покупка носителя/сервиса не требуется.
+   Зафиксировать доступ ответственного и резервного хранителя без самого секрета в Issue.
+   Не хранить единственную recovery-копию на ПК с backup или рядом с ним.
+3. До активации зашифровать безопасный тестовый файл выбранным recipient, убрать рабочую
+   identity и восстановить её из **каждой** recovery-копии в закрытый staging. Проверить
+   `age-keygen -y`, успешную расшифровку и SHA исходного тестового файла. Записать дату,
+   public recipient и результат без private identity. Только затем указать конкретную ссылку
+   в `key_recovery_document`; boolean `approved` не заменяет эту проверку.
+4. Для восстановления получить разрешённую offline копию identity, проверить public recipient,
+   ciphertext manifest/size/SHA и использовать отдельный recovery staging из раздела 11.3.
+   При неверном/отсутствующем ключе или ошибке age остановиться, удалить только созданный
+   partial plaintext и сохранить `.age` неизменным. Не запускать pg_restore на partial output.
+5. Потеря всех identities делает старые архивы невосстановимыми. Новый ключ не расшифрует их.
+   Зафиксировать инцидент, сохранить ciphertext, искать независимую recovery-копию; если БД
+   ещё доступна, отдельно согласовать новый recipient и новую зашифрованную цепочку.
+6. При смене/компрометации ключа остановить ротацию, отдельно согласовать переход. Использовать
+   новый export и отдельный защищённый набор старых копий: текущий publisher откажет при
+   несовпадении recipient в существующем index, Windows не примет старый recipient как новый.
+   Старые identities хранить до разрешённого истечения всех соответствующих копий и проверки
+   нового restore. Перешифрование требует decrypt в закрытом staging и не стирает уже утёкшие копии.
+
+После drill отдельно подтвердить удаление созданного plaintext и временной identity на recovery-хосте;
+offline оригиналы и проверенную `.age` не удалять. Приватный ключ никогда не прикладывать к evidence.
+
+### 12.3 Бесплатные бинарники и закрепление происхождения
+
+Источник — [официальный FiloSottile/age v1.3.2](https://github.com/FiloSottile/age/releases/tag/v1.3.2),
+лицензия BSD-3-Clause. Получены только assets этого GitHub release по HTTPS; до распаковки
+SHA-256 сопоставлен с `digest` официального GitHub Releases API. После распаковки отдельно
+посчитаны SHA исполняемых файлов. Runtime pins находятся в `scripts/age-toolchain.json` PR #1125.
+
+| Платформа | Release asset | SHA-256 архива |
+| --- | --- | --- |
+| Linux amd64 | `age-v1.3.2-linux-amd64.tar.gz` | `cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10` |
+| Windows amd64 | `age-v1.3.2-windows-amd64.zip` | `f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7` |
+
+| Исполняемый файл | SHA-256 |
+| --- | --- |
+| Linux `age` | `eb7dd1b518f0a307c99cd97782623c5321da049154b04acd2d98d21aa7bc9b2c` |
+| Linux `age-keygen` | `0a0009db842259d6717f7eeb30acb6b90d2a2eb924c6acd0a0db0ca1f1537899` |
+| Windows `age.exe` | `2821a4ed191da07372acd302e5f6feae7a7985e285e1417765ebe74025af45f0` |
+| Windows `age-keygen.exe` | `1549c7049be32695594bedd09bbd352a94b6013a9d5c43364f3c6cd7a09ab61c` |
+
+Перед установкой получить точный asset с официального release, проверить archive SHA, распаковать
+в отдельный каталог и проверить binary SHA; до этого ничего не исполнять. Не использовать mirrors,
+latest-URL, сторонние wrappers или автообновление. Установленный binary/config/pins должны быть
+недоступны на запись SFTP/непривилегированным пользователям. Поддержка других архитектур требует
+отдельно проверенных pins; автоматической подмены нет. Использовано доверие к официальному GitHub
+HTTPS/API; независимая Sigsum-проверка upstream `.proof` в этом прогоне не выполнялась.
+
+### 12.4 Переход с незашифрованных архивов
+
+Автоматическая миграция и удаление legacy не выполняются. Сначала остановить старые jobs и ротацию,
+зафиксировать фактическую последнюю проверенную копию/manifest, размер/SHA и доступный объём.
+Не считать перенос legacy с последующим удалением гарантией стирания SSD.
+
+1. На VPS сохранить старые проверенные копии в закрытом **неэкспортируемом** quarantine вне нового
+   export. Старый SFTP account не должен иметь к нему доступа; проверить реальные права отдельно.
+   Создать чистый export для v2, настроить только public recipient и закреплённый age.
+2. На Windows до нового Pull переместить старые plaintext-копии с manifest в отдельно защищённый
+   несинхронизируемый quarantine вне `D:\YFC-Backups`, с отдельной owner/privacy оценкой хранения.
+   Если защищённое место и запас объёма не подготовлены, переход остановить и сохранить originals.
+   До этого runner блокирует Pull и ничего из legacy не удаляет.
+3. Создать новый encrypted backup, получить его в обычную `D:\YFC-Backups`; проверить ciphertext
+   size/SHA и offline key recovery. Выполнить отдельно разрешённый isolated restore из Windows-копии
+   с данными/schema/invariants/application smoke, согласовать RPO/RTO и получить следующую
+   ежедневную проверенную копию. Старые originals пока сохраняются, новая ротация их не касается.
+4. Только после подтверждения замены и отдельного решения владельца удалить или оставить до
+   согласованного срока legacy/quarantine и старый export. Удаление, физическое стирание и
+   повторная выдача SFTP-доступа не входят в этот PR. При сбое новой схемы остановиться;
+   возвращение к plaintext-экспорту или `mode=none` не допускается.
+
+### 12.5 Синтетическая проверка и условия реальной активации
+
+Выполнен полный синтетический цикл: PostgreSQL **16.15** → custom dump **5 979 bytes** →
+реальный закреплённый Linux age **6 179 bytes** → локальная SFTP-имитация → настоящий Windows
+PULL в PowerShell **7.6.6** и **5.1.26100.9444** → Windows age decrypt → новая PostgreSQL 16.
+Исходный PostgreSQL-контейнер и plaintext dump удалены **до** восстановления; identities не
+передавались Linux publisher. Проверены строки, binary bytes, schema revision, sequence и FK.
+Настоящий age отклонил malformed recipient. Отказали неверный ключ, отсутствующий ключ и
+повреждённый ciphertext; recovery из отдельной
+синтетической identity-копии прошёл. Одноразовые identities и drill-файлы удалены после теста.
+
+Синтетический ciphertext SHA-256:
+`7803a39f5e1d2fe09ba1882613322f81518e2376856e7cb6b1949630a6511423`.
+PostgreSQL image: `postgres@sha256:721873c34ceb9f8d8fc265984940dc982404c105f19ad51be9fdc5970a6080ea`;
+Python publisher: `python@sha256:29e1fe7a54021a1d8990f59223f1246a4239b106895363680b23aa1265f73cb3`.
+Контейнеры без сети, портов и production mounts; DB в tmpfs. Дамп проверен реальным
+`pg_restore --list` в source PG16; Compose adapter внутри publisher заменён этим отдельным
+вызовом, шифрование выполнял исходный `_encrypt_archive` без подмены. Время запуска новой БД,
+restore и SQL-проверок **2,393 s** — синтетическая величина, не RTO продукта.
+
+46 целевых Python-тестов (manifest/publication/maintenance/deployment scope) прошли. Windows
+self-test: **46/46 в каждой оболочке** на том же exact source HEAD; проверены downgrade/type/recipient/format rejection, plaintext rename,
+обрыв передачи, SHA/truncation, host-key/auth, locking, disk margin, статус после простоя,
+catch-up, семидневную ротацию, её отказ и побайтное сохранение предыдущих проверенных копий.
+Ошибка age/ENOSPC и сбои записи manifest/index проверены Python fault injection; физическое
+заполнение диска не выполнялось. Реальный Scheduler/reboot, SFTP endpoint/ACL, application smoke
+и production restore — `NOT_RUN`. Exact-head CI и security-check URLs фиксируются в обоих PR
+и Issue #849 после проверки финальных head, без заявления о production readiness.
+
+Для реальной активации остаются отдельные условия: privacy/security #707/#711 и география;
+проверенные offline key custody/recovery; защита executable/config/staging/ACL и переход legacy;
+read-only SFTP с отрицательными тестами; запас диска и VPS retention относительно простоя ПК;
+owner-approved время ежедневного backup, интервал Pull/Task Scheduler, оповещения и reboot test;
+подтверждённая независимая `.age`-копия; отдельно разрешённый clean-host drill с application smoke
+и заранее согласованными RPO/RTO. `BACKUP_RECOVERY=NOT_PROVEN`, Issue #849 остаётся OPEN.
+
+`env change required: no` для application runtime: `.env`, Compose, deployment contract и
+runtime keys не меняются. Активация требует host-side установки age/pins и передачи public
+recipient через явный `--age-recipient` (пример использует shell variable `YFC_BACKUP_AGE_RECIPIENT`),
+Windows config `mode=age`, recipient/recovery reference и отдельно разрешённых действий выше.
