@@ -5,10 +5,10 @@
   "stale_after_hours": 36,
   "minimum_free_bytes": 1073741824,
   "encryption_at_rest": {
-    "mode": "none",
+    "mode": "age",
     "approved": false,
-    "plaintext_risk_acknowledged": false,
-    "key_recovery_document": "NOT_APPLICABLE"
+    "recipient": "REPLACE_WITH_OFFLINE_GENERATED_PUBLIC_AGE_RECIPIENT",
+    "key_recovery_document": "REPLACE_WITH_TESTED_OFFLINE_RECOVERY_REFERENCE"
   },
   "lock_file": "D:\\YFC-Backups\\backup-pull.lock",
   "status_file": "D:\\YFC-Backups\\backup-status.json",
