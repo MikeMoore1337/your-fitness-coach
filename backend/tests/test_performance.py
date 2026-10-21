@@ -189,6 +189,7 @@ def test_coach_client_list_query_count_is_constant() -> None:
     assert result[-1]["kbju"].assigned_by.full_name == "Scale Coach"
     assert result[-1]["weight_kg"] == 80.0
     assert result[0]["weight_kg"] == 104.0
+    assert next(item for item in result if item["telegram_user_id"] == 911_001)["weight_kg"] == 81.0
     assert len(weight_queries) == 1
     weight_sql, weight_params = weight_queries[0]
     # One shared local-day predicate, not 25 per-client predicates.
