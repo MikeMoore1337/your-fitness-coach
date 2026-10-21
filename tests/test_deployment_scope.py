@@ -24,6 +24,7 @@ def test_docs_governance_tests_and_ci_only_do_not_deploy() -> None:
             "AGENTS.md",
             ".codex/config.toml",
             ".github/workflows/deploy.yml",
+            ".github/workflows/production-capacity-audit.yml",
             "codex-backlog/GLOBAL_RULES.md",
             "docs/deployment.md",
             "scripts/deployment_scope.py",

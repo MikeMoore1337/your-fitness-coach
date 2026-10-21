@@ -17,6 +17,7 @@ Task = scope и результат.
 | Существенный motion | `$motion-design-engineer` + implementation skill | `$apple-design` при Apple-like physical/gesture trigger; `$performance-engineer` при подтверждённой стоимости; `$accessibility-engineer` при сложном reduced-motion/a11y |
 | Design exploration | `$product-designer` + explicit `$ui-prototyper` | `$landing-art-director` для Landing; `$apple-design` при Apple/Liquid Glass/native-feel direction; `$motion-design-engineer` если motion является частью концепции |
 | Landing | `$landing-art-director` + `$product-designer` | `$frontend-engineer` при реализации; SEO/performance только по scope |
+| Combined UX/UI audit + single design proposal | `$ux-ui-design-orchestra` -> `$impeccable` -> `$ui-audit` по необходимости | `accessibility-engineer` / `motion-design-engineer` только при реальных проблемах; максимум 3 независимых read-only анализа, без изменений UI до owner approval |
 | UI audit | `$ui-audit` | `$apple-design` только при аудите Apple/Liquid Glass/native-feel contract; `$motion-design-engineer` при существенном motion review; a11y/perf по риску |
 | Backend/API | `$backend-engineer` | `$python-engineer` при Python implementation; data/security/privacy по границе |
 | Python | `$python-engineer` | domain skill по фактическому коду |

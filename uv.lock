@@ -7,7 +7,11 @@ resolution-markers = [
 ]
 
 [manifest]
-constraints = [{ name = "anyio", specifier = ">=4.14.2,<4.15" }]
+constraints = [
+    { name = "anyio", specifier = ">=4.14.2,<4.15" },
+    { name = "certifi", specifier = ">=2026.10.19" },
+    { name = "pillow", specifier = ">=13.0.0" },
+]
 
 [[package]]
 name = "aiofiles"

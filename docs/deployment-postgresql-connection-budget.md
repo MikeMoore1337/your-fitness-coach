@@ -467,7 +467,14 @@ OCI/topology/provenance guards сохраняются.
 не доказывают production capacity. #1147 остаётся owner-only, read-only, no-deploy;
 `POSTGRES_BUDGET_VERDICT=NOT_VERIFIED` сохраняется.
 
-Production metrics: NO_DATA; production safety: BLOCKED. Нужны разрешённый live read-only
-снимок с полной видимостью, реальные attribution/topology/reserved slots, active/candidate
+Production metrics: PARTIAL; production safety: BLOCKED. [Owner-only audit 39555570075](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39555570075)
+на master `b85ec32af5395860104c8332315a39be53851303` получил PostgreSQL 16,
+`max_connections=100`, reserved slots `3+0`, 12 клиентских соединений и 5 фоновых
+процессов. У 11 клиентов отсутствует атрибуция; workflow завершился с
+`POSTGRES_ATTRIBUTION_INCOMPLETE`, без production mutations. Измеренные лимиты дают
+`usable=97` и 85 свободных non-reserved клиентских слотов в этом снимке. Это не
+утверждённый safety headroom и не расчёт rollout phases; effective pools и число
+процессов/реплик этим аудитом не подтверждены. [Полные результаты и ограничения](https://github.com/MikeMoore1337/your-fitness-coach/issues/848#issuecomment-6309649378).
+Нужны разрешённый live read-only снимок с полной атрибуцией, реальные topology и role privileges, active/candidate
 provenance, pooler/phase overlap, freshness, положительный owner-approved численный headroom
 и независимый dry run. Merge и deploy не разрешены.

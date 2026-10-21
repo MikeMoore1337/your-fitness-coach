@@ -347,6 +347,234 @@ jobs:
                   return unknown
               return str(declared_yfc), str(total - declared_yfc), str(unattributed)
 
+          def select_db_container(raw):
+              db_ids = [value.strip() for value in (raw or "").splitlines() if value.strip()]
+              if not db_ids:
+                  return None, "POSTGRES_DB_CONTAINER_NOT_FOUND"
+              if len(db_ids) > 1:
+                  return None, "POSTGRES_DB_CONTAINER_MULTIPLE"
+              return db_ids[0], "OK"
+
+          def parse_postgres_runtime_env(raw):
+              values = {}
+              for line in (raw or "").splitlines():
+                  key, separator, value = line.partition("=")
+                  if not separator or key not in ("POSTGRES_USER", "POSTGRES_DB"):
+                      continue
+                  if not value or key in values or any(char in value for char in "\x00\r\n"):
+                      return None
+                  values[key] = value
+              return values
+
+          def parse_postgres_response(raw):
+              allowed = {
+                  "version_major",
+                  "max_connections",
+                  "superuser_reserved_connections",
+                  "reserved_connections",
+                  "current_connections",
+                  "session_counts",
+                  "background_processes",
+                  "unsupported_backends",
+                  "statistics_visible",
+                  "total_database_size_bytes",
+                  "shared_buffers",
+              }
+              parsed = {}
+              for line in (raw or "").splitlines():
+                  if not line or line.count("=") != 1:
+                      return {}, "POSTGRES_MALFORMED_SQL_RESPONSE"
+                  key, value = line.split("=", 1)
+                  if key not in allowed or key in parsed or not value:
+                      return {}, "POSTGRES_MALFORMED_SQL_RESPONSE"
+                  parsed[key] = value
+              return parsed, "OK"
+
+          def classify_postgres_error(result):
+              if result is None:
+                  return "POSTGRES_CLIENT_UNAVAILABLE"
+              if getattr(result, "returncode", 1) == 0:
+                  return "OK"
+              stderr = str(getattr(result, "stderr", "") or "").lower()
+              if any(
+                  marker in stderr
+                  for marker in (
+                      "executable file not found",
+                      "psql: not found",
+                      "psql: command not found",
+                  )
+              ):
+                  return "POSTGRES_CLIENT_UNAVAILABLE"
+              if any(marker in stderr for marker in ("no such container", "is not running")):
+                  return "POSTGRES_DOCKER_EXEC_FAILED"
+              if any(
+                  marker in stderr
+                  for marker in (
+                      "password authentication failed",
+                      "role ",
+                      "does not exist",
+                      "no pg_hba.conf entry",
+                      "peer authentication failed",
+                      "authentication failed",
+                  )
+              ):
+                  return "POSTGRES_AUTHENTICATION_FAILED"
+              if any(
+                  marker in stderr
+                  for marker in ("permission denied", "must be superuser", "insufficient privilege")
+              ):
+                  return "POSTGRES_PERMISSION_DENIED"
+              if any(
+                  marker in stderr
+                  for marker in (
+                      "could not connect",
+                      "connection refused",
+                      "connection timed out",
+                      "timeout expired",
+                      "server is not accepting",
+                  )
+              ):
+                  return "POSTGRES_CONNECTION_FAILED"
+              return "POSTGRES_SQL_EXECUTION_FAILED"
+
+          def build_psql_command(container_id, db_user, db_name, sql):
+              return [
+                  "docker",
+                  "exec",
+                  "--user",
+                  "postgres",
+                  container_id,
+                  "psql",
+                  "-X",
+                  "-qAt",
+                  "-w",
+                  "-v",
+                  "ON_ERROR_STOP=1",
+                  f"--username={db_user}",
+                  f"--dbname={db_name}",
+                  "-c",
+                  sql,
+              ]
+
+          def validate_postgres_metrics(parsed):
+              metrics = {
+                  "version_major": "UNAVAILABLE",
+                  "max_connections": "UNAVAILABLE",
+                  "superuser_reserved_connections": "UNAVAILABLE",
+                  "reserved_connections": "UNAVAILABLE",
+                  "usable_non_reserved_connections": "UNAVAILABLE",
+                  "current_connections": "UNAVAILABLE",
+                  "background_processes": "UNAVAILABLE",
+                  "unsupported_backends": "UNAVAILABLE",
+                  "connection_headroom": "UNAVAILABLE",
+                  "unreserved_headroom": "UNAVAILABLE",
+                  "declared_yfc_sessions": "UNAVAILABLE",
+                  "non_yfc_sessions": "UNAVAILABLE",
+                  "unattributed_sessions": "UNAVAILABLE",
+                  "total_database_size_mib": "UNAVAILABLE",
+                  "shared_buffers_mib": "UNAVAILABLE",
+              }
+
+              def parse_nonnegative(name):
+                  raw = parsed.get(name)
+                  if raw is None or raw == "":
+                      return None, "missing"
+                  if not raw.isascii() or not raw.isdigit():
+                      return None, "invalid"
+                  value = int(raw)
+                  metrics[name] = str(value)
+                  return value, "ok"
+
+              version, version_status = parse_nonnegative("version_major")
+              max_connections, max_status = parse_nonnegative("max_connections")
+              superuser_reserved, superuser_status = parse_nonnegative(
+                  "superuser_reserved_connections"
+              )
+              current_connections, current_status = parse_nonnegative("current_connections")
+              metric_states = (version_status, max_status, superuser_status, current_status)
+              if "invalid" in metric_states:
+                  return metrics, "POSTGRES_MALFORMED_SQL_RESPONSE"
+              if "missing" in metric_states:
+                  return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+              if version < 16:
+                  reserved_connections = 0
+                  metrics["reserved_connections"] = "0"
+              else:
+                  reserved_connections, reserved_status = parse_nonnegative(
+                      "reserved_connections"
+                  )
+                  if reserved_status == "invalid":
+                      return metrics, "POSTGRES_MALFORMED_SQL_RESPONSE"
+                  if reserved_status == "missing":
+                      return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+
+              background, background_status = parse_nonnegative("background_processes")
+              unsupported, unsupported_status = parse_nonnegative("unsupported_backends")
+              visible, visible_status = parse_nonnegative("statistics_visible")
+              if "missing" in (background_status, unsupported_status, visible_status):
+                  return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+              if "invalid" in (background_status, unsupported_status, visible_status) or visible not in (0, 1):
+                  return metrics, "POSTGRES_MALFORMED_SQL_RESPONSE"
+              if visible != 1:
+                  return metrics, "POSTGRES_STATISTICS_VISIBILITY_REQUIRED"
+              if unsupported:
+                  return metrics, "POSTGRES_UNSUPPORTED_BACKEND_TYPE"
+              if version < 10 or max_connections <= 0:
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              if version < 16 and parsed.get("reserved_connections") not in (None, "", "0", "UNAVAILABLE"):
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              session_raw = parsed.get("session_counts")
+              if session_raw is None or session_raw == "":
+                  return metrics, "POSTGRES_REQUIRED_METRIC_UNAVAILABLE"
+              session_parts = session_raw.split(",")
+              session_counts = read_session_counts(session_raw)
+              if (
+                  len(session_parts) != 3
+                  or any(not value.isascii() or not value.isdigit() for value in session_parts)
+                  or session_counts == ("UNAVAILABLE", "UNAVAILABLE", "UNAVAILABLE")
+              ):
+                  return metrics, "POSTGRES_MALFORMED_SQL_RESPONSE"
+              session_total = int(session_parts[0])
+              (
+                  metrics["declared_yfc_sessions"],
+                  metrics["non_yfc_sessions"],
+                  metrics["unattributed_sessions"],
+              ) = session_counts
+              if int(metrics["unattributed_sessions"]):
+                  return metrics, "POSTGRES_ATTRIBUTION_INCOMPLETE"
+              if session_total != current_connections:
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              if superuser_reserved + reserved_connections > max_connections:
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              usable = max_connections - superuser_reserved - reserved_connections
+              if current_connections > max_connections:
+                  return metrics, "POSTGRES_METRIC_CONFLICT"
+              metrics["usable_non_reserved_connections"] = str(usable)
+              metrics["connection_headroom"] = str(max_connections - current_connections)
+              metrics["unreserved_headroom"] = str(usable - current_connections)
+              return metrics, "OK"
+
+          def postgres_metrics_state(metrics, diagnostic_code):
+              required = (
+                  "version_major",
+                  "max_connections",
+                  "superuser_reserved_connections",
+                  "reserved_connections",
+                  "usable_non_reserved_connections",
+                  "current_connections",
+                  "declared_yfc_sessions",
+                  "non_yfc_sessions",
+                  "unattributed_sessions",
+              )
+              if diagnostic_code == "OK":
+                  return "VERIFIED"
+              if any(metrics[key] != "UNAVAILABLE" for key in required):
+                  return "PARTIAL"
+              return "NO_DATA"
+
+          def audit_workflow_status(postgres_metrics_status):
+              return "PASS" if postgres_metrics_status == "VERIFIED" else "NEEDS_WORK"
+
           postgres = {
               "version_major": "UNAVAILABLE",
               "max_connections": "UNAVAILABLE",
@@ -354,6 +582,8 @@ jobs:
               "reserved_connections": "UNAVAILABLE",
               "usable_non_reserved_connections": "UNAVAILABLE",
               "current_connections": "UNAVAILABLE",
+              "background_processes": "UNAVAILABLE",
+              "unsupported_backends": "UNAVAILABLE",
               "connection_headroom": "UNAVAILABLE",
               "unreserved_headroom": "UNAVAILABLE",
               "declared_yfc_sessions": "UNAVAILABLE",
@@ -362,7 +592,10 @@ jobs:
               "total_database_size_mib": "UNAVAILABLE",
               "shared_buffers_mib": "UNAVAILABLE",
           }
+          postgres_diagnostic_code = "DOCKER_UNAVAILABLE"
+          postgres_config_source = "UNAVAILABLE"
           if docker_available:
+              db_id = None
               db_result = command(
                   [
                       "docker",
@@ -375,108 +608,102 @@ jobs:
                       "{{.ID}}",
                   ]
               )
-              db_ids = (
-                  db_result.stdout.splitlines()
-                  if db_result is not None and db_result.returncode == 0
-                  else []
-              )
-              if len(db_ids) == 1:
+              if db_result is None or db_result.returncode != 0:
+                  postgres_diagnostic_code = "POSTGRES_DB_CONTAINER_DISCOVERY_FAILED"
+              else:
+                  db_id, container_code = select_db_container(db_result.stdout)
+                  postgres_diagnostic_code = container_code
+              if db_id is not None:
                   sql = """SELECT 'version_major=' || (current_setting('server_version_num')::int / 10000);
           SELECT 'max_connections=' || current_setting('max_connections')::int;
           SELECT 'superuser_reserved_connections=' || current_setting('superuser_reserved_connections')::int;
           SELECT 'reserved_connections=' || COALESCE(NULLIF(current_setting('reserved_connections', true), ''), 'UNAVAILABLE');
-          SELECT 'current_connections=' || count(*) FROM pg_stat_activity;
-          SELECT 'session_counts=' || count(*) || ',' ||
-            count(*) FILTER (WHERE application_name IN
-              ('yfc-backend', 'yfc-worker', 'yfc-setup', 'yfc-migration', 'yfc-connection-budget-collector')) || ',' ||
-            count(*) FILTER (WHERE COALESCE(btrim(application_name), '') = '')
-            FROM pg_stat_activity;
+          WITH activity AS MATERIALIZED (
+            SELECT
+              count(*) FILTER (WHERE backend_type = 'client backend') AS total,
+              count(*) FILTER (WHERE backend_type = 'client backend' AND application_name IN
+                ('yfc-backend', 'yfc-worker', 'yfc-setup', 'yfc-migration')) AS yfc,
+              count(*) FILTER (WHERE backend_type = 'client backend'
+                AND COALESCE(btrim(application_name), '') = '') AS unattributed,
+              count(*) FILTER (WHERE backend_type <> 'client backend') AS background,
+              count(*) FILTER (WHERE backend_type IS NULL OR backend_type NOT IN (
+                'client backend', 'autovacuum launcher', 'autovacuum worker',
+                'background writer', 'checkpointer', 'archiver', 'walwriter',
+                'logical replication launcher', 'parallel worker')) AS unsupported
+            FROM pg_stat_activity
+          )
+          SELECT 'current_connections=' || total || E'\n' ||
+            'session_counts=' || total || ',' || yfc || ',' || unattributed || E'\n' ||
+            'background_processes=' || background || E'\n' ||
+            'unsupported_backends=' || unsupported || E'\n' ||
+            'statistics_visible=' || pg_has_role(current_user, 'pg_read_all_stats', 'member')::int
+          FROM activity;
           SELECT 'total_database_size_bytes=' || COALESCE(sum(pg_database_size(datname)), 0) FROM pg_database WHERE datallowconn;
           SELECT 'shared_buffers=' || current_setting('shared_buffers');"""
-                  pg_result = command(
+                  runtime_env_result = command(
                       [
                           "docker",
-                          "exec",
-                          "--user",
-                          "postgres",
-                          db_ids[0],
-                          "psql",
-                          "-X",
-                          "-qAt",
-                          "-v",
-                          "ON_ERROR_STOP=1",
-                          "--dbname=postgres",
-                          "-c",
-                          sql,
+                          "inspect",
+                          "--format",
+                          "{{range .Config.Env}}{{println .}}{{end}}",
+                          db_id,
                       ]
                   )
-                  raw_lines = (
-                      pg_result.stdout.splitlines()
-                      if pg_result is not None and pg_result.returncode == 0
-                      else []
-                  )
-                  parsed = {
-                      line.split("=", 1)[0]: line.split("=", 1)[1]
-                      for line in raw_lines
-                      if "=" in line
-                  }
-                  for key in ("version_major", "max_connections", "current_connections"):
-                      if parsed.get(key, "").isdigit():
-                          postgres[key] = parsed[key]
-                  if parsed.get("superuser_reserved_connections", "").isdigit():
-                      postgres["superuser_reserved_connections"] = parsed["superuser_reserved_connections"]
-                  if postgres["version_major"].isdigit() and int(postgres["version_major"]) < 16:
-                      postgres["reserved_connections"] = "0"
-                  elif parsed.get("reserved_connections", "").isdigit():
-                      postgres["reserved_connections"] = parsed["reserved_connections"]
-                  (
-                      postgres["declared_yfc_sessions"],
-                      postgres["non_yfc_sessions"],
-                      postgres["unattributed_sessions"],
-                  ) = read_session_counts(parsed.get("session_counts", ""))
-                  if postgres["max_connections"].isdigit() and postgres["current_connections"].isdigit():
-                      postgres["connection_headroom"] = str(
-                          int(postgres["max_connections"]) - int(postgres["current_connections"])
-                      )
-                  if all(
-                      postgres[key].isdigit()
-                      for key in (
-                          "max_connections",
-                          "superuser_reserved_connections",
-                          "reserved_connections",
-                      )
-                  ):
-                      usable = (
-                          int(postgres["max_connections"])
-                          - int(postgres["superuser_reserved_connections"])
-                          - int(postgres["reserved_connections"])
-                      )
-                      if usable >= 0:
-                          postgres["usable_non_reserved_connections"] = str(usable)
-                          if postgres["current_connections"].isdigit():
-                              postgres["unreserved_headroom"] = str(
-                                  usable - int(postgres["current_connections"])
+                  if runtime_env_result is None or runtime_env_result.returncode != 0:
+                      postgres_diagnostic_code = "POSTGRES_RUNTIME_CONFIG_UNAVAILABLE"
+                  else:
+                      runtime_env = parse_postgres_runtime_env(runtime_env_result.stdout)
+                      if runtime_env is None:
+                          postgres_diagnostic_code = "POSTGRES_RUNTIME_CONFIG_MALFORMED"
+                      elif "POSTGRES_USER" not in runtime_env:
+                          postgres_diagnostic_code = "POSTGRES_USER_UNAVAILABLE"
+                      elif "POSTGRES_DB" not in runtime_env:
+                          postgres_diagnostic_code = "POSTGRES_DB_UNAVAILABLE"
+                      else:
+                          postgres_config_source = "running_container_env"
+                          pg_result = command(
+                              build_psql_command(
+                                  db_id,
+                                  runtime_env["POSTGRES_USER"],
+                                  runtime_env["POSTGRES_DB"],
+                                  sql,
                               )
-                  if parsed.get("total_database_size_bytes", "").isdigit():
-                      postgres["total_database_size_mib"] = str(
-                          round(int(parsed["total_database_size_bytes"]) / 1024**2)
-                      )
-                  shared_buffers = re.fullmatch(
-                      r"([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)",
-                      parsed.get("shared_buffers", ""),
-                  )
-                  if shared_buffers is not None:
-                      factor = {
-                          "B": 1,
-                          "KB": 1024,
-                          "MB": 1024**2,
-                          "GB": 1024**3,
-                          "TB": 1024**4,
-                      }.get(shared_buffers.group(2).upper())
-                      if factor is not None:
-                          postgres["shared_buffers_mib"] = str(
-                              round(float(shared_buffers.group(1)) * factor / 1024**2)
                           )
+                          if pg_result is None or pg_result.returncode != 0:
+                              postgres_diagnostic_code = classify_postgres_error(pg_result)
+                          else:
+                              parsed, response_code = parse_postgres_response(pg_result.stdout)
+                              if response_code != "OK":
+                                  postgres_diagnostic_code = response_code
+                              else:
+                                  postgres, postgres_diagnostic_code = validate_postgres_metrics(
+                                      parsed
+                                  )
+                                  if parsed.get("total_database_size_bytes", "").isdigit():
+                                      postgres["total_database_size_mib"] = str(
+                                          round(int(parsed["total_database_size_bytes"]) / 1024**2)
+                                      )
+                                  shared_buffers = re.fullmatch(
+                                      r"([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)",
+                                      parsed.get("shared_buffers", ""),
+                                  )
+                                  if shared_buffers is not None:
+                                      factor = {
+                                          "B": 1,
+                                          "KB": 1024,
+                                          "MB": 1024**2,
+                                          "GB": 1024**3,
+                                          "TB": 1024**4,
+                                      }.get(shared_buffers.group(2).upper())
+                                      if factor is not None:
+                                          postgres["shared_buffers_mib"] = str(
+                                              round(float(shared_buffers.group(1)) * factor / 1024**2)
+                                          )
+
+          postgres_metrics_status = postgres_metrics_state(
+              postgres, postgres_diagnostic_code
+          )
+          audit_workflow = audit_workflow_status(postgres_metrics_status)
 
           def historical_capacity_metrics():
               fields = ("cpu_count", "memory_available_mb", "disk_available_mb")
@@ -576,12 +803,18 @@ jobs:
                   f"POSTGRES_RESERVED_CONNECTIONS={postgres['reserved_connections']}",
                   f"POSTGRES_USABLE_NON_RESERVED_CONNECTIONS={postgres['usable_non_reserved_connections']}",
                   f"POSTGRES_CURRENT_CONNECTIONS={postgres['current_connections']}",
+                  f"POSTGRES_BACKGROUND_PROCESSES={postgres['background_processes']}",
+                  f"POSTGRES_UNSUPPORTED_BACKENDS={postgres['unsupported_backends']}",
                   f"POSTGRES_CONNECTION_HEADROOM={postgres['connection_headroom']}",
                   f"POSTGRES_UNRESERVED_HEADROOM={postgres['unreserved_headroom']}",
                   f"POSTGRES_DECLARED_YFC_SESSIONS={postgres['declared_yfc_sessions']}",
                   f"POSTGRES_NON_YFC_SESSIONS={postgres['non_yfc_sessions']}",
                   f"POSTGRES_UNATTRIBUTED_SESSIONS={postgres['unattributed_sessions']}",
+                  f"POSTGRES_METRICS={postgres_metrics_status}",
+                  f"POSTGRES_DIAGNOSTIC_CODE={postgres_diagnostic_code}",
+                  f"POSTGRES_CONFIG_SOURCE={postgres_config_source}",
                   "POSTGRES_BUDGET_VERDICT=NOT_VERIFIED",
+                  f"AUDIT_WORKFLOW={audit_workflow}",
                   f"POSTGRES_TOTAL_DATABASE_SIZE_MIB={postgres['total_database_size_mib']}",
                   f"POSTGRES_SHARED_BUFFERS_MIB={postgres['shared_buffers_mib']}",
                   f"PORT_5678={port_5678}",
@@ -593,6 +826,8 @@ jobs:
                   "NO_PRODUCTION_MUTATIONS=true",
               ]
           ))
+          if audit_workflow != "PASS":
+              raise SystemExit(2)
           REMOTE_PYTHON
           REMOTE_PROBE
           chmod 700 "$probe_script"
