@@ -744,3 +744,17 @@ def test_collect_snapshot_binds_active_image_and_candidate_provenance(
     assert actual.context.revisions == tuple(sorted((active_revision, candidate_revision)))
     assert actual.candidate_revision == candidate_revision
     assert actual.result.status == Verdict.PASS
+
+
+@pytest.mark.parametrize("unattributed", (None, 1))
+def test_verified_runtime_with_unknown_client_attribution_cannot_pass(unattributed) -> None:
+    postgres = _postgres(_context())
+    postgres = replace(
+        postgres, capacity=replace(postgres.capacity, unattributed_connections=unattributed)
+    )
+    model, _ = build_verified_budget_model(postgres, _topology(), _approved_policy())
+
+    result = evaluate(model, now=CAPTURED_AT + timedelta(seconds=1))
+
+    assert result.status == Verdict.UNKNOWN
+    assert any(item.code == "connection_attribution_incomplete" for item in result.diagnostics)
