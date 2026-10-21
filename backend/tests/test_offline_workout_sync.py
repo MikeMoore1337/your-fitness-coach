@@ -234,7 +234,6 @@ def test_retry_is_safe_after_finish_and_other_accounts_cannot_replay_it(client) 
     assert forbidden.status_code == 404
 
 
-
 def test_cardio_exact_replay_ignores_later_duration_state(client) -> None:
     headers = _auth(client, 93_604)
     exercises = client.get("/api/v1/programs/exercises", headers=headers).json()
