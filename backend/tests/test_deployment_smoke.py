@@ -179,10 +179,13 @@ def test_production_deploy_is_fail_closed_before_backup_and_runs_public_smoke() 
     )
 
     digest_gate = script.index("require_digest_ref POSTGRES_IMAGE")
-    capacity_check = script.index("scripts/zero_downtime_deploy.py capacity-check")
+    capacity_mode = script.index("capacity_command=capacity-check")
+    sequential_mode = script.index("capacity_command=capacity-check-single-slot")
+    capacity_check = script.index('scripts/zero_downtime_deploy.py "$capacity_command"')
     compose_gate = script.index("docker compose config --quiet")
     rollout = script.index('echo "Starting fail-closed blue/green rollout"')
 
-    assert digest_gate < capacity_check < compose_gate < rollout
+    assert digest_gate < capacity_mode < sequential_mode < capacity_check < compose_gate < rollout
+    assert 'if [[ "$ROLLOUT_MODE" == "single-slot" ]]; then' in script
     assert "--remove-orphans" not in script
     assert "docker compose up" not in script
