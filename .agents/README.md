@@ -83,3 +83,12 @@ UI visual/product audit остаётся отдельным `$ui-audit`.
 Дополнены `change-impact-analysis` (затронутые потребители), `contract-testing` (межкомпонентные контракты), `cross-layer-debugging` (воспроизведённые сквозные сбои), `requirements-traceability` (связь критериев и тестов). Применять точечно по [маршрутизации](references/SKILL_ROUTING_GUIDE.md). Роли, существующая QA-стратегия, продуктовый дизайн и GitHub Flow неизменны. Источник: [AI Development Toolkit, 3a9bf14772ab579d37c6f4f9615db505ab6ac259](https://github.com/MikeMoore1337/ai-development-toolkit/tree/3a9bf14772ab579d37c6f4f9615db505ab6ac259).
 
 Существующие условные справочники `apple-design` и `clear-voice` теперь также перечислены в `MANIFEST.json`; их содержимое не изменялось.
+
+## Impeccable: основной дизайн-критик
+
+`impeccable` - project-scoped первичная UX/UI-критика для YFC, а не новый controller. Canonical `SKILL.md` находится в `skills/impeccable/`, upstream pinned 4.7.0 в `../.impeccable/`. Для рисования и улучшения UI сначала этот skill, для наблюдаемой QA-регрессии - `ui-audit`, для motion - `motion-design-engineer`, по фактической нужде. Подробности: `../docs/development/impeccable-adoption.md`. Вопросы согласования дизайна решает владелец.
+
+
+## UX/UI Design Orchestra (режим аудита по умолчанию)
+
+При запросе нескольких экспертных проверок **одного экрана** выбери `ux-ui-design-orchestra` как координирующую методику, затем `impeccable`, `ui-audit`, `accessibility-engineer` и `motion-design-engineer` строго по необходимости. Это не новая lifecycle-роль. Схема и приёмка: `../docs/development/ux-ui-design-orchestra.md`. До согласованной визуальной версии - только чтение приложения и концепты, не коммиты UI. Отсутствие доступных subagents = последовательный запуск, не утверждать обратное.
