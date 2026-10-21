@@ -84,6 +84,32 @@ def test_json_formatter_preserves_worker_lifecycle_markers() -> None:
         assert json.loads(formatter.format(record))["message"] == event_name
 
 
+def test_json_formatter_preserves_worker_failure_without_exception_details() -> None:
+    try:
+        raise RuntimeError("private worker failure with https://internal.example/token")
+    except RuntimeError:
+        record = logging.LogRecord(
+            name="fitminiapp_api.services.worker",
+            level=logging.CRITICAL,
+            pathname=__file__,
+            lineno=1,
+            msg="worker_failed",
+            args=(),
+            exc_info=sys.exc_info(),
+        )
+    record.reason = "RuntimeError"
+
+    rendered = JsonFormatter(service="notification-worker").format(record)
+    payload = json.loads(rendered)
+
+    assert payload["message"] == "worker_failed"
+    assert payload["reason"] == "RuntimeError"
+    assert payload["exception_type"] == "RuntimeError"
+    assert "exception" not in payload
+    assert "private worker failure" not in rendered
+    assert "internal.example" not in rendered
+
+
 def test_json_formatter_preserves_bounded_ai_coach_metadata_without_content() -> None:
     record = logging.LogRecord(
         name="app.ai_coach",
