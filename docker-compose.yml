@@ -38,7 +38,7 @@ services:
 
   backend:
     <<: *backend-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     env_file: .env
     extra_hosts:
@@ -72,7 +72,7 @@ services:
   backend-blue:
     <<: *backend-image
     image: ${BACKEND_BLUE_IMAGE:-yfc-backend:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
@@ -103,7 +103,7 @@ services:
   backend-green:
     <<: *backend-image
     image: ${BACKEND_GREEN_IMAGE:-yfc-backend:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
@@ -145,7 +145,7 @@ services:
 
   bot:
     <<: *bot-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -342,7 +342,7 @@ services:
 
   worker:
     <<: *backend-image
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     env_file: .env
     extra_hosts:
@@ -370,7 +370,7 @@ services:
   worker-blue:
     <<: *backend-image
     image: ${BACKEND_BLUE_IMAGE:-yfc-backend:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
@@ -398,7 +398,7 @@ services:
   worker-green:
     <<: *backend-image
     image: ${BACKEND_GREEN_IMAGE:-yfc-backend:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     env_file: .env
@@ -426,7 +426,7 @@ services:
   bot-blue:
     <<: *bot-image
     image: ${BOT_BLUE_IMAGE:-yfc-bot:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     extra_hosts:
@@ -454,7 +454,7 @@ services:
   bot-green:
     <<: *bot-image
     image: ${BOT_GREEN_IMAGE:-yfc-bot:local}
-    restart: unless-stopped
+    restart: ${YFC_CONSUMER_RESTART_POLICY:-unless-stopped}
     logging: *yfc-application-logging
     profiles: ["production-slots"]
     extra_hosts:

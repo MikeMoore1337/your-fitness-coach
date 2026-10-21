@@ -565,7 +565,7 @@ def test_trusted_db_gate_blocks_single_slot_before_reclaim_and_stop(
     def blocked(_config):
         raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
 
-    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", blocked)
     with pytest.raises(deploy.DeploymentError, match="not proven"):
         deploy.single_slot_deploy(config)
 
@@ -587,7 +587,7 @@ def test_trusted_db_gate_blocks_idempotent_single_slot_before_mutation(
     def blocked(_config):
         raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
 
-    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", blocked)
     monkeypatch.setattr(
         deploy, "_switch_gateway", lambda *_args: pytest.fail("gateway must not switch")
     )
@@ -1032,7 +1032,17 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     active_revision_path.parent.mkdir(parents=True)
     active_revision_path.write_text(OLD_SHA + "\n", encoding="utf-8")
     monkeypatch.setenv("DEPLOY_SINGLE_SLOT_CONFIRMED_SHA", NEW_SHA)
-    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", lambda _config: None)
+    from types import SimpleNamespace
+
+    guard = SimpleNamespace(
+        configure=lambda _images: None,
+        disarm=lambda: None,
+        check=lambda *args, **kwargs: None,
+        released=lambda: None,
+        last_report={},
+    )
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", lambda _config: guard)
+    calls["safety"] = guard
     monkeypatch.setattr(deploy, "_reclaim_single_slot_docker_space", lambda: None)
     monkeypatch.setattr(
         deploy,
@@ -1075,7 +1085,7 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
         lambda env, value: calls["backend_starts"].append(env["BACKEND_IMAGE"]),
     )
 
-    def start_consumers(env, evidence, value, *, require_markers, best_effort=False):
+    def start_consumers(env, evidence, value, *, require_markers, best_effort=False, safety=None):
         del evidence, value
         del best_effort
         calls["consumer_starts"].append((env["BOT_IMAGE"], require_markers))
@@ -1131,62 +1141,25 @@ def test_single_slot_rollout_replaces_legacy_services_and_records_success(
     assert not config.state_root.joinpath("state.json").exists()
 
 
-def test_repair_rollout_does_not_require_partial_consumers_or_old_image_rollback(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_partial_repair_is_blocked_before_any_runtime_mutation(tmp_path, monkeypatch):
     config = _config(tmp_path)
     calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
     monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
     monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
-    monkeypatch.setattr(
-        deploy,
-        "_legacy_image_digest",
-        lambda *_args: pytest.fail("repair must not use partial runtime as rollback baseline"),
-    )
-    monkeypatch.setattr(
-        deploy,
-        "_legacy_running_image",
-        lambda service: (
-            "registry/edge:baseline"
-            if service == "edge"
-            else pytest.fail("repair must not inspect partial application images")
-        ),
-    )
-
-    evidence = deploy.single_slot_deploy(config)
-
-    assert evidence.verdict == "active"
-    assert calls["stops"] == [NEW_SHA]
-    assert (
-        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
-        == NEW_SHA
-    )
-
-
-def test_failed_repair_after_stop_keeps_baseline_marker_and_records_intervention(
-    tmp_path: Path, monkeypatch
-) -> None:
-    config = _config(tmp_path)
-    _patch_single_slot_runtime(tmp_path, monkeypatch)
-    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
-    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
-    monkeypatch.setattr(
-        deploy,
-        "_start_legacy_backend",
-        lambda *_args: (_ for _ in ()).throw(deploy.DeploymentError("backend failed")),
-    )
-
-    with pytest.raises(deploy.DeploymentError, match="backend failed"):
+    with pytest.raises(deploy.DeploymentError, match="partial repair is blocked"):
         deploy.single_slot_deploy(config)
+    assert calls["compose"] == calls["stops"] == calls["backend_starts"] == []
+    assert config.state_root.joinpath("last-successful-revision").read_text().strip() == OLD_SHA
 
-    assert (
-        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
-        == OLD_SHA
-    )
-    summary = next(config.state_root.glob("single-slot-*/summary.json"))
-    assert json.loads(summary.read_text(encoding="utf-8"))["verdict"] == (
-        "manual intervention required"
-    )
+
+def test_partial_repair_baseline_mismatch_still_fails_closed(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
+    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", NEW_SHA)
+    with pytest.raises(deploy.DeploymentError, match="baseline does not match"):
+        deploy.single_slot_deploy(config)
+    assert calls["compose"] == calls["stops"] == calls["backend_starts"] == []
 
 
 def test_single_slot_docker_reclaim_never_removes_container_data_or_volumes(
@@ -1330,10 +1303,13 @@ def test_single_slot_rollback_requires_verified_consumer_ownership(
         if starts == 1:
             raise deploy.DeploymentError("new backend failed")
 
-    def fail_consumer_ownership(env, evidence, value, *, require_markers, best_effort=False):
+    def fail_consumer_ownership(
+        env, evidence, value, *, require_markers, best_effort=False, safety=None
+    ):
         del env, evidence, value
         assert require_markers is True
-        assert best_effort is True
+        assert best_effort is False
+        assert safety is not None
         raise deploy.DeploymentError("bot ownership confirmation timed out")
 
     monkeypatch.setattr(deploy, "_start_legacy_backend", fail_target_once)
@@ -1352,7 +1328,7 @@ def test_single_slot_rollback_requires_verified_consumer_ownership(
     assert "ownership confirmation timed out" in rollback["reason"]
 
 
-def test_single_slot_rollback_attempts_consumers_after_backend_smoke_failure(
+def test_single_slot_rollback_stops_before_consumers_after_backend_smoke_failure(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _config(tmp_path)
@@ -1374,7 +1350,7 @@ def test_single_slot_rollback_attempts_consumers_after_backend_smoke_failure(
     with pytest.raises(deploy.DeploymentError, match="new backend failed"):
         deploy.single_slot_deploy(config)
 
-    assert calls["consumer_starts"] == [("registry/bot@sha256:" + "a" * 64, True)]
+    assert calls["consumer_starts"] == []
     summaries = list(config.state_root.glob("single-slot-*/summary.json"))
     assert len(summaries) == 1
     summary = json.loads(summaries[0].read_text(encoding="utf-8"))
@@ -1531,6 +1507,7 @@ def test_single_slot_stop_is_ordered_and_uses_bounded_timeouts(tmp_path: Path, m
 
     monkeypatch.setattr(deploy, "_compose", compose)
 
+    monkeypatch.setattr(deploy, "_container_exited_cleanly", lambda lease: True)
     deploy._stop_legacy_services(config)
 
     assert commands == [
@@ -1591,3 +1568,109 @@ def test_clean_exit_evidence_requires_exited_zero(monkeypatch) -> None:
             ),
         )
         assert deploy._container_exited_cleanly(lease) is expected
+
+
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_maintenance_drain_failure_never_starts_candidate_or_rollback(
+    tmp_path, monkeypatch, interrupted
+):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def failed_drain(*args, **kwargs):
+        if interrupted:
+            raise KeyboardInterrupt()
+        raise deploy.DeploymentError("stuck drain")
+
+    monkeypatch.setattr(deploy, "_stop_legacy_services", failed_drain)
+    with pytest.raises((KeyboardInterrupt, deploy.DeploymentError)):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert calls["backend_starts"] == calls["consumer_starts"] == []
+    summary = json.loads(
+        next(_config(tmp_path).state_root.glob("single-slot-*/summary.json")).read_text()
+    )
+    assert summary["verdict"] == "manual intervention required"
+
+
+def test_maintenance_unreleased_connections_block_every_new_consumer(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def unreleased():
+        raise deploy.SafetyError("unknown_or_unreleased_database_client")
+
+    calls["safety"].released = unreleased
+    with pytest.raises(deploy.SafetyError, match="unreleased"):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert not any(args[0] == "run" for args, _ in calls["compose"])
+    assert calls["backend_starts"] == calls["consumer_starts"] == []
+
+
+def test_interrupted_rollback_cannot_start_following_consumers(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def interrupted_backend(*args):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(deploy, "_start_legacy_backend", interrupted_backend)
+    with pytest.raises(KeyboardInterrupt):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert calls["consumer_starts"] == []
+    summary = json.loads(
+        next(_config(tmp_path).state_root.glob("single-slot-*/summary.json")).read_text()
+    )
+    assert summary["verdict"] == "manual intervention required"
+    assert (
+        _config(tmp_path).state_root.joinpath("last-successful-revision").read_text().strip()
+        == OLD_SHA
+    )
+
+
+def test_maintenance_rechecks_before_each_one_shot_and_never_downgrades(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    events = []
+    guard = calls["safety"]
+    guard.released = lambda: events.append("released")
+    guard.check = lambda *args, **kwargs: events.append("checked")
+
+    def compose(*args, **kwargs):
+        if args[0] == "run":
+            assert events[-1] == "released"
+            events.append(args)
+            assert kwargs["env"]["YFC_CONSUMER_RESTART_POLICY"] == "no"
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(deploy, "_compose", compose)
+    deploy.single_slot_deploy(_config(tmp_path))
+    runs = [event for event in events if isinstance(event, tuple)]
+    assert [run[run.index("--entrypoint") + 1] for run in runs] == ["python", "alembic", "python"]
+    assert "downgrade" not in str(runs)
+    assert events[-1] == "checked"
+
+
+def test_sequential_preflight_binds_candidate_and_installed_image_provenance(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    config.root.joinpath(".deployment-sha").write_text(NEW_SHA)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(OLD_SHA)
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+    calls = []
+    from types import SimpleNamespace
+
+    guard = SimpleNamespace(
+        configure=lambda images: calls.append(images),
+        check=lambda *args, **kwargs: calls.append(args),
+    )
+    monkeypatch.setattr(deploy, "SequentialSafety", lambda root, margin: guard)
+    monkeypatch.setattr(
+        deploy,
+        "_legacy_image_digest",
+        lambda service, revision: (
+            calls.append((service, revision))
+            or ("bot-digest" if service == "bot" else "backend-digest")
+        ),
+    )
+    assert deploy._sequential_connection_budget_preflight(config) is guard
+    assert calls[:3] == [("backend", OLD_SHA), ("worker", OLD_SHA), ("bot", OLD_SHA)]
+    assert calls[3] == ("backend-digest",)
+    config.root.joinpath(".deployment-sha").write_text(OLD_SHA)
+    with pytest.raises(deploy.DeploymentError, match="candidate revision mismatch"):
+        deploy._sequential_connection_budget_preflight(config)

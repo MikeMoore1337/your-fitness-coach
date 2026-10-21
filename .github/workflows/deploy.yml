@@ -513,6 +513,7 @@ jobs:
             scripts/connection_budget_preflight.py
             scripts/trusted_runtime_collector.py
             scripts/trusted_legacy_pg_snapshot.py
+            scripts/sequential_deploy_safety.py
             scripts/production_host_cleanup.py
             scripts/configure_production_auth.py
             scripts/configure_production_food_search.py

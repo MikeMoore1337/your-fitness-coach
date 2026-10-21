@@ -82,7 +82,11 @@ require_digest_ref CLOUDFLARED_IMAGE
 # A separate read-only gate must pass BEFORE any configuration-file or runtime
 # mutation. The deployment orchestrator independently rechecks at its stage.
 echo "Checking trusted PostgreSQL capacity before production configuration changes"
-python3 scripts/zero_downtime_deploy.py capacity-check "$TARGET_SHA" "$BASE_URL" "$PUBLIC_BASE_URL"
+capacity_command=capacity-check
+if [[ "$ROLLOUT_MODE" == "single-slot" ]]; then
+  capacity_command=capacity-check-single-slot
+fi
+python3 scripts/zero_downtime_deploy.py "$capacity_command" "$TARGET_SHA" "$BASE_URL" "$PUBLIC_BASE_URL"
 
 echo "Enabling browser OAuth and keeping email registration disabled"
 python3 scripts/configure_production_auth.py .env

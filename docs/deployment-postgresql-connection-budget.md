@@ -2,6 +2,172 @@
 
 Документ описывает trusted runtime collector и fail-closed rollout gate для #848. Gate подключён к production wrapper и deployment helper, но это ещё не production activation: live snapshot, owner-approved safety headroom, dry run и release approval не подтверждены.
 
+## Последовательный выпуск: решение владельца 21.10.2026
+
+Этот раздел задаёт новый single-slot maintenance contract. Остальные разделы сохраняют
+полную консервативную модель online/blue-green collector; её фазы не отключены.
+Решение [в #848](https://github.com/MikeMoore1337/your-fitness-coach/issues/848#issuecomment-6323551623)
+разрешает разработку и изолированные тесты. **Production release BLOCKED** до отдельных
+решений по окну, резерву, credentials/ACL, независимому dry run и выпуску.
+
+### Исполняемые барьеры
+
+`scripts/sequential_deploy_safety.py` работает только внутри существующего single-slot
+helper. GitHub Actions сохраняет `concurrency.group=production`, `cancel-in-progress=false`.
+Нового controller, lock, очереди или recovery database нет. Источник фактов — Docker и PG.
+
+1. Wrapper выбирает `capacity-check-single-slot` до изменения конфигурации. Проверяются
+   точный SHA immutable bundle, отдельный observer, полный Docker inventory и DB sessions.
+   После OCI-проверки старого и нового digest потолок определяется offline engine probe
+   обоих image с действующим `.env`, затем сверяется с rendered и running overrides.
+   Одна QueuePool engine на процесс; неизвестные/unlimited pools и multiprocess блокируют путь.
+2. До backup и stop у всех существующих legacy/blue/green consumers отключается Docker
+   restart policy. Новый backend/worker/bot создаются с `YFC_CONSUMER_RESTART_POLICY=no`.
+   Это native Docker fencing от автоматического перезапуска, включая перезапуск Docker/хоста;
+   существующий stopped standby также не может сам подняться. Все проверки повторно сверяют
+   policy и точное множество работающих consumers. Любой лишний slot/setup/replica запрещён.
+3. Worker → bot → backend получают bounded graceful stop. Проверяется именно исходный
+   container ID и `exited 0`; маркер в логе не заменяет чистое завершение. Timeout/SIGKILL,
+   неожиданное исчезновение или неизвестный drain запрещают candidate и автоматический rollback.
+4. Независимый PG observer дважды подтверждает отсутствие application sessions. Затем
+   readiness → Alembic → seed выполняются отдельными одноразовыми процессами; перед и после
+   каждого есть свежий barrier. После него последовательно запускаются backend → worker → bot,
+   со свежей проверкой бюджета и предыдущего runtime перед каждым запуском.
+5. Бюджет каждого reachable этапа, включая backup, readiness, migration, seed, steady state
+   и все этапы rollback, пересчитывается при каждой проверке. Учитываются reserved slots,
+   один observer и явный положительный резерв; значения по умолчанию для резерва нет.
+   Application sessions заменяются проверенным ceiling, не прибавляются к нему повторно.
+   Все другие clients без проверяемого runtime owner **блокируют** путь, даже если они имеют
+   красивый application_name. Поэтому observed E=0 из прежнего аудита не становится допущением
+   следующего выпуска; никакой ручной external allowlist здесь нет.
+6. DB snapshot → socket join → новый DB snapshot и Docker inventory должны согласовываться.
+   Изменившиеся PID/backend_start/client tuples/container start/restart, неизвестные DB consumer
+   или пропавший observer останавливают следующий этап. Снимок из файла не принимается.
+
+При measured cap30+30, observer1 и **только предложенном M=10**: backup=72/97,
+steady/worker/rollback=71/97, setup/readiness=41/97, migration=12/97. Это модель при
+положительных барьерах, а не production PASS. Candidate overlap, dual consumers и
+legacy+blue+green не объявлены безопасными: они **запрещены runtime inventory/fencing**;
+online collector по-прежнему считает их полные потолки и не выдаёт PASS на 97 слотах.
+
+### Защищённый observer после остановки backend
+
+Нужны host Python 3.14 (версия проекта), существующий `/usr/bin/psql`, отдельный libpq service `yfc_observer` и два файла:
+`/etc/yfc/observer/pg_service.conf`, `/etc/yfc/observer/pgpass`. Каталог root:root 0700,
+файлы root:root 0600; родители root-owned, без group/world write и symlink.
+Helper/psql должен иметь законный доступ к этим файлам в существующем deployment account.
+Это prerequisite; код не устанавливает psql, не создаёт роли/файлы и не выдаёт sudo-права.
+
+План SQL для **отдельно авторизованного** provisioning (здесь не выполняется):
+
+```sql
+CREATE ROLE yfc_observer LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+  NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 1;
+GRANT CONNECT ON DATABASE <application_database> TO yfc_observer;
+GRANT pg_read_all_stats TO yfc_observer;
+ALTER ROLE yfc_observer SET default_transaction_read_only = on;
+```
+
+Пароль задаётся отдельно утверждённым secret-процессом, не SQL в Git/argv/log.
+В service-файле: TCP endpoint установленного PG, `dbname`, `user=yfc_observer`,
+`connect_timeout=5`, `passfile=/etc/yfc/observer/pgpass`; никаких application credentials.
+`pg_hba`/host ACL разрешают только этот управляемый канал. Database container, mount и
+application credentials для наблюдения менять не требуется. В CLI очищается ambient env,
+фиксируются read-only/timeouts и проверяются фактические server address/port/database,
+PG16, stats visibility, connection limit1, отсутствие superuser/опасных memberships и
+прав на application tables. Значения credentials, SQL query text и client tuples не
+попадают в evidence. Исчезновение psql, файла, доступа или PG даёт отказ, без fallback
+на superuser, работающий backend или сохранённый JSON.
+
+`pg_read_all_stats` открывает sensitive metadata, включая чужие query texts: роль и файл
+доступны только доверенному deploy operator. Скрипт выбирает только идентичности клиентов
+и агрегаты, не SQL text/username. Это не разрешение выдавать роль в production.
+
+### Доверенная legacy attribution и граница защиты
+
+При пустом application_name используются текущие client address+port, ESTABLISHED TCP
+socket и его inode с владеющим процессом **внутри конкретного inspected контейнера**.
+Probe работает от штатного container user; нет дополнительных capabilities и host /proc
+scan. Проверяются один основной Python/uvicorn process и direct `db:5432` engine.
+Неизвестные клиенты, pooler, IPv6-only/иная топология, inaccessible /proc или ambiguity
+блокируют операцию. Исторические forensic tuples не загружаются; изменение маркеров
+задним числом невозможно. Это machine bootstrap для текущих legacy sessions.
+
+Fencing покрывает native restart policies и один authorized Actions writer. Root/Docker
+administrator всё ещё способен вручную создать/start контейнер или изменить ACL между
+проверкой и запуском. Поэтому отсутствие параллельных privileged writers и ограничение
+DB/network credentials — обязательное production условие; этот код не заявляет защиты
+от злонамеренного root. Новый неизвестный consumer блокируется при ближайшем barrier.
+Действующая superuser application role из прежнего измерения требует отдельного security
+решения; отдельная observer role не исправляет её права автоматически.
+
+### Отказ и rollback
+
+После подтверждённого drain, успешных migration/seed и отказа приложения helper сначала
+чисто останавливает target, заново доказывает release sessions, повторяет schema gate,
+проверяет бюджет и поднимает старые immutable images: backend → smoke → worker → bot.
+Ошибка любого шага прекращает следующие запуски. Прерванный rollback оставляет
+`manual intervention required`; target автоматически вслед за ним не запускается.
+
+SIGKILL процесса не обрабатывается Python: Docker restart=no остаётся, уже запущенный
+one-shot может ещё работать. Следующее выполнение проверяет живой inventory/PG с нуля и
+не может миновать orphaned setup, незавершённый drain или частично восстановленный runtime.
+Нет resume-token и автоматического продолжения по summary.json. Partial `DEPLOY_REPAIR_MODE`
+блокируется до runtime mutation: этот путь требует полного проверенного baseline. Для восстановления нужны
+отдельное разрешение владельца и свежие проверки; нельзя просто повторно включить все slots.
+
+После ошибки миграции/seed автоматического app rollback нет: частичный schema/data outcome
+не доказан. `check_online_migrations.py` остаётся обязательным до downtime и перед app rollback:
+деструктивные/неописанные изменения блокируются. **App rollback не запускает downgrade и не
+восстанавливает backup.** Данные после миграции сохраняются. Для каждого будущего диапазона
+revisions нужны isolated PG16 migration и проверка старого приложения на полученной схеме;
+статический AST gate и green CI не заменяют этот release-specific результат и gate #849.
+
+Restart=no сохраняется и после успешного maintenance/rollback. После финального smoke
+оператор должен отдельно разрешить возврат штатной restart policy **только у трёх проверенных
+активных legacy контейнеров**, с новым inventory и подтверждением отсутствия slots/setup.
+До этого crash приведёт к остановке сервиса: это осознанная граница fail-closed, а не HA.
+
+### Оставшиеся production решения и замер окна
+
+**env change required: yes** для будущей активации: утверждённый
+`DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS` (без repository default); existing one-shot
+`DEPLOY_SINGLE_SLOT_CONFIRMED_SHA=<exact merged release SHA>`; выбранный Actions single-slot
+mode. `YFC_CONSUMER_RESTART_POLICY=no` передаётся только в env создаваемых consumers,
+не записывается helper в production `.env`. Новая observer role/secret/service/ACL и наличие
+psql требуют отдельного разрешения. Pool sizes/max_connections не меняются.
+
+До разрешения операций необходимо: утвердить M и окно/максимум простоя; provision observer;
+решить application role security и вернуть успешный provenance gate отдельно от #848;
+подтвердить единственного privileged writer; выполнить разрешённый независимый dry run
+на exact release с fresh topology/attribution/pools и всеми negative cases; проверить
+schema compatibility старого release, #849 backup/recovery и rollback; согласовать rearm
+policy; получить отдельное разрешение на stop/migration/restart/deploy.
+
+Оценка окна = сумма измеренных graceful stop + release barriers + readiness/migration/seed
++ backend/worker/bot readiness + smoke; отдельно измеряется failed rollout + rollback.
+StageRecord сохраняет start/end/duration по этапам. Лимиты drain/readiness — timeout bounds,
+не прогноз длительности миграции. До staging rehearsal фактическая длительность **NO_DATA**;
+численное окно и время production не выбраны. Полный production dry run не выполнен.
+
+### Изолированная проверка реализации, 21.10.2026
+
+- Linux / Python 3.14 / psycopg 3.3.6: **351 целевой pytest PASS**, включая три реальных
+  PG16 теста роли, read-only и удерживаемой транзакции; Ruff/format и deployment/image/workflow
+  contracts PASS. Fault injection проверяет обычный путь, stuck/нечистый stop, unknown consumer,
+  missing observer, unreleased clients, capacity denial, interruption и fail-fast rollback.
+- Отдельная Docker/PG16 лаборатория: legacy socket join без application_name, graceful stop,
+  disappearance sessions при остановленном backend и restart=no — PASS. Реальные leaked SQL
+  client, утрата stats privileges, сверхбюджет и SIGKILL — DENIED; автоперезапуска после SIGKILL нет.
+  На Windows psql transport перенесён адаптером в отдельный DB container; production host psql,
+  защищённые host files/ACL и реальные процессы production этим не проверены.
+- Новая схема развёрнута с нуля до `0130_workout_rest_sessions` в отдельной PG16. Исходники
+  прежней измеренной production revision `aba8275040578e69fe597bea350351cf4351392f` прошли readiness,
+  dev login и authorized `/me` на этой схеме. Использован локальный runtime image с примонтированным
+  старым source; это не проверка точного production rollback digest и не всех V11 journeys.
+- Production аудит не повторялся; stop/migration/credentials/roles/env/pools/restart в production
+  не выполнялись. Полный release rehearsal и длительность сервисного окна остаются NOT_VERIFIED.
+
 ## Что подтверждено в репозитории
 
 Проверено относительно актуального `origin/master`, смёрженного в ветку PR 20.10.2026:
