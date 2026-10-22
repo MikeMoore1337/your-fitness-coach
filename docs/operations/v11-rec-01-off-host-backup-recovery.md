@@ -29,6 +29,8 @@ pg_dump, если целевой архив уже существует. Обн�
 они удаляются при успехе и ошибке. Публикация архива выполняется rename на том же томе,
 затем atomic manifest и последним — `index.json`, служащий признаком завершения.
 Linux publisher сохраняет существующий `flock` от параллельной публикации.
+Внешний архив до rename получает mode `0640`: запись владельцу, чтение его группе,
+доступ остальным запрещён. Приватный staging остаётся `0700`.
 
 Manifest/index **v3**, `archive_format=tar-gzip-pg-custom`, содержат размер и SHA-256 всего
 `.tar.gz`, время создания/публикации, статус `format_verified_pg_restore_list`. Manifest
@@ -139,7 +141,9 @@ Unit=yfc-backup-tar.service
 ```
 
 Service должен запускаться из существующего app root под утверждённым publisher identity,
-`UMask=0077`; использовать команду раздела 1. Сам systemd timer не имеет Enabled-поля:
+`UMask=0027` и primary group существующего read-only SFTP. Backup root/staging не должны
+наследовать другую группу через setgid/default ACL; проверить uid/gid/mode опубликованного
+архива и отсутствие лишних ACL перед настоящими данными. Использовать команду раздела 1. Сам systemd timer не имеет Enabled-поля:
 disabled означает отсутствие `systemctl enable/start` и проверенный inactive state.
 Существующий timer оставить disabled/inactive; не заменять его автоматически.
 

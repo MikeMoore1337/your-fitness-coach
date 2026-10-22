@@ -185,6 +185,7 @@ def validate_tar_archive(path: Path) -> dict[str, Any]:
 
 def create_tar_archive(source: Path, target: Path, recovery: Mapping[str, Any]) -> None:
     with target.open("xb") as output:
+        os.chmod(target, 0o640)
         with tarfile.open(fileobj=output, mode="w:gz", format=tarfile.USTAR_FORMAT) as archive:
             dump = tarfile.TarInfo("database.dump")
             dump.size = source.stat().st_size

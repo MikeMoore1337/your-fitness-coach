@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import struct
 import tarfile
 from datetime import datetime, timedelta, timezone
@@ -71,6 +72,8 @@ def manifest_for(path: Path) -> dict:
 def test_archive_manifest_index_roundtrip_and_safe_unpack(tmp_path: Path) -> None:
     archive = make_archive(tmp_path)
     manifest = manifest_for(archive)
+    if os.name != "nt":
+        assert archive.stat().st_mode & 0o777 == 0o640
     bm.write_json_atomic(tmp_path / manifest["manifest_name"], manifest)
     index = bm.build_index([manifest])
     assert bm.validate_index(index) == index
