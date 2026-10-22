@@ -19,8 +19,10 @@ def test_new_noop_patch_does_not_create_a_version_or_mutation(client) -> None:
         headers=headers,
         json={"expected_version": before, "mutation_id": "new-noop-mutation-000001"},
     )
+    null_completion = client.patch(endpoint, headers=headers, json={"is_completed": None})
     assert empty.status_code == 422, empty.text
     assert metadata_only.status_code == 422, metadata_only.text
+    assert null_completion.status_code == 422, null_completion.text
 
     reread = client.get("/api/v1/workouts/today", headers=headers).json()
     persisted_set = reread["exercises"][0]["sets"][0]
