@@ -218,9 +218,10 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
             if (validWorkoutStatus(current)) await updateCachedSet(queryClient, current);
             setSyncState('conflict');
             setMessage(
-              typeof detail.message === 'string'
-                ? detail.message
-                : 'Конфликт изменения подхода. Локальные данные сохранены для проверки.',
+              getUserFacingErrorMessage(
+                reason,
+                'Конфликт изменения подхода. Локальные данные сохранены для проверки.',
+              ),
             );
             return false;
           }
