@@ -100,6 +100,7 @@ def apply_workout_set_update(
             },
         )
 
+    applied = False
     for field in (
         "actual_reps",
         "actual_weight",
@@ -114,6 +115,10 @@ def apply_workout_set_update(
     ):
         if field in changes and (field != "is_completed" or changes[field] is not None):
             setattr(set_row, field, changes[field])
+            applied = True
+
+    if not applied:
+        raise WorkoutSetSyncError(422, "Не указаны изменения подхода")
 
     set_row.version += 1
     if mutation_id is not None:
