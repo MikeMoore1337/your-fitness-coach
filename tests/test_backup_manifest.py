@@ -237,6 +237,47 @@ def test_publication_rechecks_dump_then_commits_index(
     assert before == {p.name: p.read_bytes() for p in index.parent.iterdir()}
 
 
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX SFTP permission contract")
+def test_sftp_export_metadata_group_readable_after_index_replacement(publisher: Path) -> None:
+    now = bm.utc_now()
+    original_umask = os.umask(0o027)
+    try:
+        first_manifest, index, _ = publish(publisher, now - timedelta(days=1))
+        second_manifest, index, _ = publish(publisher, now)
+    finally:
+        os.umask(original_umask)
+    entries = bm.read_index(index)["backups"]
+    assert len(entries) == 2
+    for metadata in (first_manifest, second_manifest, index):
+        assert metadata.stat().st_mode & 0o777 == 0o640
+        assert metadata.stat().st_gid == os.getgid()
+    for entry in entries:
+        archive = index.parent / entry["archive_name"]
+        assert archive.stat().st_mode & 0o777 == 0o640
+        assert archive.stat().st_gid == os.getgid()
+    private_metadata = publisher / "private" / "private.json"
+    bm.write_json_atomic(private_metadata, {"private": True})
+    assert private_metadata.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX SFTP permission contract")
+def test_group_readable_json_failure_keeps_existing_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index = tmp_path / "index.json"
+    bm.write_json_atomic(index, {"version": 1}, group_readable=True)
+    original = index.read_bytes()
+
+    def reject_mode(*args: object) -> None:
+        raise OSError("synthetic chmod failure")
+
+    monkeypatch.setattr(bm.os, "fchmod", reject_mode)
+    with pytest.raises(OSError, match="chmod failure"):
+        bm.write_json_atomic(index, {"version": 2}, group_readable=True)
+    assert index.read_bytes() == original
+    assert not list(tmp_path.glob("*.partial"))
+
 def test_retention_keeps_two_good_even_when_all_expired(publisher: Path) -> None:
     now = bm.utc_now()
     for days in (10, 9, 8):
@@ -273,12 +314,12 @@ def test_failed_publication_preserves_two_previous_copies(
     before = {p.name: p.read_bytes() for p in index.parent.iterdir()}
     write = db.write_json_atomic
 
-    def fail_write(path: Path, value: dict) -> None:
+    def fail_write(path: Path, value: dict, *, group_readable: bool = False) -> None:
         if (failure == "manifest" and path.name.endswith(".manifest.json")) or (
             failure == "index" and path.name == "index.json"
         ):
             raise OSError("synthetic metadata failure")
-        write(path, value)
+        write(path, value, group_readable=group_readable)
 
     def fail_pack(*args: object) -> None:
         raise OSError("synthetic pack/space failure")
