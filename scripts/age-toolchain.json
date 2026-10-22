@@ -1,0 +1,16 @@
+{
+  "version": "v1.3.2",
+  "source": "https://github.com/FiloSottile/age/releases/tag/v1.3.2",
+  "linux-amd64": {
+    "asset": "age-v1.3.2-linux-amd64.tar.gz",
+    "asset_sha256": "cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10",
+    "age_sha256": "eb7dd1b518f0a307c99cd97782623c5321da049154b04acd2d98d21aa7bc9b2c",
+    "keygen_sha256": "0a0009db842259d6717f7eeb30acb6b90d2a2eb924c6acd0a0db0ca1f1537899"
+  },
+  "windows-amd64": {
+    "asset": "age-v1.3.2-windows-amd64.zip",
+    "asset_sha256": "f48d8f8f9ebe903ab5027ed067652f2cc1db94bc206976430133b905dcd8e8c7",
+    "age_sha256": "2821a4ed191da07372acd302e5f6feae7a7985e285e1417765ebe74025af45f0",
+    "keygen_sha256": "1549c7049be32695594bedd09bbd352a94b6013a9d5c43364f3c6cd7a09ab61c"
+  }
+}
