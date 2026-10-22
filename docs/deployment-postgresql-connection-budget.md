@@ -103,6 +103,58 @@ ALTER ROLE yfc_observer SET default_transaction_read_only = on;
 ```
 
 Пароль задаётся отдельно утверждённым secret-процессом, не SQL в Git/argv/log.
+
+### Одноразовая активация наблюдателя (отдельно авторизованный этап #848)
+
+Скрипт [`scripts/provision_pg_observer.py`](../scripts/provision_pg_observer.py) создан для
+**настоящего YFC VPS**, а не для Hermes BRC Docker sandbox. Он требует root,
+но вносит только явно разрешённые изменения: создаёт PostgreSQL-роль
+`yfc_observer`, каталог `/etc/yfc/observer` и два защищённых файла
+`pg_service.conf`/`pgpass`. Ни контейнеры, ни приложение, ни миграции,
+ни параметры PostgreSQL, ни правила firewall, ни `.env` не меняются.
+
+Перед запуском уполномоченный оператор должен подтвердить сохранность
+актуального соединения к VPS, отсутствие конфликтующей observer-роли и
+наличие одного running Docker Compose `fit-mini-app/db` с публикацией
+`127.0.0.1:5432`. Из root SSH-сессии без `exit` и `set -e`:
+
+```bash
+apt-get update
+DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-client-16
+```
+
+Установщик **не** устанавливает пакеты автоматически, а проверяет
+`/usr/bin/psql`. Скачивать его следует только с **полным 40-значным
+SHA Git-коммита** в URL `raw.githubusercontent.com` и после скачивания
+сверить отдельно зафиксированный SHA256 файла. Никогда не использовать
+`curl | bash`, непроверенную текущую ветку или stdin с паролем в чате.
+После сверки выполнять **как отдельные команды**, не завершая SSH:
+
+```bash
+python3 /root/provision_pg_observer_issue848.py --check
+python3 /root/provision_pg_observer_issue848.py --apply
+```
+
+Финальные pinned commit/SHA256 предоставляет PR review evidence.
+`--check` не создаёт роль/файлы, но читает Docker/PG metadata.
+`--apply` создаёт случайный 256-битный пароль локально; SQL получает
+только SCRAM-SHA-256 verifier через stdin (не исходный пароль и не argv);
+`pgpass` создаётся с UID/GID настоящего deploy account и mode `0600`.
+Проверка после установки вызывает **host psql от `yfc-deploy`** в чистом
+окружении с read-only/timeouts и отвергает привилегированную роль,
+лишние права на application tables, опасные memberships и невалидный
+connection limit. При ошибке код сообщает только безопасную метку:
+никаких паролей, содержимого файлов и SQL с деталями клиента не печатает.
+
+Это строго **one-shot**, не updater: если каталог или роль уже существуют,
+скрипт отказывается перезаписывать их и не вращает секреты. Если роль создана,
+а проверка не пройдена, остановить работы и сохранить состояние для
+отдельного разбора; не делать автоматический DROP/RESTART.
+Успешная роль наблюдателя сама по себе **не снимает** release gates:
+нужны отрицательные и положительные host-ACL проверки, approved
+M/E/maintenance window, live stage barriers, #1148 provenance, #849 restore
+и отдельное разрешение владельца на merge/deploy.
+
 В service-файле: TCP endpoint установленного PG, `dbname`, `user=yfc_observer`,
 `connect_timeout=5`, `passfile=/etc/yfc/observer/pgpass`; никаких application credentials.
 `pg_hba`/host ACL разрешают только этот управляемый канал. Database container, mount и
