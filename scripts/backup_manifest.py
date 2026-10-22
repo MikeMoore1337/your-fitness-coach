@@ -17,7 +17,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-MANIFEST_SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
+ARCHIVE_FORMAT = "age-v1"
+AGE_VERSION = "v1.3.2"
+AGE_HEADER = b"age-encryption.org/v1\n-> X25519 "
 MANIFEST_KIND = "yfc-backup-manifest"
 INDEX_KIND = "yfc-backup-index"
 INDEX_FILENAME = "index.json"
@@ -103,6 +106,21 @@ def manifest_name_for(archive_name: str) -> str:
     return f"{archive_name}.manifest.json"
 
 
+def require_age_file(path: Path) -> None:
+    with path.open("rb") as stream:
+        if stream.read(len(AGE_HEADER)) != AGE_HEADER:
+            raise BackupManifestError("archive is not binary age X25519 format")
+
+
+def require_encryption(value: Mapping[str, Any]) -> None:
+    if value.get("archive_format") != ARCHIVE_FORMAT or value.get("age_version") != AGE_VERSION:
+        raise BackupManifestError("unsupported encrypted archive format or age version")
+    if not re.fullmatch(r"age1[023456789acdefghjklmnpqrstuvwxyz]{58}", str(value.get("recipient"))):
+        raise BackupManifestError("recipient must be one native age X25519 public key")
+    if not str(value.get("archive_name", "")).endswith(".dump.age"):
+        raise BackupManifestError("archive_name must end with .dump.age")
+
+
 def _require_filename(value: object, *, field: str) -> str:
     if not isinstance(value, str) or not _SAFE_FILENAME.fullmatch(value):
         raise BackupManifestError(f"{field} must be a safe file name")
@@ -145,6 +163,7 @@ def build_manifest(
     *,
     database_major: str,
     schema_revision: str,
+    recipient: str,
     created_at: datetime | None = None,
     published_at: datetime | None = None,
 ) -> dict[str, Any]:
@@ -154,6 +173,14 @@ def build_manifest(
     size = archive.stat().st_size
     if size <= 0:
         raise BackupManifestError("backup archive must not be empty")
+    encryption = {
+        "archive_format": ARCHIVE_FORMAT,
+        "age_version": AGE_VERSION,
+        "recipient": recipient,
+        "archive_name": _require_filename(archive.name, field="archive_name"),
+    }
+    require_encryption(encryption)
+    require_age_file(archive)
     reference = utc_now()
     created = created_at or reference
     published = published_at or reference
@@ -165,7 +192,7 @@ def build_manifest(
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "kind": MANIFEST_KIND,
         "source": "vps",
-        "archive_name": _require_filename(archive.name, field="archive_name"),
+        **encryption,
         "manifest_name": manifest_name_for(archive.name),
         "archive_size_bytes": size,
         "archive_sha256": sha256_file(archive),
@@ -189,12 +216,16 @@ def _as_object(value: object, *, description: str) -> dict[str, Any]:
 def validate_manifest(value: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
     manifest = dict(value)
     reference = now or utc_now()
-    if manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION:
+    if (
+        type(manifest.get("schema_version")) is not int
+        or manifest.get("schema_version") != MANIFEST_SCHEMA_VERSION
+    ):
         raise BackupManifestError("unsupported backup manifest schema")
     if manifest.get("kind") != MANIFEST_KIND:
         raise BackupManifestError("unexpected backup manifest kind")
     if manifest.get("source") != "vps":
         raise BackupManifestError("backup manifest source must be vps")
+    require_encryption(manifest)
     archive_name = _require_filename(manifest.get("archive_name"), field="archive_name")
     if manifest.get("manifest_name") != manifest_name_for(archive_name):
         raise BackupManifestError("manifest_name does not match archive_name")
@@ -237,6 +268,9 @@ def index_entry(manifest: Mapping[str, Any], *, now: datetime | None = None) -> 
     return {
         key: checked[key]
         for key in (
+            "archive_format",
+            "age_version",
+            "recipient",
             "manifest_name",
             "archive_name",
             "archive_size_bytes",
@@ -252,6 +286,7 @@ def _validate_index_entry(
     value: Mapping[str, Any], *, now: datetime | None = None
 ) -> dict[str, Any]:
     entry = dict(value)
+    require_encryption(entry)
     _require_filename(entry.get("manifest_name"), field="manifest_name")
     archive_name = _require_filename(entry.get("archive_name"), field="archive_name")
     if entry.get("manifest_name") != manifest_name_for(archive_name):
@@ -300,7 +335,10 @@ def build_index(
 def validate_index(value: Mapping[str, Any], *, now: datetime | None = None) -> dict[str, Any]:
     index = dict(value)
     reference = now or utc_now()
-    if index.get("schema_version") != MANIFEST_SCHEMA_VERSION:
+    if (
+        type(index.get("schema_version")) is not int
+        or index.get("schema_version") != MANIFEST_SCHEMA_VERSION
+    ):
         raise BackupManifestError("unsupported backup index schema")
     if index.get("kind") != INDEX_KIND:
         raise BackupManifestError("unexpected backup index kind")
