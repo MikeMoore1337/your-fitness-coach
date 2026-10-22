@@ -2,7 +2,7 @@
   "local_root": "D:\\YFC-Backups",
   "retention_days": 7,
   "minimum_valid_backups": 2,
-  "stale_after_hours": 36,
+  "stale_after_hours": 26,
   "minimum_free_bytes": 1073741824,
   "encryption_at_rest": {
     "mode": "age",

@@ -8,7 +8,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pullScript = Join-Path $scriptRoot "windows_backup_pull.ps1"
 $shellName = if ($PSVersionTable.PSEdition -eq "Desktop") { "powershell.exe" } else { "pwsh.exe" }
 $pwsh = Join-Path $PSHOME $shellName
-$fixtureTime = [DateTimeOffset]::UtcNow.AddHours(-1)
+$fixtureTime = [DateTimeOffset]::Parse("2026-10-18T12:00:00Z")
 Write-Host "Runtime: $($PSVersionTable.PSVersion) ($pwsh)"
 $runtimeRoot = Join-Path (Split-Path -Parent $scriptRoot) ".artifacts\runtime\tests"
 $root = Join-Path $runtimeRoot ("yfc-backup-selftest-" + [guid]::NewGuid().ToString("N"))
@@ -25,6 +25,12 @@ $holdPath = Join-Path $root "sftp-hold"
 $startedPath = Join-Path $root "sftp-started"
 $firstOutputPath = Join-Path $root "first-output.txt"
 $firstErrorPath = Join-Path $root "first-error.txt"
+$clockPath = Join-Path $root "clock.txt"
+
+function Set-TestTime {
+    param([DateTimeOffset]$Now)
+    [IO.File]::WriteAllText($clockPath, $Now.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+}
 
 function Write-JsonFile {
     param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][object]$Value)
@@ -98,7 +104,7 @@ function Write-RemoteIndex {
     Write-JsonFile (Join-Path $remote "index.json") ([ordered]@{
             schema_version = 2
             kind = "yfc-backup-index"
-            generated_at_utc = [DateTimeOffset]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            generated_at_utc = [IO.File]::ReadAllText($clockPath)
             backups = @($Entries)
         })
 }
@@ -154,6 +160,19 @@ function Wait-ForFile {
 
 try {
     [void](New-Item -ItemType Directory -Force -Path $remote, $local)
+    # Override only the clock in an isolated runner; production has no test-time setting.
+    $source = [IO.File]::ReadAllText($pullScript)
+    $mainCall = '$exitCode = Invoke-Main'
+    if ([regex]::Matches($source, [regex]::Escape($mainCall)).Count -ne 1) { throw "expected one main entry point" }
+    $clockOverride = @'
+function Get-NowUtc {
+    return [DateTimeOffset]::Parse([IO.File]::ReadAllText($env:YFC_SELFTEST_CLOCK_FILE))
+}
+'@
+    $pullScript = Join-Path $root "pull-under-test.ps1"
+    [IO.File]::WriteAllText($pullScript, $source.Replace($mainCall, "$clockOverride`n$mainCall"))
+    $env:YFC_SELFTEST_CLOCK_FILE = $clockPath
+    Set-TestTime ($fixtureTime.AddHours(1))
     [IO.File]::WriteAllText($identity, "synthetic-key", (New-Object Text.UTF8Encoding($false)))
     [IO.File]::WriteAllText($knownHosts, "backup.example ssh-ed25519 AAAAsynthetic", (New-Object Text.UTF8Encoding($false)))
     $fakeSource = @'
@@ -200,7 +219,7 @@ exit 0
         local_root = $local
         retention_days = 7
         minimum_valid_backups = 2
-        stale_after_hours = 36
+        stale_after_hours = 26
         minimum_free_bytes = 0
         encryption_at_rest = [ordered]@{
             mode = "age"
@@ -231,6 +250,61 @@ exit 0
     $persistedSuccess = Get-Content -LiteralPath $config.status_file -Raw | ConvertFrom-Json
     if ($persistedSuccess.status_write_result -ne "SUCCESS") { throw "successful status write must persist SUCCESS in the status file" }
     Invoke-PullCase "repeat-is-idempotent" 0 ""
+
+    foreach ($case in @(
+        @{ Name = "younger-than-26h"; Seconds = 93599; Code = 0; State = "HEALTHY" },
+        @{ Name = "exactly-26h"; Seconds = 93600; Code = 0; State = "HEALTHY" },
+        @{ Name = "older-than-26h"; Seconds = 93601; Code = 10; State = "STALE" }
+    )) {
+        Set-TestTime ($fixtureTime.AddSeconds($case.Seconds))
+        $status = Invoke-StatusCase $case.Name $case.Code
+        if ($status.state -ne $case.State -or $status.freshness_state -ne $case.State -or [DateTimeOffset]$status.last_successful_backup_utc -ne [DateTimeOffset]$entry.created_at_utc) {
+            throw "$($case.Name) must use source creation time and a strict >26h threshold"
+        }
+    }
+    $receivedAt = (Get-OutputStatus).last_successful_copy_received_at_utc
+    Invoke-PullCase "scheduler-success-without-new-archive-is-stale" 10 ""
+    $noNewArchive = Get-OutputStatus
+    if ($noNewArchive.state -ne "STALE" -or $noNewArchive.last_pull_result -ne "SUCCESS" -or $noNewArchive.downloaded_count -ne 0 -or $noNewArchive.last_successful_copy_received_at_utc -ne $receivedAt) {
+        throw "successful hourly polling must not refresh the source backup age or copy receipt"
+    }
+
+    $config.Remove("stale_after_hours")
+    Write-JsonFile $configPath $config
+    Invoke-StatusCase "default-threshold-is-26h" 10 | Out-Null
+    $config.stale_after_hours = 27
+    Write-JsonFile $configPath $config
+    Invoke-StatusCase "explicit-threshold-override" 0 | Out-Null
+    $config.stale_after_hours = 0
+    Write-JsonFile $configPath $config
+    Invoke-StatusCase "invalid-threshold-rejected" 25 | Out-Null
+    $config.stale_after_hours = 26
+    Write-JsonFile $configPath $config
+
+    # Re-publication and a new download receipt cannot make an old source dump fresh.
+    $republished = New-Manifest $entry.archive_name $entry.created_at_utc $entry.archive_sha256 $entry.archive_size_bytes
+    $republished.published_at_utc = [IO.File]::ReadAllText($clockPath)
+    Write-JsonFile (Join-Path $remote $entry.manifest_name) $republished
+    $entry.published_at_utc = $republished.published_at_utc
+    Write-RemoteIndex @($entry)
+    Remove-Item -LiteralPath (Join-Path $local $entry.manifest_name), (Join-Path $local $entry.archive_name) -Force
+    Invoke-PullCase "repeat-download-and-publication-do-not-reset-age" 10 ""
+    $redownloaded = Get-OutputStatus
+    if ($redownloaded.downloaded_count -ne 1 -or $redownloaded.state -ne "STALE" -or [DateTimeOffset]$redownloaded.last_successful_backup_utc -ne [DateTimeOffset]$entry.created_at_utc -or $redownloaded.last_successful_copy_received_at_utc -eq $receivedAt) {
+        throw "new receipt and publication must retain old source creation time"
+    }
+    Invoke-PullCase "vps-unavailable-with-stale-source" 22 "NETWORK"
+    $unavailable = Invoke-StatusCase "vps-failure-and-staleness-remain-visible" 22
+    if ($unavailable.state -ne "NETWORK" -or $unavailable.freshness_state -ne "STALE" -or $unavailable.last_pull_result -ne "FAILED" -or $unavailable.last_failure_code -ne "NETWORK") {
+        throw "VPS failure and stale source must remain separate diagnostics"
+    }
+
+    Set-TestTime ($fixtureTime.AddHours(1))
+    $entry.published_at_utc = $entry.created_at_utc
+    Write-JsonFile (Join-Path $remote $entry.manifest_name) (New-Manifest $entry.archive_name $entry.created_at_utc $entry.archive_sha256 $entry.archive_size_bytes)
+    Copy-Item -LiteralPath (Join-Path $remote $entry.manifest_name) -Destination (Join-Path $local $entry.manifest_name) -Force
+    Write-RemoteIndex @($entry)
+    Invoke-PullCase "freshness-fixture-recovery" 0 ""
 
     $config.encryption_at_rest.mode = "none"
     $config.encryption_at_rest.plaintext_risk_acknowledged = $true
@@ -273,6 +347,8 @@ exit 0
     Write-RemoteIndex @($badEntry, $entry)
     Invoke-PullCase "interrupted-ciphertext-transfer" 22 "INTERRUPT"
     Invoke-PullCase "checksum-mismatch-preserves-valid-copy" 12 ""
+    $corruptedDownload = Get-OutputStatus
+    if ($corruptedDownload.valid_backup_count -ne 1 -or (Test-Path -LiteralPath (Join-Path $local $badEntry.archive_name))) { throw "corrupted download must not become a verified copy" }
 
     $truncated = Add-RemoteBackup "truncated.dump.age" ([Text.Encoding]::UTF8.GetBytes("complete-archive")) ($fixtureTime.AddMinutes(2).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     [IO.File]::WriteAllText((Join-Path $remote $truncated.archive_name), "short")
@@ -475,6 +551,9 @@ exit 0
     }
     $missingStatus = Invoke-StatusCase "missing-local-copies" 11
     if ($missingStatus.state -ne "MISSING" -or $missingStatus.local_backup_state -ne "MISSING") { throw "absence of local copies must be MISSING" }
+    Invoke-PullCase "vps-unavailable-without-local-copies" 22 "NETWORK"
+    $noCopies = Get-OutputStatus
+    if ($noCopies.state -ne "NETWORK" -or $noCopies.freshness_state -ne "MISSING" -or $noCopies.valid_backup_count -ne 0) { throw "network failure must not hide missing independent copies" }
     Copy-Item -LiteralPath (Join-Path $remote $entry.archive_name) -Destination (Join-Path $local $entry.archive_name) -Force
     Copy-Item -LiteralPath (Join-Path $remote $entry.manifest_name) -Destination (Join-Path $local $entry.manifest_name) -Force
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.archive_name) -Destination (Join-Path $local $concurrentEntry.archive_name) -Force
@@ -493,6 +572,7 @@ exit 0
     Write-Host "Synthetic Windows pull scenarios passed. Root: $root"
 }
 finally {
+    Remove-Item Env:YFC_SELFTEST_CLOCK_FILE -ErrorAction SilentlyContinue
     Remove-Item Env:YFC_FAKE_REMOTE_ROOT -ErrorAction SilentlyContinue
     Remove-Item Env:YFC_FAKE_SFTP_FAILURE -ErrorAction SilentlyContinue
     Remove-Item Env:YFC_FAKE_SFTP_HOLD_FILE -ErrorAction SilentlyContinue

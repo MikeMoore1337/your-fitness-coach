@@ -340,7 +340,7 @@ function Read-Config {
     $timeout = if ($null -eq (Get-PropertyValue $ssh "connect_timeout_seconds")) { 20 } else { [int](Get-PropertyValue $ssh "connect_timeout_seconds") }
     $retentionDays = if ($null -eq (Get-PropertyValue $raw "retention_days")) { 7 } else { [int](Get-PropertyValue $raw "retention_days") }
     $minimumValid = if ($null -eq (Get-PropertyValue $raw "minimum_valid_backups")) { 2 } else { [int](Get-PropertyValue $raw "minimum_valid_backups") }
-    $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 36 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
+    $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 26 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
     $minimumFree = if ($null -eq (Get-PropertyValue $raw "minimum_free_bytes")) { 104857600 } else { [int64](Get-PropertyValue $raw "minimum_free_bytes") }
     if ($port -lt 1 -or $port -gt 65535 -or $timeout -lt 1 -or $retentionDays -lt 1 -or $minimumValid -lt 1 -or $staleHours -lt 1 -or $minimumFree -lt 0) {
         Throw-BackupPullError "CONFIG_INVALID" "backup limits are invalid"
@@ -697,7 +697,7 @@ function Invoke-Rotation {
     param([Parameter(Mandatory = $true)][object]$Config)
     $snapshot = Get-LocalSnapshot $Config
     $valid = @($snapshot.Valid | Sort-Object CreatedAt -Descending)
-    $cutoff = [DateTimeOffset]::UtcNow.AddDays(-$Config.RetentionDays)
+    $cutoff = (Get-NowUtc).AddDays(-$Config.RetentionDays)
     $removed = 0
     foreach ($item in @($valid | Sort-Object CreatedAt)) {
         if ($item.CreatedAt -ge $cutoff -or ($valid.Count - $removed) -le $Config.MinimumValidBackups) {
