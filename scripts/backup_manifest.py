@@ -447,7 +447,11 @@ def read_index(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
     return validate_index(read_json(path), now=now)
 
 
-def write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
+def write_json_atomic(
+    path: Path, value: Mapping[str, Any], *, group_readable: bool = False
+) -> None:
+    if group_readable and os.name != "posix":
+        raise BackupManifestError("SFTP group-readable metadata require a POSIX publisher")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -463,6 +467,10 @@ def write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
             json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
             stream.write("\n")
             stream.flush()
+            if group_readable:
+                # Publish complete metadata for the dedicated read-only SFTP group.
+                # The temporary name is never committed as the published index.
+                os.fchmod(stream.fileno(), 0o640)
             os.fsync(stream.fileno())
         os.replace(temporary, path)
         temporary = None
