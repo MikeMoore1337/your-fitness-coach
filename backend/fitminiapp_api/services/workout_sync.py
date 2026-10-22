@@ -100,6 +100,9 @@ def apply_workout_set_update(
             },
         )
 
+    if not changes:
+        raise WorkoutSetSyncError(422, "Не указаны изменения подхода")
+
     for field in (
         "actual_reps",
         "actual_weight",
