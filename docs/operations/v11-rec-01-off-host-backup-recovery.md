@@ -202,7 +202,9 @@ DNS и фоновые writer processes должны быть остановле�
 
 Issue #849 остаётся открытым до независимой off-host копии и clean-host restore evidence.
 
-## 9. Фактическая перепроверка Phase B/C (2026-10-19)
+## 9. Историческая перепроверка Phase B/C (2026-10-19)
+
+Ниже сохранён snapshot на указанную дату; текущая проверка и порядок активации — в разделе 13.
 
 Проверка выполнена read-only на доступном production VPS и на Windows-ПК владельца.
 Production payload не скачивался на Windows, restore не выполнялся, а конфигурация VPS,
@@ -296,7 +298,7 @@ transfer ещё не выполнен и SFTP/encryption gates не закрыт
 | Recovery key | Key material не читался; custody/escrow и recovery test не подтверждены | `NOT_VERIFIED` |
 | Sync/share | Путь не находится под известным OneDrive root; процесс OneDrive и target reparse point не обнаружены; SMB query получил отказ | Частичная проверка; отсутствие всех sync/share механизмов не доказано |
 
-Каталог и ACL намеренно не создавались: при отсутствии elevated owner/runner identity это могло бы закрепить неподходящее наследование. Ранее предложенный BitLocker-encrypted VHDX/container позднее отклонён владельцем в пользу обычной папки `D:\YFC-Backups`; отдельное шифрование тома/контейнера не внедряется. Подтверждено администратором Windows: `D:` FullyDecrypted, ProtectionStatus Off, EncryptionMethod None. Перед переносом реальных персональных данных остаётся открытым отдельное решение о допустимости хранения без шифрования.
+Каталог и ACL намеренно не создавались: при отсутствии elevated owner/runner identity это могло бы закрепить неподходящее наследование. Ранее предложенный BitLocker-encrypted VHDX/container позднее отклонён владельцем в пользу обычной папки `D:\YFC-Backups`; отдельное шифрование тома/контейнера не внедряется. Подтверждено администратором Windows: `D:` FullyDecrypted, ProtectionStatus Off, EncryptionMethod None. Позднее выбран age для самих файлов (раздел 12); перед реальной передачей требуется проверить этот контур и privacy delta, а состояние тома отдельно не доказывает защищённость файлов.
 
 ### 10.2 SFTP security state и план hardening
 
@@ -322,14 +324,17 @@ Owner-approved план, не применённый:
 
 ### 10.5 Owner proposals и remaining gates
 
+Решения о file-level age от 21.10.2026 заменили прежние предложения о plaintext storage;
+ниже учтён этот выбор. Фактическая активация по-прежнему не разрешена.
+
 | Решение | Предложение, не утверждение | Нужное подтверждение |
 | --- | --- | --- |
 | Cadence | **OWNER-APPROVED:** один новый архив в сутки. Опрос Windows каждый час остаётся предложением, а не утверждённым расписанием | Настройка и проверка реального VPS timer / Windows pull |
 | Retention | **OWNER-APPROVED:** хранить архивы 7 дней (обычно 7 ежедневных копий). При очистке не удалять единственную последнюю проверенную копию в период сбоев; отдельно сигнализировать о нарушении retention | Проверить расписание очистки и корректность безопасного удаления после валидации новой копии |
-| RPO | Не хуже 24 часов | Последний успешный pull и время публикации |
+| RPO | Первоначальное предложение 24 часа уточнено в 13.3 с учётом задержки Pull; target ещё не утверждён | Последний успешный pull и время source dump |
 | RTO | Первичная цель 8 часов | Измеренный clean-host restore |
-| Encryption | **OWNER DECISION:** VHDX/зашифрованные контейнеры отклонены; использовать обычную папку на незашифрованном `D:` | Физическая защита данных отсутствует; отдельный security/privacy gate для переноса production PII |
-| Key recovery | Не применяется к отклонённому BitLocker/VHDX-контейнеру; ключи SSH/SFTP при этом остаются отдельным security gate | Нельзя объявлять `encryption-at-rest=PASS` при незашифрованном D: |
+| Encryption | **OWNER-APPROVED:** обычная папка на `D:`, только `.dump.age`, шифрование на VPS до публикации; без VHDX | Проверить age ciphertext, private staging, ACL и privacy scope; состояние тома не доказывает защиту файлов |
+| Key recovery | Отдельная offline age identity и две независимые защищённые recovery-копии по разделу 12.2; SSH key хранится отдельно | До активации восстановить identity из каждой копии и расшифровать синтетический файл |
 | Clean host | Disposable non-public Linux VM/host, независимый от VPS и Windows-ПК, matching PostgreSQL major/revision, без внешнего egress | Exact image/revision и approved non-production inputs |
 
 До подтверждения elevated storage/ACL identity, recovery-key custody, отдельного hardened SFTP endpoint, non-interactive key access, scheduler checks и owner targets вердикт остаётся `BLOCKED_OWNER_FACTS`. `PHASE_B_1_READY_FOR_ACTIVATION` не заявляется.
@@ -641,6 +646,10 @@ Age защищает конфиденциальность копий при от
    Старые identities хранить до разрешённого истечения всех соответствующих копий и проверки
    нового restore. Перешифрование требует decrypt в закрытом staging и не стирает уже утёкшие копии.
 
+У age нет центрального отзыва уже выпущенных архивов: исключение старого recipient из новых
+публикаций защищает только будущие копии. Отзыв отдельного SSH key прекращает транспортный
+доступ, но не делает ранее скачанный ciphertext недоступным владельцу старой age identity.
+
 После drill отдельно подтвердить удаление созданного plaintext и временной identity на recovery-хосте;
 offline оригиналы и проверенную `.age` не удалять. Приватный ключ никогда не прикладывать к evidence.
 
@@ -668,7 +677,26 @@ SHA-256 сопоставлен с `digest` официального GitHub Relea
 latest-URL, сторонние wrappers или автообновление. Установленный binary/config/pins должны быть
 недоступны на запись SFTP/непривилегированным пользователям. Поддержка других архитектур требует
 отдельно проверенных pins; автоматической подмены нет. Использовано доверие к официальному GitHub
-HTTPS/API; независимая Sigsum-проверка upstream `.proof` в этом прогоне не выполнялась.
+HTTPS/API. Дополнительная Sigsum-проверка обоих assets выполнена 22.10.2026: `PASS`.
+Использованы два upstream public signing keys из
+[SIGSUM.md на закреплённой ревизии](https://github.com/FiloSottile/age/blob/b74dce4cdbe35b5e5f66c06d9612b72f89028758/SIGSUM.md),
+официальный `sigsum-verify v0.13.1` и встроенная policy `sigsum-generic-2025-1`.
+Проверка прошла offline в одноразовом контейнере с read-only mounts только публичных assets,
+proofs и signing keys; production secrets/data не подключались. SHA-256 proofs:
+Linux `98402fa59b4e433426156b4a7e74a32e44902e0434c61158f7de18ffc84f1f97`,
+Windows `00ae35a24a47b9bace52ec62f06d402f38f6ecba4ca099d060a137e82ef0bc1d`.
+Повторно сверены оба archive SHA и все четыре binary SHA из таблиц выше.
+Sigsum подтверждает подпись/включение в transparency log в рамках этой policy, а не
+воспроизводимость сборки из исходников, отсутствие уязвимостей или установку на VPS.
+В Releases API `immutable=false`; фиксированные SHA сохраняются, latest/автообновления не используются.
+
+Для повторной проверки после получения официального verifier и public keys оператор выполняет
+следующие команды в каталоге с assets/proofs; private age identity здесь не нужна:
+
+```sh
+sigsum-verify -k age-sigsum-key.pub -P sigsum-generic-2025-1 age-v1.3.2-linux-amd64.tar.gz.proof < age-v1.3.2-linux-amd64.tar.gz
+sigsum-verify -k age-sigsum-key.pub -P sigsum-generic-2025-1 age-v1.3.2-windows-amd64.zip.proof < age-v1.3.2-windows-amd64.zip
+```
 
 ### 12.4 Переход с незашифрованных архивов
 
@@ -732,3 +760,139 @@ owner-approved время ежедневного backup, интервал Pull/T
 runtime keys не меняются. Активация требует host-side установки age/pins и передачи public
 recipient через явный `--age-recipient` (пример использует shell variable `YFC_BACKUP_AGE_RECIPIENT`),
 Windows config `mode=age`, recipient/recovery reference и отдельно разрешённых действий выше.
+
+## 13. Подготовка активации (22.10.2026, без production changes)
+
+### 13.1 Текущие факты и границы проверки
+
+Проверены live `master=efbf14b453bae3d3c2ba32b2cf04784c47fd8968`, source PR #1125
+`f0ad024ef4b486fd99cb41677cf6c6785c6a2571` и прежний docs HEAD #1123
+`3e46ebe53056c6b224a3666c497a43c0fe3c0015`. Оба PR OPEN/Draft, без merge.
+У source exact HEAD aggregate `checks=success`, CodeQL Python/JS, Dependency audit и Free PR
+security audit успешны: [CI 39678838169](https://github.com/MikeMoore1337/your-fitness-coach/actions/runs/39678838169).
+Исходники не менялись: существующие 46 Python tests, по 46 PowerShell-сценариев и PG16/age
+synthetic restore из раздела 12.5 повторно не запускались. Их старые отчёты проверены;
+это не новый production drill. После изменения этого runbook нужен новый docs exact-head CI.
+
+| Область | Read-only наблюдение 22.10.2026 | Вывод для активации |
+| --- | --- | --- |
+| VPS access | Основной SSH alias завершился timeout; существующий второй alias с `BatchMode=yes`, `StrictHostKeyChecking=yes` дал доступ к хосту с YFC backend/worker/bot и DB containers | Доступ для ограниченной диагностики есть; это не разрешение на изменение хоста. Hermes relay показывает sandbox devices, они не использовались как production evidence |
+| PostgreSQL/tools | В DB container `postgres`, `pg_dump`, `pg_restore` версии **16.15**; размер текущей БД **87 268 375 bytes**. Docker доступен. В PATH и предусмотренном `/opt/yfc-tools/age-v1.3.2/age` age не найден | PG16 capability подтверждена; установка pinned age и права executable ещё требуются. Это не исчерпывающий поиск всех executable хоста |
+| VPS archives | В двух существующих backup roots найдены старые `.dump`, включая копии до 19.10 размером до **51 592 746 bytes**; index/manifest в проверенном application backup root не найдены. Архивы не открывались, не перемещались и не удалялись | Ciphertext publication и свежий off-host backup `NOT_PROVEN`. Историческое наличие `.env` из раздела 9 не подтверждено в этом root сейчас; разрешать весь root по-прежнему нельзя |
+| VPS permissions | Backup roots `0700`, владелец deploy; несколько legacy dump имеют `0664`, внешний parent `/srv` — root-owned `0755` | Есть место для отдельного export/chroot проекта, но фактические publish/read/write/traversal permissions нового endpoint `NOT_VERIFIED` |
+| SSH/SFTP | `yfc-backup-readonly` отсутствует; существующий `backup` имеет `nologin`. Effective sshd для предполагаемого пользователя: password auth/TTY/forwarding разрешены, `ForceCommand=none`, `ChrootDirectory=none`, `AuthenticationMethods=any` | Hardened dedicated endpoint отсутствует в проверенной конфигурации. `nologin` сам по себе не доказывает read-only SFTP |
+| VPS space/jobs | На filesystem backup roots свободно **25 032 531 968 bytes**, `/tmp` — около **1 GB**. В проверенных system timers/root cron/cron files YFC dump job не найден; есть системный `dpkg-db-backup.timer` | Объём достаточен относительно наблюдаемых старых dumps, но peak нового dump+ciphertext/retention и задания вне проверенного scope `NOT_VERIFIED`; системное задание не изменять |
+| Plaintext cleanup | `TemporaryDirectory` закрывает `.dump-*` staging на нормальном выходе/исключении; source review и прежняя fault injection доступны | Crash/power-loss cleanup на VPS и отсутствие plaintext в snapshots/swap `NOT_VERIFIED`; процедура ниже обязательна |
+| Windows tools/storage | Реальные PowerShell **7.6.6**, **5.1.26100.9444**, OpenSSH **9.5p2** доступны. D: NTFS, total **1 000 203 087 872**, free **183 331 258 368 bytes**. `D:\YFC-Backups` отсутствует | Target ACL и dedicated runner не подготовлены; незашифрованных файлов в отсутствующем target нет, это не аудит всего D: |
+| Windows age | age не найден в PATH; уже имеющиеся synthetic tools в ignored artifacts имеют правильные archive/binary SHA и `age --version=v1.3.2` | Проверенный portable tool доступен для диагностики; защищённая operational installation `NOT_VERIFIED`, автоматически ничего не установлено |
+| Scheduler | Sandbox-запросы сообщили недоступность службы. Повторная read-only проверка вне sandbox подтвердила `Schedule=Running`; точная задача `\YFC\OffHostBackupPull` не найдена | Возможность службы подтверждена; batch logon, отдельный key, reboot/catch-up и выполнение без входа пользователя `NOT_VERIFIED` |
+| Windows ACL/sync | Parent D: имеет права обычных Users/Authenticated Users. Target не находится под известным OneDrive root, OneDrive process не найден, D: не reparse point. Read-only SMB query не нашёл share, покрывающий target | Новый каталог требует отдельного ACL. Эти проверки не исключают все сторонние sync agents/remote access; нужен owner inventory и проверка точного runner context |
+
+Dedicated SSH key и отдельный pinned known_hosts предусмотрены runner: `-F NUL`,
+`IdentitiesOnly=yes`, `IdentityAgent=none`, `StrictHostKeyChecking=yes`, без global known_hosts.
+Настоящий backup SSH key не создавался; доступ к нему от имени будущего runner не проверен.
+Внешний размер/количество архивов не доказывает валидность их содержимого или recoverability.
+
+### 13.2 Privacy/security delta к Task 108
+
+[#707](https://github.com/MikeMoore1337/your-fitness-coach/issues/707#issuecomment-5997663176)
+закрыт после Stage B reconciliation: владелец сообщил о внешней российской юридической
+проверке без blocking objections и об уведомлении Роскомнадзора. Детали заключения/подачи
+в public evidence `NOT_PROVIDED`. Закрытие
+[#711](https://github.com/MikeMoore1337/your-fitness-coach/issues/711#issuecomment-5997663344)
+подтверждает технический baseline, сохраняя непроверенные регионы/договоры/retention как UNKNOWN.
+Повторять эти стадии или объявлять их незавершёнными не требуется. Новый Windows backup flow
+проверяется как конкретная delta в существующей рамке Task 108, а не как новая legal program.
+
+В разделе 10 сохранено сообщение владельца «VPS и Windows в России»; это `OWNER_REPORTED`,
+не независимое подтверждение физического места и не отдельное разрешение на новую передачу.
+До активации владелец/privacy owner фиксирует в защищённом intake:
+
+- фактическую страну/место размещения ПК и VPS, хранителей, физический доступ и перемещения ПК;
+  место изолированного restore host и двух key-recovery copies; точный адрес не публикуется;
+- маршрут VPS → исходящий SSH/SFTP → ПК, фактические VPN/proxy/relay, endpoints, обработчиков
+  и страны хранения/обработки; IP, DNS или VPN не используются как доказательство юрисдикции;
+- фактический состав полного DB dump: идентификация/auth metadata, тренировки, питание,
+  измерения, coach/client records, binary columns и другие присутствующие таблицы; целесообразность,
+  минимизацию и классификацию чувствительных данных подтверждают owner/privacy/counsel;
+- цели, доступ, retention 7 суток с исключением защищённых последних копий, правила удаления,
+  incident handling и повторного применения удалений после восстановления старого snapshot;
+- применимость прежнего counsel решения к этой delta либо отдельное решение по MATERIAL/UNKNOWN.
+  Выбор age и наличие SSH не заменяют эту проверку.
+
+Результат: baseline решения признаны; storage/transport/data-scope delta —
+`OWNER_PRIVACY_DECISION_REQUIRED`, спорные правовые вопросы — `LEGAL_COUNSEL_REQUIRED`.
+Соответствие законодательству по этой проверке не заявляется.
+
+### 13.3 Предложения по эксплуатации — ещё не утверждены
+
+Создание **одного архива в сутки** и retention **7 дней** уже утверждены. Остальные значения
+ниже — предложения для решения владельца до измерения drill, не действующая конфигурация.
+
+| Параметр | Предложение | Условие проверки |
+| --- | --- | --- |
+| Время backup | 03:00 Europe/Moscow = 00:00 UTC ежедневно; проверить существующее окно нагрузки | Измерить длительность/peak disk первого backup, не менять PostgreSQL |
+| Windows Pull | Каждый час с 03:30 MSK; `StartWhenAvailable`, `IgnoreNew`, повтор после отказа | XML — шаблон; согласовать timezone, batch identity и фактический logon type, проверить без интерактивного входа |
+| RPO | Номинально 24 часа; первоначальный предельный возраст независимо полученной копии **26 часов** | Суточный интервал + ожидание Pull/завершения могут превысить 24 часа. Если требуется строго ≤24 часов, это предложение недостаточно: согласовать иную политику до активации |
+| RTO | **8 часов** от объявления полной потери VPS до проверенного изолированного приложения | Измерять получение ciphertext/ключа, provision, decrypt, PG restore, schema/invariants и application smoke; отдельно учитывать traffic cutover. 2,393 s synthetic не использовать |
+| Сбой | Немедленный sanitized alert при ненулевом publisher/Pull exit, host-key/auth/crypto mismatch или disk failure | Существующий разрешённый канал, без archive payload, secrets и данных пользователей; проверить доставку на тестовой ошибке |
+| Нет новой копии | Alert при возрасте >26 часов или `MISSING`/`CORRUPTED`, затем напоминание раз в сутки до устранения | Проверять время source dump и receipt независимо; старый `HEALTHY` не считать свежей копией |
+| Потеря связи/ПК выключен | Alert после двух пропущенных часовых receipts, критический по RPO; восстановление связи — одно уведомление | Нужен наблюдатель вне ПК и желательно вне VPS. Локальная Windows задача не способна сообщить о собственном выключении; канал/наблюдатель пока не выбраны и не реализованы |
+| Restore drills | После первой независимой копии, смены ключа/версии PG и далее ежеквартально | Каждый real-data drill отдельно разрешить; recording без PII. Частоту утверждает владелец |
+
+VPS хранит семь **успешных публикаций**, Windows — пары старше семи суток с минимум двумя
+valid copies. Простой ПК около/свыше семи дней может дать необратимый пропуск ежедневных копий;
+catch-up получает только ещё существующие. Длительность простоя и такое ограничение надо принять
+заранее; при нарушении срока защищёнными копиями нужен отдельный privacy/retention разбор.
+Без утверждённого внешнего observer потеря связи end-to-end остаётся `NOT_VERIFIED`.
+
+### 13.4 Последовательность первоначальной активации и отката
+
+Все действия таблицы **подготовлены, но не выполнены**. Текущий запрос разрешает только
+read-only диагностику и разработку документации. Для каждого изменяющего среду шага требуется
+отдельное явное разрешение с точным host/account/path и границами данных. Сначала review/CI
+существующих PR, затем отдельные merge/release разрешения; эта таблица их не выдаёт.
+
+| Шаг | Предварительные условия и действие | Проверка успешности | Безопасный откат | Разрешение владельца |
+| --- | --- | --- | --- | --- |
+| 1. Privacy/security и физическое место | Закрыть delta из 13.2, выбрать ответственного, допустимые данные, access/retention и RPO/RTO | Датированное решение owner/privacy; counsel по MATERIAL/UNKNOWN, private evidence reference без адресов/секретов в Issue | При нехватке фактов остановить активацию; существующие копии не менять | Требуется решение по реальным данным и местам хранения |
+| 2. Age identity и recovery | Доверенная offline среда, проверенные binaries, закрытый staging; владелец создаёт identity по 12.2, передаёт только public recipient, делает две независимо защищённые копии | Из каждой копии отдельно восстановлены identity/recipient и расшифрован synthetic файл с исходным SHA; private key не попал в VPS/backup/Git/CI/logs | До успешной проверки не активировать recipient. Сохранить рабочие recovery copies; cleanup только созданных временных key/plaintext, без заявления о физическом стирании | Отдельное разрешение на настоящий ключ; действие выполняет владелец |
+| 3. VPS tools/private staging/SFTP | Подтверждены pinned age/Sigsum, publisher identity и диск; подготовить closed staging и отдельный ciphertext export, dedicated public-key-only internal-sftp/chroot по 10.2 | `sshd -t`, независимая admin session и новый login; list/get synthetic object успешны, put/rename/remove/traversal/shell/TTY/forwarding запрещены; secrets невидимы; publisher может писать, SFTP user не может | Сохранить конфигурацию, при сбое убрать только новый drop-in/mount, проверить `sshd -t` и reload без потери admin access; копии сохранить | VPS install/users/SSH/ACL/mount/reload — отдельное точное разрешение |
+| 4. Windows storage/SSH | Выбрана runner identity; создать D:\YFC-Backups, script/config/SSH paths с нужными ACL, исключить sync/share/reparse; age identity вне этих путей | Под runner write+atomic rename в synthetic target разрешены, посторонний read/write запрещён; отдельный SSH key работает с out-of-band pinned host fingerprint | До real-data transfer исправить ACL/paths; вернуть прежние ACL только для подготовленных объектов по сохранённому descriptor. Не ослаблять реальные backup ACL ради rollback | Отдельное разрешение на каталог, ACL и настоящий SSH key |
+| 5. Расписания/logs/alerts | Утвердить 13.3 и бесплатный существующий alert channel/observer; подготовить **выключенные** timer/task, ограниченные logs, нет конфликтующих jobs | Проверены command paths/timezone/noninteractive key access, ненулевые exits, sanitized тестовый alert и пропуск heartbeat; повторный schedule не создаёт второй ежедневный dump | Отключить/удалить только новые задания/правила уведомлений, сохранить evidence и копии | Отдельное разрешение на registration/config; включение только после шагов 6–9 |
+| 6. Legacy transition | Инвентаризация метаданных/последней valid копии, запас места и закрытый quarantine; остановить конфликтующие старые jobs/rotation и выполнить 12.4 | Originals сохранены, новый v2 export пуст и не открывает старый plaintext; Windows target ciphertext-only; известен допустимый перерыв backup | Остановить новый flow, сохранить legacy и ciphertext. Не возвращать plaintext export, `mode=none` и не удалять originals | Отдельное разрешение на остановку jobs, перемещение/карантин; удаление legacy требует ещё одного решения после restore |
+| 7. Первый реальный `.dump.age` | Шаги 1–6 успешны; approved public recipient, patched helper exact revision, private staging/export и peak disk готовы; один ручной publisher run | `pg_restore --list` исходного dump, age version/hash, ciphertext manifest/index v2 с size/SHA/recipient; index последним; plaintext штатно очищен | При ошибке сохранить старый index/копии, остановить jobs; после crash осмотреть только принадлежащий этому запуску закрытый staging, подтвердить отсутствие живого writer и отдельно разрешить cleanup | Отдельное разрешение на production dump/encryption/publication; без передачи на этом шаге |
+| 8. Независимое получение Windows | Закрыты legal/transport/ACL/key gates; отдельно разрешить transfer exact archive и запустить ручной Pull под runner | Windows-held ciphertext и manifest size/SHA совпали, receipt/freshness сохранены; повтор не перезаписывает; независимость от VPS подтверждена доступом к сохранённому object при недоступном источнике | Остановить Pull, сохранить старые valid пары и полученный ciphertext, расследовать failure; не менять host pin автоматически | Отдельное разрешение на передачу production данных в выбранное место |
+| 9. Clean-host восстановление | Отдельно approved закрытый host/PG16/exact app revision, secrets из разрешённого источника; writers/bot/provider egress/public routes отключены; цели RPO/RTO согласованы заранее | Decrypt Windows-копии recovered key, затем настоящий PG restore, Alembic/schema, rows/binary/sequence/FK, health и application smoke по разделу 7; измерить полный RTO/RPO без PII в evidence | При сбое остановить drill, закрыть/очистить только разрешённую isolated среду и временный plaintext/key; source DB, ciphertext и offline originals сохранить | Отдельное разрешение на перенос/расшифровку/restore реальных данных и временные secrets. Traffic cutover сюда не входит |
+| 10. Штатная работа | Шаги 7–9 приняты, получена следующая ежедневная valid копия, alarms и recovery evidence проверены | Разрешить включение schedules; подтвердить неинтерактивный/reboot/catch-up цикл, ежедневную свежесть, exit/logs/alerts, 7-day policy и сохранение двух valid копий | Отключить только новые schedules/rotation, сохранить последние копии; вручную возобновлять backup только по согласованному безопасному режиму. Удаление данных не является автоматическим rollback | Отдельное разрешение на включение и эксплуатационную приёмку; legacy deletion и traffic cutover разрешаются отдельно |
+
+На шаге 3 publisher helper разрешает publish path только **внутри BACKUP_DIR**. Нельзя просто
+передать `/srv/yfc/backups` или произвольный chroot path в `--publish-dir`. После отдельного
+разрешения оператор может предоставить именно ciphertext child через read-only bind mount
+в `/export` нового root-owned chroot; способ и persistent mount надо проверить на фактическом
+хосте. Chroot parents не должны быть writable ни SFTP-пользователю, ни publisher. Писать в
+отдельный export child может только publisher; read-only mount не заменяет SSH restrictions.
+Export allowlist включает служебный `.publish.lock`, index и ciphertext/manifest; ни `.env`,
+ни `.dump-*`/`.age-*` staging туда не попадают.
+
+Перед шагом 7 измерить размещение staging на том же filesystem и свободный объём под сохранённые
+копии + новый plaintext dump + ciphertext + partial/metadata + согласованный запас. По старым
+файлам до 51,6 MB и 25 GB free сейчас не видно дефицита, но реальный peak/рост не измерен.
+После crash оператор не использует wildcard cleanup: сверяет владельца/путь/живой процесс и
+удаляет только согласованные abandoned files, не последние verified копии. Удаление не доказывает
+стирание SSD/swap/snapshots. До выполнения проверки этот контроль `NOT_VERIFIED`.
+
+### 13.5 Итог готовности
+
+- `CODE_READY=PASS` для неизменённого source HEAD #1125: source review, существующие целевые
+  тесты/синтетический restore и live exact-head/security CI; это не production readiness.
+- `ACTIVATION_READINESS=BLOCKED`: необходимы owner/privacy delta, реальные offline keys/recovery,
+  VPS age/SFTP/staging/legacy/ACL, Windows runner/ACL/SSH, schedules/alerts и согласованные targets.
+- `BACKUP_RECOVERY=NOT_PROVEN`: настоящая независимая защищённая копия не получена и не
+  восстановлена с application smoke в разрешённой изолированной среде.
+
+`env change required: no` для application runtime. Обязательные будущие host-side действия:
+pinned age install, public recipient/publisher arguments, private staging/export/SSH/mount/ACL,
+Windows runner config/key/known_hosts, schedules/alerts, legacy transition и recovery evidence.
+Настоящие ключи, копии, users/SSH/ACL/schedules, приложение и PostgreSQL не изменялись;
+merge/deploy/real restore не выполнялись. Issue #849 остаётся OPEN, существующие PR — Draft.
