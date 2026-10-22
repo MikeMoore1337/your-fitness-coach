@@ -74,6 +74,12 @@ def test_archive_manifest_index_roundtrip_and_safe_unpack(tmp_path: Path) -> Non
     manifest = manifest_for(archive)
     if os.name != "nt":
         assert archive.stat().st_mode & 0o777 == 0o640
+        previous_umask = os.umask(0o077)
+        try:
+            private_archive = make_archive(tmp_path / "private")
+            assert private_archive.stat().st_mode & 0o777 == 0o600
+        finally:
+            os.umask(previous_umask)
     bm.write_json_atomic(tmp_path / manifest["manifest_name"], manifest)
     index = bm.build_index([manifest])
     assert bm.validate_index(index) == index
