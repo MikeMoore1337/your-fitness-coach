@@ -237,7 +237,6 @@ def test_publication_rechecks_dump_then_commits_index(
     assert before == {p.name: p.read_bytes() for p in index.parent.iterdir()}
 
 
-
 @pytest.mark.skipif(os.name != "posix", reason="POSIX SFTP permission contract")
 def test_sftp_export_metadata_group_readable_after_index_replacement(publisher: Path) -> None:
     now = bm.utc_now()
@@ -277,6 +276,7 @@ def test_group_readable_json_failure_keeps_existing_index(
         bm.write_json_atomic(index, {"version": 2}, group_readable=True)
     assert index.read_bytes() == original
     assert not list(tmp_path.glob("*.partial"))
+
 
 def test_retention_keeps_two_good_even_when_all_expired(publisher: Path) -> None:
     now = bm.utc_now()
