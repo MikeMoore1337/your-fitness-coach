@@ -53,10 +53,44 @@ online collector по-прежнему считает их полные пото
 ### Защищённый observer после остановки backend
 
 Нужны host Python 3.14 (версия проекта), существующий `/usr/bin/psql`, отдельный libpq service `yfc_observer` и два файла:
-`/etc/yfc/observer/pg_service.conf`, `/etc/yfc/observer/pgpass`. Каталог root:root 0700,
-файлы root:root 0600; родители root-owned, без group/world write и symlink.
-Helper/psql должен иметь законный доступ к этим файлам в существующем deployment account.
-Это prerequisite; код не устанавливает psql, не создаёт роли/файлы и не выдаёт sudo-права.
+`/etc/yfc/observer/pg_service.conf`, `/etc/yfc/observer/pgpass`.
+Код **не** создаёт роли/файлы, не вызывает `sudo`, не повышает привилегии и не
+включает observer автоматически. Production provision требует отдельного approval.
+
+**Контракт доступа без привилегий root при запуске:**
+
+| Путь | Владелец и группа | POSIX mode | Почему |
+|---|---|---|---|
+| Родительские каталоги `/`, `/etc`, `/etc/yfc` | root (UID 0) | directory, без group/other write; SSH deploy должен иметь traversal | Защита от подмены пути |
+| `/etc/yfc/observer/` | `root:<primary-group-of-yfc-deploy>` | `0750` | `yfc-deploy` может войти, но не менять содержимое каталога |
+| `pg_service.conf` | `root:<primary-group-of-yfc-deploy>` | `0640` | Конфигурация без секрета доступна только оператору/его группе |
+| `pgpass` | `yfc-deploy:<primary-group-of-yfc-deploy>` | `0600` | Парольный файл читается effective user; **libpq игнорирует** файлы с любым group/other access |
+
+Каждый файл должен быть обычным (не symlink) с ровно одной жёсткой ссылкой.
+Python выполняется с effective UID пользователя `yfc-deploy` и его primary GID
+(без `sudo`/root); отсутствие `getpwnam`, несоответствие UID/GID, неверный
+owner/mode/type/nlink или невозможность открыть файлы с `O_NOFOLLOW` вызывает
+fail-closed. Проверяется неизменность файла между `lstat` и `fstat`.
+Все эти условия — часть **предлагаемой provision policy**, а не измеренные
+права на production. Если фактический deployment account/группа отличаются,
+не ослаблять проверку: сначала представить отдельное разрешённое решение.
+
+Причина изменения относительно первоначальных `root:root 0700/0600`: SSH
+workflows запускают helper под `yfc-deploy`, которому не доступны root-only
+файлы. Простое изменение `pgpass` на mode `0640` тоже недопустимо, поскольку
+libpq игнорирует доступный группе файл паролей. При provisioning секрет
+передаётся по утверждённому закрытому каналу, без записи в Git, stdout,
+командную строку или CI artifacts; ротация производится атомарно с сохранением
+owner/mode.
+
+**Отдельный обязательный read-only preflight production перед активацией:**
+`id -u`, `id -g` и `getent passwd yfc-deploy` под текущим SSH account,
+sanitized `namei -l` / `stat` только для owner/mode/type на путях выше,
+`test -r` файлов из того же effective account и факт наличия `psql`.
+Не печатать содержимое файлов, libpq credentials, окружение или SQL queries.
+До provision ещё несуществующих файлов read-only audit должен вернуть
+`NOT_PROVISIONED`, а не PASS. Не создавать роль/ACL, менять runtime или
+выполнять подключение к production PostgreSQL без следующего owner approval.
 
 План SQL для **отдельно авторизованного** provisioning (здесь не выполняется):
 
