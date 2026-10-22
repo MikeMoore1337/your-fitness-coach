@@ -1353,6 +1353,14 @@ def update_workout_set(
     changes = payload.model_dump(exclude_unset=True)
     expected_version = changes.pop("expected_version", None)
     mutation_id = changes.pop("mutation_id", None)
+    # Exact retries depend on the original request, not today's mutable set state.
+    try:
+        replayed = replayed_workout_set(db, set_row, mutation_id, changes)
+    except WorkoutSetSyncError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    if replayed is not None:
+        return serialize_workout_set(replayed)
+
     try:
         validate_workout_set_changes(
             workout_exercise_metric_type(workout_exercise),
@@ -1363,9 +1371,6 @@ def update_workout_set(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     try:
-        replayed = replayed_workout_set(db, set_row, mutation_id, changes)
-        if replayed is not None:
-            return serialize_workout_set(replayed)
         if mutation_id is None and workout.status != "in_progress":
             raise HTTPException(
                 status_code=409,

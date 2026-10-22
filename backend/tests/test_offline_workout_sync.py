@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
+from fitminiapp_api.core.timezone import today_msk
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.program import WorkoutSetMutation
 
@@ -231,3 +232,102 @@ def test_retry_is_safe_after_finish_and_other_accounts_cannot_replay_it(client) 
     other_headers = _auth(client, 93_602)
     forbidden = client.patch(endpoint, headers=other_headers, json=payload)
     assert forbidden.status_code == 404
+
+
+def test_cardio_exact_replay_ignores_later_duration_state(client) -> None:
+    headers = _auth(client, 93_604)
+    exercises = client.get("/api/v1/programs/exercises", headers=headers).json()
+    cardio_id = next(item["id"] for item in exercises if item["metric_type"] == "cardio")
+    today = today_msk()
+    created = client.post(
+        "/api/v1/programs/templates",
+        headers=headers,
+        json={
+            "title": "Повтор кардио-операции",
+            "goal": "maintenance",
+            "level": "beginner",
+            "mode": "self",
+            "assign_after_create": True,
+            "start_date": today.isoformat(),
+            "schedule_weekdays": [today.weekday()],
+            "days": [
+                {
+                    "title": "Кардио",
+                    "exercises": [
+                        {
+                            "exercise_id": cardio_id,
+                            "prescribed_duration_minutes": 25,
+                            "rest_seconds": 90,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    assert created.status_code == 200, created.text
+    workout = client.get("/api/v1/workouts/today", headers=headers).json()
+    started = client.post(f"/api/v1/workouts/{workout['id']}/start", headers=headers)
+    assert started.status_code == 200, started.text
+    set_row = started.json()["exercises"][0]["sets"][0]
+    endpoint = f"/api/v1/workouts/sets/{set_row['id']}"
+
+    duration = client.patch(
+        endpoint,
+        headers=headers,
+        json={
+            "duration_minutes": 25,
+            "expected_version": 1,
+            "mutation_id": "cardio-set-duration-000001",
+        },
+    )
+    assert duration.status_code == 200, duration.text
+    completion = {
+        "is_completed": True,
+        "expected_version": 2,
+        "mutation_id": "cardio-completion-0000001",
+    }
+    completed = client.patch(endpoint, headers=headers, json=completion)
+    assert completed.status_code == 200, completed.text
+    assert completed.json()["is_completed"] is True
+
+    cleared = client.patch(
+        endpoint,
+        headers=headers,
+        json={
+            "is_completed": False,
+            "duration_minutes": None,
+            "expected_version": 3,
+            "mutation_id": "cardio-clear-duration-0001",
+        },
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["duration_minutes"] is None
+
+    # Exact replay must not be revalidated against *newer* mutable set state.
+    replay = client.patch(endpoint, headers=headers, json=completion)
+    assert replay.status_code == 200, replay.text
+    assert replay.json() == cleared.json()
+
+    changed_payload = client.patch(
+        endpoint,
+        headers=headers,
+        json={**completion, "distance_km": 5},
+    )
+    assert changed_payload.status_code == 409, changed_payload.text
+    assert changed_payload.json()["detail"]["code"] == "workout_set_idempotency_conflict"
+
+    new_invalid = client.patch(
+        endpoint,
+        headers=headers,
+        json={
+            "is_completed": True,
+            "expected_version": 4,
+            "mutation_id": "cardio-new-completion-0001",
+        },
+    )
+    assert new_invalid.status_code == 422
+    with get_session_context() as db:
+        assert db.query(WorkoutSetMutation).count() == 3
+
+    other_headers = _auth(client, 93_605)
+    assert client.patch(endpoint, headers=other_headers, json=completion).status_code == 404
