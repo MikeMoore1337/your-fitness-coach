@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import os
+import pwd
 import stat
 import time
 from pathlib import Path
@@ -29,6 +31,7 @@ CONSUMERS = frozenset(
 )
 DB_CONSUMERS = CONSUMERS - {"bot", "bot-blue", "bot-green"}
 OBSERVER_DIRECTORY = Path("/etc/yfc/observer")
+DEPLOY_ACCOUNT = "yfc-deploy"
 
 # Raw tuples stay in memory. Never emit query text, usernames or client addresses.
 OBSERVER_SQL = """
@@ -119,20 +122,66 @@ class SafetyError(RuntimeError):
 
 
 def _protected_observer_files() -> None:
-    for parent in OBSERVER_DIRECTORY.parents:
-        info = parent.lstat()
-        if info.st_uid != 0 or stat.S_ISLNK(info.st_mode) or info.st_mode & 0o022:
-            raise SafetyError("observer_parent_unprotected")
-    for path in (
-        OBSERVER_DIRECTORY,
-        OBSERVER_DIRECTORY / "pg_service.conf",
-        OBSERVER_DIRECTORY / "pgpass",
-    ):
-        info = path.lstat()
-        if info.st_uid != 0 or stat.S_ISLNK(info.st_mode) or info.st_mode & 0o077:
-            raise SafetyError("observer_files_unprotected")
-        if path != OBSERVER_DIRECTORY and not stat.S_ISREG(info.st_mode):
-            raise SafetyError("observer_files_invalid")
+    """Verify libpq files are readable by the unprivileged SSH deploy identity.
+
+    pgpass must be owned by the effective user and mode 0600: libpq ignores
+    any password file exposing group or other permissions on Unix.
+    """
+    try:
+        account = pwd.getpwnam(DEPLOY_ACCOUNT)
+    except KeyError:
+        raise SafetyError("observer_deploy_identity_missing") from None
+    if account.pw_uid == 0 or os.geteuid() != account.pw_uid or os.getegid() != account.pw_gid:
+        raise SafetyError("observer_deploy_identity_invalid")
+
+    try:
+        for parent in OBSERVER_DIRECTORY.parents:
+            info = parent.lstat()
+            if info.st_uid != 0 or not stat.S_ISDIR(info.st_mode) or info.st_mode & 0o022:
+                raise SafetyError("observer_parent_unprotected")
+
+        directory = OBSERVER_DIRECTORY.lstat()
+        if (
+            not stat.S_ISDIR(directory.st_mode)
+            or directory.st_uid != 0
+            or directory.st_gid != account.pw_gid
+            or stat.S_IMODE(directory.st_mode) != 0o750
+        ):
+            raise SafetyError("observer_directory_unprotected")
+
+        for name, expected_uid, mode in (
+            ("pg_service.conf", 0, 0o640),
+            ("pgpass", account.pw_uid, 0o600),
+        ):
+            path = OBSERVER_DIRECTORY / name
+            metadata = path.lstat()
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or metadata.st_uid != expected_uid
+                or metadata.st_gid != account.pw_gid
+                or stat.S_IMODE(metadata.st_mode) != mode
+            ):
+                raise SafetyError("observer_files_unprotected")
+
+            # An actual open with the deployment identity detects inaccessible
+            # files and O_NOFOLLOW protects against a file replacement symlink.
+            descriptor = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+            try:
+                opened = os.fstat(descriptor)
+                if (
+                    opened.st_dev != metadata.st_dev
+                    or opened.st_ino != metadata.st_ino
+                    or opened.st_uid != metadata.st_uid
+                    or opened.st_gid != metadata.st_gid
+                    or opened.st_mode != metadata.st_mode
+                    or opened.st_nlink != metadata.st_nlink
+                ):
+                    raise SafetyError("observer_files_changed_during_access")
+            finally:
+                os.close(descriptor)
+    except OSError, ValueError:
+        raise SafetyError("observer_files_unreadable") from None
 
 
 def validate_snapshot(snapshot: dict, *, addresses: set[str], database: str) -> list[dict]:
