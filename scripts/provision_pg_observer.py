@@ -5,6 +5,7 @@ Run as root on the REAL production host, never in a sandbox. No application
 deploy, container restart, migration, PostgreSQL configuration or pool changes.
 Requires /usr/bin/psql (postgresql-client-16), installed separately.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -18,6 +19,7 @@ import secrets
 import stat
 import subprocess
 import sys
+from contextlib import suppress
 from pathlib import Path
 
 ROOT = Path("/etc/yfc/observer")
@@ -33,10 +35,14 @@ class Blocked(Exception):
 def execute(argv: list[str], stdin: str | None = None) -> str:
     try:
         proc = subprocess.run(
-            argv, input=stdin, capture_output=True, text=True,
-            timeout=20, check=False,
+            argv,
+            input=stdin,
+            capture_output=True,
+            text=True,
+            timeout=20,
+            check=False,
         )
-    except (OSError, subprocess.TimeoutExpired):
+    except OSError, subprocess.TimeoutExpired:
         raise Blocked("command_unavailable_or_timed_out") from None
     if proc.returncode:
         # Server errors may include SQL, so do not forward stderr.
@@ -51,7 +57,10 @@ def scram(password: str, salt: bytes | None = None) -> str:
     client = hmac.new(salted, b"Client Key", hashlib.sha256).digest()
     stored = hashlib.sha256(client).digest()
     server = hmac.new(salted, b"Server Key", hashlib.sha256).digest()
-    b64 = lambda data: base64.b64encode(data).decode("ascii")
+
+    def b64(data: bytes) -> str:
+        return base64.b64encode(data).decode("ascii")
+
     return "SCRAM-SHA-256$4096:" + b64(salt) + "$" + b64(stored) + ":" + b64(server)
 
 
@@ -68,12 +77,19 @@ def deploy_account() -> pwd.struct_passwd:
 
 
 def database() -> tuple[str, str, str]:
-    ids = execute([
-        "docker", "ps", "-q",
-        "--filter", f"label=com.docker.compose.project={PROJECT}",
-        "--filter", "label=com.docker.compose.service=db",
-        "--filter", "status=running",
-    ]).splitlines()
+    ids = execute(
+        [
+            "docker",
+            "ps",
+            "-q",
+            "--filter",
+            f"label=com.docker.compose.project={PROJECT}",
+            "--filter",
+            "label=com.docker.compose.service=db",
+            "--filter",
+            "status=running",
+        ]
+    ).splitlines()
     if len(ids) != 1 or not re.fullmatch(r"[a-f0-9]{12,64}", ids[0]):
         raise Blocked("db_container_ambiguous")
     cid = ids[0]
@@ -88,11 +104,27 @@ def database() -> tuple[str, str, str]:
 
 def db_sql(cid: str, name: str, admin: str, sql: str) -> str:
     # Never pass even a SCRAM verifier as an argv argument.
-    return execute([
-        "docker", "exec", "-i", "-u", "postgres", cid,
-        "psql", "-X", "-qAt", "-w", "-v", "ON_ERROR_STOP=1",
-        "-U", admin, "-d", name,
-    ], stdin=sql)
+    return execute(
+        [
+            "docker",
+            "exec",
+            "-i",
+            "-u",
+            "postgres",
+            cid,
+            "psql",
+            "-X",
+            "-qAt",
+            "-w",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-U",
+            admin,
+            "-d",
+            name,
+        ],
+        stdin=sql,
+    )
 
 
 def secure_parents() -> None:
@@ -108,19 +140,37 @@ def prerequisites() -> tuple[pwd.struct_passwd, str, str, str]:
     if not Path("/usr/bin/psql").exists():
         raise Blocked("psql_missing_install_postgresql_client_16")
     secure_parents()
+    if ROOT.parent.exists():
+        parent = ROOT.parent.lstat()
+        # Traversal must work for deploy user, not just for root.
+        if not (
+            parent.st_mode & stat.S_IXOTH
+            or (parent.st_gid == account.pw_gid and parent.st_mode & stat.S_IXGRP)
+        ):
+            raise Blocked("observer_parent_not_traversable_by_deploy")
     if ROOT.exists() or ROOT.is_symlink():
         raise Blocked("observer_directory_exists_do_not_overwrite")
     cid, dbname, admin = database()
-    if db_sql(
-        cid, dbname, admin,
-        "SELECT current_setting('server_version_num')::int >= 160000 "
-        "AND current_setting('is_superuser') = 'on';\n",
-    ) != "t":
+    if (
+        db_sql(
+            cid,
+            dbname,
+            admin,
+            "SELECT current_setting('server_version_num')::int >= 160000 "
+            "AND current_setting('is_superuser') = 'on';\n",
+        )
+        != "t"
+    ):
         raise Blocked("postgres_admin_or_version_invalid")
-    if db_sql(
-        cid, dbname, admin,
-        "SELECT count(*) FROM pg_roles WHERE rolname='yfc_observer';\n",
-    ) != "0":
+    if (
+        db_sql(
+            cid,
+            dbname,
+            admin,
+            "SELECT count(*) FROM pg_roles WHERE rolname='yfc_observer';\n",
+        )
+        != "0"
+    ):
         raise Blocked("observer_role_exists_do_not_rotate")
     return account, cid, dbname, admin
 
@@ -135,10 +185,8 @@ def write_stage(path: Path, data: str, uid: int, gid: int, mode: int) -> None:
             file.flush()
             os.fsync(file.fileno())
     except BaseException:
-        try:
+        with suppress(OSError):
             os.close(fd)
-        except OSError:
-            pass
         raise
 
 
@@ -151,18 +199,45 @@ def verify() -> None:
         "AND NOT rolcreatedb AND NOT rolcreaterole "
         "AND NOT rolreplication AND NOT rolbypassrls "
         "FROM pg_roles WHERE rolname = current_user) "
+        "AND NOT EXISTS (SELECT 1 FROM pg_roles r WHERE "
+        "(r.rolsuper OR r.rolcreatedb OR r.rolcreaterole OR r.rolreplication "
+        "OR r.rolbypassrls OR r.rolname IN ("
+        "'pg_monitor','pg_read_all_data','pg_write_all_data',"
+        "'pg_signal_backend','pg_read_server_files','pg_write_server_files',"
+        "'pg_execute_server_program','pg_use_reserved_connections')) "
+        "AND pg_has_role(current_user,r.oid,'member')) "
+        "AND NOT EXISTS (SELECT 1 FROM pg_class c "
+        "JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE c.relkind IN ('r','p','v','m','f') "
+        "AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' "
+        "AND has_table_privilege(current_user,c.oid,"
+        "'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')) "
         "THEN 'PASS' ELSE 'FAIL' END;"
     )
-    result = execute([
-        "runuser", "-u", USER, "--", "/usr/bin/env", "-i",
-        "PATH=/usr/bin:/bin",
-        f"PGSERVICEFILE={ROOT}/pg_service.conf",
-        f"PGPASSFILE={ROOT}/pgpass",
-        "PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=5000",
-        "/usr/bin/psql", "-X", "-w", "-A", "-t", "-v", "ON_ERROR_STOP=1",
-        "--dbname=service=yfc_observer connect_timeout=5",
-        "-c", query,
-    ])
+    result = execute(
+        [
+            "runuser",
+            "-u",
+            USER,
+            "--",
+            "/usr/bin/env",
+            "-i",
+            "PATH=/usr/bin:/bin",
+            f"PGSERVICEFILE={ROOT}/pg_service.conf",
+            f"PGPASSFILE={ROOT}/pgpass",
+            "PGOPTIONS=-c default_transaction_read_only=on -c statement_timeout=5000",
+            "/usr/bin/psql",
+            "-X",
+            "-w",
+            "-A",
+            "-t",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "--dbname=service=yfc_observer connect_timeout=5",
+            "-c",
+            query,
+        ]
+    )
     if result != "PASS":
         raise Blocked("observer_readonly_or_permissions_invalid")
 
@@ -171,7 +246,9 @@ def provision() -> None:
     account, cid, dbname, admin = prerequisites()
     password = secrets.token_hex(32)
     verifier = scram(password)
-    ROOT.parent.mkdir(mode=0o755, exist_ok=True)
+    if not ROOT.parent.exists():
+        ROOT.parent.mkdir(mode=0o755)
+        ROOT.parent.chmod(0o755)
     secure_parents()
     ROOT.mkdir(mode=0o700)
     os.chown(ROOT, 0, account.pw_gid)
@@ -226,7 +303,7 @@ def main() -> int:
     except Blocked as exc:
         print(f"OBSERVER_BLOCKED:{exc}", file=sys.stderr)
         return 1
-    except (OSError, ValueError):
+    except OSError, ValueError:
         print("OBSERVER_BLOCKED:host_operation_failed", file=sys.stderr)
         return 1
 
