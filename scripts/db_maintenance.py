@@ -292,7 +292,7 @@ def publish_backup(
             )
             packed.replace(target)
         manifest_path = root / manifest_name_for(target.name)
-        write_json_atomic(manifest_path, manifest)
+        write_json_atomic(manifest_path, manifest, group_readable=True)
         current_entries = [
             entry for entry in current_entries if entry["archive_name"] != target.name
         ]
@@ -305,7 +305,7 @@ def publish_backup(
             if position < 2 or parse_utc(entry["created_at_utc"], field="created_at_utc") >= cutoff
         ]
         # index.json is the commit marker: it is replaced only after all metadata is complete.
-        write_json_atomic(index_path, build_index(retained_entries))
+        write_json_atomic(index_path, build_index(retained_entries), group_readable=True)
 
         warnings: list[str] = []
         retained_names = {str(entry["archive_name"]) for entry in retained_entries}
