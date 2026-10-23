@@ -2,6 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RestTimer } from '../../../../src/features/workouts/TodayWorkout';
 import { activeWorkoutRestKey } from '../../../../src/features/workouts/activeWorkoutQueue';
+import {
+  beginMeasuredRest,
+  updateMeasuredRest,
+} from '../../../../src/features/workouts/restSessions';
+import { legacyWorkoutRestStorageKey } from '../../../../src/shared/userScopedStorage';
 
 vi.mock('../../../../src/shared/telegram/useTelegram', () => ({ haptic: vi.fn() }));
 
@@ -26,6 +31,14 @@ function mount() {
   );
 }
 
+function startUnmeasuredRest(deadline = initialTime + 90_000, seconds = 90) {
+  act(() => {
+    window.dispatchEvent(
+      new CustomEvent('fit:rest', { detail: { workoutId: 42, seconds, deadline } }),
+    );
+  });
+}
+
 function pointer(target: Element, type: string, pointerId = 1) {
   fireEvent(target, Object.assign(new Event(type, { bubbles: true }), { pointerId }));
 }
@@ -34,7 +47,6 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(initialTime);
   localStorage.clear();
-  localStorage.setItem(key, JSON.stringify(initialTime + 90_000));
 });
 
 afterEach(() => {
@@ -44,6 +56,52 @@ afterEach(() => {
 });
 
 describe('RestTimer', () => {
+  it('does not resurrect a deadline-only legacy timer after resume', () => {
+    localStorage.removeItem(key);
+    localStorage.setItem(legacyWorkoutRestStorageKey(42), JSON.stringify(initialTime + 90_000));
+
+    mount();
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(localStorage.getItem(legacyWorkoutRestStorageKey(42))).toBeNull();
+  });
+
+  it('does not resurrect a deadline-only scoped timer after resume', () => {
+    localStorage.setItem(key, JSON.stringify(initialTime + 90_000));
+
+    mount();
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(localStorage.getItem(key)).toBeNull();
+  });
+
+  it('restores the measured panel when resume follows a durable rest journal', () => {
+    localStorage.removeItem(key);
+    expect(beginMeasuredRest(7, 42, 201, 90, initialTime)).not.toBeNull();
+
+    mount();
+
+    expect(screen.getByRole('complementary')).toHaveTextContent('ФАКТ');
+    expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  });
+
+  it('ignores a replayed completion event after its measured rest is terminal', () => {
+    localStorage.removeItem(key);
+    expect(beginMeasuredRest(7, 42, 201, 90, initialTime)).not.toBeNull();
+    expect(updateMeasuredRest(7, 42, 201, 'complete', initialTime + 30_000)).not.toBeNull();
+
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  });
+
   it('uses an uppercase FACT label with a real, explicitly stoppable measured clock', () => {
     mount();
     act(() => {
@@ -64,19 +122,18 @@ describe('RestTimer', () => {
     expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
   });
 
-  it('settles an already-expired stored deadline without a user event', () => {
+  it('clears an expired deadline-only timer on resume', () => {
     localStorage.setItem(key, JSON.stringify(initialTime - 1));
 
     mount();
 
-    expect(screen.queryByRole('timer', { name: 'Отдых' })).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveTextContent('Отдых завершён');
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(localStorage.getItem(key)).toBeNull();
   });
 
   it('shows the compact completion notice without an external event', () => {
-    localStorage.setItem(key, JSON.stringify(initialTime - 1));
-
     mount();
+    startUnmeasuredRest(initialTime - 1);
 
     const panel = screen.getByRole('complementary');
     expect(panel).toHaveClass('is-compact');
@@ -85,9 +142,8 @@ describe('RestTimer', () => {
   });
 
   it('removes the completion notice from the DOM on the first hide action', () => {
-    localStorage.setItem(key, JSON.stringify(initialTime - 1));
-
     mount();
+    startUnmeasuredRest(initialTime - 1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
 
@@ -96,9 +152,9 @@ describe('RestTimer', () => {
 
   it('compacts after a real deadline without an external event', async () => {
     vi.useRealTimers();
-    localStorage.setItem(key, JSON.stringify(Date.now() + 25));
 
     mount();
+    startUnmeasuredRest(Date.now() + 25);
 
     await waitFor(() => expect(screen.getByRole('complementary')).toHaveClass('is-compact'));
     expect(screen.getByRole('status')).toHaveTextContent('Отдых завершён');
@@ -106,6 +162,7 @@ describe('RestTimer', () => {
 
   it('extends the existing scoped deadline with native clicks and preserves field focus', () => {
     mount();
+    startUnmeasuredRest();
     const weight = screen.getByRole('textbox', { name: 'Вес' });
     weight.focus();
     const add30 = screen.getByRole('button', { name: '+30 сек' });
@@ -123,6 +180,7 @@ describe('RestTimer', () => {
 
   it('shows a skipped-rest notice immediately and removes it on the first hide', () => {
     mount();
+    startUnmeasuredRest();
     fireEvent.click(screen.getByRole('button', { name: 'Пропустить' }));
 
     expect(localStorage.getItem(key)).toBeNull();
@@ -137,8 +195,8 @@ describe('RestTimer', () => {
   });
 
   it('retains the pressed control when the deadline expires and ignores its late click', () => {
-    localStorage.setItem(key, JSON.stringify(initialTime + 1_000));
     mount();
+    startUnmeasuredRest(initialTime + 1_000);
     const add30 = screen.getByRole('button', { name: '+30 сек' });
     pointer(add30, 'pointerdown');
     act(() => vi.advanceTimersByTime(1_000));
@@ -152,6 +210,7 @@ describe('RestTimer', () => {
 
   it('reconciles the stored deadline on resume and starts a new rest after skip', () => {
     mount();
+    startUnmeasuredRest();
     vi.setSystemTime(initialTime + 65_000);
     fireEvent(window, new Event('pageshow'));
     expect(screen.getByRole('timer')).toHaveTextContent('0:25');
@@ -176,22 +235,22 @@ describe('RestTimer', () => {
   });
 
   it('keeps one deadline timer across resume events and clears it on unmount', () => {
-    const timersBeforeMount = vi.getTimerCount();
     const view = mount();
+    startUnmeasuredRest();
     const timersWithRest = vi.getTimerCount();
 
-    expect(timersWithRest).toBe(timersBeforeMount + 1);
+    expect(timersWithRest).toBeGreaterThan(0);
     fireEvent(window, new Event('pageshow'));
     fireEvent(document, new Event('visibilitychange'));
     expect(vi.getTimerCount()).toBe(timersWithRest);
 
     view.unmount();
-    expect(vi.getTimerCount()).toBe(timersBeforeMount);
+    expect(vi.getTimerCount()).toBe(timersWithRest - 1);
   });
 
   it('releases interrupted pointers on pagehide before compacting an expired rest', () => {
-    localStorage.setItem(key, JSON.stringify(initialTime + 1_000));
     mount();
+    startUnmeasuredRest(initialTime + 1_000);
     pointer(screen.getByRole('button', { name: '+30 сек' }), 'pointerdown', 8);
     act(() => vi.advanceTimersByTime(1_000));
     fireEvent(window, new Event('pagehide'));

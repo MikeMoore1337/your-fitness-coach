@@ -19,7 +19,7 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
-import { readStorage, removeStorage, writeStorage } from '../../shared/storage';
+import { removeStorage, writeStorage } from '../../shared/storage';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import {
@@ -507,13 +507,22 @@ function WorkoutSetRow({
         setJustConfirmed(true);
       }
       if (accepted && immediate && startRest && canStartRest(nextSetKind, nextCompleted)) {
-        const deadline = Date.now() + restSeconds * 1000;
-        if (userId) writeStorage(activeWorkoutRestKey(userId, workoutId), deadline);
-        window.dispatchEvent(
-          new CustomEvent('fit:rest', {
-            detail: { workoutId, setId: set.id, seconds: restSeconds, deadline },
-          }),
-        );
+        // Persist measured rest before the UI event so freeze/resume cannot leave a bare deadline.
+        const started = userId
+          ? beginMeasuredRest(userId, workoutId, set.id, restSeconds, Date.now())
+          : null;
+        if (started) {
+          window.dispatchEvent(
+            new CustomEvent('fit:rest', {
+              detail: {
+                workoutId,
+                setId: set.id,
+                seconds: restSeconds,
+                deadline: started.deadline,
+              },
+            }),
+          );
+        }
       }
       return accepted;
     } finally {
@@ -1495,16 +1504,11 @@ export function RestTimer({
   const storageKey = activeWorkoutRestKey(userId, workoutId);
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
   const [deadline, setDeadline] = useState(() => {
-    // A crash between journaling the accepted set and writing the legacy
-    // deadline must not make a durable active rest invisible after reload.
     const restored = activeRestJournalSession(userId, workoutId);
-    if (restored) return restored.deadline;
-    const scoped = readStorage<number>(storageKey, 0);
-    if (scoped) return scoped;
-    const legacy = readStorage<number>(legacyStorageKey, 0);
-    if (legacy) writeStorage(storageKey, legacy);
     removeStorage(legacyStorageKey);
-    return legacy;
+    if (restored) return restored.deadline;
+    removeStorage(storageKey);
+    return 0;
   });
   const [now, setNow] = useState(() => Date.now());
   const [measuredRest, setMeasuredRest] = useState(() =>
@@ -1556,6 +1560,7 @@ export function RestTimer({
       const started = detail.setId
         ? beginMeasuredRest(userId, workoutId, detail.setId, detail.seconds, acceptedAt)
         : null;
+      if (detail.setId && !started) return;
       const nextDeadline =
         started?.deadline ?? detail.deadline ?? acceptedAt + detail.seconds * 1000;
       setMeasuredRest(started);
