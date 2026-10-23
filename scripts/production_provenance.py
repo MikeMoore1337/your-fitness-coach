@@ -277,7 +277,6 @@ def _bot_process_owner(pid: int, *, proc_root: Path = Path("/proc")) -> str:
     return identity[19]
 
 
-
 # The deploy user cannot ptrace UID 10001 on production. Run a bounded read-only
 # check *as that same UID* inside the already verified bot container instead.
 # Never run this probe as root or treat missing data as a valid owner.
@@ -356,8 +355,14 @@ def _bot_process_owner_in_container(container_id: str, host_pid: int) -> str:
     before = host_starttime()
     completed = subprocess.run(
         [
-            "docker", "exec", "--user", "10001:10001",
-            container_id, "python", "-c", _BOT_CONTAINER_OWNER_PROBE,
+            "docker",
+            "exec",
+            "--user",
+            "10001:10001",
+            container_id,
+            "python",
+            "-c",
+            _BOT_CONTAINER_OWNER_PROBE,
         ],
         check=True,
         capture_output=True,
