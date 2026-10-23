@@ -64,7 +64,9 @@ for (const width of [360, 390, 430, 1440]) {
             await expect(add).toBeFocused();
           } catch (error) {
             const focusState = await page.evaluate(() => {
-              const trigger = document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]');
+              const trigger = document.querySelector<HTMLElement>(
+                '[data-testid="quick-add-trigger"]',
+              );
               const active = document.activeElement;
               const style = trigger ? getComputedStyle(trigger) : null;
               return {
