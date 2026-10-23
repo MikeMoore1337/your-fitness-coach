@@ -195,11 +195,12 @@ def test_backup_group_read_triage_is_exact_and_keeps_other_findings_blocking(
 
 def test_polling_heartbeat_group_only_read_exception_is_exact(tmp_path: Path) -> None:
     """A single explicitly approved 0640 line; no new general bypass."""
+    status_path = "bot/fitminiapp_bot/polling_health.py"
     for path, line, rule, blocked in (
-        ("bot/fitminiapp_bot/polling_health.py", 71, "py/overly-permissive-file", False),
-        ("bot/fitminiapp_bot/polling_health.py", 72, "py/overly-permissive-file", True),
+        (status_path, 71, "py/overly-permissive-file", False),
+        (status_path, 72, "py/overly-permissive-file", True),
         ("bot/fitminiapp_bot/other.py", 71, "py/overly-permissive-file", True),
-        ("bot/fitminiapp_bot/polling_health.py", 71, "py/path-injection", True),
+        (status_path, 71, "py/path-injection", True),
     ):
         evidence = _sarif(
             security_severity="7.8", level="warning",
