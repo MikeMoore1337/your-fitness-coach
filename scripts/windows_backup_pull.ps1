@@ -123,12 +123,11 @@ function Get-Sha256 {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
-function Assert-EncryptedMetadata {
+function Assert-ArchiveMetadata {
     param([object]$Value)
-    if ((Get-PropertyValue $Value "archive_format") -cne "age-v1" -or (Get-PropertyValue $Value "age_version") -cne "v1.3.2" -or
-        [string](Get-PropertyValue $Value "archive_name") -cnotmatch '\.dump\.age$' -or
-        [string](Get-PropertyValue $Value "recipient") -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$') {
-        Throw-BackupPullError "CORRUPTED" "only pinned native age encrypted dumps are accepted"
+    if ((Get-PropertyValue $Value "archive_format") -cne "tar-gzip-pg-custom" -or
+        [string](Get-PropertyValue $Value "archive_name") -cnotmatch '^backup-[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz$') {
+        Throw-BackupPullError "CORRUPTED" "expected backup-YYYY-MM-DD.tar.gz"
     }
     $size = Get-PropertyValue $Value "archive_size_bytes"
     if (($size -isnot [int] -and $size -isnot [long]) -or $size -le 0) {
@@ -136,23 +135,24 @@ function Assert-EncryptedMetadata {
     }
 }
 
-function Assert-AgeFile {
-    param([string]$Path)
-    $expected = "age-encryption.org/v1`n-> X25519 "
-    $stream = [IO.File]::OpenRead($Path)
-    try {
-        $buffer = New-Object byte[] $expected.Length
-        if ($stream.Read($buffer, 0, $buffer.Length) -ne $buffer.Length -or [Text.Encoding]::ASCII.GetString($buffer) -cne $expected) {
-            Throw-BackupPullError "CORRUPTED" "archive does not have a binary age X25519 header"
-        }
+function Assert-TarFile {
+    param([string]$Path, [string]$ManifestPath, [object]$Config)
+    $validator = Join-Path $PSScriptRoot "backup_manifest.py"
+    if (-not (Test-Path -LiteralPath $Config.PythonPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $validator -PathType Leaf)) {
+        Throw-BackupPullError "CONFIG_INVALID" "Python and backup_manifest.py must be installed together with the pull script"
     }
-    finally { $stream.Dispose() }
+    # One standard-library validator is shared by publication, pull, status and recovery.
+    $result = & $Config.PythonPath -I $validator $Path --manifest $ManifestPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Throw-BackupPullError "CORRUPTED" "tar.gz validation failed"
+    }
 }
 
 function Assert-FormatVersion {
     param([object]$Value)
     $version = Get-PropertyValue $Value "schema_version"
-    if (($version -isnot [int] -and $version -isnot [long]) -or $version -ne 2) {
+    if (($version -isnot [int] -and $version -isnot [long]) -or $version -ne 3) {
         Throw-BackupPullError "CORRUPTED" "unsupported backup metadata schema"
     }
 }
@@ -184,7 +184,7 @@ function Assert-ManifestEntry {
         [object]$NowUtc = $null
     )
     Assert-FormatVersion $Manifest
-    Assert-EncryptedMetadata $Manifest
+    Assert-ArchiveMetadata $Manifest
     if ((Get-PropertyValue $Manifest "kind") -ne "yfc-backup-manifest") {
         Throw-BackupPullError "CORRUPTED" "unexpected backup manifest kind"
     }
@@ -235,7 +235,7 @@ function Assert-IndexEntry {
         [Parameter(Mandatory = $true)][object]$Entry,
         [object]$NowUtc = $null
     )
-    Assert-EncryptedMetadata $Entry
+    Assert-ArchiveMetadata $Entry
     $archiveName = Assert-SafeFileName (Get-PropertyValue $Entry "archive_name") "archive_name"
     $manifestName = Assert-SafeFileName (Get-PropertyValue $Entry "manifest_name") "manifest_name"
     if ($manifestName -ne "$archiveName.manifest.json") {
@@ -294,25 +294,14 @@ function Read-Config {
     if ($null -ne (Get-PropertyValue $raw "password") -or $null -ne (Get-PropertyValue $ssh "password")) {
         Throw-BackupPullError "CONFIG_INVALID" "passwords are not supported; use an SSH identity"
     }
-    $encryption = Get-PropertyValue $raw "encryption_at_rest"
-    if ($null -eq $encryption) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest approval is required"
+    if ($null -ne (Get-PropertyValue $raw "encryption_at_rest")) {
+        Throw-BackupPullError "CONFIG_INVALID" "legacy configuration preserved; prepare a separate tar.gz configuration"
     }
-    $encryptionMode = [string](Get-PropertyValue $encryption "mode")
-    $encryptionApprovedValue = Get-PropertyValue $encryption "approved"
-    if ($encryptionApprovedValue -isnot [bool]) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest.approved must be a JSON boolean"
+    $pythonValue = [string](Get-PropertyValue $raw "python_path")
+    if ([string]::IsNullOrWhiteSpace($pythonValue)) {
+        Throw-BackupPullError "CONFIG_INVALID" "absolute python_path is required for archive validation"
     }
-    $encryptionApproved = [bool]$encryptionApprovedValue
-    $keyRecoveryDocument = [string](Get-PropertyValue $encryption "key_recovery_document")
-    if ($encryptionMode -cne "age" -or -not $encryptionApproved -or
-        [string]::IsNullOrWhiteSpace($keyRecoveryDocument) -or $keyRecoveryDocument -match "REPLACE_WITH|OWNER_APPROVAL_REQUIRED|NOT_APPLICABLE") {
-        Throw-BackupPullError "CONFIG_INVALID" "age approval and a tested offline key recovery reference are required"
-    }
-    $recipient = [string](Get-PropertyValue $encryption "recipient")
-    if ($recipient -cnotmatch '^age1[023456789acdefghjklmnpqrstuvwxyz]{58}$') {
-        Throw-BackupPullError "CONFIG_INVALID" "expected native age recipient is required"
-    }
+    $pythonPath = Resolve-ConfiguredPath $pythonValue $configDir
     $localValue = [string](Get-PropertyValue $raw "local_root")
     if ([string]::IsNullOrWhiteSpace($localValue)) {
         Throw-BackupPullError "CONFIG_INVALID" "local_root is required"
@@ -342,7 +331,7 @@ function Read-Config {
     $minimumValid = if ($null -eq (Get-PropertyValue $raw "minimum_valid_backups")) { 2 } else { [int](Get-PropertyValue $raw "minimum_valid_backups") }
     $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 26 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
     $minimumFree = if ($null -eq (Get-PropertyValue $raw "minimum_free_bytes")) { 104857600 } else { [int64](Get-PropertyValue $raw "minimum_free_bytes") }
-    if ($port -lt 1 -or $port -gt 65535 -or $timeout -lt 1 -or $retentionDays -lt 1 -or $minimumValid -lt 1 -or $staleHours -lt 1 -or $minimumFree -lt 0) {
+    if ($port -lt 1 -or $port -gt 65535 -or $timeout -lt 1 -or $retentionDays -lt 1 -or $minimumValid -lt 2 -or $staleHours -lt 1 -or $minimumFree -lt 0) {
         Throw-BackupPullError "CONFIG_INVALID" "backup limits are invalid"
     }
     $lockValue = Get-PropertyValue $raw "lock_file"
@@ -369,10 +358,7 @@ function Read-Config {
         LockFile = $lockFile
         StatusFile = $statusFile
         LogFile = $logFile
-        EncryptionAtRestMode = $encryptionMode
-        EncryptionAtRestApproved = $encryptionApproved
-        Recipient = $recipient
-        KeyRecoveryDocument = $keyRecoveryDocument
+        PythonPath = $pythonPath
     }
 }
 
@@ -562,7 +548,7 @@ function Get-LocalSnapshot {
     )
     $valid = New-Object Collections.ArrayList
     $invalid = New-Object Collections.ArrayList
-    $files = @(Get-ChildItem -LiteralPath $Config.LocalRoot -Filter "*.manifest.json" -File -ErrorAction SilentlyContinue)
+    $files = @(Get-ChildItem -LiteralPath $Config.LocalRoot -Filter "backup-????-??-??.tar.gz.manifest.json" -File -ErrorAction SilentlyContinue)
     foreach ($file in $files) {
         try {
             $manifest = Read-JsonObject $file.FullName
@@ -572,14 +558,11 @@ function Get-LocalSnapshot {
             if (-not (Test-Path -LiteralPath $archivePath -PathType Leaf)) {
                 Throw-BackupPullError "CORRUPTED" "archive is missing"
             }
-            if ([string](Get-PropertyValue $manifest "recipient") -cne $Config.Recipient) {
-                Throw-BackupPullError "CORRUPTED" "local recipient differs from approved recovery key"
-            }
-            Assert-AgeFile $archivePath
             $archiveItem = Get-Item -LiteralPath $archivePath
             if ([int64]$archiveItem.Length -ne [int64](Get-PropertyValue $manifest "archive_size_bytes") -or (Get-Sha256 $archivePath) -ne [string](Get-PropertyValue $manifest "archive_sha256")) {
                 Throw-BackupPullError "CORRUPTED" "archive digest does not match manifest"
             }
+            Assert-TarFile $archivePath $file.FullName $Config
             [void]$valid.Add([pscustomobject]@{
                     Manifest = $manifest
                     ManifestPath = $file.FullName
@@ -727,10 +710,6 @@ function Invoke-Pull {
         if (-not (Test-Path -LiteralPath $Config.LocalRoot -PathType Container)) {
             Throw-BackupPullError "CONFIG_INVALID" "backup directory must be prepared before the first pull"
         }
-        # Preserve legacy copies for a separately approved migration; never rotate or import them.
-        if (@(Get-ChildItem -LiteralPath $Config.LocalRoot -File -Filter "*.dump").Count -gt 0) {
-            Throw-BackupPullError "CONFIG_INVALID" "legacy plaintext backups require a separate protected migration"
-        }
         Assert-SshFiles $Config
         $lock = Acquire-BackupLock $Config.LockFile
         $lockAcquired = $true
@@ -745,9 +724,6 @@ function Invoke-Pull {
         $localByName = @{}
         foreach ($item in @($local.Valid)) { $localByName[$item.ArchiveName] = $item }
         foreach ($entry in $entries) {
-            if ([string](Get-PropertyValue $entry "recipient") -cne $Config.Recipient) {
-                Throw-BackupPullError "CORRUPTED" "index recipient differs from approved recovery key"
-            }
             $archiveName = [string](Get-PropertyValue $entry "archive_name")
             if ($localByName.ContainsKey($archiveName) -and [string](Get-PropertyValue $localByName[$archiveName].Manifest "archive_sha256") -eq [string](Get-PropertyValue $entry "archive_sha256")) {
                 continue
@@ -758,7 +734,7 @@ function Invoke-Pull {
             Invoke-SftpGet $Config $manifestName $manifestTemp $incoming
             $manifest = Read-JsonObject $manifestTemp
             [void](Assert-ManifestEntry $manifest $nowUtc)
-            foreach ($field in @("archive_format", "age_version", "recipient", "archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "published_at_utc", "verification_status")) {
+            foreach ($field in @("archive_format", "archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "published_at_utc", "verification_status")) {
                 if ([string](Get-PropertyValue $manifest $field) -ne [string](Get-PropertyValue $entry $field)) {
                     Throw-BackupPullError "CORRUPTED" "manifest and index disagree"
                 }
@@ -769,7 +745,7 @@ function Invoke-Pull {
             if ([int64]$archiveItem.Length -ne [int64](Get-PropertyValue $manifest "archive_size_bytes") -or (Get-Sha256 $archiveTemp) -ne [string](Get-PropertyValue $manifest "archive_sha256")) {
                 Throw-BackupPullError "CORRUPTED" "downloaded archive digest does not match manifest"
             }
-            Assert-AgeFile $archiveTemp
+            Assert-TarFile $archiveTemp $manifestTemp $Config
             $archiveTarget = Join-Path $Config.LocalRoot $archiveName
             $manifestTarget = Join-Path $Config.LocalRoot $manifestName
             if ((Test-Path -LiteralPath $archiveTarget -PathType Leaf) -and -not (Test-Path -LiteralPath $manifestTarget -PathType Leaf)) {

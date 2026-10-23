@@ -173,3 +173,21 @@ def test_validated_baseline_does_not_hide_same_rule_on_a_new_line(tmp_path: Path
     assert len(result) == 1
     assert result[0]["blocking"] is True
     assert result[0]["validated_reason"] is None
+
+
+def test_backup_group_read_triage_is_exact_and_keeps_other_findings_blocking(
+    tmp_path: Path,
+) -> None:
+    for rule, path, line, blocked in (
+        ("py/overly-permissive-file", "scripts/backup_manifest.py", 187, False),
+        ("py/overly-permissive-file", "scripts/backup_manifest.py", 188, True),
+        ("py/overly-permissive-file", "scripts/unrelated.py", 187, True),
+        ("test/other-security-rule", "scripts/backup_manifest.py", 187, True),
+    ):
+        document = _sarif(
+            security_severity="7.8", level="warning", rule_id=rule, path=path, line=line
+        )
+        result = codeql_sarif_gate.evaluate(_write(tmp_path, document))
+        assert len(result) == 1
+        assert result[0]["blocking"] is blocked
+        assert bool(result[0]["validated_reason"]) is not blocked

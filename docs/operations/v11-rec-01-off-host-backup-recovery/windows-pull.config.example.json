@@ -1,18 +1,12 @@
 {
-  "local_root": "D:\\YFC-Backups",
+  "local_root": "D:\\YFC-Backups\\tar-gz",
   "retention_days": 7,
   "minimum_valid_backups": 2,
   "stale_after_hours": 26,
   "minimum_free_bytes": 1073741824,
-  "encryption_at_rest": {
-    "mode": "age",
-    "approved": false,
-    "recipient": "REPLACE_WITH_OFFLINE_GENERATED_PUBLIC_AGE_RECIPIENT",
-    "key_recovery_document": "REPLACE_WITH_TESTED_OFFLINE_RECOVERY_REFERENCE"
-  },
-  "lock_file": "D:\\YFC-Backups\\backup-pull.lock",
-  "status_file": "D:\\YFC-Backups\\backup-status.json",
-  "log_file": "D:\\YFC-Backups\\backup-pull.log",
+  "lock_file": "D:\\YFC-Backups\\tar-gz\\backup-pull.lock",
+  "status_file": "D:\\YFC-Backups\\tar-gz\\backup-status.json",
+  "log_file": "D:\\YFC-Backups\\tar-gz\\backup-pull.log",
   "ssh": {
     "host": "replace-with-vps-hostname",
     "port": 22,
@@ -20,8 +14,9 @@
     "identity_file": "C:\\Users\\REPLACE\\.ssh\\yfc-backup",
     "known_hosts_file": "C:\\Users\\REPLACE\\.ssh\\yfc-backup-known_hosts",
     "sftp_path": "C:\\Windows\\System32\\OpenSSH\\sftp.exe",
-    "remote_root": "/srv/yfc/.artifacts/operations/backups/offhost",
+    "remote_root": "/offhost-tar",
     "remote_index": "index.json",
     "connect_timeout_seconds": 20
-  }
+  },
+  "python_path": "C:\\YFC\\Python\\python.exe"
 }
