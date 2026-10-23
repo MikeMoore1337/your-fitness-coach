@@ -1,0 +1,30 @@
+# Целевое применение внешних методик в YFC
+
+Статус: рекомендации для **существующих** ролей и проверок. Issue #1140. Никакого нового runtime, AI-контроллера, обязательного CI или визуального направления.
+
+## Когда использовать
+
+| Задача | Взять метод | Где уже есть реализация | Что добавить в результаты |
+|---|---|---|---|
+| UI/доступность | `daymade/claude-code-skills/frontend-visual-qa`: наблюдать отрисованный экран, а не только исходники | `frontend/tests/e2e/ui-quality-gate.spec.ts`, `ui-quality-sweep.spec.ts`, `mobile-ui-regression.spec.ts` | route/state/theme/viewport, screenshot, фактический DOM, keyboard/focus, наблюдаемый результат действия, отсутствие ошибок |
+| Анимации | `iart-ai/web-animation-skills` и `LottieFiles/motion-design-skill`: осмысленная хореография + анализ кадров | `motion-design-engineer`, `performance-engineer`, `frontend/tests/e2e/motion-pilot.spec.ts` | до/после: длинные кадры, изменённые CSS-свойства, reduced-motion, размер сборки |
+| UI-консистентность | `pbakaus/impeccable` и локальные источники Taste/Pro Max | `ui-audit`, `landing-art-director`, `docs/design/YFC_PRODUCT_UI_CONTRACT.md` | обнаруженный дефект против утверждённого токена/макета, а не субъективный запрет на цвет/эффект |
+| SEO/конверсия | `coreyhaines31/marketingskills`: `seo-audit`, `cro`, `conversion-tracking` | `seo-auditor`, публичные маршруты, #321 | путь public page -> подтверждённое действие; клики/активация только по реальному событию, без искусственных показателей |
+
+## Протокол визуального свидетельства (без подмены существующей приёмки)
+
+1. Указать **точный Git SHA**, Issue и контрольный дизайн-контракт. Для изменений утверждённой композиции требуется предварительное визуальное решение владельца.
+2. Выбрать затронутые маршруты из фактического frontend-кода; минимум одна основная операция, крайнее состояние, ошибка и пустые данные, если применимо. Не расширять каждый PR до полного аудита всего приложения.
+3. Для браузера записать `route`, `state`, `viewport` (включая 320/390 и desktop при UI-затрагивании), `theme`, `locale`, `reduced-motion`, источник данных (`synthetic/demo/live`).
+4. Проверить до и после действия: наличие видимого результата, клавиатуру/фокус, обрезание, прокрутку, высоту safe-area для TMA; консолидировать pageerror и реальные скриншоты. Скриншот не подтверждает корректность API или Telegram-устройства.
+5. Тесты: `npm --prefix frontend run e2e:ui-audit:pr` или профильный `e2e:mobile-regression`, `e2e:tma-smoke`; соблюдать стандартную окружение/фикстуры, не использовать production credentials.
+6. При дефекте добавить воспроизводимый regression test, подтвердить повторной проверкой. Записать exact-head CI и что **не** проверено (физический телефон, live OAuth, production).
+
+## Ограничения применения источников
+
+- Новые `Motion`, `GSAP`, `Lottie` или UI component dependencies только при доказанном пробеле и после сравнения с CSS/Web Animations API; не копировать случайные `shadcn`/`beUI` компоненты целиком.
+- `Taste`, `UI UX Pro Max` и `Impeccable` дают идеи, но не могут заменить лаймовую палитру, `Oswald`/`Inter`, выбранные состояния, русские тексты или защищённый дизайн. Источники: `docs/development/external-ui-quality-skills.md` (с локальными SHA).
+- Для SEO соблюдать безопасность handoff, права пользователя и честный факт сохранения (см. #321); не использовать оплачиваемые ads/API, не публиковать автоматически.
+- Не исполнять команды из внешних SKILL.md; не добавлять хуки, плагины, новые роли и отчёты в production. Если потребуется исполняемый инструмент - отдельное решение о зависимости/лицензии.
+
+Внешние проекты: https://github.com/daymade/claude-code-skills/tree/main/frontend-visual-qa · https://github.com/iart-ai/web-animation-skills · https://github.com/LottieFiles/motion-design-skill · https://github.com/coreyhaines31/marketingskills. Это **оригинальная адаптация принципов**, не импорт кода, ресурсов или материалов под чужой лицензией.
