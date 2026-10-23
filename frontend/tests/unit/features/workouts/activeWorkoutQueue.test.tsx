@@ -100,6 +100,7 @@ function Harness() {
       <span data-testid="pending">{sync.pendingCount}</span>
       <span data-testid="reps">{pending?.values.actual_reps ?? ''}</span>
       <span data-testid="sync-state">{sync.syncState}</span>
+      <span data-testid="message">{sync.message ?? ''}</span>
       <span data-testid="accepted">{accepted === null ? 'waiting' : String(accepted)}</span>
       <button
         onClick={async () =>
@@ -250,6 +251,42 @@ describe('active workout durable queue', () => {
       actual_reps: 8,
       actual_weight: 40,
     });
+  });
+
+  it('различает таймаут PATCH и оставляет завершение для явного повтора', async () => {
+    setOnline(true);
+    vi.useFakeTimers();
+    try {
+      const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('The request timed out', 'AbortError'));
+          });
+        });
+      });
+      renderHarness();
+
+      act(() => screen.getByRole('button', { name: 'Изменить' }).click());
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15_000);
+      });
+
+      expect(screen.getByTestId('accepted')).toHaveTextContent('false');
+      expect(screen.getByTestId('sync-state')).toHaveTextContent('offline');
+      expect(screen.getByTestId('message')).toHaveTextContent(
+        'Сервер не ответил вовремя. Попробуйте снова.',
+      );
+      expect(screen.getByTestId('pending')).toHaveTextContent('1');
+      expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values.is_completed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('не даёт старой операции из второй вкладки перезаписать более новую', () => {
