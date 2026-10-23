@@ -1403,12 +1403,25 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
   await expect.poll(() => server.patches.length).toBe(1);
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await first.getByRole('button', { name: /^2 —/ }).click();
-  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  const completionButton = first.locator('[data-workout-field="done"]');
+  const tapStartedAt = await page.evaluate(() => performance.now());
+  await completionButton.dblclick();
   try {
+    await expect(completionButton).toHaveText('Сохраняем…');
+    await expect(completionButton).toBeDisabled();
+    await expect(completionButton).toHaveAttribute('aria-busy', 'true');
+    await expect(completionButton).toHaveAttribute('aria-label', /^Сохраняем…:/);
+    await expect(completionButton).toHaveAttribute('aria-pressed', 'false');
+    const feedbackAt = await page.evaluate(() => performance.now());
+    expect(feedbackAt - tapStartedAt).toBeLessThan(1000);
+    expect(server.patches).toHaveLength(1);
+    expect(server.patches[0]?.body.is_completed).toBe(false);
+    expect(server.patches[0]?.respondedAt).toBeUndefined();
     await page.screenshot({ path: info.outputPath('held-autosave.png') });
     await info.attach('held-autosave.json', {
       body: JSON.stringify(
         {
+          tapToFeedbackMs: feedbackAt - tapStartedAt,
           patches: server.patches,
           server: server.readSet(201),
           currentSet: await page
@@ -1426,12 +1439,21 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
     });
     expect(server.readSet(201).is_completed).toBe(false);
     await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
-    await expect(first.getByRole('button', { name: /^Завершить:/ })).toBeDisabled();
-    const box = (await first.locator('[data-workout-field="done"]').boundingBox())!;
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   } finally {
     release();
   }
+  await expect.poll(() => server.patches.length).toBe(3);
+  expect(server.patches[0]?.body.is_completed).toBe(false);
+  expect(server.patches[0]?.status).toBe(200);
+  expect(server.patches[1]?.body.is_completed).toBe(true);
+  expect(server.patches[1]?.body.expected_version).toBe(1);
+  expect(server.patches[1]?.status).toBe(409);
+  expect(server.patches[2]?.body.is_completed).toBe(true);
+  expect(server.patches[2]?.body.expected_version).toBe(2);
+  expect(server.patches[2]?.status).toBe(200);
+  expect(server.patches[2]?.body.mutation_id).toBe(server.patches[1]?.body.mutation_id);
+  expect(server.patches[1]?.receivedAt).toBeGreaterThanOrEqual(server.patches[0]?.respondedAt ?? 0);
+  expect(server.patches[2]?.receivedAt).toBeGreaterThanOrEqual(server.patches[1]?.respondedAt ?? 0);
   await expect.poll(() => server.readSet(201).is_completed).toBe(true);
   await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
   await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
@@ -1569,6 +1591,7 @@ for (const theme of ['dark', 'light'] as const) {
     await first.getByRole('button', { name: /^Завершить:/ }).click();
     await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
     await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+    await expect(first).toHaveAttribute('aria-current', 'step');
     expect(server.readSet(201).is_completed).toBe(false);
     await page.locator('.active-workout-sync').scrollIntoViewIfNeeded();
     await page.screenshot({ path: info.outputPath(`completion-error-360-${theme}.png`) });
@@ -3842,7 +3865,18 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
     fullPage: true,
   });
 
-  await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
+  const cardioDone = cardio.locator('[data-workout-field="done"]');
+  const releaseCardio = server.holdNextPatch();
+  await cardioDone.click();
+  try {
+    await expect(cardioDone).toHaveText('Сохраняем…');
+    await expect(cardioDone).toBeDisabled();
+    await expect(cardioDone).toHaveAttribute('aria-busy', 'true');
+    await expect(cardioDone).toHaveAttribute('aria-label', /^Сохраняем…:/);
+    await expect(cardioDone).toHaveAttribute('aria-pressed', 'true');
+  } finally {
+    releaseCardio();
+  }
   await server.cardioCompleted;
   await expect
     .poll(() =>
