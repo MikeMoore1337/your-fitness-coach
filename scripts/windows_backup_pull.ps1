@@ -123,6 +123,40 @@ function Get-Sha256 {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Assert-ArchiveMetadata {
+    param([object]$Value)
+    if ((Get-PropertyValue $Value "archive_format") -cne "tar-gzip-pg-custom" -or
+        [string](Get-PropertyValue $Value "archive_name") -cnotmatch '^backup-[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz$') {
+        Throw-BackupPullError "CORRUPTED" "expected backup-YYYY-MM-DD.tar.gz"
+    }
+    $size = Get-PropertyValue $Value "archive_size_bytes"
+    if (($size -isnot [int] -and $size -isnot [long]) -or $size -le 0) {
+        Throw-BackupPullError "CORRUPTED" "archive size must be a positive JSON integer"
+    }
+}
+
+function Assert-TarFile {
+    param([string]$Path, [string]$ManifestPath, [object]$Config)
+    $validator = Join-Path $PSScriptRoot "backup_manifest.py"
+    if (-not (Test-Path -LiteralPath $Config.PythonPath -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $validator -PathType Leaf)) {
+        Throw-BackupPullError "CONFIG_INVALID" "Python and backup_manifest.py must be installed together with the pull script"
+    }
+    # One standard-library validator is shared by publication, pull, status and recovery.
+    $result = & $Config.PythonPath -I $validator $Path --manifest $ManifestPath 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Throw-BackupPullError "CORRUPTED" "tar.gz validation failed"
+    }
+}
+
+function Assert-FormatVersion {
+    param([object]$Value)
+    $version = Get-PropertyValue $Value "schema_version"
+    if (($version -isnot [int] -and $version -isnot [long]) -or $version -ne 3) {
+        Throw-BackupPullError "CORRUPTED" "unsupported backup metadata schema"
+    }
+}
+
 function Read-JsonObject {
     param(
         [Parameter(Mandatory = $true)][string]$Path,
@@ -149,9 +183,8 @@ function Assert-ManifestEntry {
         [Parameter(Mandatory = $true)][object]$Manifest,
         [object]$NowUtc = $null
     )
-    if ((Get-PropertyValue $Manifest "schema_version") -ne 1) {
-        Throw-BackupPullError "CORRUPTED" "unsupported backup manifest schema"
-    }
+    Assert-FormatVersion $Manifest
+    Assert-ArchiveMetadata $Manifest
     if ((Get-PropertyValue $Manifest "kind") -ne "yfc-backup-manifest") {
         Throw-BackupPullError "CORRUPTED" "unexpected backup manifest kind"
     }
@@ -202,6 +235,7 @@ function Assert-IndexEntry {
         [Parameter(Mandatory = $true)][object]$Entry,
         [object]$NowUtc = $null
     )
+    Assert-ArchiveMetadata $Entry
     $archiveName = Assert-SafeFileName (Get-PropertyValue $Entry "archive_name") "archive_name"
     $manifestName = Assert-SafeFileName (Get-PropertyValue $Entry "manifest_name") "manifest_name"
     if ($manifestName -ne "$archiveName.manifest.json") {
@@ -224,9 +258,7 @@ function Assert-BackupIndex {
         [Parameter(Mandatory = $true)][object]$Index,
         [object]$NowUtc = $null
     )
-    if ((Get-PropertyValue $Index "schema_version") -ne 1) {
-        Throw-BackupPullError "CORRUPTED" "unsupported backup index schema"
-    }
+    Assert-FormatVersion $Index
     if ((Get-PropertyValue $Index "kind") -ne "yfc-backup-index") {
         Throw-BackupPullError "CORRUPTED" "unexpected backup index kind"
     }
@@ -262,26 +294,14 @@ function Read-Config {
     if ($null -ne (Get-PropertyValue $raw "password") -or $null -ne (Get-PropertyValue $ssh "password")) {
         Throw-BackupPullError "CONFIG_INVALID" "passwords are not supported; use an SSH identity"
     }
-    $encryption = Get-PropertyValue $raw "encryption_at_rest"
-    if ($null -eq $encryption) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest approval is required"
+    if ($null -ne (Get-PropertyValue $raw "encryption_at_rest")) {
+        Throw-BackupPullError "CONFIG_INVALID" "legacy configuration preserved; prepare a separate tar.gz configuration"
     }
-    $encryptionMode = [string](Get-PropertyValue $encryption "mode")
-    $encryptionApprovedValue = Get-PropertyValue $encryption "approved"
-    if ($encryptionApprovedValue -isnot [bool]) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest.approved must be a JSON boolean"
+    $pythonValue = [string](Get-PropertyValue $raw "python_path")
+    if ([string]::IsNullOrWhiteSpace($pythonValue)) {
+        Throw-BackupPullError "CONFIG_INVALID" "absolute python_path is required for archive validation"
     }
-    $encryptionApproved = [bool]$encryptionApprovedValue
-    $keyRecoveryDocument = [string](Get-PropertyValue $encryption "key_recovery_document")
-    if ([string]::IsNullOrWhiteSpace($keyRecoveryDocument)) {
-        Throw-BackupPullError "CONFIG_INVALID" "key_recovery_document is required"
-    }
-    if ($encryptionApproved -and $keyRecoveryDocument -match "REPLACE_WITH|OWNER_APPROVAL_REQUIRED") {
-        Throw-BackupPullError "CONFIG_INVALID" "approved encryption requires a concrete key recovery reference"
-    }
-    if ($encryptionMode -notin @("bitlocker", "file_encryption", "OWNER_APPROVAL_REQUIRED")) {
-        Throw-BackupPullError "CONFIG_INVALID" "encryption_at_rest mode is unsupported"
-    }
+    $pythonPath = Resolve-ConfiguredPath $pythonValue $configDir
     $localValue = [string](Get-PropertyValue $raw "local_root")
     if ([string]::IsNullOrWhiteSpace($localValue)) {
         Throw-BackupPullError "CONFIG_INVALID" "local_root is required"
@@ -307,11 +327,11 @@ function Read-Config {
     [void](Assert-SafeFileName $remoteIndex "remote_index")
     $port = if ($null -eq (Get-PropertyValue $ssh "port")) { 22 } else { [int](Get-PropertyValue $ssh "port") }
     $timeout = if ($null -eq (Get-PropertyValue $ssh "connect_timeout_seconds")) { 20 } else { [int](Get-PropertyValue $ssh "connect_timeout_seconds") }
-    $retentionDays = if ($null -eq (Get-PropertyValue $raw "retention_days")) { 30 } else { [int](Get-PropertyValue $raw "retention_days") }
+    $retentionDays = if ($null -eq (Get-PropertyValue $raw "retention_days")) { 7 } else { [int](Get-PropertyValue $raw "retention_days") }
     $minimumValid = if ($null -eq (Get-PropertyValue $raw "minimum_valid_backups")) { 2 } else { [int](Get-PropertyValue $raw "minimum_valid_backups") }
-    $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 36 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
+    $staleHours = if ($null -eq (Get-PropertyValue $raw "stale_after_hours")) { 26 } else { [int](Get-PropertyValue $raw "stale_after_hours") }
     $minimumFree = if ($null -eq (Get-PropertyValue $raw "minimum_free_bytes")) { 104857600 } else { [int64](Get-PropertyValue $raw "minimum_free_bytes") }
-    if ($port -lt 1 -or $port -gt 65535 -or $timeout -lt 1 -or $retentionDays -lt 1 -or $minimumValid -lt 1 -or $staleHours -lt 1 -or $minimumFree -lt 0) {
+    if ($port -lt 1 -or $port -gt 65535 -or $timeout -lt 1 -or $retentionDays -lt 1 -or $minimumValid -lt 2 -or $staleHours -lt 1 -or $minimumFree -lt 0) {
         Throw-BackupPullError "CONFIG_INVALID" "backup limits are invalid"
     }
     $lockValue = Get-PropertyValue $raw "lock_file"
@@ -338,9 +358,7 @@ function Read-Config {
         LockFile = $lockFile
         StatusFile = $statusFile
         LogFile = $logFile
-        EncryptionAtRestMode = $encryptionMode
-        EncryptionAtRestApproved = $encryptionApproved
-        KeyRecoveryDocument = $keyRecoveryDocument
+        PythonPath = $pythonPath
     }
 }
 
@@ -408,9 +426,14 @@ function Invoke-SftpGet {
         "get $RemoteName `"$localEscaped`""
     ) | Set-Content -LiteralPath $batchPath -Encoding ASCII
     $arguments = @(
+        "-F"
+        "NUL"
         "-oBatchMode=yes"
         "-oStrictHostKeyChecking=yes"
         "-oUserKnownHostsFile=$($Config.KnownHostsFile)"
+        "-oGlobalKnownHostsFile=NUL"
+        "-oIdentitiesOnly=yes"
+        "-oIdentityAgent=none"
         "-oConnectTimeout=$($Config.ConnectTimeoutSeconds)"
         "-i"
         $Config.IdentityFile
@@ -420,12 +443,18 @@ function Invoke-SftpGet {
         $batchPath
         "$($Config.User)@$($Config.Host)"
     )
+    $previousErrorAction = $ErrorActionPreference
     try {
+        # Windows PowerShell turns native stderr into errors before we can classify it.
+        $ErrorActionPreference = "Continue"
         & $Config.SftpPath @arguments 1> $stdoutPath 2> $stderrPath
         $exitCode = $LASTEXITCODE
     }
     catch {
         $exitCode = 255
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorAction
     }
     $diagnostic = ""
     if (Test-Path -LiteralPath $stderrPath) {
@@ -519,7 +548,7 @@ function Get-LocalSnapshot {
     )
     $valid = New-Object Collections.ArrayList
     $invalid = New-Object Collections.ArrayList
-    $files = @(Get-ChildItem -LiteralPath $Config.LocalRoot -Filter "*.manifest.json" -File -ErrorAction SilentlyContinue)
+    $files = @(Get-ChildItem -LiteralPath $Config.LocalRoot -Filter "backup-????-??-??.tar.gz.manifest.json" -File -ErrorAction SilentlyContinue)
     foreach ($file in $files) {
         try {
             $manifest = Read-JsonObject $file.FullName
@@ -533,6 +562,7 @@ function Get-LocalSnapshot {
             if ([int64]$archiveItem.Length -ne [int64](Get-PropertyValue $manifest "archive_size_bytes") -or (Get-Sha256 $archivePath) -ne [string](Get-PropertyValue $manifest "archive_sha256")) {
                 Throw-BackupPullError "CORRUPTED" "archive digest does not match manifest"
             }
+            Assert-TarFile $archivePath $file.FullName $Config
             [void]$valid.Add([pscustomobject]@{
                     Manifest = $manifest
                     ManifestPath = $file.FullName
@@ -650,7 +680,7 @@ function Invoke-Rotation {
     param([Parameter(Mandatory = $true)][object]$Config)
     $snapshot = Get-LocalSnapshot $Config
     $valid = @($snapshot.Valid | Sort-Object CreatedAt -Descending)
-    $cutoff = [DateTimeOffset]::UtcNow.AddDays(-$Config.RetentionDays)
+    $cutoff = (Get-NowUtc).AddDays(-$Config.RetentionDays)
     $removed = 0
     foreach ($item in @($valid | Sort-Object CreatedAt)) {
         if ($item.CreatedAt -ge $cutoff -or ($valid.Count - $removed) -le $Config.MinimumValidBackups) {
@@ -677,8 +707,8 @@ function Invoke-Pull {
     $downloaded = 0
     $attemptAt = Get-UtcString
     try {
-        if (-not $Config.EncryptionAtRestApproved -or $Config.EncryptionAtRestMode -eq "OWNER_APPROVAL_REQUIRED") {
-            Throw-BackupPullError "CONFIG_INVALID" "encryption-at-rest owner approval is not complete"
+        if (-not (Test-Path -LiteralPath $Config.LocalRoot -PathType Container)) {
+            Throw-BackupPullError "CONFIG_INVALID" "backup directory must be prepared before the first pull"
         }
         Assert-SshFiles $Config
         $lock = Acquire-BackupLock $Config.LockFile
@@ -704,7 +734,7 @@ function Invoke-Pull {
             Invoke-SftpGet $Config $manifestName $manifestTemp $incoming
             $manifest = Read-JsonObject $manifestTemp
             [void](Assert-ManifestEntry $manifest $nowUtc)
-            foreach ($field in @("archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "published_at_utc", "verification_status")) {
+            foreach ($field in @("archive_format", "archive_name", "archive_size_bytes", "archive_sha256", "created_at_utc", "published_at_utc", "verification_status")) {
                 if ([string](Get-PropertyValue $manifest $field) -ne [string](Get-PropertyValue $entry $field)) {
                     Throw-BackupPullError "CORRUPTED" "manifest and index disagree"
                 }
@@ -715,6 +745,7 @@ function Invoke-Pull {
             if ([int64]$archiveItem.Length -ne [int64](Get-PropertyValue $manifest "archive_size_bytes") -or (Get-Sha256 $archiveTemp) -ne [string](Get-PropertyValue $manifest "archive_sha256")) {
                 Throw-BackupPullError "CORRUPTED" "downloaded archive digest does not match manifest"
             }
+            Assert-TarFile $archiveTemp $manifestTemp $Config
             $archiveTarget = Join-Path $Config.LocalRoot $archiveName
             $manifestTarget = Join-Path $Config.LocalRoot $manifestName
             if ((Test-Path -LiteralPath $archiveTarget -PathType Leaf) -and -not (Test-Path -LiteralPath $manifestTarget -PathType Leaf)) {

@@ -11,9 +11,10 @@ import argparse
 import os
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -26,11 +27,15 @@ try:
         BackupManifestError,
         build_index,
         build_manifest,
+        create_tar_archive,
+        format_utc,
         index_entry,
         manifest_name_for,
+        parse_utc,
         read_index,
         read_manifest,
         sha256_file,
+        validate_tar_archive,
         write_json_atomic,
     )
 except ModuleNotFoundError:  # direct `python scripts/db_maintenance.py` invocation
@@ -38,11 +43,15 @@ except ModuleNotFoundError:  # direct `python scripts/db_maintenance.py` invocat
         BackupManifestError,
         build_index,
         build_manifest,
+        create_tar_archive,
+        format_utc,
         index_entry,
         manifest_name_for,
+        parse_utc,
         read_index,
         read_manifest,
         sha256_file,
+        validate_tar_archive,
         write_json_atomic,
     )
 
@@ -216,6 +225,7 @@ def _validate_published_entry(root: Path, entry: dict[str, object]) -> None:
         raise BackupManifestError("published archive size does not match its manifest")
     if manifest["archive_sha256"] != sha256_file(archive):
         raise BackupManifestError("published archive digest does not match its manifest")
+    validate_tar_archive(archive)
 
 
 def publish_backup(
@@ -229,50 +239,73 @@ def publish_backup(
 ) -> tuple[Path, Path, tuple[str, ...]]:
     """Publish one verified archive and its index, with rotation after commit."""
 
-    if retain < 2:
-        raise ValueError("published retention must keep at least two backups")
+    if retain < 1:
+        raise ValueError("retention days must be positive")
     root = _artifact_path(publish_dir)
     if root == BACKUP_DIR or not root.is_relative_to(BACKUP_DIR):
         raise ValueError("publish directory must be a child of the backup directory")
-    target = _artifact_path(archive)
-    if target.parent != root:
-        raise ValueError("published archive must be directly below the publish directory")
-    if not target.is_file():
-        raise FileNotFoundError(f"backup does not exist: {target}")
+    source = _artifact_path(archive)
+    if source.is_relative_to(root) or root.is_relative_to(source.parent):
+        raise ValueError("plaintext staging must be separate from the SFTP publish directory")
+    if source.suffix != ".dump" or not source.is_file():
+        raise ValueError("publication requires an existing private .dump")
+    created_at = created_at or datetime.now(UTC)
+    date = created_at.astimezone(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    target = root / f"backup-{date}.tar.gz"
 
     with _publisher_lock(root):
-        _verify_archive(target)
-        manifest_path = root / manifest_name_for(target.name)
-        if manifest_path.exists():
-            manifest = read_manifest(manifest_path)
-            if (
-                manifest["archive_name"] != target.name
-                or manifest["archive_size_bytes"] != target.stat().st_size
-                or manifest["archive_sha256"] != sha256_file(target)
-            ):
-                raise BackupManifestError("existing backup manifest does not match archive")
-        else:
-            manifest = build_manifest(
-                target,
-                database_major=database_major,
-                schema_revision=schema_revision,
-                created_at=created_at,
+        # Legacy exports require an explicit migration, never an automatic downgrade or deletion.
+        if any(
+            path.name not in {"index.json", ".publish.lock"}
+            and not path.name.endswith((".tar.gz", ".tar.gz.manifest.json"))
+            for path in root.iterdir()
+        ):
+            raise ValueError(
+                "publish directory contains legacy or unexpected files; migrate it first"
             )
-            write_json_atomic(manifest_path, manifest)
-
         index_path = root / "index.json"
         current_entries: list[dict[str, object]] = []
         if index_path.exists():
             current_entries = list(read_index(index_path)["backups"])
             for entry in current_entries:
                 _validate_published_entry(root, entry)
+        if target.exists():
+            raise FileExistsError("refusing to overwrite published archive")
+        _verify_archive(source)
+        with tempfile.TemporaryDirectory(prefix=".tar-", dir=BACKUP_DIR) as staging:
+            packed = Path(staging) / target.name
+            create_tar_archive(
+                source,
+                packed,
+                {
+                    "schema_version": 1,
+                    "database_major": database_major,
+                    "schema_revision": schema_revision,
+                    "created_at_utc": format_utc(created_at),
+                },
+            )
+            manifest = build_manifest(
+                packed,
+                database_major=database_major,
+                schema_revision=schema_revision,
+                created_at=created_at,
+            )
+            packed.replace(target)
+        manifest_path = root / manifest_name_for(target.name)
+        write_json_atomic(manifest_path, manifest, group_readable=True)
         current_entries = [
             entry for entry in current_entries if entry["archive_name"] != target.name
         ]
         current_entries.append(index_entry(manifest))
-        retained_entries = build_index(current_entries)["backups"][:retain]
+        ordered = build_index(current_entries)["backups"]
+        cutoff = datetime.now(UTC) - timedelta(days=retain)
+        retained_entries = [
+            entry
+            for position, entry in enumerate(ordered)
+            if position < 2 or parse_utc(entry["created_at_utc"], field="created_at_utc") >= cutoff
+        ]
         # index.json is the commit marker: it is replaced only after all metadata is complete.
-        write_json_atomic(index_path, build_index(retained_entries))
+        write_json_atomic(index_path, build_index(retained_entries), group_readable=True)
 
         warnings: list[str] = []
         retained_names = {str(entry["archive_name"]) for entry in retained_entries}
@@ -300,19 +333,24 @@ def create_published_backup(
 ) -> tuple[Path, Path, Path, tuple[str, ...]]:
     root = _artifact_path(publish_dir)
     target = _artifact_path(output)
-    if target.parent != root:
-        raise ValueError("published archive must be directly below the publish directory")
     created_at = datetime.now(UTC)
-    archive = create_backup(target)
-    manifest, index, warnings = publish_backup(
-        archive,
-        publish_dir=root,
-        database_major=database_major,
-        schema_revision=schema_revision,
-        created_at=created_at,
-        retain=retain,
-    )
-    return archive, manifest, index, warnings
+    date = created_at.astimezone(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    if target.parent != root or target.name != f"backup-{date}.tar.gz":
+        raise ValueError("published archive must be directly below the publish directory")
+    if target.exists():
+        raise FileExistsError("daily backup already exists; refusing to overwrite")
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".dump-", dir=BACKUP_DIR) as staging:
+        archive = create_backup(Path(staging) / "database.dump")
+        manifest, index, warnings = publish_backup(
+            archive,
+            publish_dir=root,
+            database_major=database_major,
+            schema_revision=schema_revision,
+            created_at=created_at,
+            retain=retain,
+        )
+    return target, manifest, index, warnings
 
 
 def restore_backup(source: Path, *, confirmed_database: str) -> tuple[Path, str]:
@@ -376,7 +414,7 @@ def main() -> int:
         "--retain-published",
         type=int,
         default=7,
-        help="number of published archives to retain; minimum is two",
+        help="retention in days; always preserve the newest two verified archives",
     )
 
     restore_parser = subparsers.add_parser(
@@ -401,7 +439,8 @@ def main() -> int:
                 print(f"Backup created: {created}")
                 return 0
             publish_dir = _artifact_path(args.publish_dir)
-            output = args.output or publish_dir / f"fitminiapp-{_timestamp()}.dump"
+            date = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+            output = args.output or publish_dir / f"backup-{date}.tar.gz"
             database_major = args.database_major or _database_major()
             schema_revision = args.schema_revision or _schema_revision()
             created, manifest, index, warnings = create_published_backup(

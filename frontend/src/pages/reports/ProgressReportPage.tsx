@@ -12,6 +12,8 @@ import { downloadProgressReport } from '../../features/reports/downloadProgressR
 import { ReportHandoffPanel } from '../../features/reports/ReportHandoffPanel';
 import { PublicProgressSharePanel } from '../../features/reports/PublicProgressSharePanel';
 import { AppLink, progressReportReturn, useNavigation } from '../../shared/navigation/router';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { formatTimeZoneLabel } from '../../shared/dateTime';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { TimeSeriesChart } from '../../shared/ui/DataViz';
@@ -45,20 +47,6 @@ type ReportSelection = {
   dateFrom: string;
   dateTo: string;
 };
-
-function positiveClientId(search: string): number | null {
-  const value = new URLSearchParams(search).get('client_id');
-  if (!value || !/^\d+$/.test(value)) return null;
-  const result = Number(value);
-  return Number.isSafeInteger(result) && result > 0 ? result : null;
-}
-
-function positiveHandoffId(search: string): number | null {
-  const value = new URLSearchParams(search).get('handoff_id');
-  if (!value || !/^\d+$/.test(value)) return null;
-  const result = Number(value);
-  return Number.isSafeInteger(result) && result > 0 ? result : null;
-}
 
 function handoffReturnPath(search: string): string {
   return new URLSearchParams(search).get('return_to') ===
@@ -470,7 +458,8 @@ function ReportContent({
           <h1 id="report-overview-title">Отчёт о прогрессе</h1>
           <p className="progress-report-subject">{report.subject.name}</p>
           <p>
-            {formatDate(report.period_start)} — {formatDate(report.period_end)} · {report.timezone}
+            {formatDate(report.period_start)} — {formatDate(report.period_end)} ·{' '}
+            {formatTimeZoneLabel(report.timezone)}
           </p>
           <p>
             {report.subject.role === 'client' ? 'Клиент тренера' : 'Личный отчёт'} · Цель:{' '}
@@ -890,8 +879,9 @@ function ReportContent({
 
 export default function ProgressReportPage() {
   const { navigate, search } = useNavigation();
-  const clientId = positiveClientId(search);
-  const handoffId = positiveHandoffId(search);
+  const params = new URLSearchParams(search);
+  const clientId = positiveIntegerParam(params, 'client_id');
+  const handoffId = positiveIntegerParam(params, 'handoff_id');
   const auth = useOptionalAuth();
   const [draft, setDraft] = useState<ReportSelection>(() => initialSelection(search));
   const [applied, setApplied] = useState<ReportSelection>(() => initialSelection(search));

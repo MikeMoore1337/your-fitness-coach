@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Task version="1.4" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>YFC Phase A template. Import only after Phase B owner, privacy and key gates pass.</Description>
+    <Description>YFC Disabled tar.gz template. Enable only after owner-authorized synthetic checks and privacy/access gates.</Description>
     <URI>\YFC\OffHostBackupPull</URI>
   </RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
-      <StartBoundary>2026-01-01T03:00:00</StartBoundary>
-      <Enabled>true</Enabled>
+      <StartBoundary>2026-01-01T00:30:00+03:00</StartBoundary>
+      <Enabled>false</Enabled>
       <ScheduleByDay>
         <DaysInterval>1</DaysInterval>
       </ScheduleByDay>
@@ -32,7 +32,7 @@
     <StartWhenAvailable>true</StartWhenAvailable>
     <RunOnlyIfNetworkAvailable>true</RunOnlyIfNetworkAvailable>
     <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
-    <Enabled>true</Enabled>
+    <Enabled>false</Enabled>
   </Settings>
   <Actions Context="Author">
     <Exec>

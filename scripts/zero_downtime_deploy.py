@@ -17,6 +17,11 @@ from collections.abc import Iterator, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+try:
+    from scripts.sequential_deploy_safety import SafetyError, SequentialSafety
+except ModuleNotFoundError:
+    from sequential_deploy_safety import SafetyError, SequentialSafety
+
 SLOTS = ("blue", "green")
 STATE_VERSION = 1
 
@@ -126,6 +131,49 @@ def _deployment_setting(key: str, default: str) -> str:
         elif " #" in value:
             value = value.split(" #", maxsplit=1)[0].rstrip()
     return value
+
+
+def _trusted_connection_budget_preflight(config: DeployConfig) -> None:
+    """Block connection-increasing rollout operations until runtime capacity is proven.
+
+    The safety margin has no repository default. An explicit, reviewed
+    production setting and a fresh in-process trusted collector verdict are
+    required. Failure details remain sanitized and cannot disclose DB secrets.
+    """
+    raw_margin = _deployment_setting("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "").strip()
+    if not re.fullmatch(r"[1-9][0-9]{0,5}", raw_margin):
+        raise DeploymentError("PostgreSQL connection budget safety margin is not configured")
+    try:
+        from scripts.trusted_runtime_collector import (
+            CollectorPolicy,
+            Verdict,
+            collect_runtime_snapshot,
+        )
+    except ModuleNotFoundError:
+        # The deploy helper also runs directly as python scripts/zero_downtime_deploy.py.
+        # Import Verdict from the *same collector module* to avoid duplicated
+        # StrEnum classes when the package and script import paths differ.
+        from trusted_runtime_collector import CollectorPolicy, Verdict, collect_runtime_snapshot
+
+    policy = CollectorPolicy(
+        safety_headroom_connections=int(raw_margin),
+        safety_headroom_source="explicit DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS production setting",
+    )
+    try:
+        evidence = collect_runtime_snapshot(
+            release_path=config.root,
+            compose_file=config.root / "docker-compose.yml",
+            policy=policy,
+        )
+    except Exception:
+        raise DeploymentError("trusted PostgreSQL capacity evidence is unavailable") from None
+    if evidence.result.status is not Verdict.PASS:
+        raise DeploymentError("trusted PostgreSQL connection capacity is not proven")
+    # The reported revision list includes BOTH the active and candidate SHA.
+    # Membership alone would incorrectly accept target=active even when the
+    # immutable candidate bundle contains a different revision.
+    if evidence.candidate_revision != config.target_revision:
+        raise DeploymentError("trusted PostgreSQL capacity revision does not match target")
 
 
 def configured_timeout(key: str, default: int) -> int:
@@ -418,6 +466,30 @@ def _capacity() -> dict[str, int]:
     if missing:
         raise DeploymentError(f"parallel-slot capacity gate failed: {missing}")
     return report
+
+
+def _sequential_connection_budget_preflight(config: DeployConfig) -> SequentialSafety:
+    try:
+        revision = (config.root / ".deployment-sha").read_text(encoding="utf-8").strip()
+    except OSError:
+        raise DeploymentError("maintenance candidate revision evidence unavailable") from None
+    if revision != config.target_revision or re.fullmatch(r"[0-9a-f]{40}", revision) is None:
+        raise DeploymentError("maintenance candidate revision mismatch")
+    raw_margin = _deployment_setting("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "").strip()
+    if not re.fullmatch(r"[1-9][0-9]{0,5}", raw_margin):
+        raise DeploymentError("PostgreSQL connection budget safety margin is not configured")
+    safety = SequentialSafety(config.root, int(raw_margin))
+    try:
+        active = (config.state_root / "last-successful-revision").read_text().strip()
+        backend = _legacy_image_digest("backend", active)
+        if _legacy_image_digest("worker", active) != backend:
+            raise DeploymentError("maintenance backend/worker image mismatch")
+        _legacy_image_digest("bot", active)
+        safety.configure((backend,))
+    except Exception:
+        raise DeploymentError("maintenance effective pool evidence unavailable") from None
+    safety.check(frozenset({"backend", "worker", "bot"}), disarmed=False)
+    return safety
 
 
 def _single_slot_capacity() -> dict[str, int]:
@@ -859,6 +931,7 @@ def bootstrap_state(config: DeployConfig) -> None:
     state_path = config.state_root / "state.json"
     if state_path.exists():
         raise DeploymentError(f"deployment state already exists: {state_path}")
+    _trusted_connection_budget_preflight(config)
     for service in ("backend", "worker", "bot", "edge"):
         if not _service_is_running(service):
             raise DeploymentError(f"legacy bootstrap requires running service {service}")
@@ -916,6 +989,7 @@ def rollback(config: DeployConfig) -> None:
         else os.environ.copy()
     )
     rollback_backend = _slot_service("backend", state.rollback_slot)
+    _trusted_connection_budget_preflight(config)
     if state.rollback_slot == "legacy":
         _compose("start", rollback_backend)
     else:
@@ -1021,6 +1095,7 @@ def deploy(config: DeployConfig) -> Evidence:
         )
     state = ReleaseState.from_path(state_path)
     if state.active_revision == config.target_revision:
+        _trusted_connection_budget_preflight(config)
         _switch_gateway(state.active_slot, state.active_slot)
         if state.rollback_slot is not None:
             _compose("stop", "-t", "45", _slot_service("backend", state.rollback_slot))
@@ -1065,6 +1140,9 @@ def deploy(config: DeployConfig) -> Evidence:
     persistent_images_updated = False
 
     try:
+        with _stage(evidence, "connection_budget_preflight"):
+            _trusted_connection_budget_preflight(config)
+
         with _stage(evidence, "preflight"):
             evidence.capacity = _capacity()
             _compose("config", "--quiet")
@@ -1352,20 +1430,13 @@ def _stop_legacy_services(config: DeployConfig, *, require_running: bool = True)
                     f"legacy service {service} stopped before maintenance handoff"
                 )
             continue
-        worker_lease = (
-            _consumer_lease(service, ("worker_started",)) if service == "worker" else None
-        )
+        lease = _consumer_lease(service, ())
         _compose("stop", "-t", str(timeout), service)
         if _service_is_running(service):
             raise DeploymentError(f"legacy service {service} remained running after stop")
-        if (
-            worker_lease is not None
-            and "worker_stopped" not in _current_run_logs(worker_lease)
-            and not _container_exited_cleanly(worker_lease)
-        ):
+        if not _container_exited_cleanly(lease):
             raise DeploymentError(
-                "worker did not acknowledge a completed drain within "
-                f"{config.worker_drain_seconds}s; consumer state is uncertain"
+                f"{service} did not exit cleanly within {timeout}s; consumer state is uncertain"
             )
 
 
@@ -1392,6 +1463,7 @@ def _start_legacy_consumers(
     *,
     require_markers: bool,
     best_effort: bool = False,
+    safety: SequentialSafety | None = None,
 ) -> tuple[ConsumerLease, ConsumerLease]:
     errors: list[str] = []
     worker_lease: ConsumerLease | None = None
@@ -1399,6 +1471,8 @@ def _start_legacy_consumers(
 
     started = time.monotonic()
     try:
+        if safety is not None:
+            safety.check(frozenset({"backend"}))
         _compose(
             "up",
             "-d",
@@ -1422,6 +1496,8 @@ def _start_legacy_consumers(
 
     started = time.monotonic()
     try:
+        if safety is not None:
+            safety.check(frozenset({"backend", "worker"}))
         _compose(
             "up",
             "-d",
@@ -1474,6 +1550,10 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
         raise DeploymentError(
             "repair rollout baseline does not match last-successful-revision evidence"
         )
+    if repair_mode:
+        raise DeploymentError(
+            "maintenance requires a complete verified baseline; partial repair is blocked"
+        )
 
     deployment_id = (
         f"single-slot-{int(time.time())}-{config.target_revision[:12]}-{uuid.uuid4().hex[:8]}"
@@ -1489,6 +1569,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     evidence_path = config.state_root / deployment_id / "summary.json"
 
     if active_revision == config.target_revision:
+        _sequential_connection_budget_preflight(config)
         _switch_gateway("legacy", "legacy")
         _public_smoke(config, require_progress_report_shell=True)
         evidence.verdict = "active"
@@ -1501,17 +1582,22 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     target_env: dict[str, str] | None = None
     services_stopped = False
     persistent_images_updated = False
+    drain_verified = False
+    migration_completed = False
+    safety: SequentialSafety | None = None
 
     try:
+        with _stage(evidence, "connection_budget_preflight"):
+            safety = _sequential_connection_budget_preflight(config)
+
         with _stage(evidence, "single_slot_legacy_provenance"):
-            if not repair_mode:
-                old_backend = _legacy_image_digest("backend", active_revision)
-                old_bot = _legacy_image_digest("bot", active_revision)
-                old_worker = _legacy_image_digest("worker", active_revision)
-                if old_worker != old_backend:
-                    raise DeploymentError(
-                        "legacy backend and worker do not use the same verified image digest"
-                    )
+            old_backend = _legacy_image_digest("backend", active_revision)
+            old_bot = _legacy_image_digest("bot", active_revision)
+            old_worker = _legacy_image_digest("worker", active_revision)
+            if old_worker != old_backend:
+                raise DeploymentError(
+                    "legacy backend and worker do not use the same verified image digest"
+                )
             _legacy_running_image("edge")
 
         with _stage(evidence, "single_slot_docker_reclaim"):
@@ -1521,8 +1607,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
             evidence.capacity = _single_slot_capacity()
             _compose("config", "--quiet")
             _switch_gateway("legacy", "legacy")
-            if not repair_mode:
-                _public_smoke(config)
+            _public_smoke(config)
 
         with _stage(evidence, "pull_and_verify"):
             preliminary_env = _legacy_environment(
@@ -1542,6 +1627,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                 backend_image=target_backend,
                 bot_image=target_bot,
             )
+            target_env["YFC_CONSUMER_RESTART_POLICY"] = "no"
             _compose("config", "--quiet", env=target_env)
             _run(
                 [
@@ -1574,7 +1660,14 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                 ]
             )
 
+        if safety is None:
+            raise DeploymentError("maintenance safety observer missing")
+        safety.configure((old_backend, target_backend))
+        safety.disarm()
+        safety.check(frozenset({"backend", "worker", "bot"}))
+
         with _stage(evidence, "backup"):
+            safety.check(frozenset({"backend", "worker", "bot"}))
             _run([sys.executable, "scripts/db_maintenance.py", "backup"])
 
         with _stage(evidence, "migration_gate"):
@@ -1582,26 +1675,44 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
 
         with _stage(evidence, "pre_stop_capacity"):
             evidence.capacity = _single_slot_capacity()
+            safety.check(frozenset({"backend", "worker", "bot"}))
 
         with _stage(evidence, "maintenance_stop"):
             services_stopped = True
-            if repair_mode:
-                _stop_legacy_services(config, require_running=False)
-            else:
-                _stop_legacy_services(config)
+            _stop_legacy_services(config)
+            safety.released()
+            drain_verified = True
 
-        with _stage(evidence, "migration"):
-            if target_env is None:
-                raise DeploymentError("target images were not resolved before maintenance")
-            _compose(
-                "run",
-                "--rm",
-                "--no-deps",
-                "setup",
-                env=_migration_environment(target_env),
-            )
+        # Separate one-shot processes so each receives a fresh independent barrier.
+        for stage, entrypoint, command in (
+            (
+                "setup_readiness",
+                "python",
+                [
+                    "-c",
+                    "from fitminiapp_api.db.session import engine; from sqlalchemy import text; c=engine.connect(); c.execute(text('SELECT 1')); c.close(); engine.dispose()",
+                ],
+            ),
+            ("migration", "alembic", ["upgrade", "head"]),
+            ("setup_seed", "python", ["-m", "fitminiapp_api.services.seed"]),
+        ):
+            with _stage(evidence, stage):
+                safety.released()
+                _compose(
+                    "run",
+                    "--rm",
+                    "--no-deps",
+                    "--entrypoint",
+                    entrypoint,
+                    "setup",
+                    *command,
+                    env=_migration_environment(target_env),
+                )
+                safety.released()
+        migration_completed = True
 
         with _stage(evidence, "application_start"):
+            safety.released()
             _start_legacy_backend(target_env, config)
             _public_smoke(config, require_progress_report_shell=True)
             consumer_leases = _start_legacy_consumers(
@@ -1609,9 +1720,12 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
                 evidence,
                 config,
                 require_markers=True,
+                safety=safety,
             )
 
         with _stage(evidence, "verification"):
+            safety.check(frozenset({"backend", "worker", "bot"}))
+            evidence.capacity.update(safety.last_report)
             for lease in consumer_leases:
                 if not _lease_is_current_and_healthy(lease):
                     raise DeploymentError(
@@ -1632,63 +1746,35 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
         print(f"Single-slot deployment verified: revision={config.target_revision}; slot=legacy")
         return evidence
     except BaseException:
-        if services_stopped and old_backend and old_bot:
+        if (
+            drain_verified
+            and migration_completed
+            and old_backend
+            and old_bot
+            and safety is not None
+        ):
             rollback_stage = StageRecord(name="single_slot_rollback", started_at=time.time())
             evidence.stages.append(rollback_stage)
             try:
-                for service, timeout in (
-                    ("worker", config.worker_drain_seconds),
-                    ("bot", config.bot_drain_seconds),
-                    ("backend", config.backend_drain_seconds),
-                ):
-                    if _service_is_running(service):
-                        _compose("stop", "-t", str(timeout), service)
-                rollback_env = _legacy_environment(
-                    backend_image=old_backend,
-                    bot_image=old_bot,
+                _stop_legacy_services(config, require_running=False)
+                safety.released()
+                # The migration gate must still accept the old/new schema contract.
+                # Never run Alembic downgrade or restore data as an app rollback.
+                _run(_online_migration_command(active_revision, config.target_revision))
+                safety.released()
+                rollback_env = _legacy_environment(backend_image=old_backend, bot_image=old_bot)
+                rollback_env["YFC_CONSUMER_RESTART_POLICY"] = "no"
+                _start_legacy_backend(rollback_env, config)
+                _start_legacy_consumers(
+                    rollback_env, evidence, config, require_markers=True, safety=safety
                 )
-                rollback_errors: list[str] = []
-                try:
-                    _start_legacy_backend(rollback_env, config)
-                except BaseException as rollback_backend_exc:
-                    rollback_errors.append(
-                        f"backend: {type(rollback_backend_exc).__name__}: {rollback_backend_exc}"
-                    )
-                try:
-                    _start_legacy_consumers(
-                        rollback_env,
-                        evidence,
-                        config,
-                        require_markers=True,
-                        best_effort=True,
-                    )
-                except BaseException as rollback_consumers_exc:
-                    rollback_errors.append(
-                        "consumers: "
-                        f"{type(rollback_consumers_exc).__name__}: {rollback_consumers_exc}"
-                    )
+                safety.check(frozenset({"backend", "worker", "bot"}))
                 if persistent_images_updated:
-                    try:
-                        _persist_application_image_refs(
-                            config.root / ".env",
-                            backend_image=old_backend,
-                            bot_image=old_bot,
-                        )
-                    except BaseException as rollback_env_exc:
-                        rollback_errors.append(
-                            "environment image refs: "
-                            f"{type(rollback_env_exc).__name__}: {rollback_env_exc}"
-                        )
-                try:
-                    _public_smoke(config)
-                except BaseException as rollback_smoke_exc:
-                    rollback_errors.append(
-                        f"public smoke: {type(rollback_smoke_exc).__name__}: {rollback_smoke_exc}"
+                    _persist_application_image_refs(
+                        config.root / ".env", backend_image=old_backend, bot_image=old_bot
                     )
-                if rollback_errors:
-                    raise DeploymentError(
-                        "rollback restoration was incomplete: " + "; ".join(rollback_errors)
-                    )
+                _public_smoke(config)
+                _atomic_text(active_revision_path, active_revision + "\n")
                 evidence.verdict = "rolled back"
                 rollback_stage.status = "passed"
             except BaseException as rollback_exc:
@@ -1738,7 +1824,14 @@ def _config(args: argparse.Namespace) -> DeployConfig:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
-    for command in ("deploy", "bootstrap", "rollback", "single-slot"):
+    for command in (
+        "deploy",
+        "bootstrap",
+        "rollback",
+        "single-slot",
+        "capacity-check",
+        "capacity-check-single-slot",
+    ):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("target_revision")
         subparser.add_argument("base_url")
@@ -1746,7 +1839,13 @@ def main() -> int:
     args = parser.parse_args()
     try:
         config = _config(args)
-        if args.command == "bootstrap":
+        if args.command == "capacity-check":
+            _trusted_connection_budget_preflight(config)
+            print("Trusted PostgreSQL capacity preflight: PASS")
+        elif args.command == "capacity-check-single-slot":
+            _sequential_connection_budget_preflight(config)
+            print("Sequential PostgreSQL capacity preflight: PASS")
+        elif args.command == "bootstrap":
             bootstrap_state(config)
         elif args.command == "rollback":
             rollback(config)
@@ -1762,7 +1861,14 @@ def main() -> int:
                 f"Deployment verdict: {evidence.verdict}; "
                 f"revision={evidence.target_revision}; slot={evidence.candidate_slot}"
             )
-    except (KeyError, OSError, ValueError, subprocess.CalledProcessError, DeploymentError) as exc:
+    except (
+        KeyError,
+        OSError,
+        ValueError,
+        subprocess.CalledProcessError,
+        DeploymentError,
+        SafetyError,
+    ) as exc:
         print(f"Production deployment failed: {exc}", file=sys.stderr)
         return 1
     return 0

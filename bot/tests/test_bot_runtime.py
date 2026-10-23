@@ -42,6 +42,24 @@ def test_dispatcher_escalates_polling_conflict_without_retrying():
     asyncio.run(consume_updates())
 
 
+def test_bot_formatter_preserves_polling_conflict_marker() -> None:
+    record = logging.LogRecord(
+        name="bot.fitminiapp_bot.bot",
+        level=logging.CRITICAL,
+        pathname=__file__,
+        lineno=1,
+        msg="telegram_polling_conflict",
+        args=(),
+        exc_info=None,
+    )
+    record.retry_seconds = 300
+
+    payload = json.loads(JsonFormatter().format(record))
+
+    assert payload["message"] == "telegram_polling_conflict"
+    assert payload["retry_seconds"] == 300
+
+
 def test_polling_lock_filename_is_stable_and_does_not_expose_token(tmp_path: Path):
     first = PollingFileLock(str(tmp_path), "secret-token")
     second = PollingFileLock(str(tmp_path), "secret-token")

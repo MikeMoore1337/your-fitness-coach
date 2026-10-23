@@ -8,7 +8,12 @@ from fitminiapp_api.core.config import settings
 
 for attempt in range(60):
     try:
-        engine = create_engine(settings.database_url, future=True)
+        connect_args = (
+            {}
+            if settings.database_url.startswith("sqlite")
+            else {"application_name": settings.db_application_name}
+        )
+        engine = create_engine(settings.database_url, future=True, connect_args=connect_args)
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         print("Database is ready")

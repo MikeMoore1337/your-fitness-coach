@@ -1,194 +1,229 @@
-# V11-REC-01: off-host backup и disaster recovery
+# V11-REC-01: резервная копия PostgreSQL на Windows
 
-Статус документа: Phase A, Draft. Issue: [#849](https://github.com/MikeMoore1337/your-fitness-coach/issues/849).
+Актуальное решение владельца для [Issue #849](https://github.com/MikeMoore1337/your-fitness-coach/issues/849),
+22.10.2026: обычные **незашифрованные `backup-YYYY-MM-DD.tar.gz`**. Age, BitLocker,
+VHDX и отдельные ключи восстановления не нужны. Это заменяет прежнее требование age.
+Архивы содержат данные БД открытым текстом после распаковки; доступ ограничивают права
+каталогов и существующий защищённый SFTP. SHA-256 обнаруживает повреждение, но не
+заменяет доверенный источник: SSH host key должен оставаться закреплённым.
 
-Документ фиксирует контракт, локальную синтетическую проверку и runbook. Он не доказывает,
-что независимая копия уже существует, что шифрование уже включено, или что восстановление на
-чистом хосте уже выполнялось.
+Этот PR готовит исходники и шаблоны. Он не разрешает production dump/restore, перенос
+пользовательских данных или включение расписаний. `BACKUP_RECOVERY=NOT_PROVEN` до
+отдельно разрешённого восстановления реальной независимой копии с application smoke.
 
-## 1. Принятый контур Phase A
+## 1. Формат и создание
 
-Windows-ПК владельца периодически забирает архив с VPS по исходящему SSH/SFTP-соединению.
-VPS не подключается к Windows-ПК. На VPS используется существующий
-`scripts/db_maintenance.py`; Windows runner — `scripts/windows_backup_pull.ps1`.
+Используется существующий `scripts/db_maintenance.py backup`: `pg_dump --format=custom
+--no-owner --no-privileges` через существующий Compose service `db`. Каталог работающей
+PostgreSQL, WAL, `.env`, credentials, ключи и host volumes в tar не попадают.
+До публикации dump проверяется `pg_restore --list`. Это проверка формата, не восстановление.
 
-Внешний SFTP-пользователь должен быть read-only и видеть только каталог off-host backup.
-Парольная SSH-аутентификация запрещена: runner требует отдельный ключ и pinned
-`known_hosts`. Параметр `StrictHostKeyChecking=yes` не допускает TOFU или использование
-глобального `known_hosts`.
+В архиве ровно два обычных USTAR-файла:
 
-В Phase A намеренно не включены: production credentials, реальные дампы, Windows Task
-Scheduler registration, изменение VPS, платное хранилище, WAL/PITR и восстановление с
-production DNS. XML в `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull-task.example.xml` — только шаблон для
-отдельного owner-approved шага.
+- `database.dump`: PostgreSQL custom dump;
+- `recovery.json`: версия формата, UTC начала создания dump, PostgreSQL major и Alembic revision.
 
-## 2. Что именно считается опубликованной копией
+Имя содержит дату МСК (UTC+03:00). Повторное создание в ту же дату отказывает до нового
+pg_dump, если целевой архив уже существует. Обновление не перезаписывает дневную копию.
+Промежуточные файлы находятся вне SFTP export, в приватном временном каталоге backup root;
+они удаляются при успехе и ошибке. Публикация архива выполняется rename на том же томе,
+затем atomic manifest и последним — `index.json`, служащий признаком завершения.
+Linux publisher сохраняет существующий `flock` от параллельной публикации.
+Внешний архив создаётся через `O_EXCL` с максимальными правами `0640`: запись владельцу,
+чтение его группе, доступ остальным запрещён. Более строгий umask сохраняется (например,
+`0077` даёт `0600`); права после создания не расширяются. Приватный staging остаётся `0700`.
+Опубликованные `index.json` и `*.manifest.json` также должны читаться отдельным SFTP UID:
+атомарный writer сохраняет временный JSON как `0600` до завершения записи, затем явно
+устанавливает `0640` **до** rename. По умолчанию прочие JSON остаются `0600`.
+Эти явные права метаданных не зависят от umask, поэтому обязателен контроль их фактического
+GID и принадлежности выделенной read-only группе. Отсутствие world bits сохраняется.
 
-Команда публикации создаёт архив, проверяет его через `pg_restore --list`, затем атомарно
-пишет sidecar manifest и последним заменяет `index.json`. `index.json` — commit marker:
-Windows runner принимает только архивы, перечисленные в нём, и не использует незавершённые
-файлы из временного каталога.
+Manifest/index **v3**, `archive_format=tar-gzip-pg-custom`, содержат размер и SHA-256 всего
+`.tar.gz`, время создания/публикации, статус `format_verified_pg_restore_list`. Manifest
+также содержит revision/image identity, если переданы существующие `YFC_RELEASE_SHA`,
+`YFC_BACKEND_IMAGE_DIGEST`, `YFC_BOT_IMAGE_DIGEST`; иначе identity явно неизвестна.
+`restore_status=not_run` не меняется от успешного скачивания.
 
-```text
-.artifacts/operations/backups/offhost/
-  fitminiapp-<UTC>.dump
-  fitminiapp-<UTC>.dump.manifest.json
-  index.json
+Команда для будущей разрешённой активации, **не выполнять сейчас**:
+
+```sh
+python3 scripts/db_maintenance.py backup \
+  --publish-dir .artifacts/operations/backups/offhost-tar \
+  --retain-published 7
 ```
 
-Manifest содержит имя, размер и SHA-256 архива, UTC timestamps, PostgreSQL major, Alembic
-revision, coverage persistent state и application identity. Если release SHA или image
-digests не переданы доверенным окружением, identity получает статус `not_provided`; это не
-становится доказательством конкретной версии приложения. Index entry повторяет также
-`published_at_utc`, чтобы проверка не теряла второй timestamp при передаче.
+Без `--publish-dir` прежний raw `.dump` helper для локального safety backup/restore
+сохраняется. Его существующие вызывающие скрипты не меняются. Для новых независимых
+копий всегда использовать публикацию `.tar.gz`.
 
-Для всех timestamp применяется UTC и фиксированная tolerance clock skew в 5 минут. Значение
-дальше текущего времени более чем на 5 минут считается повреждённой metadata; timestamp в
-пределах tolerance не превращает отрицательный возраст в `HEALTHY` — такой архив остаётся
-`STALE` до наступления его времени.
+## 2. Переход без удаления старых копий
 
-`verification_status=format_verified_pg_restore_list` означает только читаемый custom-format
-архив. `restore_status=not_run` остаётся до Phase C. `pg_restore --list` не является
-доказательством успешного восстановления.
+Не менять установленные конфигурации, `.age`/`.dump`, старые manifest/index, SSH identity,
+`known_hosts` и age-toolchain. Они сохраняются для отдельно разрешённого использования.
+Новый publisher не принимает legacy index v1/v2 и отказывает при legacy/неожиданных файлах
+в новом export. Смешивать форматы или автоматически переконвертировать копии нельзя.
 
-Публикатор повторно проверяет архив непосредственно перед публикацией, удерживает VPS lock,
-проверяет каждый существующий index entry и только после успешной замены index выполняет
-ротацию. Неудалённый старый файл не маскируется: незавершённая ротация возвращает ненулевой
-код и требует ручного разбора.
+Для перехода подготовить новый VPS-каталог `offhost-tar` и Windows-каталог
+`D:\YFC-Backups\tar-gz`, скопировать три скрипта из одного проверенного commit:
+`db_maintenance.py` и `backup_manifest.py` на VPS; `windows_backup_pull.ps1` и
+`backup_manifest.py` на Windows. Сохранить старые исходники и конфигурации отдельно
+до проверки нового пути. Не менять target существующего задания поверх старой конфигурации.
+Старая Windows-конфигурация с `encryption_at_rest` явно отклоняется новым runner.
+Legacy-файлы в локальном каталоге игнорируются, не учитываются в числе исправных и не ротируются.
 
-## 3. Инвентаризация persistent state
+Частичный сбой publication оставляет старый index действующим и старые копии сохранными.
+Новый orphan без manifest/index не считается исправным. Не удалять его автоматически:
+остановить расписание, проверить digest/содержимое и отдельно разрешить исправление.
+Windows умеет завершить прерванное продвижение, когда архив без manifest уже совпадает
+с проверенным удалённым объектом. Несовпадающий локальный файл не перезаписывается.
 
-| Объект | Phase A решение | Граница доказательства |
-| --- | --- | --- |
-| PostgreSQL relations | Включены в custom-format `pg_dump` | Нужна clean-host restore-проверка |
-| `users.custom_avatar_image_bytes`, news images и account export bytes | Включены как binary columns PostgreSQL | Нужна проверка целостности после restore |
-| named volume `postgres_data` | Восстанавливается логическим дампом, не копированием volume | WAL/PITR не входит в scope |
-| `caddy_data` | Перевыпускается или пересоздаётся по отдельному runbook | Фактическая TLS/ACME recovery не проверена |
-| `caddy_config`, `edge_config` | Восстанавливаются из версии приложения, Compose и approved environment | Untracked host mounts требуют owner inventory |
-| `bot_polling_lock` | Эфемерный lock, создаётся заново при старте | Не является backup payload |
-| Git и immutable application images | Источник versioned application files | Exact SHA/image digest должен быть зафиксирован при recovery |
-| Secrets, SSH keys, TLS private keys | Исключены из dump и manifest | Отдельный approved источник и key recovery обязательны |
+## 3. Windows PULL и SFTP
 
-В репозитории нет утверждения о наличии или отсутствии независимой backup-копии. До
-доказательства владельцем состояние: `NOT_PROVEN`.
+Шаблон: [windows-pull.config.example.json](v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json).
+Для проверки tar Windows использует **Python 3.10+ и только стандартную библиотеку**;
+пакеты через pip, age и WSL не нужны. Указать абсолютный `python_path` к доверенному
+существующему Python, без Windows Store alias. Не передавать в конфигурации passwords.
 
-## 4. Конфигурация Windows pull
+Сохранить существующие dedicated read-only SFTP account, chroot и SSH host key.
+Не менять глобальный sshd, credentials, shell/TTY/forwarding или ACL в рамках этого PR.
+Внутри существующего chroot оператор после отдельного разрешения публикует новый
+`/offhost-tar` с completed archives, manifest и index. Publisher имеет запись, SFTP user —
+только list/get; приватный staging остаётся вне chroot. `remote_root` в JSON задаётся
+относительно **видимого SFTP root**, а не абсолютного host path.
 
-Начальная форма: `docs/operations/v11-rec-01-off-host-backup-recovery/windows-pull.config.example.json`. Перед реальным запуском
-владелец должен заменить placeholders, предоставить ключ, pinned host key и документ
-восстановления ключа. Поле `encryption_at_rest` по умолчанию имеет
-`mode=OWNER_APPROVAL_REQUIRED` и `approved=false`; Pull с ним завершается `CONFIG_INVALID`.
+Runner сохраняет `StrictHostKeyChecking=yes`, отдельный `UserKnownHostsFile`,
+`GlobalKnownHostsFile=NUL`, `BatchMode=yes`, `IdentitiesOnly=yes`, `IdentityAgent=none`,
+`-F NUL`, dedicated identity. Не заменять pin результатом непроверенного `ssh-keyscan`.
+Проверка нового пути после разрешения: list/get synthetic archive успешно;
+put/rename/remove/traversal/shell/TTY/forwarding запрещены; неверный host key отклоняется.
+SSH key — ключ доступа SFTP, он сохраняется; отдельного ключа расшифрования больше нет.
 
-Runner:
-
-- после успешного lock создаёт собственный временный `.incoming-<GUID>`, проверяет manifest,
-  размер и SHA-256; другой процесс не создаёт, не очищает и не изменяет эту папку;
-- при отказе в lock не пишет общий status/log и не выполняет cleanup; аварийно оставшийся
-  temporary directory не является основанием удалять ранее подтверждённые копии;
-- не перезаписывает существующую копию с другим digest;
-- публикует архив, затем manifest; при ошибке удаляет только незавершённый новый archive;
-- держит Windows file lock, поэтому параллельный Pull получает `LOCKED`;
-- разделяет в status локальное состояние verified backups, `freshness_state`, последнюю
-  попытку SSH pull, `last_sync_result` и время последнего получения новой независимой копии;
-- сохраняет последнюю ошибку передачи в sanitized status и failure sidecar; сетевой сбой не
-  превращает существующую валидную копию в `CORRUPTED`, но и не скрывается под `HEALTHY`;
-- пишет только sanitized status/log: UTC, код и безопасное имя архива;
-- считает локальный snapshot по фактическим файлам, а не по одному status-файлу;
-- хранит минимум `minimum_valid_backups` валидных копий и не удаляет последнюю валидную;
-- сообщает `STALE`, `MISSING` или `CORRUPTED`, даже если старый status-файл был healthy.
-
-Планировщик должен быть настроен отдельно с `StartWhenAvailable`, повтором после пропущенного
-запуска, `MultipleInstances=IgnoreNew` и ограничением времени. Ниже приведены exit codes,
-которые должны быть видны в журнале/мониторинге:
-
-| Код | Состояние |
-| ---: | --- |
-| 0 | `HEALTHY` / успешный Pull |
-| 10 | `STALE` |
-| 11 | `MISSING` — нет копии или remote object |
-| 12 | `CORRUPTED` — manifest, размер или SHA не совпали |
-| 20 | `HOST_KEY` |
-| 21 | `AUTHENTICATION` |
-| 22 | `NETWORK` / timeout |
-| 23 | `DISK_FULL` |
-| 24 | `LOCKED` |
-| 25 | `CONFIG_INVALID`, включая отсутствие owner approval шифрования |
-| 26 | `PROMOTE_FAILED`, включая незавершённую ротацию |
-| 27 | `UNEXPECTED` |
-
-## 5. Синтетическая проверка Phase A
-
-Локальный self-test не подключается к VPS и не использует реальный dump:
+Runner скачивает только index/новые объекты через outbound SFTP во временный каталог
+на том же диске. До продвижения проверяет manifest/index, size/SHA-256, gzip целиком,
+два допустимых tar member и соответствие встроенных metadata sidecar. Нет `extractall`:
+при распаковке читаются только фиксированные имена. Абсолютные пути, `..`, Windows paths,
+ссылки, устройства, FIFO, каталоги, PAX/longname extensions, дубликаты, лишние файлы,
+посторонний хвост, плохой checksum/CRC и усечение отклоняются. Лимит обычного USTAR member
+— менее 8 GiB; больший dump отклонится до публикации. Перед таким ростом потребуется
+явное расширение формата и тестов, не молчаливый fallback.
 
 ```powershell
-pwsh -NoProfile -File scripts/windows_backup_pull_selftest.ps1
+& 'C:\YFC\Python\python.exe' --version
+& 'C:\YFC\scripts\windows_backup_pull.ps1' -Mode Pull -ConfigPath 'C:\YFC\windows-pull-tar.config.json'
+& 'C:\YFC\scripts\windows_backup_pull.ps1' -Mode Status -ConfigPath 'C:\YFC\windows-pull-tar.config.json'
 ```
 
-Проверяются: успешный Pull, повторная идемпотентность, checksum mismatch с сохранением
-валидной копии, восстановление orphan archive после сбоя между rename, отсутствующий manifest,
-отказ pinned host key, stale status и блокировка до owner approval шифрования. Отдельная
-concurrency regression удерживает первый Pull на незавершённом temporary download, запускает
-второй Pull с `LOCKED`, сверяет неизменность temporary/status файлов и затем проверяет
-успешное продолжение первого Pull. Дополнительно проверяются failed pull при свежей и stale
-копии, восстановление после сбоя, отсутствие копий, повреждённая локальная копия и отказ
-записи status. Python-тесты проверяют schema/manifest, fixed-time future timestamps,
-`published_at_utc` в index, duplicate/path-safe index entries, повторную верификацию архива
-публикатором и отказ от ротации при повреждённой старой записи. Отдельно проверяются
-authentication failure, network timeout, low-disk margin, concurrent lock и malformed config.
+`Status` проверяет локальные копии, ничего не скачивает. Логи/status не содержат данных БД,
+ключей или native stderr. Сохраняются отдельные состояния локальной копии, свежести,
+последнего Pull и последней ошибки. Сбой сети не делает исправную старую копию повреждённой.
 
-Синтетический прогон не доказывает физический BitLocker/file encryption, реальную SFTP
-аутентификацию, сетевой timeout, заполнение диска, VPS filesystem permissions, Task Scheduler,
-production credentials, clean-host restore или production smoke. `encryption_at_rest.approved`
-является только конфигурационным gate и никогда не заменяет проверку BitLocker/file encryption
-и recovery key на физическом Windows-ПК. Проверка Task Scheduler вне интерактивного сеанса
-также остаётся отдельным owner-approved Phase B тестом.
+## 4. Расписание, хранение и предупреждение
 
-## 6. CI routing для Python backup-контракта
+| Параметр | Значение |
+| --- | --- |
+| Создание VPS | ежедневно 03:00 МСК = 00:00 UTC |
+| Windows PULL | каждый час XX:30, catch-up после включения/сети |
+| Хранение | 7 суток на обеих сторонах |
+| Защищённый минимум | последние 2 исправные копии, даже старше 7 суток |
+| Свежесть | `STALE` только при возрасте **больше 26 часов** от создания dump |
 
-Текущая routing policy относила изменённые `scripts/` и root `tests/` к
-`workflow-platform`, поэтому Python tests были skipped несмотря на изменение backup Python
-implementation и tests. Узкое правило в `scripts/ci_contract.py` распознаёт backup Python
-paths как Python surface; для текущего PR консервативный профиль — `cross-stack`, а
-authoritative `python-tests` дополнительно собирает `tests/test_backup_manifest.py` и
-`tests/test_db_maintenance.py`. Это исправление scope routing относится к общей задаче
-детерминизма CI из открытого Issue #821; отдельный CI refactoring в рамках #849 не добавляется.
+VPS вращает только повторно проверенные записи своего v3 index после успешной публикации.
+Повреждение прежней indexed копии прекращает публикацию и удаление. Windows вращает только
+проверенные tar.gz/sidecar после успешного Pull; повреждённые/legacy файлы не удаляет.
+Конфигурация не позволяет уменьшить минимум ниже двух. Выключенный PC может пропустить
+новые копии после истечения VPS retention: две сохранённые старые копии не доказывают RPO.
 
-## 7. Runbook clean-host restore (Phase C, не выполнен)
+[Windows Task Scheduler XML](v11-rec-01-off-host-backup-recovery/windows-pull-task.example.xml)
+содержит `PT1H`, старт `00:30+03:00`, `StartWhenAvailable` и **оба Enabled=false**.
+Не импортировать и не включать задачу сейчас. Существующую задачу также не изменять.
+Пример для будущего VPS timer, который сейчас **не устанавливается и не включается**:
 
-Выполнять только по отдельному owner approval на непубличном чистом хосте. До восстановления
-DNS и фоновые writer processes должны быть остановлены.
+```ini
+[Timer]
+OnCalendar=*-*-* 00:00:00 UTC
+Persistent=true
+AccuracySec=1s
+Unit=yfc-backup-tar.service
+```
 
-1. Зафиксировать дату, source archive, manifest, `archive_sha256`, PostgreSQL major, schema
-   revision, release SHA и image digests. Скопировать архив во временный каталог clean host;
-   sole local copy не удалять.
-2. Установить тот же PostgreSQL major и exact application revision. Поднять только DB и
-   необходимые сервисы без публичного маршрута.
-3. Получить secrets, SSH keys, TLS private keys и environment из отдельно approved источника.
-   Не извлекать их из dump, manifest или логов.
-4. Сверить размер и SHA-256 с manifest. Затем проверить читаемость custom archive через
-   `pg_restore --list`; failure останавливает runbook.
-5. Создать целевую пустую БД, остановить writers и выполнить проверенный restore с
-   `--clean --if-exists --no-owner --no-privileges --exit-on-error --single-transaction`.
-   Не считать `pg_restore --list` заменой этому шагу.
-6. Проверить Alembic revision и выполнить только согласованную миграционную последовательность
-   до ожидаемого head. Миграции не должны запускаться до фиксации backup evidence.
-7. Проверить binary columns, восстановить/перевыпустить Caddy state, применить approved
-   environment и проверить версионные application files. Untracked host mounts сначала
-   инвентаризировать, а не угадывать.
-8. Выполнить integrity checks: health endpoint, подключение к БД, миграционный head, synthetic
-   login/workout read path и отсутствие ошибок startup. Не использовать реальные пользовательские
-   данные в опубликованном evidence.
-9. Измерить фактические RPO/RTO, записать commands, exact revision, результаты smoke и все
-   отклонения. Сейчас RPO/RTO: `UNKNOWN`, restore drill: `NOT_VERIFIED`.
-10. DNS/traffic cutover и rollback — отдельная owner-authorized операция после успешных
-    smoke checks. Она не входит в этот Phase A PR.
+Service должен запускаться из существующего app root под утверждённым publisher identity,
+`UMask=0027` и primary group существующего read-only SFTP. Backup root/staging не должны
+наследовать другую группу через setgid/default ACL; проверить uid/gid/mode опубликованного
+архива и отсутствие лишних ACL перед настоящими данными. Проверить после **двух** последовательных синтетических
+публикаций, включая замену `index.json`, что отдельный SFTP UID с разрешённым GID может
+`list/get` архив, manifest и index; посторонний UID/GID не может прочитать эти файлы.
+SFTP put/rename/remove должен оставаться запрещён. Использовать команду раздела 1. Сам systemd timer не имеет Enabled-поля:
+disabled означает отсутствие `systemctl enable/start` и проверенный inactive state.
+Существующий timer оставить disabled/inactive; не заменять его автоматически.
 
-## 8. Гейты
+Коды: `0 HEALTHY`, `10 STALE`, `11 MISSING`, `12 CORRUPTED`, `20 HOST_KEY`,
+`21 AUTHENTICATION`, `22 NETWORK`, `23 DISK_FULL`, `24 LOCKED`, `25 CONFIG_INVALID`,
+`26 PROMOTE_FAILED`, `27 UNEXPECTED`. Код 10 и status JSON — локальное предупреждение.
+Доставка уведомлений на выключенном PC не доказана; перед запуском согласовать канал,
+который действительно увидит владелец, и проверить stale/failure notification.
 
-| Фаза | Требование | Состояние в этом PR |
-| --- | --- | --- |
-| Phase A | Контракт, manifest/index, VPS helper, Windows pull, docs, synthetic checks | Реализовано локально; Draft PR |
-| Phase B | Owner decision по encryption/key custody/retention, независимый off-host объект, реальный SFTP pull, clean non-prod restore | `NOT_VERIFIED` / не запускалось |
-| Phase C | Production authorization, exact release, migrations, smoke, DNS/rollback evidence | `NOT_VERIFIED` + `NOT_AUTHORIZED` / не запускалось |
+## 5. Безопасное восстановление
 
-Issue #849 остаётся открытым до независимой off-host копии и clean-host restore evidence.
+Выбрать конкретную PC-held копию и соответствующий manifest из доверенного SFTP source.
+Не запускать SQL из недоверенного dump: SHA не является авторизацией содержимого.
+Проверить свободное место для распакованного dump и БД, закрытые ACL recovery-каталога,
+PostgreSQL major, доверенный image и отсутствие production network/volumes/credentials.
+
+```powershell
+$python = 'C:\YFC\Python\python.exe'
+$archive = 'D:\YFC-Backups\tar-gz\backup-YYYY-MM-DD.tar.gz'
+$manifest = "$archive.manifest.json"
+$restore = 'D:\YFC-Recovery\NEW-EMPTY-DIRECTORY'
+& $python -I 'C:\YFC\scripts\backup_manifest.py' $archive --manifest $manifest --output-dir $restore
+if ($LASTEXITCODE -ne 0) { throw 'Archive rejected; preserve original and stop' }
+```
+
+`--output-dir` должен отсутствовать: helper создаёт его после полной проверки. Он не
+перезаписывает существующий каталог. Ошибка ввода-вывода может оставить частичный output;
+не использовать его и не удалять оригинальный архив. Передать `database.dump` бинарным
+файлом в **новую изолированную non-production PostgreSQL** того же major. Не использовать
+PowerShell text pipeline для binary. Внутри изолированного контура:
+
+```sh
+pg_restore --list /restore/database.dump
+createdb --template=template0 yfc_recovery
+pg_restore --dbname=yfc_recovery --no-owner --no-privileges --exit-on-error \
+  --single-transaction /restore/database.dump
+```
+
+Проверить Alembic revision до миграций, согласованные counts/invariants, binary columns,
+FK/unique constraints и sequence; затем отдельно разрешённый application smoke на exact
+release/image. Не запускать bot/background writers/provider egress. Зафиксировать начало,
+окончание, digest, версии, команды/коды и измеренный RTO/RPO по заранее согласованной методике.
+Не выбирать targets после результата. DNS/cutover и production restore сюда не входят.
+Оригинал с Windows сохраняется до отдельного разрешения на удаление.
+
+## 6. Проверки и оставшиеся действия
+
+```powershell
+python -m pytest -o addopts= tests/test_backup_manifest.py tests/test_db_maintenance.py -q
+pwsh -NoProfile -File scripts/windows_backup_pull_selftest.ps1 -PythonPath 'C:\PATH\python.exe'
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/windows_backup_pull_selftest.ps1 -PythonPath 'C:\PATH\python.exe'
+```
+
+Python-тесты не обращаются к настоящей БД и не запускают pg_dump. Windows self-test работает
+с синтетическими локальными файлами и fake SFTP, проверяет pinned-key options, corruption,
+offline/catch-up, lock, disk, статус, границу 26 часов и last-two retention. Настоящий
+SFTP и изолированный pg_restore требуют отдельного синтетического integration evidence;
+никакой synthetic PASS не доказывает production recovery.
+
+До реального запуска остаются: review/merge PR; доставка проверенных host-side scripts
+и новой конфигурации без удаления старой; существующие SFTP/host-key/ACL проверки для нового
+каталога; privacy/data-location решение (#707/#711) для реальных данных; согласованные
+RPO/RTO и уведомления; отдельное разрешение на настоящий backup/PULL/drill; затем отдельное
+включение Windows-задачи и VPS timer и наблюдение первого дневного цикла.
+
+`env change required: no` для приложения/PostgreSQL. Host-side нужны новый export path,
+`python_path`, новая Pull-конфигурация и будущая команда расписания без age flags.
+Приложение, PostgreSQL, существующие архивы/конфигурации и выключенные расписания этим PR
+не изменяются. Encryption/key-recovery gates сняты текущим решением владельца.
+
+Исторические решения и проверки остаются в [PR #1125](https://github.com/MikeMoore1337/your-fitness-coach/pull/1125)
+и [PR #1123](https://github.com/MikeMoore1337/your-fitness-coach/pull/1123).
+Их age-команды не применять к новым архивам. Полный clean-host recovery acceptance #849,
+включая приложение и независимую реальную копию, этим изменением не закрывается.

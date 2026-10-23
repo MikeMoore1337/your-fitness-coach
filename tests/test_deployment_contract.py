@@ -49,6 +49,37 @@ def test_deploy_bundle_includes_migration_sources() -> None:
     assert "backend/alembic/versions" in deploy
 
 
+def test_repair_bundle_includes_the_complete_trusted_capacity_gate() -> None:
+    root = Path(__file__).resolve().parents[1]
+    deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+    repair_bundle = deploy.split("tooling_paths=(", 1)[1].split(")", 1)[0]
+
+    # The host orchestrator must never be copied from a newer tooling
+    # revision without its trusted collector and preflight implementation.
+    for path in (
+        "scripts/zero_downtime_deploy.py",
+        "scripts/connection_budget_preflight.py",
+        "scripts/trusted_runtime_collector.py",
+        "scripts/trusted_legacy_pg_snapshot.py",
+    ):
+        assert path in repair_bundle
+
+
+def test_trusted_postgres_preflight_runs_before_any_production_config_mutation() -> None:
+    root = Path(__file__).resolve().parents[1]
+    wrapper = (root / "scripts" / "deploy_production.sh").read_text(encoding="utf-8")
+    orchestrator = (root / "scripts" / "zero_downtime_deploy.py").read_text(encoding="utf-8")
+    marker = 'python3 scripts/zero_downtime_deploy.py "$capacity_command"'
+    assert wrapper.count(marker) == 1
+    first_mutation = 'echo "Enabling browser OAuth'
+    assert wrapper.index(marker) < wrapper.index(first_mutation)
+    assert '"capacity-check-single-slot"' in orchestrator
+    assert "capacity_command=capacity-check-single-slot" in wrapper
+    assert 'if args.command == "capacity-check":' in orchestrator
+    assert 'with _stage(evidence, "connection_budget_preflight"):' in orchestrator
+    assert orchestrator.count("_trusted_connection_budget_preflight(config)") >= 4
+
+
 def test_application_base_images_are_immutable_and_keep_runtime_generations() -> None:
     root = Path(__file__).resolve().parents[1]
 

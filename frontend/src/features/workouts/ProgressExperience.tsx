@@ -1,5 +1,5 @@
 import { DateInput } from '../../shared/ui/PickerInput';
-import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -32,6 +32,7 @@ import {
 } from '../../shared/ui/common';
 import { NutritionPeriodReport, type ControlledNutritionPeriod } from './NutritionReport';
 import { Icon } from '../../shared/ui/Icon';
+import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { CardioHistory } from '../cardio/CardioLogging';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
 import { MuscleWorkloadList as SharedMuscleWorkloadList } from './MuscleWorkload';
@@ -221,6 +222,7 @@ function ProgressTrendPanel({
   summary: ProgressSummary;
   showConfidence?: boolean;
 }) {
+  const tabPanelId = `progress-trend-panel-${useId().replaceAll(':', '')}`;
   const trends = summary.body.trends;
   const defaultMetric = trends.find((trend) => trend.metric === 'weight_kg')?.metric ?? null;
   const [selectedMetric, setSelectedMetric] = useState<BodyTrend['metric'] | null>(defaultMetric);
@@ -229,6 +231,8 @@ function ProgressTrendPanel({
       ? selectedMetric
       : defaultMetric;
   const selectedTrend = trends.find((trend) => trend.metric === activeMetric);
+  const activeTabIndex = trends.findIndex((trend) => trend.metric === activeMetric);
+  const activeTabId = activeTabIndex >= 0 ? `${tabPanelId}-tab-${activeTabIndex}` : undefined;
 
   return (
     <section className={`progress-trend-panel${detail ? ' progress-trend-panel--detail' : ''}`}>
@@ -247,33 +251,48 @@ function ProgressTrendPanel({
       {trends.length ? (
         <>
           <div className="progress-trend-switcher" role="tablist" aria-label="Показатель графика">
-            {trends.map((trend) => (
-              <button
-                aria-selected={activeMetric === trend.metric}
-                data-yfc-choice="compact"
-                className={activeMetric === trend.metric ? 'is-active' : ''}
-                key={trend.metric}
-                onClick={() => setSelectedMetric(trend.metric)}
-                role="tab"
-                type="button"
-              >
-                {bodyMetricLabel(trend)}
-              </button>
-            ))}
+            {trends.map((trend, index) => {
+              const selected = activeMetric === trend.metric;
+              const tabId = `${tabPanelId}-tab-${index}`;
+              return (
+                <button
+                  aria-controls={tabPanelId}
+                  aria-selected={selected}
+                  data-yfc-choice="compact"
+                  className={selected ? 'is-active' : ''}
+                  id={tabId}
+                  key={trend.metric}
+                  onClick={() => setSelectedMetric(trend.metric)}
+                  onKeyDown={handleTabKeyDown}
+                  role="tab"
+                  tabIndex={selected || (activeTabIndex < 0 && index === 0) ? 0 : -1}
+                  type="button"
+                >
+                  {bodyMetricLabel(trend)}
+                </button>
+              );
+            })}
           </div>
-          {selectedTrend ? (
-            <BodyChart trend={selectedTrend} />
-          ) : (
-            <EmptyState title="Мало данных" text="За выбранный период нет замеров тела." />
-          )}
-          <ProgressTrendRows selectedMetric={activeMetric} trends={trends} />
-          {showConfidence && (
-            <DataConfidence
-              className="data-confidence--compact"
-              kind="weight"
-              signal={summary.data_sufficiency.weight_trend}
-            />
-          )}
+          <div
+            aria-label={activeTabId ? undefined : 'Результаты замеров'}
+            aria-labelledby={activeTabId}
+            id={tabPanelId}
+            role="tabpanel"
+          >
+            {selectedTrend ? (
+              <BodyChart trend={selectedTrend} />
+            ) : (
+              <EmptyState title="Мало данных" text="За выбранный период нет замеров тела." />
+            )}
+            <ProgressTrendRows selectedMetric={activeMetric} trends={trends} />
+            {showConfidence && (
+              <DataConfidence
+                className="data-confidence--compact"
+                kind="weight"
+                signal={summary.data_sufficiency.weight_trend}
+              />
+            )}
+          </div>
         </>
       ) : (
         <EmptyState
@@ -626,7 +645,7 @@ function SummaryOverview({
               value={latestWeight}
             />
             <ProgressMetricCard
-              detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} PR`}
+              detail={`${formatNumber(summary.training.frequency_per_week, 1)} в неделю · ${summary.training.new_personal_records} ${plural(summary.training.new_personal_records, 'новый личный рекорд', 'новых личных рекорда', 'новых личных рекордов')}`}
               label="Тренировки"
               state={trainingState}
               to={progressViewPath(search, 'training')}
