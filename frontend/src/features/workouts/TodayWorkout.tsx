@@ -2121,10 +2121,13 @@ export function TodayWorkout({
   useEffect(() => {
     let frame: number | undefined;
     let pointerActive = false;
+    let manualScroll = false;
+    let pointerStartY = 0;
     let correctionPending = false;
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
+        if (manualScroll) return;
         // A pressed control must stay under the pointer until its click is delivered.
         if (pointerActive) {
           correctionPending = true;
@@ -2151,11 +2154,22 @@ export function TodayWorkout({
         if (Math.abs(delta) > 1) window.scrollBy({ top: delta, behavior: 'instant' });
       });
     };
-    const pointerDown = () => {
+    const pointerDown = (event: PointerEvent) => {
       pointerActive = true;
+      manualScroll = false;
+      pointerStartY = event.clientY;
+    };
+    const pointerMove = (event: PointerEvent) => {
+      if (!pointerActive || Math.abs(event.clientY - pointerStartY) <= 8) return;
+      manualScroll = true;
+      correctionPending = false;
     };
     const pointerEnd = () => {
       pointerActive = false;
+      if (manualScroll) {
+        correctionPending = false;
+        return;
+      }
       if (correctionPending) keepFieldsVisible();
     };
     const viewport = window.visualViewport;
@@ -2167,6 +2181,7 @@ export function TodayWorkout({
     };
     const observer = new ResizeObserver(keepFieldsVisible);
     const focus = () => {
+      manualScroll = false;
       observer.disconnect();
       const row = document.activeElement?.closest('.active-workout-set');
       if (
@@ -2181,6 +2196,7 @@ export function TodayWorkout({
     };
     document.addEventListener('focusin', focus);
     document.addEventListener('pointerdown', pointerDown, true);
+    document.addEventListener('pointermove', pointerMove, true);
     document.addEventListener('pointerup', pointerEnd, true);
     document.addEventListener('pointercancel', pointerEnd, true);
     viewport?.addEventListener('resize', keepFieldsVisible);
@@ -2191,6 +2207,7 @@ export function TodayWorkout({
       observer.disconnect();
       document.removeEventListener('focusin', focus);
       document.removeEventListener('pointerdown', pointerDown, true);
+      document.removeEventListener('pointermove', pointerMove, true);
       document.removeEventListener('pointerup', pointerEnd, true);
       document.removeEventListener('pointercancel', pointerEnd, true);
       viewport?.removeEventListener('resize', keepFieldsVisible);
