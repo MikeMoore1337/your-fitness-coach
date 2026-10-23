@@ -411,6 +411,8 @@ describe('ProgressExperience', () => {
       'href',
       '/app/report?period=days_30',
     );
+    expect(screen.getByText(/3 новых личных рекорда/)).toBeVisible();
+    expect(screen.queryByText(/в неделю · .* PR/)).not.toBeInTheDocument();
     const helpControl = screen.getByText('О показателях', { exact: true });
     const helpDisclosure = helpControl.closest('details');
     expect(helpDisclosure).not.toBeNull();
@@ -531,6 +533,29 @@ describe('ProgressExperience', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: 'Живот' }));
     expect(await screen.findByRole('img', { name: /Живот/ })).toBeVisible();
+  });
+
+  it('keeps body metric tabs keyboard-operable and linked to their panel', async () => {
+    installApi();
+    renderExperience('?section=progress&progress_view=body');
+
+    await screen.findByRole('heading', { name: 'Тело' });
+    const tablist = screen.getByRole('tablist', { name: 'Показатель графика' });
+    const weightTab = within(tablist).getByRole('tab', { name: 'Вес' });
+    const waistTab = within(tablist).getByRole('tab', { name: 'Талия' });
+    const panel = screen.getByRole('tabpanel');
+
+    expect(weightTab).toHaveAttribute('tabindex', '0');
+    expect(waistTab).toHaveAttribute('tabindex', '-1');
+    expect(weightTab).toHaveAttribute('aria-controls', panel.id);
+    expect(panel).toHaveAttribute('aria-labelledby', weightTab.id);
+
+    weightTab.focus();
+    fireEvent.keyDown(weightTab, { key: 'ArrowRight' });
+
+    expect(waistTab).toHaveFocus();
+    expect(waistTab).toHaveAttribute('aria-selected', 'true');
+    expect(panel).toHaveAttribute('aria-labelledby', waistTab.id);
   });
 
   it('keeps empty, one-point and partial adherence states factual', async () => {
