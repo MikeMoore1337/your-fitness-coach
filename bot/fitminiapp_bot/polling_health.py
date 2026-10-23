@@ -4,30 +4,40 @@ The bot process is the only producer. No Telegram API calls or user/token data a
 introduced. An independent restricted reader must still verify source, owner,
 freshness and trust before treating this file as operational evidence.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import json
 import os
-from pathlib import Path
 import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
 
 STATES = frozenset({"healthy", "unhealthy", "unknown"})
-EVIDENCE = frozenset({
-    "getupdates_success", "getupdates_error", "polling_starting",
-    "polling_stopped", "polling_conflict",
-})
+EVIDENCE = frozenset(
+    {
+        "getupdates_success",
+        "getupdates_error",
+        "polling_starting",
+        "polling_stopped",
+        "polling_conflict",
+    }
+)
 
 
 def write_polling_health(
-    path: str, state: str, evidence: str, *, now: datetime | None = None,
+    path: str,
+    state: str,
+    evidence: str,
+    *,
+    now: datetime | None = None,
 ) -> bool:
     """Atomic, small, fixed-schema proof. Fail closed without harming polling."""
     if not path:
         return False
     if state not in STATES or evidence not in EVIDENCE:
         raise ValueError("invalid_polling_health_state")
-    observed = now or datetime.now(timezone.utc)
+    observed = now or datetime.now(UTC)
     if observed.tzinfo is None:
         raise ValueError("timezone_required")
     payload = {
@@ -36,7 +46,7 @@ def write_polling_health(
         "component": "telegram_polling",
         "state": state,
         "evidence": evidence,
-        "observed_at": observed.astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "observed_at": observed.astimezone(UTC).isoformat().replace("+00:00", "Z"),
     }
     target = Path(path)
     temporary: str | None = None
@@ -47,8 +57,11 @@ def write_polling_health(
             return False
         # No sensitive fields and no persistence unless explicitly provisioned.
         with tempfile.NamedTemporaryFile(
-            mode="w", encoding="utf-8", dir=target.parent,
-            prefix=".polling-status-", delete=False,
+            mode="w",
+            encoding="utf-8",
+            dir=target.parent,
+            prefix=".polling-status-",
+            delete=False,
         ) as handle:
             temporary = handle.name
             json.dump(payload, handle, separators=(",", ":"), ensure_ascii=True)
