@@ -191,3 +191,21 @@ def test_backup_group_read_triage_is_exact_and_keeps_other_findings_blocking(
         assert len(result) == 1
         assert result[0]["blocking"] is blocked
         assert bool(result[0]["validated_reason"]) is not blocked
+
+
+def test_polling_heartbeat_group_only_read_exception_is_exact(tmp_path: Path) -> None:
+    """A single explicitly approved 0640 line; no new general bypass."""
+    for path, line, rule, blocked in (
+        ("bot/fitminiapp_bot/polling_health.py", 71, "py/overly-permissive-file", False),
+        ("bot/fitminiapp_bot/polling_health.py", 72, "py/overly-permissive-file", True),
+        ("bot/fitminiapp_bot/other.py", 71, "py/overly-permissive-file", True),
+        ("bot/fitminiapp_bot/polling_health.py", 71, "py/path-injection", True),
+    ):
+        evidence = _sarif(
+            security_severity="7.8", level="warning",
+            rule_id=rule, path=path, line=line,
+        )
+        found = codeql_sarif_gate.evaluate(_write(tmp_path, evidence))
+        assert len(found) == 1
+        assert found[0]["blocking"] is blocked
+        assert bool(found[0]["validated_reason"]) is not blocked
