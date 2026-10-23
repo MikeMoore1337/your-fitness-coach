@@ -167,6 +167,7 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
@@ -175,6 +176,13 @@ services:
         condition: service_healthy
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
 
   edge:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
@@ -452,12 +460,20 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
     stop_grace_period: ${DEPLOY_BOT_DRAIN_SECONDS:-45s}
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
     networks:
       default:
       app_edge:
@@ -480,12 +496,20 @@ services:
       APP_ENV: ${APP_ENV:-dev}
       BOT_POLLING_ENABLED: ${BOT_POLLING_ENABLED:-true}
       BOT_POLLING_LOCK_DIR: /var/lock/fitminiapp-bot
+      BOT_POLLING_HEALTH_PATH: ${BOT_POLLING_HEALTH_PATH:-}
       BOT_CONFLICT_RETRY_SECONDS: ${BOT_CONFLICT_RETRY_SECONDS:-300}
       BOT_PROFILE_SYNC_STATE_PATH: ${BOT_PROFILE_SYNC_STATE_PATH:-/var/lock/fitminiapp-bot/profile-sync-state.json}
       ADMIN_TELEGRAM_USER_IDS: ${ADMIN_TELEGRAM_USER_IDS:-}
     stop_grace_period: ${DEPLOY_BOT_DRAIN_SECONDS:-45s}
     volumes:
       - bot_polling_lock:/var/lock/fitminiapp-bot
+      # Optional host-owned, group-readable status directory; bot still runs
+      # read-only and emits no status until BOT_POLLING_HEALTH_PATH is set.
+      - type: bind
+        source: ${BOT_POLLING_HEALTH_HOST_DIR:-/var/lib/hermes-infra-read/polling}
+        target: /run/yfc-polling-status
+        bind:
+          create_host_path: true
     networks:
       default:
       app_edge:
