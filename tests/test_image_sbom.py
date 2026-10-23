@@ -124,6 +124,7 @@ def test_published_sbom_binds_registry_digest_to_scanned_image(tmp_path: Path, f
     docker = tmp_path / "docker"
     docker.write_text(
         """#!/usr/bin/env python3
+import json
 import os
 import sys
 
@@ -131,15 +132,16 @@ args = sys.argv[1:]
 failure = os.environ['FAILURE']
 digest = 'sha256:' + 'd' * 64
 if args[:3] == ['buildx', 'imagetools', 'inspect']:
-    print('invalid' if failure == 'digest' else digest)
+    if args[-1] == '--raw':
+        print(json.dumps({'config': {'digest': 'sha256:' + ('e' if failure == 'image_id' else 'b') * 64}}))
+    else:
+        print('invalid' if failure == 'digest' else digest)
 elif args[0] == 'pull':
     assert args[1] == 'ghcr.io/example/yfc@' + digest
     sys.exit(1 if failure == 'pull' else 0)
 elif args[:2] == ['image', 'inspect']:
     assert args[2] == 'ghcr.io/example/yfc@' + digest
-    if args[-1] == '{{.Id}}':
-        print('sha256:' + ('e' if failure == 'image_id' else 'b') * 64)
-    elif args[-1] == '{{.Os}}/{{.Architecture}}':
+    if args[-1] == '{{.Os}}/{{.Architecture}}':
         print('linux/amd64')
     else:
         print(('e' if failure == 'revision' else 'c') * 40)

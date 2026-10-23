@@ -129,6 +129,11 @@ jobs:
             exit 0
           fi
           test "$current_master" = "$DEPLOY_SHA"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            echo "reason=owner-authorized deployment of current tested master" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           base_sha="$(git rev-parse "$DEPLOY_SHA^1")"
           scope="$(python scripts/deployment_scope.py \
             --base "$base_sha" \

@@ -1106,9 +1106,9 @@ jobs:
           published_digest="$(docker buildx imagetools inspect "$PUBLISHED_REF" --format '{{.Manifest.Digest}}')"
           [[ "$published_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           immutable_ref="$published_repository@$published_digest"
-          docker pull "$immutable_ref"
-          published_image_id="$(docker image inspect "$immutable_ref" --format '{{.Id}}')"
+          published_image_id="$(docker buildx imagetools inspect "$immutable_ref" --raw | python -c 'import json, sys; print(json.load(sys.stdin)["config"]["digest"])')"
           test "$published_image_id" = "$EXPECTED_IMAGE_ID"
+          docker pull "$immutable_ref"
           oci_revision="$(docker image inspect "$immutable_ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
           architecture="$(docker image inspect "$immutable_ref" --format '{{.Os}}/{{.Architecture}}')"
           test "$architecture" = "linux/amd64"
