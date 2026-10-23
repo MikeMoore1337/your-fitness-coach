@@ -21,6 +21,7 @@ from scripts.connection_budget_preflight import (
     evaluate,
     main,
     model_from_mapping,
+    read_postgres_runtime_snapshot,
     read_postgres_snapshot,
     read_safe_pool_environment,
     validate_rollout_stage_order,
@@ -239,6 +240,103 @@ def test_postgres_connection_failure_is_fail_closed() -> None:
 
     with pytest.raises(PostgresSnapshotError, match="snapshot"):
         read_postgres_snapshot(Connection())
+
+
+def test_runtime_postgres_snapshot_uses_aggregates_and_requires_visibility() -> None:
+    class Cursor:
+        query = ""
+
+        def execute(self, query: str) -> None:
+            self.query = query
+
+        def fetchone(self):
+            return (160004, 200, 3, 2, 20, 8, 0, 12, True, False)
+
+        def close(self) -> None:
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    snapshot = read_postgres_runtime_snapshot(
+        Connection(),
+        ("yfc-backend", "yfc-worker"),
+    )
+
+    assert snapshot == PostgresCapacity(
+        server_version_major=16,
+        max_connections=200,
+        superuser_reserved_connections=3,
+        reserved_connections=2,
+        current_connections=20,
+        observed_yfc_connections=8,
+        observed_non_yfc_connections=12,
+        unattributed_connections=0,
+    )
+
+
+def test_runtime_postgres_snapshot_does_not_treat_unattributed_as_yfc() -> None:
+    class Cursor:
+        def execute(self, query: str) -> None:
+            assert "postgresql://secret" not in query
+            assert not any(
+                token in query.upper() for token in ("INSERT", "UPDATE", "DELETE", "ALTER")
+            )
+
+        def fetchone(self):
+            return (150000, 200, 3, None, 20, 8, 4, 8, True, False)
+
+        def close(self) -> None:
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    snapshot = read_postgres_runtime_snapshot(Connection(), ("yfc-backend",))
+
+    assert snapshot.server_version_major == 15
+    assert snapshot.observed_non_yfc_connections == 12
+    assert snapshot.unattributed_connections == 4
+
+
+def test_runtime_postgres_snapshot_blocks_without_pg_stat_activity_visibility() -> None:
+    class Cursor:
+        def execute(self, query: str) -> None:
+            pass
+
+        def fetchone(self):
+            return (160004, 200, 3, 2, 20, 8, 0, 12, False, False)
+
+        def close(self) -> None:
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    with pytest.raises(PostgresSnapshotError, match="snapshot"):
+        read_postgres_runtime_snapshot(Connection(), ("yfc-backend",))
+
+
+def test_runtime_postgres_snapshot_blocks_attribution_mismatch() -> None:
+    class Cursor:
+        def execute(self, query: str) -> None:
+            pass
+
+        def fetchone(self):
+            return (160004, 200, 3, 2, 20, 8, 0, 11, True, False)
+
+        def close(self) -> None:
+            pass
+
+    class Connection:
+        def cursor(self):
+            return Cursor()
+
+    with pytest.raises(PostgresSnapshotError, match="attribution"):
+        read_postgres_runtime_snapshot(Connection(), ("yfc-backend",))
 
 
 def test_invalid_values_are_blocked() -> None:
@@ -506,3 +604,19 @@ def test_mapping_parser_does_not_supply_missing_production_defaults() -> None:
 
     assert result.status == Verdict.UNKNOWN
     assert result.worst_case_connections is None
+
+
+@pytest.mark.parametrize("unknown", (0, 3))
+def test_inclusive_unknown_count_is_not_added_twice(unknown) -> None:
+    model = _model()
+    model = replace(model, postgres=replace(model.postgres, unattributed_connections=unknown))
+    result = _evaluate(model)
+    assert result.status == Verdict.PASS
+    assert result.worst_case_connections == 132
+    invalid = replace(model, postgres=replace(model.postgres, unattributed_connections=13))
+    assert _evaluate(invalid).status == Verdict.BLOCKED
+    # The subset invariant also applies when inclusive non-YFC is derived from total - YFC.
+    derived = replace(
+        invalid, postgres=replace(invalid.postgres, observed_non_yfc_connections=None)
+    )
+    assert _evaluate(derived).status == Verdict.BLOCKED

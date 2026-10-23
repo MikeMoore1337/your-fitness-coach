@@ -24,6 +24,7 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 MIGRATION_ADVISORY_LOCK_ID = 626517843
+MIGRATION_APPLICATION_NAME = "yfc-migration"
 
 
 def run_migrations_offline() -> None:
@@ -63,6 +64,11 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=(
+            {}
+            if settings.database_url.startswith("sqlite")
+            else {"application_name": MIGRATION_APPLICATION_NAME}
+        ),
     )
     with connectable.connect() as connection:
         run(connection)

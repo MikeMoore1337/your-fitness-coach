@@ -13,6 +13,7 @@ import { ReportHandoffPanel } from '../../features/reports/ReportHandoffPanel';
 import { PublicProgressSharePanel } from '../../features/reports/PublicProgressSharePanel';
 import { AppLink, progressReportReturn, useNavigation } from '../../shared/navigation/router';
 import { positiveIntegerParam } from '../../shared/navigation/routeParams';
+import { formatTimeZoneLabel } from '../../shared/dateTime';
 import { BrandLockup } from '../../shared/ui/BrandLogo';
 import { DataConfidence } from '../../shared/ui/DataConfidence';
 import { TimeSeriesChart } from '../../shared/ui/DataViz';
@@ -457,7 +458,8 @@ function ReportContent({
           <h1 id="report-overview-title">Отчёт о прогрессе</h1>
           <p className="progress-report-subject">{report.subject.name}</p>
           <p>
-            {formatDate(report.period_start)} — {formatDate(report.period_end)} · {report.timezone}
+            {formatDate(report.period_start)} — {formatDate(report.period_end)} ·{' '}
+            {formatTimeZoneLabel(report.timezone)}
           </p>
           <p>
             {report.subject.role === 'client' ? 'Клиент тренера' : 'Личный отчёт'} · Цель:{' '}

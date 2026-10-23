@@ -51,11 +51,10 @@ for (const width of [360, 390, 430, 1440]) {
           const add = page.getByRole('button', { name: 'Быстро добавить', exact: true });
           await add.hover();
           await add.focus();
-          await capture('focus');
+          await expect(add).toBeFocused();
           await page.keyboard.press('Enter');
           const sheet = page.getByRole('dialog', { name: 'Что добавить?' });
           await expect(sheet).toBeVisible();
-          await capture('quick-add');
           await page.keyboard.press('Tab');
           await expect(sheet.locator(':focus')).toHaveCount(1);
           await page.keyboard.press('Escape');
@@ -86,6 +85,13 @@ for (const width of [360, 390, 430, 1440]) {
             });
             throw error;
           }
+          // Full-page captures can resize Chromium; keep the keyboard flow uninterrupted.
+          await capture('focus');
+          await add.click();
+          await expect(sheet).toBeVisible();
+          await capture('quick-add');
+          await page.keyboard.press('Escape');
+          await expect(sheet).toBeHidden();
         }
       }
       for (const [name, url] of [

@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from scripts import zero_downtime_deploy as deploy
+from scripts.connection_budget_preflight import Verdict
 
 OLD_SHA = "a" * 40
 NEW_SHA = "b" * 40
@@ -98,17 +100,18 @@ def test_persist_application_image_refs_replaces_duplicates_and_preserves_file_c
     tmp_path: Path,
 ) -> None:
     environment_file = tmp_path / ".env"
-    environment_file.write_text(
-        "# keep this comment\n"
-        "APP_ENV=prod\n"
-        "BACKEND_IMAGE=registry/backend:old\n"
-        "BACKEND_IMAGE=registry/backend:duplicate\n"
-        "BOT_IMAGE=registry/bot:old\n"
-        "OTHER=value\n",
-        encoding="utf-8",
-    )
-    os.chmod(environment_file, 0o640)
+    fd = os.open(environment_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as stream:
+        stream.write(
+            "# keep this comment\n"
+            "APP_ENV=prod\n"
+            "BACKEND_IMAGE=registry/backend:old\n"
+            "BACKEND_IMAGE=registry/backend:duplicate\n"
+            "BOT_IMAGE=registry/bot:old\n"
+            "OTHER=value\n"
+        )
     expected_mode = os.stat(environment_file).st_mode & 0o777
+    assert expected_mode == 0o600
     backend_image = "registry/backend@sha256:" + "1" * 64
     bot_image = "registry/bot@sha256:" + "2" * 64
 
@@ -356,6 +359,7 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
         assert config.worker_drain_seconds == 120
         calls["consumer_stop"].append(slot)
 
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", lambda _config: None)
     monkeypatch.setattr(deploy, "_capacity", lambda: {"cpu_count": 4})
     monkeypatch.setattr(deploy, "_compose", compose)
     monkeypatch.setattr(deploy, "_run", run)
@@ -381,6 +385,236 @@ def _patch_runtime(monkeypatch, *, fail_at: str | None = None):
     monkeypatch.setattr(deploy, "_stop_slot_consumers", stop_consumers)
     monkeypatch.setattr(deploy, "_start_slot_consumers", start_consumers)
     return calls
+
+
+def test_capacity_check_cli_uses_read_only_gate_and_never_starts_rollout(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = _config(tmp_path)
+    called = []
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "zero_downtime_deploy.py",
+            "capacity-check",
+            NEW_SHA,
+            config.base_url,
+            config.public_base_url,
+        ],
+    )
+    monkeypatch.setattr(deploy, "_config", lambda _args: config)
+    monkeypatch.setattr(
+        deploy,
+        "_trusted_connection_budget_preflight",
+        lambda current: called.append(current),
+    )
+    monkeypatch.setattr(deploy, "deploy", lambda _config: pytest.fail("rollout must not run"))
+    monkeypatch.setattr(
+        deploy, "single_slot_deploy", lambda _config: pytest.fail("single-slot must not run")
+    )
+    assert deploy.main() == 0
+    assert called == [config]
+    assert capsys.readouterr().out == "Trusted PostgreSQL capacity preflight: PASS\n"
+
+
+def test_capacity_check_cli_denial_is_nonzero_and_sanitized(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    config = _config(tmp_path)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "zero_downtime_deploy.py",
+            "capacity-check",
+            NEW_SHA,
+            config.base_url,
+            config.public_base_url,
+        ],
+    )
+    monkeypatch.setattr(deploy, "_config", lambda _args: config)
+
+    def reject(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL capacity evidence is unavailable")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", reject)
+    assert deploy.main() == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "capacity evidence is unavailable" in output.err
+    assert "Traceback" not in output.err
+
+
+def test_trusted_db_gate_has_no_implicit_safety_margin(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", raising=False)
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "")
+    config = _config(tmp_path)
+    with pytest.raises(deploy.DeploymentError, match="margin is not configured"):
+        deploy._trusted_connection_budget_preflight(config)
+
+
+@pytest.mark.parametrize("value", ("0", "-5", "1.5", "ten", "9999999"))
+def test_trusted_db_gate_rejects_invalid_margin(tmp_path: Path, monkeypatch, value: str) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", value)
+    with pytest.raises(deploy.DeploymentError, match="margin is not configured"):
+        deploy._trusted_connection_budget_preflight(_config(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("verdict", "reported_revisions", "candidate_revision", "should_pass"),
+    (
+        (Verdict.PASS, (NEW_SHA,), NEW_SHA, True),
+        (Verdict.BLOCKED, (NEW_SHA,), NEW_SHA, False),
+        (Verdict.UNKNOWN, (NEW_SHA,), NEW_SHA, False),
+        (Verdict.PASS, (OLD_SHA,), OLD_SHA, False),
+        # The active revision may equal the requested SHA while the bundle
+        # identifies a different candidate. Union membership must not pass.
+        (Verdict.PASS, (NEW_SHA, OLD_SHA), OLD_SHA, False),
+        (Verdict.PASS, (NEW_SHA, OLD_SHA), NEW_SHA, True),
+    ),
+)
+def test_trusted_db_gate_accepts_only_matching_fresh_collector_pass(
+    tmp_path: Path, monkeypatch, verdict, reported_revisions, candidate_revision, should_pass
+) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+    config = _config(tmp_path)
+    captured = []
+
+    def fake_collect(*, release_path, compose_file, policy):
+        captured.append((release_path, compose_file, policy))
+        return SimpleNamespace(
+            result=SimpleNamespace(status=verdict),
+            context=SimpleNamespace(revisions=reported_revisions),
+            candidate_revision=candidate_revision,
+        )
+
+    monkeypatch.setattr("scripts.trusted_runtime_collector.collect_runtime_snapshot", fake_collect)
+    if should_pass:
+        deploy._trusted_connection_budget_preflight(config)
+    else:
+        with pytest.raises(deploy.DeploymentError, match=r"capacity|revision"):
+            deploy._trusted_connection_budget_preflight(config)
+    assert len(captured) == 1
+    assert captured[0][0] == config.root
+    assert captured[0][1] == config.root / "docker-compose.yml"
+    assert captured[0][2].safety_headroom_connections == 10
+
+
+def test_trusted_db_gate_sanitizes_collector_failure(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+
+    def fail_collect(**kwargs):
+        raise RuntimeError("private DB credentials should never reach deployment logs")
+
+    monkeypatch.setattr("scripts.trusted_runtime_collector.collect_runtime_snapshot", fail_collect)
+    with pytest.raises(deploy.DeploymentError, match="evidence is unavailable") as raised:
+        deploy._trusted_connection_budget_preflight(_config(tmp_path))
+    assert "credentials" not in str(raised.value)
+
+
+def test_trusted_db_gate_blocks_zero_downtime_before_any_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    _state(config)
+    calls = _patch_runtime(monkeypatch)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.deploy(config)
+
+    assert calls["compose"] == []
+    assert calls["run"] == []
+    assert calls["switch"] == []
+    assert calls["consumer_start"] == []
+    assert calls["consumer_stop"] == []
+
+
+def test_trusted_db_gate_blocks_idempotent_zero_downtime_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    _state(config, revision=NEW_SHA)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy, "_switch_gateway", lambda *_args: pytest.fail("gateway must not switch")
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.deploy(config)
+
+
+def test_trusted_db_gate_blocks_single_slot_before_reclaim_and_stop(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    reclaim_calls = []
+    monkeypatch.setattr(
+        deploy, "_reclaim_single_slot_docker_space", lambda: reclaim_calls.append("reclaim")
+    )
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.single_slot_deploy(config)
+
+    assert reclaim_calls == []
+    assert calls["compose"] == []
+    assert calls["stops"] == []
+    assert calls["backend_starts"] == []
+    assert calls["consumer_starts"] == []
+
+
+def test_trusted_db_gate_blocks_idempotent_single_slot_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(NEW_SHA, encoding="utf-8")
+    monkeypatch.setenv("DEPLOY_SINGLE_SLOT_CONFIRMED_SHA", NEW_SHA)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy, "_switch_gateway", lambda *_args: pytest.fail("gateway must not switch")
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.single_slot_deploy(config)
+
+
+def test_trusted_db_gate_blocks_legacy_bootstrap_before_mutation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(OLD_SHA, encoding="utf-8")
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    monkeypatch.setattr(
+        deploy,
+        "_service_is_running",
+        lambda _service: pytest.fail("bootstrap must gate before runtime inspection"),
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.bootstrap_state(config)
 
 
 def test_successful_rollout_updates_state_only_after_observation(
@@ -754,6 +988,38 @@ def test_manual_rollback_swaps_only_verified_revisions(tmp_path: Path, monkeypat
     assert "BOT_IMAGE=registry/bot@sha256:" + "2" * 64 in environment
 
 
+def test_trusted_db_gate_blocks_rollback_before_restoration(tmp_path: Path, monkeypatch) -> None:
+    config = _config(tmp_path)
+    state = deploy.ReleaseState(
+        version=1,
+        active_slot="green",
+        active_revision=NEW_SHA,
+        active_backend_image="registry/backend@sha256:" + "3" * 64,
+        active_bot_image="registry/bot@sha256:" + "4" * 64,
+        rollback_slot="blue",
+        rollback_revision=OLD_SHA,
+        rollback_backend_image="registry/backend@sha256:" + "1" * 64,
+        rollback_bot_image="registry/bot@sha256:" + "2" * 64,
+    )
+    deploy._atomic_json(config.state_root / "state.json", asdict(state))
+    calls = _patch_runtime(monkeypatch)
+
+    def blocked(_config):
+        raise deploy.DeploymentError("trusted PostgreSQL connection capacity is not proven")
+
+    monkeypatch.setattr(deploy, "_trusted_connection_budget_preflight", blocked)
+    with pytest.raises(deploy.DeploymentError, match="not proven"):
+        deploy.rollback(config)
+
+    assert calls["compose"] == []
+    assert calls["switch"] == []
+    assert calls["consumer_stop"] == []
+    assert calls["consumer_start"] == []
+    unchanged = deploy.ReleaseState.from_path(config.state_root / "state.json")
+    assert unchanged.active_revision == NEW_SHA
+    assert unchanged.rollback_revision == OLD_SHA
+
+
 def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     calls: dict[str, list] = {
         "compose": [],
@@ -766,6 +1032,17 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
     active_revision_path.parent.mkdir(parents=True)
     active_revision_path.write_text(OLD_SHA + "\n", encoding="utf-8")
     monkeypatch.setenv("DEPLOY_SINGLE_SLOT_CONFIRMED_SHA", NEW_SHA)
+    from types import SimpleNamespace
+
+    guard = SimpleNamespace(
+        configure=lambda _images: None,
+        disarm=lambda: None,
+        check=lambda *args, **kwargs: None,
+        released=lambda: None,
+        last_report={},
+    )
+    monkeypatch.setattr(deploy, "_sequential_connection_budget_preflight", lambda _config: guard)
+    calls["safety"] = guard
     monkeypatch.setattr(deploy, "_reclaim_single_slot_docker_space", lambda: None)
     monkeypatch.setattr(
         deploy,
@@ -808,7 +1085,7 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
         lambda env, value: calls["backend_starts"].append(env["BACKEND_IMAGE"]),
     )
 
-    def start_consumers(env, evidence, value, *, require_markers, best_effort=False):
+    def start_consumers(env, evidence, value, *, require_markers, best_effort=False, safety=None):
         del evidence, value
         del best_effort
         calls["consumer_starts"].append((env["BOT_IMAGE"], require_markers))
@@ -864,62 +1141,25 @@ def test_single_slot_rollout_replaces_legacy_services_and_records_success(
     assert not config.state_root.joinpath("state.json").exists()
 
 
-def test_repair_rollout_does_not_require_partial_consumers_or_old_image_rollback(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_partial_repair_is_blocked_before_any_runtime_mutation(tmp_path, monkeypatch):
     config = _config(tmp_path)
     calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
     monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
     monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
-    monkeypatch.setattr(
-        deploy,
-        "_legacy_image_digest",
-        lambda *_args: pytest.fail("repair must not use partial runtime as rollback baseline"),
-    )
-    monkeypatch.setattr(
-        deploy,
-        "_legacy_running_image",
-        lambda service: (
-            "registry/edge:baseline"
-            if service == "edge"
-            else pytest.fail("repair must not inspect partial application images")
-        ),
-    )
-
-    evidence = deploy.single_slot_deploy(config)
-
-    assert evidence.verdict == "active"
-    assert calls["stops"] == [NEW_SHA]
-    assert (
-        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
-        == NEW_SHA
-    )
-
-
-def test_failed_repair_after_stop_keeps_baseline_marker_and_records_intervention(
-    tmp_path: Path, monkeypatch
-) -> None:
-    config = _config(tmp_path)
-    _patch_single_slot_runtime(tmp_path, monkeypatch)
-    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
-    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", OLD_SHA)
-    monkeypatch.setattr(
-        deploy,
-        "_start_legacy_backend",
-        lambda *_args: (_ for _ in ()).throw(deploy.DeploymentError("backend failed")),
-    )
-
-    with pytest.raises(deploy.DeploymentError, match="backend failed"):
+    with pytest.raises(deploy.DeploymentError, match="partial repair is blocked"):
         deploy.single_slot_deploy(config)
+    assert calls["compose"] == calls["stops"] == calls["backend_starts"] == []
+    assert config.state_root.joinpath("last-successful-revision").read_text().strip() == OLD_SHA
 
-    assert (
-        config.state_root.joinpath("last-successful-revision").read_text(encoding="utf-8").strip()
-        == OLD_SHA
-    )
-    summary = next(config.state_root.glob("single-slot-*/summary.json"))
-    assert json.loads(summary.read_text(encoding="utf-8"))["verdict"] == (
-        "manual intervention required"
-    )
+
+def test_partial_repair_baseline_mismatch_still_fails_closed(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    monkeypatch.setenv("DEPLOY_REPAIR_MODE", "true")
+    monkeypatch.setenv("DEPLOY_REPAIR_BASELINE_SHA", NEW_SHA)
+    with pytest.raises(deploy.DeploymentError, match="baseline does not match"):
+        deploy.single_slot_deploy(config)
+    assert calls["compose"] == calls["stops"] == calls["backend_starts"] == []
 
 
 def test_single_slot_docker_reclaim_never_removes_container_data_or_volumes(
@@ -1063,10 +1303,13 @@ def test_single_slot_rollback_requires_verified_consumer_ownership(
         if starts == 1:
             raise deploy.DeploymentError("new backend failed")
 
-    def fail_consumer_ownership(env, evidence, value, *, require_markers, best_effort=False):
+    def fail_consumer_ownership(
+        env, evidence, value, *, require_markers, best_effort=False, safety=None
+    ):
         del env, evidence, value
         assert require_markers is True
-        assert best_effort is True
+        assert best_effort is False
+        assert safety is not None
         raise deploy.DeploymentError("bot ownership confirmation timed out")
 
     monkeypatch.setattr(deploy, "_start_legacy_backend", fail_target_once)
@@ -1085,7 +1328,7 @@ def test_single_slot_rollback_requires_verified_consumer_ownership(
     assert "ownership confirmation timed out" in rollback["reason"]
 
 
-def test_single_slot_rollback_attempts_consumers_after_backend_smoke_failure(
+def test_single_slot_rollback_stops_before_consumers_after_backend_smoke_failure(
     tmp_path: Path, monkeypatch
 ) -> None:
     config = _config(tmp_path)
@@ -1107,7 +1350,7 @@ def test_single_slot_rollback_attempts_consumers_after_backend_smoke_failure(
     with pytest.raises(deploy.DeploymentError, match="new backend failed"):
         deploy.single_slot_deploy(config)
 
-    assert calls["consumer_starts"] == [("registry/bot@sha256:" + "a" * 64, True)]
+    assert calls["consumer_starts"] == []
     summaries = list(config.state_root.glob("single-slot-*/summary.json"))
     assert len(summaries) == 1
     summary = json.loads(summaries[0].read_text(encoding="utf-8"))
@@ -1264,6 +1507,7 @@ def test_single_slot_stop_is_ordered_and_uses_bounded_timeouts(tmp_path: Path, m
 
     monkeypatch.setattr(deploy, "_compose", compose)
 
+    monkeypatch.setattr(deploy, "_container_exited_cleanly", lambda lease: True)
     deploy._stop_legacy_services(config)
 
     assert commands == [
@@ -1324,3 +1568,130 @@ def test_clean_exit_evidence_requires_exited_zero(monkeypatch) -> None:
             ),
         )
         assert deploy._container_exited_cleanly(lease) is expected
+
+
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_maintenance_drain_failure_never_starts_candidate_or_rollback(
+    tmp_path, monkeypatch, interrupted
+):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def failed_drain(*args, **kwargs):
+        if interrupted:
+            raise KeyboardInterrupt()
+        raise deploy.DeploymentError("stuck drain")
+
+    monkeypatch.setattr(deploy, "_stop_legacy_services", failed_drain)
+    with pytest.raises((KeyboardInterrupt, deploy.DeploymentError)):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert calls["backend_starts"] == calls["consumer_starts"] == []
+    summary = json.loads(
+        next(_config(tmp_path).state_root.glob("single-slot-*/summary.json")).read_text()
+    )
+    assert summary["verdict"] == "manual intervention required"
+
+
+def test_maintenance_unreleased_connections_block_every_new_consumer(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def unreleased():
+        raise deploy.SafetyError("unknown_or_unreleased_database_client")
+
+    calls["safety"].released = unreleased
+    with pytest.raises(deploy.SafetyError, match="unreleased"):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert not any(args[0] == "run" for args, _ in calls["compose"])
+    assert calls["backend_starts"] == calls["consumer_starts"] == []
+
+
+def test_interrupted_rollback_cannot_start_following_consumers(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+
+    def interrupted_backend(*args):
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(deploy, "_start_legacy_backend", interrupted_backend)
+    with pytest.raises(KeyboardInterrupt):
+        deploy.single_slot_deploy(_config(tmp_path))
+    assert calls["consumer_starts"] == []
+    summary = json.loads(
+        next(_config(tmp_path).state_root.glob("single-slot-*/summary.json")).read_text()
+    )
+    assert summary["verdict"] == "manual intervention required"
+    assert (
+        _config(tmp_path).state_root.joinpath("last-successful-revision").read_text().strip()
+        == OLD_SHA
+    )
+
+
+def test_maintenance_rechecks_before_each_one_shot_and_never_downgrades(tmp_path, monkeypatch):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    events = []
+    guard = calls["safety"]
+    guard.released = lambda: events.append("released")
+    guard.check = lambda *args, **kwargs: events.append("checked")
+
+    def compose(*args, **kwargs):
+        if args[0] == "run":
+            assert events[-1] == "released"
+            events.append(args)
+            assert kwargs["env"]["YFC_CONSUMER_RESTART_POLICY"] == "no"
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(deploy, "_compose", compose)
+    deploy.single_slot_deploy(_config(tmp_path))
+    runs = [event for event in events if isinstance(event, tuple)]
+    assert [run[run.index("--entrypoint") + 1] for run in runs] == ["python", "alembic", "python"]
+    assert "downgrade" not in str(runs)
+    assert events[-1] == "checked"
+
+
+def test_sequential_preflight_binds_candidate_and_installed_image_provenance(tmp_path, monkeypatch):
+    config = _config(tmp_path)
+    config.root.joinpath(".deployment-sha").write_text(NEW_SHA)
+    config.state_root.mkdir(parents=True)
+    config.state_root.joinpath("last-successful-revision").write_text(OLD_SHA)
+    monkeypatch.setenv("DEPLOY_DB_SAFETY_HEADROOM_CONNECTIONS", "10")
+    calls = []
+    from types import SimpleNamespace
+
+    guard = SimpleNamespace(
+        configure=lambda images: calls.append(images),
+        check=lambda *args, **kwargs: calls.append(args),
+    )
+    monkeypatch.setattr(deploy, "SequentialSafety", lambda root, margin: guard)
+    monkeypatch.setattr(
+        deploy,
+        "_legacy_image_digest",
+        lambda service, revision: (
+            calls.append((service, revision))
+            or ("bot-digest" if service == "bot" else "backend-digest")
+        ),
+    )
+    assert deploy._sequential_connection_budget_preflight(config) is guard
+    assert calls[:3] == [("backend", OLD_SHA), ("worker", OLD_SHA), ("bot", OLD_SHA)]
+    assert calls[3] == ("backend-digest",)
+    config.root.joinpath(".deployment-sha").write_text(OLD_SHA)
+    with pytest.raises(deploy.DeploymentError, match="candidate revision mismatch"):
+        deploy._sequential_connection_budget_preflight(config)
+
+
+def test_rollback_restores_revision_when_failure_follows_successful_revision_write(
+    tmp_path, monkeypatch
+):
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    config = _config(tmp_path)
+    write = deploy._atomic_text
+
+    def fail_after_revision_write(path, value):
+        write(path, value)
+        if path == config.state_root / "last-successful-revision" and value.strip() == NEW_SHA:
+            raise deploy.DeploymentError("failure after revision write")
+
+    monkeypatch.setattr(deploy, "_atomic_text", fail_after_revision_write)
+    with pytest.raises(deploy.DeploymentError, match="failure after revision write"):
+        deploy.single_slot_deploy(config)
+    assert config.state_root.joinpath("last-successful-revision").read_text().strip() == OLD_SHA
+    summary = json.loads(next(config.state_root.glob("single-slot-*/summary.json")).read_text())
+    assert summary["verdict"] == "rolled back"
+    assert len(calls["backend_starts"]) == 2

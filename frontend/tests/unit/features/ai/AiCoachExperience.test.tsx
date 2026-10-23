@@ -755,7 +755,11 @@ describe('AiCoachExperience', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Отправить' }));
     await waitFor(() => expect(screen.getByTestId('ai-coach-chat-failure')).toBeInTheDocument());
     expect(input).toHaveValue('Объясни мне этот материал.');
-    expect(screen.getByText(/Не удалось сформировать ответ\. Повторить\./)).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('ai-coach-chat-failure')).getByText(
+        /Не удалось сформировать ответ\. Повторить\./,
+      ),
+    ).toBeInTheDocument();
     expect(screen.queryByText('На этот запрос нельзя ответить безопасно')).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'Повторить' }));
     await waitFor(() =>

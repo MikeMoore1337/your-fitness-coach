@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,6 +71,12 @@ class Settings(BaseSettings):
     db_max_overflow: int = Field(default=20, ge=0, le=200)
     db_pool_timeout_seconds: int = Field(default=30, ge=1, le=300)
     db_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86400)
+    db_application_name: Literal["yfc-backend", "yfc-worker", "yfc-setup", "yfc-migration"] = Field(
+        default="yfc-backend",
+        validation_alias=AliasChoices(
+            "YFC_DB_APPLICATION_NAME", "DB_APPLICATION_NAME", "db_application_name"
+        ),
+    )
     enable_dev_auth: bool = False
     enable_web_auth: bool = False
     enable_email_auth: bool = False

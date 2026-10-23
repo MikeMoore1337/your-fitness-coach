@@ -49,6 +49,73 @@ def test_deploy_bundle_includes_migration_sources() -> None:
     assert "backend/alembic/versions" in deploy
 
 
+def test_repair_bundle_includes_the_complete_trusted_capacity_gate() -> None:
+    root = Path(__file__).resolve().parents[1]
+    deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
+    repair_bundle = deploy.split("tooling_paths=(", 1)[1].split(")", 1)[0]
+
+    # The host orchestrator must never be copied from a newer tooling
+    # revision without its trusted collector and preflight implementation.
+    for path in (
+        "scripts/zero_downtime_deploy.py",
+        "scripts/connection_budget_preflight.py",
+        "scripts/trusted_runtime_collector.py",
+        "scripts/trusted_legacy_pg_snapshot.py",
+    ):
+        assert path in repair_bundle
+
+
+def test_trusted_postgres_preflight_runs_before_any_production_config_mutation() -> None:
+    root = Path(__file__).resolve().parents[1]
+    wrapper = (root / "scripts" / "deploy_production.sh").read_text(encoding="utf-8")
+    orchestrator = (root / "scripts" / "zero_downtime_deploy.py").read_text(encoding="utf-8")
+    marker = 'python3 scripts/zero_downtime_deploy.py "$capacity_command"'
+    assert wrapper.count(marker) == 1
+    first_mutation = 'echo "Enabling browser OAuth'
+    assert wrapper.index(marker) < wrapper.index(first_mutation)
+    assert '"capacity-check-single-slot"' in orchestrator
+    assert "capacity_command=capacity-check-single-slot" in wrapper
+    assert 'if args.command == "capacity-check":' in orchestrator
+    assert 'with _stage(evidence, "connection_budget_preflight"):' in orchestrator
+    assert orchestrator.count("_trusted_connection_budget_preflight(config)") >= 4
+
+
+def test_application_base_images_are_immutable_and_keep_runtime_generations() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    deployment_contract.validate_application_base_images(root)
+
+
+def test_mutable_application_base_image_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "bot").mkdir()
+    (tmp_path / "backend" / "Dockerfile").write_text(
+        "FROM node:24-alpine\nFROM python:3.14-slim\n", encoding="utf-8"
+    )
+    (tmp_path / "bot" / "Dockerfile").write_text("FROM python:3.14-slim\n", encoding="utf-8")
+
+    with pytest.raises(deployment_contract.DeploymentContractError, match="mutable"):
+        deployment_contract.validate_application_base_images(tmp_path)
+
+
+def test_mutable_apt_upgrade_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "bot").mkdir()
+    python_ref = deployment_contract.APPLICATION_BASE_IMAGES["bot/Dockerfile"][0]
+    (tmp_path / "backend" / "Dockerfile").write_text(
+        "FROM "
+        + deployment_contract.APPLICATION_BASE_IMAGES["backend/Dockerfile"][0]
+        + "\nFROM "
+        + deployment_contract.APPLICATION_BASE_IMAGES["backend/Dockerfile"][1]
+        + "\nRUN apt-get upgrade --yes\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bot" / "Dockerfile").write_text(f"FROM {python_ref}\n", encoding="utf-8")
+
+    with pytest.raises(deployment_contract.DeploymentContractError, match="apt-get upgrade"):
+        deployment_contract.validate_application_base_images(tmp_path)
+
+
 def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> None:
     root = Path(__file__).resolve().parents[1]
     deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")

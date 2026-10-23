@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
+import sqlalchemy
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
@@ -34,6 +35,51 @@ def test_alembic_env_accepts_percent_encoded_database_url(monkeypatch) -> None:
     runpy.run_path(str(root / "backend" / "alembic" / "env.py"))
 
     assert captured["sqlalchemy.url"] == ("postgresql+psycopg://app:encoded%%21password@db/app")
+
+
+def test_alembic_online_engine_uses_fixed_application_marker(monkeypatch) -> None:
+    from alembic import context
+    from fitminiapp_api.core import config as app_config
+
+    root = Path(__file__).resolve().parents[2]
+    captured: dict[str, object] = {}
+    fake_config = SimpleNamespace(
+        config_file_name=None,
+        config_ini_section="alembic",
+        attributes={},
+        set_main_option=lambda _key, _value: None,
+        get_section=lambda *_args: {"sqlalchemy.url": "postgresql+psycopg://app:password@db/app"},
+    )
+
+    class Connection:
+        dialect = SimpleNamespace(name="postgresql")
+
+        def execute(self, *_args, **_kwargs) -> None:
+            return None
+
+    class Connectable:
+        def connect(self):
+            return nullcontext(Connection())
+
+    def fake_engine_from_config(*_args, **kwargs):
+        captured["connect_args"] = kwargs["connect_args"]
+        return Connectable()
+
+    monkeypatch.setattr(context, "config", fake_config, raising=False)
+    monkeypatch.setattr(context, "is_offline_mode", lambda: False)
+    monkeypatch.setattr(context, "configure", lambda **_kwargs: None)
+    monkeypatch.setattr(context, "begin_transaction", nullcontext)
+    monkeypatch.setattr(context, "run_migrations", lambda: None)
+    monkeypatch.setattr(sqlalchemy, "engine_from_config", fake_engine_from_config)
+    monkeypatch.setattr(
+        app_config.settings,
+        "database_url",
+        "postgresql+psycopg://app:password@db/app",
+    )
+
+    runpy.run_path(str(root / "backend" / "alembic" / "env.py"))
+
+    assert captured["connect_args"] == {"application_name": "yfc-migration"}
 
 
 def test_legacy_support_revision_remains_in_the_linear_upgrade_path() -> None:
