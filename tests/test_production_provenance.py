@@ -730,6 +730,7 @@ def test_restricted_proc_does_not_fallback_on_invalid_host_lock(monkeypatch):
         provenance._bot_process_owner_with_container_fallback(CONTAINER_ID, 1234)
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
 def test_container_probe_requires_same_uid_and_matches_host_starttime(monkeypatch):
     current_pid = os.getpid()
     host_stat = (Path("/proc") / str(current_pid) / "stat").read_text()
@@ -760,6 +761,7 @@ def test_container_probe_requires_same_uid_and_matches_host_starttime(monkeypatc
     '{"verified": true, "starttime": "1", "token": "sensitive"}',
     "invalid-json",
 ])
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
 def test_container_probe_fails_closed_on_untrusted_response(monkeypatch, output):
     current_pid = os.getpid()
     monkeypatch.setattr(
@@ -771,6 +773,7 @@ def test_container_probe_fails_closed_on_untrusted_response(monkeypatch, output)
         provenance._bot_process_owner_in_container(CONTAINER_ID, current_pid)
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
 def test_container_probe_fails_closed_if_docker_exec_denied(monkeypatch):
     current_pid = os.getpid()
 
