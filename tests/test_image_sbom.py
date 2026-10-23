@@ -1,7 +1,10 @@
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from scripts.validate_image_sbom import (
     ImageSbomValidationError,
     validate_and_write_provenance,
@@ -100,3 +103,79 @@ def test_secret_shaped_sbom_content_is_rejected(tmp_path: Path) -> None:
             architecture="linux/amd64",
             output=tmp_path / "provenance.json",
         )
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Executes the Linux Actions bash step")
+@pytest.mark.parametrize("failure", [None, "image_id", "revision", "digest", "pull"])
+def test_published_sbom_binds_registry_digest_to_scanned_image(tmp_path: Path, failure: str | None):
+    root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load((root / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    step = next(
+        step
+        for step in workflow["jobs"]["containers"]["steps"]
+        if step.get("name") == "Verify published application image digest"
+    )
+    built = _validate(tmp_path)
+    for source, target in (
+        ("image.cyclonedx.json", "sbom.cyclonedx.json"),
+        ("image.spdx.json", "sbom.spdx.json"),
+    ):
+        (tmp_path / target).write_bytes((tmp_path / source).read_bytes())
+    docker = tmp_path / "docker"
+    docker.write_text(
+        """#!/usr/bin/env python3
+import os
+import sys
+
+args = sys.argv[1:]
+failure = os.environ['FAILURE']
+digest = 'sha256:' + 'd' * 64
+if args[:3] == ['buildx', 'imagetools', 'inspect']:
+    print('invalid' if failure == 'digest' else digest)
+elif args[0] == 'pull':
+    assert args[1] == 'ghcr.io/example/yfc@' + digest
+    sys.exit(1 if failure == 'pull' else 0)
+elif args[:2] == ['image', 'inspect']:
+    assert args[2] == 'ghcr.io/example/yfc@' + digest
+    if args[-1] == '{{.Id}}':
+        print('sha256:' + ('e' if failure == 'image_id' else 'b') * 64)
+    elif args[-1] == '{{.Os}}/{{.Architecture}}':
+        print('linux/amd64')
+    else:
+        print(('e' if failure == 'revision' else 'c') * 40)
+else:
+    raise AssertionError(args)
+""",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    result = subprocess.run(
+        ["bash", "-c", step["run"]],
+        cwd=root,
+        env={
+            **os.environ,
+            "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+            "PUBLISHED_REF": "ghcr.io/example/yfc:" + "c" * 40,
+            "EXPECTED_IMAGE_ID": built["image"]["local_image_id"],
+            "SOURCE_REVISION": "c" * 40,
+            "SBOM_DIR": str(tmp_path),
+            "FAILURE": failure or "",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    published = json.loads((tmp_path / "provenance.json").read_text(encoding="utf-8"))
+    if failure:
+        assert result.returncode != 0
+        assert published == built
+    else:
+        assert result.returncode == 0, result.stderr
+        assert published["image"]["digest"] == "sha256:" + "d" * 64
+        assert published["image"]["ref"].endswith("@sha256:" + "d" * 64)
+        assert published["image"]["local_image_id"] == built["image"]["local_image_id"]
+        assert published["sboms"] == built["sboms"] | {
+            "cyclonedx": {**built["sboms"]["cyclonedx"], "path": "sbom.cyclonedx.json"},
+            "spdx_json": {**built["sboms"]["spdx_json"], "path": "sbom.spdx.json"},
+        }
+        assert json.loads((tmp_path / "build-provenance.json").read_text()) == built

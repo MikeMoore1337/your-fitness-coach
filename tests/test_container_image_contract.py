@@ -34,7 +34,12 @@ def test_ci_publishes_verified_backend_and_bot_sbom_provenance() -> None:
         "Validate image SBOM provenance"
     )
     assert workflow.index("Validate image SBOM provenance") < workflow.index("Upload image SBOMs")
-    assert workflow.index("Upload image SBOMs") < workflow.index("Publish scanned image")
+    assert workflow.index("Validate image SBOM provenance") < workflow.index(
+        "Publish scanned image"
+    )
+    assert workflow.index("Verify published application image digest") < workflow.index(
+        "Upload image SBOMs"
+    )
 
 
 @pytest.mark.parametrize(
