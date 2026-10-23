@@ -19,7 +19,7 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
-import { readStorage, removeStorage, writeStorage } from '../../shared/storage';
+import { removeStorage, writeStorage } from '../../shared/storage';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import {
@@ -1505,10 +1505,10 @@ export function RestTimer({
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
   const [deadline, setDeadline] = useState(() => {
     const restored = activeRestJournalSession(userId, workoutId);
-    const scoped = readStorage<number>(storageKey, 0);
     removeStorage(legacyStorageKey);
     if (restored) return restored.deadline;
-    return scoped;
+    removeStorage(storageKey);
+    return 0;
   });
   const [now, setNow] = useState(() => Date.now());
   const [measuredRest, setMeasuredRest] = useState(() =>
