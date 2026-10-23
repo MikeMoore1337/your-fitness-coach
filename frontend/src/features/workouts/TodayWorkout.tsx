@@ -873,7 +873,7 @@ function WorkoutSetRow({
           type="button"
           disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
-          aria-label={`${retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
+          aria-label={`${completing ? 'Сохраняем…' : retryCompletion ? 'Повторить сохранение' : completed ? 'Выполнен' : 'Завершить'}: ${exerciseTitle}, подход ${set.set_number}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
@@ -885,7 +885,9 @@ function WorkoutSetRow({
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {retryCompletion ? (
+          {completing ? (
+            'Сохраняем…'
+          ) : retryCompletion ? (
             'Повторить сохранение'
           ) : completed ? (
             <>
@@ -1407,7 +1409,7 @@ function CardioWorkoutRow({
           type="button"
           disabled={disabled || completing || (completed && !retryCompletion)}
           aria-busy={completing || undefined}
-          aria-label={`${retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Кардио выполнено' : 'Завершить кардио'}: ${exerciseTitle}`}
+          aria-label={`${completing ? 'Сохраняем…' : retryCompletion ? 'Повторить сохранение кардио' : completed ? 'Кардио выполнено' : 'Завершить кардио'}: ${exerciseTitle}`}
           aria-pressed={completed}
           className="active-workout-set__done"
           data-workout-field="done"
@@ -1424,7 +1426,9 @@ function CardioWorkoutRow({
             enqueueSave({ completed: nextCompleted }, true);
           }}
         >
-          {retryCompletion ? (
+          {completing ? (
+            'Сохраняем…'
+          ) : retryCompletion ? (
             'Повторить сохранение'
           ) : completed ? (
             <>
@@ -2091,7 +2095,7 @@ export function TodayWorkout({
     const accepted = await activeSync.enqueue(setId, version, values, immediate);
     if (navigation)
       setCompletionNavigation((current) =>
-        current === navigation ? (accepted ? { setId, accepted: true } : null) : current,
+        current === navigation ? (accepted ? { setId, accepted: true } : navigation) : current,
       );
     return accepted;
   };
