@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-alpine AS frontend-build
+FROM node:24-alpine@sha256:44fce696f38ba8c987c4db89954051000bbd05ffd8d8659ba15ed4a8602e937f AS frontend-build
 WORKDIR /frontend
 ARG VITE_PWA_ENABLED=true
 ENV VITE_PWA_ENABLED=$VITE_PWA_ENABLED
@@ -9,14 +9,17 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.14-slim
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e597550000edbe78fdc2594d5cd8de1a217f504c /uv /uvx /bin/
+# OS security updates arrive through the reviewed base-image digest refresh; do not add a
+# mutable apt-get upgrade here because it breaks source-to-image reproducibility.
+# shortcut: apt package versions remain repository-resolved; use a dated Debian snapshot only
+# if byte-for-byte replay of OS package installation becomes a requirement.
 RUN apt-get update \
-    && apt-get upgrade --yes \
     && apt-get install -y --no-install-recommends \
         fonts-dejavu-core \
         libexpat1 \

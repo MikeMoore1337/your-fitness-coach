@@ -911,6 +911,7 @@ jobs:
           IMAGE_KIND: ${{ matrix.image }}
         run: python scripts/deployment_contract.py refs --repository "$GITHUB_REPOSITORY" --revision "$GITHUB_SHA" --kind "$IMAGE_KIND" >> "$GITHUB_OUTPUT"
       - name: Build and scan production image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
@@ -923,6 +924,32 @@ jobs:
           no-cache: ${{ matrix.no_cache }}
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+      - name: Verify built application image provenance
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        id: image-provenance
+        shell: bash
+        env:
+          LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+          SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$BUILD_DIGEST"
+          [[ "$BUILD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          local_image_id="$(docker image inspect "$LOCAL_TAG" --format '{{.Id}}')"
+          oci_revision="$(docker image inspect "$LOCAL_TAG" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          architecture="$(docker image inspect "$LOCAL_TAG" --format '{{.Os}}/{{.Architecture}}')"
+          [[ "$local_image_id" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$oci_revision" = "$SOURCE_REVISION"
+          test "$architecture" = "linux/amd64"
+          echo "image_digest=$BUILD_DIGEST" >> "$GITHUB_OUTPUT"
+          echo "local_image_id=$local_image_id" >> "$GITHUB_OUTPUT"
+          echo "oci_revision=$oci_revision" >> "$GITHUB_OUTPUT"
+          echo "architecture=$architecture" >> "$GITHUB_OUTPUT"
+      - name: Prepare image SBOM output
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        shell: bash
+        run: mkdir -p ".artifacts/runtime/sbom/${{ matrix.image }}"
       - name: Verify bot runtime image contract
         if: matrix.image == 'bot'
         shell: bash
@@ -956,6 +983,55 @@ jobs:
           ignore-unfixed: true
           trivyignores: .trivyignore.yaml
           exit-code: "1"
+      - name: Generate CycloneDX SBOM
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.local_tag }}
+          format: cyclonedx
+          output: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.cyclonedx.json
+          exit-code: "0"
+      - name: Generate SPDX JSON SBOM
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
+        with:
+          version: v0.73.0
+          image-ref: ${{ steps.image.outputs.local_tag }}
+          format: spdx-json
+          output: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.spdx.json
+          exit-code: "0"
+      - name: Validate image SBOM provenance
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        env:
+          CYCLONEDX_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.cyclonedx.json
+          SPDX_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/sbom.spdx.json
+          PROVENANCE_PATH: .artifacts/runtime/sbom/${{ matrix.image }}/provenance.json
+          IMAGE_REF: ${{ steps.image.outputs.image_ref }}
+          IMAGE_DIGEST: ${{ steps.image-provenance.outputs.image_digest }}
+          LOCAL_IMAGE_ID: ${{ steps.image-provenance.outputs.local_image_id }}
+          SOURCE_REVISION: ${{ github.sha }}
+          OCI_REVISION: ${{ steps.image-provenance.outputs.oci_revision }}
+          ARCHITECTURE: ${{ steps.image-provenance.outputs.architecture }}
+        run: |
+          python scripts/validate_image_sbom.py \
+            --cyclonedx "$CYCLONEDX_PATH" \
+            --spdx "$SPDX_PATH" \
+            --image-ref "$IMAGE_REF" \
+            --image-digest "$IMAGE_DIGEST" \
+            --local-image-id "$LOCAL_IMAGE_ID" \
+            --source-revision "$SOURCE_REVISION" \
+            --oci-revision "$OCI_REVISION" \
+            --architecture "$ARCHITECTURE" \
+            --output "$PROVENANCE_PATH"
+      - name: Upload image SBOMs
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sbom-${{ matrix.image }}-${{ github.sha }}
+          path: .artifacts/runtime/sbom/${{ matrix.image }}
+          if-no-files-found: error
+          retention-days: 14
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: docker/login-action@v4
@@ -969,6 +1045,20 @@ jobs:
           LOCAL_TAG: ${{ steps.image.outputs.local_tag }}
           PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
         run: docker tag "$LOCAL_TAG" "$PUBLISHED_REF" && docker push "$PUBLISHED_REF"
+      - name: Verify published application image digest
+        if: >-
+          github.event_name == 'push' && github.ref == 'refs/heads/master' &&
+          (matrix.image == 'backend' || matrix.image == 'bot')
+        shell: bash
+        env:
+          PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
+          EXPECTED_DIGEST: ${{ steps.image-provenance.outputs.image_digest }}
+        run: |
+          set -Eeuo pipefail
+          published_repository="${PUBLISHED_REF%:*}"
+          repo_digest="$(docker image inspect "$PUBLISHED_REF" --format '{{join .RepoDigests "\n"}}' | grep -F "${published_repository}@" | head -n 1)"
+          published_digest="${repo_digest##*@}"
+          test "$published_digest" = "$EXPECTED_DIGEST"
 
   scheduled-report:
     name: Private scheduled Allure report

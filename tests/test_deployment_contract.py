@@ -80,6 +80,42 @@ def test_trusted_postgres_preflight_runs_before_any_production_config_mutation()
     assert orchestrator.count("_trusted_connection_budget_preflight(config)") >= 4
 
 
+def test_application_base_images_are_immutable_and_keep_runtime_generations() -> None:
+    root = Path(__file__).resolve().parents[1]
+
+    deployment_contract.validate_application_base_images(root)
+
+
+def test_mutable_application_base_image_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "bot").mkdir()
+    (tmp_path / "backend" / "Dockerfile").write_text(
+        "FROM node:24-alpine\nFROM python:3.14-slim\n", encoding="utf-8"
+    )
+    (tmp_path / "bot" / "Dockerfile").write_text("FROM python:3.14-slim\n", encoding="utf-8")
+
+    with pytest.raises(deployment_contract.DeploymentContractError, match="mutable"):
+        deployment_contract.validate_application_base_images(tmp_path)
+
+
+def test_mutable_apt_upgrade_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "backend").mkdir()
+    (tmp_path / "bot").mkdir()
+    python_ref = deployment_contract.APPLICATION_BASE_IMAGES["bot/Dockerfile"][0]
+    (tmp_path / "backend" / "Dockerfile").write_text(
+        "FROM "
+        + deployment_contract.APPLICATION_BASE_IMAGES["backend/Dockerfile"][0]
+        + "\nFROM "
+        + deployment_contract.APPLICATION_BASE_IMAGES["backend/Dockerfile"][1]
+        + "\nRUN apt-get upgrade --yes\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "bot" / "Dockerfile").write_text(f"FROM {python_ref}\n", encoding="utf-8")
+
+    with pytest.raises(deployment_contract.DeploymentContractError, match="apt-get upgrade"):
+        deployment_contract.validate_application_base_images(tmp_path)
+
+
 def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> None:
     root = Path(__file__).resolve().parents[1]
     deploy = (root / ".github" / "workflows" / "deploy.yml").read_text(encoding="utf-8")
