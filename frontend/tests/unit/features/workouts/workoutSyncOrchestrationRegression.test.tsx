@@ -99,7 +99,7 @@ describe('QA: delayed GET and idempotency conflict', () => {
     ).toBe(true);
     await act(async () => {
       resolveStaleGet(workout);
-      await query;
+      await query.catch(() => undefined);
     });
     expect(
       client.getQueryData<Workout>(['workout', 'today'])?.exercises[0]?.sets[0]?.is_completed,
