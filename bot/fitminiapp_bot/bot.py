@@ -669,7 +669,10 @@ async def main() -> None:
                     menu_button_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await menu_button_task
-            _polling_evidence("unknown", "polling_stopped")
+            # Keep the observed conflict until a real successful getUpdates;
+            # do not overwrite proof with generic shutdown/unknown.
+            if not conflict:
+                _polling_evidence("unknown", "polling_stopped")
             polling_lock.release()
 
         if not conflict:
