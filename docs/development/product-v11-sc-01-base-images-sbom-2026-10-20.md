@@ -90,11 +90,16 @@ Issue: [#851](https://github.com/MikeMoore1337/your-fitness-coach/issues/851)
    непустые component/package lists, lowercase SHA-256 image digest, image ID,
    архитектуру, равенство OCI revision исходному полному Git SHA, SHA-256 обоих SBOM и
    secret-shaped поля/значения;
-5. публикует SBOM и `provenance.json` как artifact с retention 14 дней. Sidecar содержит
-   `image.ref`, `image.digest`, `image.local_image_id`, `image.architecture`,
-   `image.oci_revision`, `image.source_revision` и хэши двух SBOM;
-6. после публикации на `master` проверяет, что digest GHCR равен digest, полученному на
-   этапе сборки. Несовпадение останавливает job.
+5. на `master` публикует только просканированный образ, получает registry digest и загружает
+   его по immutable reference. Image/config ID должен совпасть с просканированным локальным
+   образом; OCI revision и архитектура повторно проверяются. Ошибка или несовпадение блокируют job;
+6. сохраняет исходный BuildKit sidecar как `build-provenance.json` и повторно валидирует
+   `provenance.json` с фактическим published digest. Docker load/push может изменить представление
+   manifest, поэтому равенство этих двух manifest digest не предполагается;
+7. после успешных проверок публикует SBOM и sidecars как artifact с retention 14 дней.
+   `provenance.json` содержит immutable `image.ref`, registry `image.digest`, проверенный
+   `image.local_image_id`, архитектуру, OCI/source revision и хэши двух SBOM. В PR без push
+   sidecar описывает только BuildKit export; production evidence из него не выводится.
 
 Пути артефактов не содержат переменных окружения, токенов, cookies, персональных или
 медицинских данных. Репозиторное Trivy-сканирование `vuln,misconfig,secret` остаётся

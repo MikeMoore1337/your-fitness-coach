@@ -1077,14 +1077,6 @@ jobs:
             --oci-revision "$OCI_REVISION" \
             --architecture "$ARCHITECTURE" \
             --output "$PROVENANCE_PATH"
-      - name: Upload image SBOMs
-        if: matrix.image == 'backend' || matrix.image == 'bot'
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-sbom-${{ matrix.image }}-${{ github.sha }}
-          path: .artifacts/runtime/sbom/${{ matrix.image }}
-          if-no-files-found: error
-          retention-days: 14
       - name: Log in to GitHub Container Registry
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: docker/login-action@v4
@@ -1105,13 +1097,41 @@ jobs:
         shell: bash
         env:
           PUBLISHED_REF: ${{ steps.image.outputs.image_ref }}
-          EXPECTED_DIGEST: ${{ steps.image-provenance.outputs.image_digest }}
+          EXPECTED_IMAGE_ID: ${{ steps.image-provenance.outputs.local_image_id }}
+          SOURCE_REVISION: ${{ github.sha }}
+          SBOM_DIR: .artifacts/runtime/sbom/${{ matrix.image }}
         run: |
           set -Eeuo pipefail
           published_repository="${PUBLISHED_REF%:*}"
-          repo_digest="$(docker image inspect "$PUBLISHED_REF" --format '{{join .RepoDigests "\n"}}' | grep -F "${published_repository}@" | head -n 1)"
-          published_digest="${repo_digest##*@}"
-          test "$published_digest" = "$EXPECTED_DIGEST"
+          published_digest="$(docker buildx imagetools inspect "$PUBLISHED_REF" --format '{{.Manifest.Digest}}')"
+          [[ "$published_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          immutable_ref="$published_repository@$published_digest"
+          published_image_id="$(docker buildx imagetools inspect "$immutable_ref" --raw | python -c 'import json, sys; print(json.load(sys.stdin)["config"]["digest"])')"
+          test "$published_image_id" = "$EXPECTED_IMAGE_ID"
+          docker pull "$immutable_ref"
+          oci_revision="$(docker image inspect "$immutable_ref" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          architecture="$(docker image inspect "$immutable_ref" --format '{{.Os}}/{{.Architecture}}')"
+          test "$architecture" = "linux/amd64"
+          # Docker load/push can change the manifest representation; verify the scanned config ID.
+          cp "$SBOM_DIR/provenance.json" "$SBOM_DIR/build-provenance.json"
+          python scripts/validate_image_sbom.py \
+            --cyclonedx "$SBOM_DIR/sbom.cyclonedx.json" \
+            --spdx "$SBOM_DIR/sbom.spdx.json" \
+            --image-ref "$immutable_ref" \
+            --image-digest "$published_digest" \
+            --local-image-id "$published_image_id" \
+            --source-revision "$SOURCE_REVISION" \
+            --oci-revision "$oci_revision" \
+            --architecture "$architecture" \
+            --output "$SBOM_DIR/provenance.json"
+      - name: Upload image SBOMs
+        if: matrix.image == 'backend' || matrix.image == 'bot'
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-sbom-${{ matrix.image }}-${{ github.sha }}
+          path: .artifacts/runtime/sbom/${{ matrix.image }}
+          if-no-files-found: error
+          retention-days: 14
 
   scheduled-report:
     name: Private scheduled Allure report

@@ -1,6 +1,9 @@
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from scripts import deployment_contract
 
 
@@ -129,3 +132,43 @@ def test_release_dispatch_keeps_native_concurrency_and_exact_ci_evidence() -> No
     assert ".head_sha == $sha" in deploy
     assert '.conclusion == "success"' in deploy
     assert "task_session.py" not in deploy
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Executes the Linux Actions bash step")
+@pytest.mark.parametrize("current_master", ["a" * 40, "b" * 40])
+def test_explicit_deploy_requires_current_master_even_after_no_deploy_change(
+    tmp_path: Path, current_master: str
+) -> None:
+    root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load((root / ".github/workflows/deploy.yml").read_text())
+    step = next(
+        step for step in workflow["jobs"]["authorize"]["steps"] if step.get("id") == "provenance"
+    )
+    for command in ("git", "gh"):
+        executable = tmp_path / command
+        executable.write_text('#!/bin/sh\nprintf "%s\\n" "$CURRENT_MASTER"\n')
+        executable.chmod(0o755)
+    output = tmp_path / "github-output"
+    result = subprocess.run(
+        ["bash", "-c", step["run"]],
+        cwd=root,
+        env={
+            **os.environ,
+            "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+            "CURRENT_MASTER": current_master,
+            "DEPLOY_SHA": "a" * 40,
+            "DEPLOY_OPERATION": "deploy",
+            "REPOSITORY": "example/yfc",
+            "GITHUB_EVENT_NAME": "workflow_dispatch",
+            "GITHUB_OUTPUT": str(output),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if current_master == "a" * 40:
+        assert result.returncode == 0, result.stderr
+        assert "deploy=true" in output.read_text()
+    else:
+        assert result.returncode != 0
+        assert "deploy=true" not in output.read_text()
