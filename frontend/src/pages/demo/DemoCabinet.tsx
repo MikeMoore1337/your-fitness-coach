@@ -26,6 +26,7 @@ import {
 } from '../../features/demo/demoRoute';
 import { productEventSurface, trackProductEvent } from '../../shared/analytics/productEvents';
 import { AppLink, useNavigation } from '../../shared/navigation/router';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import { DemoRuntimeProvider } from '../../shared/runtime/runtime';
 import { Button, ErrorState, LoadingState, Surface } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
@@ -111,7 +112,8 @@ function productionPathInDemo(to: string, scenario: DemoScenario): string {
     if (scenario === 'trainer') {
       for (const key of ['client_id', 'workout_id'] as const) {
         const value = parsed.searchParams.get(key);
-        if (value && /^\d+$/.test(value)) target.searchParams.set(key, value);
+        if (value && positiveIntegerParam(parsed.searchParams, key) !== null)
+          target.searchParams.set(key, value);
       }
       if (parsed.searchParams.get('tab') === 'tools') target.searchParams.set('tab', 'tools');
       const tool = parsed.searchParams.get('tool');
@@ -402,7 +404,8 @@ export default function DemoCabinet() {
       const current = new URL(window.location.href);
       for (const key of ['client_id', 'workout_id'] as const) {
         const value = current.searchParams.get(key);
-        if (value && /^\d+$/.test(value)) normalizedUrl.searchParams.set(key, value);
+        if (value && positiveIntegerParam(current.searchParams, key) !== null)
+          normalizedUrl.searchParams.set(key, value);
       }
       if (current.searchParams.get('tab') === 'tools') {
         normalizedUrl.searchParams.set('tab', 'tools');

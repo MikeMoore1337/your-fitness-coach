@@ -1493,9 +1493,14 @@ def list_clients(
     client_users = [user for user, _private_name, _operational_status, _labels in clients]
     users_by_id = {user.id: user for user in client_users}
     # One extra query for all clients, never one query per client.
-    # Filter by each user's own local day before ranking historical weights.
+    # Keep each client's local-day cutoff, but group clients sharing that date
+    # so the SQL predicate count does not grow with the client list.
     latest_weight_by_user: dict[int, float] = {}
     if client_users:
+        client_ids_by_local_day: dict[date, list[int]] = {}
+        for user in client_users:
+            client_ids_by_local_day.setdefault(today_for_user(user), []).append(user.id)
+
         ranked = (
             db.query(
                 BodyMeasurement.user_id.label("user_id"),
@@ -1508,15 +1513,14 @@ def list_clients(
                 .label("rank"),
             )
             .filter(
-                BodyMeasurement.user_id.in_(users_by_id),
                 BodyMeasurement.weight_kg.is_not(None),
                 or_(
                     *[
                         and_(
-                            BodyMeasurement.user_id == user.id,
-                            BodyMeasurement.measured_on <= today_for_user(user),
+                            BodyMeasurement.user_id.in_(client_ids),
+                            BodyMeasurement.measured_on <= local_day,
                         )
-                        for user in client_users
+                        for local_day, client_ids in client_ids_by_local_day.items()
                     ]
                 ),
             )
