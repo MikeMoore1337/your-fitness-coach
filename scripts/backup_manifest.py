@@ -6,10 +6,15 @@ contents, credentials, private keys, or user records.
 
 from __future__ import annotations
 
+import argparse
+import gzip
 import hashlib
+import io
 import json
 import os
 import re
+import shutil
+import tarfile
 import tempfile
 from collections.abc import Mapping
 from copy import deepcopy
@@ -17,10 +22,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-MANIFEST_SCHEMA_VERSION = 2
-ARCHIVE_FORMAT = "age-v1"
-AGE_VERSION = "v1.3.2"
-AGE_HEADER = b"age-encryption.org/v1\n-> X25519 "
+MANIFEST_SCHEMA_VERSION = 3
+ARCHIVE_FORMAT = "tar-gzip-pg-custom"
 MANIFEST_KIND = "yfc-backup-manifest"
 INDEX_KIND = "yfc-backup-index"
 INDEX_FILENAME = "index.json"
@@ -106,19 +109,105 @@ def manifest_name_for(archive_name: str) -> str:
     return f"{archive_name}.manifest.json"
 
 
-def require_age_file(path: Path) -> None:
-    with path.open("rb") as stream:
-        if stream.read(len(AGE_HEADER)) != AGE_HEADER:
-            raise BackupManifestError("archive is not binary age X25519 format")
+def require_archive_metadata(value: Mapping[str, Any]) -> None:
+    if value.get("archive_format") != ARCHIVE_FORMAT:
+        raise BackupManifestError("unsupported archive format")
+    name = _require_filename(value.get("archive_name"), field="archive_name")
+    if not re.fullmatch(r"backup-[0-9]{4}-[0-9]{2}-[0-9]{2}\.tar\.gz", name):
+        raise BackupManifestError("archive_name must be backup-YYYY-MM-DD.tar.gz")
+    try:
+        datetime.strptime(name[7:17], "%Y-%m-%d")
+    except ValueError as exc:
+        raise BackupManifestError("invalid backup date") from exc
 
 
-def require_encryption(value: Mapping[str, Any]) -> None:
-    if value.get("archive_format") != ARCHIVE_FORMAT or value.get("age_version") != AGE_VERSION:
-        raise BackupManifestError("unsupported encrypted archive format or age version")
-    if not re.fullmatch(r"age1[023456789acdefghjklmnpqrstuvwxyz]{58}", str(value.get("recipient"))):
-        raise BackupManifestError("recipient must be one native age X25519 public key")
-    if not str(value.get("archive_name", "")).endswith(".dump.age"):
-        raise BackupManifestError("archive_name must end with .dump.age")
+def _read_exact(stream: Any, size: int) -> bytes:
+    data = stream.read(size)
+    if len(data) != size:
+        raise BackupManifestError("truncated tar archive")
+    return data
+
+
+def validate_tar_archive(path: Path) -> dict[str, Any]:
+    """Read all gzip bytes, accepting only two plain USTAR files; never extract paths."""
+    recovery: dict[str, Any] | None = None
+    seen: set[str] = set()
+    try:
+        with gzip.open(path, "rb") as stream:
+            while True:
+                header = _read_exact(stream, 512)
+                if header == bytes(512):
+                    if _read_exact(stream, 512) != bytes(512):
+                        raise BackupManifestError("invalid tar end marker")
+                    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                        if chunk.strip(b"\0"):
+                            raise BackupManifestError("unexpected trailing tar content")
+                    break
+                member = tarfile.TarInfo.frombuf(header, "utf-8", "strict")
+                if (
+                    member.name not in {"database.dump", "recovery.json"}
+                    or member.name in seen
+                    or member.type != tarfile.REGTYPE
+                    or member.linkname
+                    or member.size <= 0
+                    or member.size > 8**11 - 1
+                ):
+                    raise BackupManifestError("unsafe or duplicate tar member")
+                seen.add(member.name)
+                if member.name == "recovery.json":
+                    if member.size > 65536:
+                        raise BackupManifestError("recovery metadata is too large")
+                    recovery = _as_object(
+                        json.loads(_read_exact(stream, member.size)), description="recovery"
+                    )
+                else:
+                    if member.size < 5 or _read_exact(stream, 5) != b"PGDMP":
+                        raise BackupManifestError("database.dump is not a custom PostgreSQL dump")
+                    remaining = member.size - 5
+                    while remaining > 0:
+                        chunk = _read_exact(stream, min(remaining, 1024 * 1024))
+                        remaining -= len(chunk)
+                    if remaining < 0:
+                        raise BackupManifestError("database.dump is too short")
+                if _read_exact(stream, (-member.size) % 512).strip(b"\0"):
+                    raise BackupManifestError("invalid tar padding")
+    except (OSError, EOFError, UnicodeError, tarfile.TarError, json.JSONDecodeError) as exc:
+        raise BackupManifestError("corrupt tar.gz archive") from exc
+    if seen != {"database.dump", "recovery.json"} or recovery is None:
+        raise BackupManifestError("required tar members are missing")
+    if type(recovery.get("schema_version")) is not int or recovery["schema_version"] != 1:
+        raise BackupManifestError("unsupported recovery metadata")
+    _require_database_major(recovery.get("database_major"))
+    _require_schema_revision(recovery.get("schema_revision"))
+    parse_utc(recovery.get("created_at_utc"), field="created_at_utc", now=utc_now())
+    return recovery
+
+
+def create_tar_archive(source: Path, target: Path, recovery: Mapping[str, Any]) -> None:
+    with os.fdopen(os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640), "wb") as output:
+        with tarfile.open(fileobj=output, mode="w:gz", format=tarfile.USTAR_FORMAT) as archive:
+            dump = tarfile.TarInfo("database.dump")
+            dump.size = source.stat().st_size
+            dump.mode = 0o600
+            with source.open("rb") as stream:
+                archive.addfile(dump, stream)
+            data = json.dumps(dict(recovery), sort_keys=True).encode("utf-8")
+            metadata = tarfile.TarInfo("recovery.json")
+            metadata.size = len(data)
+            metadata.mode = 0o600
+            archive.addfile(metadata, io.BytesIO(data))
+        output.flush()
+        os.fsync(output.fileno())
+    validate_tar_archive(target)
+
+
+def unpack_archive(source: Path, output: Path) -> None:
+    validate_tar_archive(source)
+    output.mkdir(parents=True, exist_ok=False)
+    with tarfile.open(source, "r:gz") as archive:
+        for name in ("database.dump", "recovery.json"):
+            with archive.extractfile(name) as stream, (output / name).open("xb") as target:
+                shutil.copyfileobj(stream, target)
 
 
 def _require_filename(value: object, *, field: str) -> str:
@@ -163,7 +252,6 @@ def build_manifest(
     *,
     database_major: str,
     schema_revision: str,
-    recipient: str,
     created_at: datetime | None = None,
     published_at: datetime | None = None,
 ) -> dict[str, Any]:
@@ -173,26 +261,28 @@ def build_manifest(
     size = archive.stat().st_size
     if size <= 0:
         raise BackupManifestError("backup archive must not be empty")
-    encryption = {
-        "archive_format": ARCHIVE_FORMAT,
-        "age_version": AGE_VERSION,
-        "recipient": recipient,
-        "archive_name": _require_filename(archive.name, field="archive_name"),
-    }
-    require_encryption(encryption)
-    require_age_file(archive)
+    metadata = {"archive_format": ARCHIVE_FORMAT, "archive_name": archive.name}
+    require_archive_metadata(metadata)
+    recovery = validate_tar_archive(archive)
     reference = utc_now()
-    created = created_at or reference
+    created = created_at or parse_utc(recovery["created_at_utc"], field="created_at_utc")
     published = published_at or reference
     created_text = format_utc(created)
     published_text = format_utc(published)
     parse_utc(created_text, field="created_at_utc", now=reference)
     parse_utc(published_text, field="published_at_utc", now=reference)
+    if recovery != {
+        "schema_version": 1,
+        "database_major": database_major,
+        "schema_revision": schema_revision,
+        "created_at_utc": created_text,
+    }:
+        raise BackupManifestError("recovery metadata does not match manifest")
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
         "kind": MANIFEST_KIND,
         "source": "vps",
-        **encryption,
+        **metadata,
         "manifest_name": manifest_name_for(archive.name),
         "archive_size_bytes": size,
         "archive_sha256": sha256_file(archive),
@@ -225,7 +315,7 @@ def validate_manifest(value: Mapping[str, Any], *, now: datetime | None = None) 
         raise BackupManifestError("unexpected backup manifest kind")
     if manifest.get("source") != "vps":
         raise BackupManifestError("backup manifest source must be vps")
-    require_encryption(manifest)
+    require_archive_metadata(manifest)
     archive_name = _require_filename(manifest.get("archive_name"), field="archive_name")
     if manifest.get("manifest_name") != manifest_name_for(archive_name):
         raise BackupManifestError("manifest_name does not match archive_name")
@@ -253,7 +343,7 @@ def validate_manifest(value: Mapping[str, Any], *, now: datetime | None = None) 
 
 def read_json(path: Path) -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise BackupManifestError(f"cannot read backup metadata: {path.name}") from exc
     return _as_object(value, description=path.name)
@@ -269,8 +359,6 @@ def index_entry(manifest: Mapping[str, Any], *, now: datetime | None = None) -> 
         key: checked[key]
         for key in (
             "archive_format",
-            "age_version",
-            "recipient",
             "manifest_name",
             "archive_name",
             "archive_size_bytes",
@@ -286,7 +374,7 @@ def _validate_index_entry(
     value: Mapping[str, Any], *, now: datetime | None = None
 ) -> dict[str, Any]:
     entry = dict(value)
-    require_encryption(entry)
+    require_archive_metadata(entry)
     _require_filename(entry.get("manifest_name"), field="manifest_name")
     archive_name = _require_filename(entry.get("archive_name"), field="archive_name")
     if entry.get("manifest_name") != manifest_name_for(archive_name):
@@ -359,7 +447,11 @@ def read_index(path: Path, *, now: datetime | None = None) -> dict[str, Any]:
     return validate_index(read_json(path), now=now)
 
 
-def write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
+def write_json_atomic(
+    path: Path, value: Mapping[str, Any], *, group_readable: bool = False
+) -> None:
+    if group_readable and os.name != "posix":
+        raise BackupManifestError("SFTP group-readable metadata require a POSIX publisher")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
@@ -375,9 +467,44 @@ def write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
             json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
             stream.write("\n")
             stream.flush()
+            if group_readable:
+                # Publish complete metadata for the dedicated read-only SFTP group.
+                # The temporary name is never committed as the published index.
+                os.fchmod(stream.fileno(), 0o640)
             os.fsync(stream.fileno())
         os.replace(temporary, path)
         temporary = None
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Validate or safely unpack a YFC tar.gz backup")
+    parser.add_argument("archive", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    args = parser.parse_args()
+    try:
+        recovery = validate_tar_archive(args.archive)
+        if args.manifest:
+            manifest = read_manifest(args.manifest)
+            if (
+                args.archive.stat().st_size != manifest["archive_size_bytes"]
+                or sha256_file(args.archive) != manifest["archive_sha256"]
+                or any(
+                    recovery[key] != manifest[key]
+                    for key in ("database_major", "schema_revision", "created_at_utc")
+                )
+            ):
+                raise BackupManifestError("archive does not match manifest")
+        if args.output_dir:
+            unpack_archive(args.archive, args.output_dir)
+        return 0
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}")
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

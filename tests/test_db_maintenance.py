@@ -185,48 +185,52 @@ def test_database_name_uses_compose_without_exposing_credentials(
     }
 
 
-def test_encrypt_rejects_unpinned_binary_before_execution(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    executable = tmp_path / "age.exe"
-    executable.write_bytes(b"untrusted executable")
-
-    def unexpected(*args: object, **kwargs: object) -> None:
-        raise AssertionError("untrusted binary executed")
-
-    monkeypatch.setattr(db_maintenance.subprocess, "run", unexpected)
-    with pytest.raises(ValueError, match="pinned official binary"):
-        db_maintenance._encrypt_archive(
-            tmp_path / "input.dump",
-            tmp_path / "output.age",
-            recipient="invalid",
-            age_path=executable,
-        )
-
-
-def test_create_published_backup_removes_private_staging_on_age_failure(
+def test_create_published_backup_removes_private_staging_on_failure(
     isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from datetime import datetime, timedelta, timezone
+
     root = isolated_paths / "operations" / "backups"
+    date = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
 
     def fake_dump(path: Path) -> Path:
-        path.write_bytes(b"PGDMP private")
+        path.write_bytes(b"PGDMP synthetic")
         return path
 
     def failed_publish(path: Path, **kwargs: object) -> None:
         assert path.parent.parent == root
         assert path.parent != kwargs["publish_dir"]
-        raise RuntimeError("synthetic encryption failure")
+        raise RuntimeError("synthetic publication failure")
 
     monkeypatch.setattr(db_maintenance, "create_backup", fake_dump)
     monkeypatch.setattr(db_maintenance, "publish_backup", failed_publish)
-    with pytest.raises(RuntimeError, match="encryption failure"):
+    with pytest.raises(RuntimeError, match="publication failure"):
         db_maintenance.create_published_backup(
-            root / "offhost" / "new.dump.age",
+            root / "offhost" / f"backup-{date}.tar.gz",
             publish_dir=root / "offhost",
             database_major="16",
             schema_revision="test",
-            recipient="invalid",
-            age_path=Path("/age"),
         )
     assert list(root.iterdir()) == []
+
+
+def test_existing_daily_archive_prevents_pg_dump(
+    isolated_paths: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    root = isolated_paths / "operations" / "backups" / "offhost"
+    root.mkdir(parents=True)
+    date = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    target = root / f"backup-{date}.tar.gz"
+    target.write_bytes(b"preserve")
+
+    def unexpected(*args: object) -> None:
+        raise AssertionError("pg_dump started for an existing day")
+
+    monkeypatch.setattr(db_maintenance, "create_backup", unexpected)
+    with pytest.raises(FileExistsError):
+        db_maintenance.create_published_backup(
+            target, publish_dir=root, database_major="16", schema_revision="test"
+        )
+    assert target.read_bytes() == b"preserve"

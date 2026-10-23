@@ -11,6 +11,13 @@ BLOCKING_NON_SECURITY_LEVELS = {"error"}
 
 ValidatedFindingKey = tuple[str, str, int]
 VALIDATED_NON_EXPLOITABLE_FINDINGS: dict[ValidatedFindingKey, str] = {
+    ("py/overly-permissive-file", "scripts/backup_manifest.py", 187): (
+        "Owner-selected unencrypted backups deliberately allow the dedicated read-only SFTP "
+        "group to read 0640 archives. O_EXCL creation preserves stricter umask, private staging "
+        "is 0700, and world access is absent. Linux permission/UID/GID checks and backup tests "
+        "verify owner-write, group-read-only and unrelated-user denial; runbook requires the "
+        "existing SFTP group and ACL verification before real data."
+    ),
     ("js/user-controlled-bypass", "frontend/src/pages/auth/LoginPage.tsx", 195): (
         "The URL-controlled branch only clears the product-analytics login-attempt marker from "
         "memory/sessionStorage. Authentication state, tokens, cookies, roles and authorization "
