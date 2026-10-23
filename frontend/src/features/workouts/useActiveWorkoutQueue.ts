@@ -10,7 +10,6 @@ import {
   activeWorkoutQueueKey,
   clearActiveWorkoutData,
   emptyActiveWorkoutQueue,
-  createWorkoutMutationId,
   enqueueWorkoutMutation,
   latestMutationForSet,
   loadActiveWorkoutQueue,
@@ -46,7 +45,12 @@ function validWorkoutStatus(value: unknown): value is WorkoutStatus {
   );
 }
 
-function updateCachedSet(queryClient: ReturnType<typeof useQueryClient>, current: WorkoutStatus) {
+async function updateCachedSet(
+  queryClient: ReturnType<typeof useQueryClient>,
+  current: WorkoutStatus,
+): Promise<void> {
+  // An older GET must not overwrite the version accepted by this PATCH.
+  await queryClient.cancelQueries({ queryKey: ['workout', 'today'], exact: true });
   queryClient.setQueryData<Workout>(['workout', 'today'], (workout) => {
     if (!workout) return workout;
     return {
@@ -194,7 +198,7 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
             mutation_id: pending.mutation_id,
           },
         });
-        updateCachedSet(queryClient, saved);
+        await updateCachedSet(queryClient, saved);
         persist(acknowledgeWorkoutMutation(readFresh(), pending.mutation_id, saved.version));
         conflictAttempts = 0;
       } catch (reason) {
@@ -202,31 +206,24 @@ export function useActiveWorkoutQueue(userId: number | undefined, workout: Worko
           const detail = conflictDetail(reason);
           const current = detail?.current;
           if (detail?.code === 'workout_set_version_conflict' && validWorkoutStatus(current)) {
-            updateCachedSet(queryClient, current);
+            await updateCachedSet(queryClient, current);
             persist(
               resolveWorkoutVersionConflict(readFresh(), pending.mutation_id, current.version),
             );
             conflictAttempts += 1;
             continue;
           }
-          if (detail?.code === 'workout_set_idempotency_conflict' && validWorkoutStatus(current)) {
-            const rebased = resolveWorkoutVersionConflict(
-              readFresh(),
-              pending.mutation_id,
-              current.version,
+          if (detail?.code === 'workout_set_idempotency_conflict') {
+            // Do not silently bypass the server's idempotency protection by changing the ID.
+            if (validWorkoutStatus(current)) await updateCachedSet(queryClient, current);
+            setSyncState('conflict');
+            setMessage(
+              getUserFacingErrorMessage(
+                reason,
+                'Конфликт изменения подхода. Локальные данные сохранены для проверки.',
+              ),
             );
-            const index = rebased.queue.findIndex(
-              (item) => item.mutation_id === pending.mutation_id,
-            );
-            if (index >= 0) {
-              rebased.queue[index] = {
-                ...rebased.queue[index]!,
-                mutation_id: createWorkoutMutationId(),
-              };
-            }
-            persist(rebased);
-            conflictAttempts += 1;
-            continue;
+            return false;
           }
           setSyncState('conflict');
           setMessage(
