@@ -697,7 +697,6 @@ def test_real_linux_kernel_flock_owner(tmp_path):
             process.wait(timeout=10)
 
 
-
 def test_restricted_host_proc_uses_nonroot_container_proof(monkeypatch):
     def denied(_pid):
         raise PermissionError("host /proc/host-pid/environ is not readable")
@@ -754,13 +753,16 @@ def test_container_probe_requires_same_uid_and_matches_host_starttime(monkeypatc
     assert options["check"] is True
 
 
-@pytest.mark.parametrize("output", [
-    "{}",
-    '{"verified": false, "starttime": "1"}',
-    '{"verified": true, "starttime": "unrelated"}',
-    '{"verified": true, "starttime": "1", "token": "sensitive"}',
-    "invalid-json",
-])
+@pytest.mark.parametrize(
+    "output",
+    [
+        "{}",
+        '{"verified": false, "starttime": "1"}',
+        '{"verified": true, "starttime": "unrelated"}',
+        '{"verified": true, "starttime": "1", "token": "sensitive"}',
+        "invalid-json",
+    ],
+)
 @pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
 def test_container_probe_fails_closed_on_untrusted_response(monkeypatch, output):
     current_pid = os.getpid()
