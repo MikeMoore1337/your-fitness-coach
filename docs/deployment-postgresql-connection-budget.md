@@ -120,8 +120,22 @@ ALTER ROLE yfc_observer SET default_transaction_read_only = on;
 
 ```bash
 apt-get update
+apt-cache policy postgresql-client-16 postgresql-client-18
+# Install the available distro client only (not the PostgreSQL server).
 DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-client-16
+# On Ubuntu 26.04 "resolute" the default repositories have client 18,
+# while client 16 is absent. Use instead, after verifying apt-cache policy:
+# DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends postgresql-client-18
+/usr/bin/psql --version
 ```
+
+**Ubuntu 26.04.1 LTS (resolute/amd64), подтверждённый production host 23.10.2026:**
+штатный APT не нашёл `postgresql-client-16`; клиент `postgresql-client-18` установлен
+без PostgreSQL server upgrade. `psql 18.6` успешно выполнил используемые
+read-only запросы к PostgreSQL server 16 и прошёл one-time observer verifier.
+Команду установки версии 16 выше **не повторять** на resolute; вместо неё
+использовать закомментированную строку с версией 18. Не подключать PGDG
+репозиторий без отдельной необходимости и решения владельца.
 
 Установщик **не** устанавливает пакеты автоматически, а проверяет
 `/usr/bin/psql`. Скачивать его следует только с **полным 40-значным
