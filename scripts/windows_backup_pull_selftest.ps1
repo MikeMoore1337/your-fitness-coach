@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param()
+param([Parameter(Mandatory = $true)][string]$PythonPath)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -45,7 +45,7 @@ function New-Manifest {
         [Parameter(Mandatory = $true)][int64]$Size
     )
     return [ordered]@{
-        schema_version = 2
+        schema_version = 3
         kind = "yfc-backup-manifest"
         source = "vps"
         archive_name = $ArchiveName
@@ -56,9 +56,8 @@ function New-Manifest {
         published_at_utc = $CreatedAt
         database_major = "16"
         schema_revision = "20261018_01"
-        archive_format = "age-v1"
-        age_version = "v1.3.2"
-        recipient = ("age1" + ("q" * 58))
+        archive_format = "tar-gzip-pg-custom"
+
         verification_status = "format_verified_pg_restore_list"
         restore_status = "not_run"
         application_identity = [ordered]@{
@@ -78,7 +77,21 @@ function Add-RemoteBackup {
         [Parameter(Mandatory = $true)][string]$CreatedAt,
         [string]$ManifestDigest
     )
-    $Bytes = [Text.Encoding]::ASCII.GetBytes("age-encryption.org/v1`n-> X25519 ") + $Bytes
+    $fixture = Join-Path $root "make-fixture.py"
+    $fixtureSource = @'
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent))
+import backup_manifest as bm
+root, name, created = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+source = root / "synthetic.dump"
+source.write_bytes(b"PGDMP synthetic-only")
+bm.create_tar_archive(source, root / name, {"schema_version": 1, "database_major": "16", "schema_revision": "20261018_01", "created_at_utc": created})
+'@
+    [IO.File]::WriteAllText($fixture, $fixtureSource)
+    & $PythonPath $fixture $remote $ArchiveName $CreatedAt
+    if ($LASTEXITCODE -ne 0) { throw "fixture creation failed" }
+    $Bytes = [IO.File]::ReadAllBytes((Join-Path $remote $ArchiveName))
     $archivePath = Join-Path $remote $ArchiveName
     [IO.File]::WriteAllBytes($archivePath, $Bytes)
     $digest = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -92,9 +105,8 @@ function Add-RemoteBackup {
         archive_sha256 = $ManifestDigest
         created_at_utc = $CreatedAt
         published_at_utc = $CreatedAt
-        archive_format = "age-v1"
-        age_version = "v1.3.2"
-        recipient = ("age1" + ("q" * 58))
+        archive_format = "tar-gzip-pg-custom"
+
         verification_status = "format_verified_pg_restore_list"
     }
 }
@@ -102,7 +114,7 @@ function Add-RemoteBackup {
 function Write-RemoteIndex {
     param([Parameter(Mandatory = $true)][object[]]$Entries)
     Write-JsonFile (Join-Path $remote "index.json") ([ordered]@{
-            schema_version = 2
+            schema_version = 3
             kind = "yfc-backup-index"
             generated_at_utc = [IO.File]::ReadAllText($clockPath)
             backups = @($Entries)
@@ -113,7 +125,7 @@ function Invoke-PullCase {
     param([Parameter(Mandatory = $true)][string]$Name, [Parameter(Mandatory = $true)][int]$ExpectedCode, [string]$Failure)
     $before = @{}
     if ($ExpectedCode -ge 11) {
-        foreach ($file in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.dump.age" -or $_.Name -like "*.manifest.json" })) {
+        foreach ($file in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.manifest.json" })) {
             $before[$file.FullName] = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash
         }
     }
@@ -171,6 +183,9 @@ function Get-NowUtc {
 '@
     $pullScript = Join-Path $root "pull-under-test.ps1"
     [IO.File]::WriteAllText($pullScript, $source.Replace($mainCall, "$clockOverride`n$mainCall"))
+    $validatorSource = [IO.File]::ReadAllText((Join-Path $scriptRoot "backup_manifest.py"))
+    $validatorSource = $validatorSource.Replace('return datetime.now(timezone.utc)', 'return datetime.fromisoformat(Path(os.environ["YFC_SELFTEST_CLOCK_FILE"]).read_text().strip().replace("Z", "+00:00"))')
+    [IO.File]::WriteAllText((Join-Path $root "backup_manifest.py"), $validatorSource)
     $env:YFC_SELFTEST_CLOCK_FILE = $clockPath
     Set-TestTime ($fixtureTime.AddHours(1))
     [IO.File]::WriteAllText($identity, "synthetic-key", (New-Object Text.UTF8Encoding($false)))
@@ -195,7 +210,7 @@ foreach ($line in @(Get-Content -LiteralPath $batch)) {
         $source = Join-Path $remoteRoot $matches[1]
         $destination = $matches[2].Replace('\"', '"')
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { exit 0 }
-        if ($env:YFC_FAKE_SFTP_FAILURE -eq "INTERRUPT" -and $source.EndsWith(".age")) {
+        if ($env:YFC_FAKE_SFTP_FAILURE -eq "INTERRUPT" -and $source.EndsWith(".tar.gz")) {
             [IO.File]::WriteAllText($destination, "partial")
             [Console]::Error.WriteLine("Connection lost")
             exit 255
@@ -221,12 +236,7 @@ exit 0
         minimum_valid_backups = 2
         stale_after_hours = 26
         minimum_free_bytes = 0
-        encryption_at_rest = [ordered]@{
-            mode = "age"
-            recipient = ("age1" + ("q" * 58))
-            approved = $true
-            key_recovery_document = "synthetic-only"
-        }
+        python_path = $PythonPath
         lock_file = (Join-Path $local "backup-pull.lock")
         status_file = (Join-Path $local "backup-status.json")
         log_file = (Join-Path $local "backup-pull.log")
@@ -244,7 +254,7 @@ exit 0
     }
     Write-JsonFile $configPath $config
 
-    $entry = Add-RemoteBackup "fitminiapp-20261018T120000Z.dump.age" ([Text.Encoding]::UTF8.GetBytes("synthetic-one")) ($fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    $entry = Add-RemoteBackup "backup-2026-10-18.tar.gz" ([Text.Encoding]::UTF8.GetBytes("synthetic-one")) ($fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($entry)
     Invoke-PullCase "success" 0 ""
     $persistedSuccess = Get-Content -LiteralPath $config.status_file -Raw | ConvertFrom-Json
@@ -306,85 +316,75 @@ exit 0
     Write-RemoteIndex @($entry)
     Invoke-PullCase "freshness-fixture-recovery" 0 ""
 
-    $config.encryption_at_rest.mode = "none"
-    $config.encryption_at_rest.plaintext_risk_acknowledged = $true
-    Write-JsonFile $configPath $config
-    Invoke-PullCase "plaintext-opt-in-cannot-bypass-age" 25 ""
-    $config.encryption_at_rest.mode = "age"
-    Write-JsonFile $configPath $config
-
-    $legacy = Join-Path $local "legacy.dump"
+    $legacy = Join-Path $local "legacy.dump.age"
     [IO.File]::WriteAllText($legacy, "preserve-legacy")
-    Invoke-PullCase "legacy-plaintext-requires-migration" 25 ""
+    Invoke-PullCase "legacy-preserved-and-ignored" 0 ""
     if ([IO.File]::ReadAllText($legacy) -ne "preserve-legacy") { throw "legacy copy changed" }
-    Remove-Item -LiteralPath $legacy -Force
 
     Remove-Item -LiteralPath (Join-Path $local $entry.manifest_name) -Force
     Invoke-PullCase "orphan-archive-recovery" 0 ""
 
-    foreach ($badVersion in @(1, "2", $true, 2.5)) {
+    foreach ($badVersion in @(1, 2, "3", $true, 3.5)) {
         $badIndex = [ordered]@{ schema_version = $badVersion; kind = "yfc-backup-index"; generated_at_utc = $fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"); backups = @($entry) }
         Write-JsonFile (Join-Path $remote "index.json") $badIndex
         Invoke-PullCase "reject-schema-$badVersion" 12 ""
     }
-    foreach ($mutation in @("archive_format", "age_version", "recipient", "archive_size_bytes")) {
+    foreach ($mutation in @("archive_format", "archive_size_bytes")) {
         $changed = [ordered]@{}
         foreach ($key in $entry.Keys) { $changed[$key] = $entry[$key] }
-        $changed[$mutation] = if ($mutation -eq "recipient") { "age1" + ("p" * 58) } elseif ($mutation -eq "archive_size_bytes") { "100" } else { "unsupported" }
+        $changed[$mutation] = if ($mutation -eq "archive_size_bytes") { "100" } else { "unsupported" }
         Write-RemoteIndex @($changed)
         Invoke-PullCase "reject-index-$mutation" 12 ""
     }
-    $renamed = Add-RemoteBackup "renamed.dump.age" ([Text.Encoding]::UTF8.GetBytes("placeholder")) ($fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
-    [IO.File]::WriteAllText((Join-Path $remote $renamed.archive_name), "PGDMP plaintext disguised as age")
+    $renamed = Add-RemoteBackup "backup-2026-10-23.tar.gz" ([Text.Encoding]::UTF8.GetBytes("placeholder")) ($fixtureTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    [IO.File]::WriteAllText((Join-Path $remote $renamed.archive_name), "PGDMP raw dump disguised as tar.gz")
     $renamed.archive_size_bytes = (Get-Item (Join-Path $remote $renamed.archive_name)).Length
     $renamed.archive_sha256 = (Get-FileHash (Join-Path $remote $renamed.archive_name)).Hash.ToLowerInvariant()
     $renamedManifest = New-Manifest $renamed.archive_name $renamed.created_at_utc $renamed.archive_sha256 $renamed.archive_size_bytes
     Write-JsonFile (Join-Path $remote $renamed.manifest_name) $renamedManifest
     Write-RemoteIndex @($renamed)
-    Invoke-PullCase "plaintext-renamed-to-age-rejected-even-with-valid-hash" 12 ""
+    Invoke-PullCase "raw-dump-renamed-to-tar-rejected-even-with-valid-hash" 12 ""
 
-    $badEntry = Add-RemoteBackup "fitminiapp-20261018T120100Z.dump.age" ([Text.Encoding]::UTF8.GetBytes("synthetic-two")) ($fixtureTime.AddMinutes(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")) ("0" * 64)
+    $badEntry = Add-RemoteBackup "backup-2026-10-19.tar.gz" ([Text.Encoding]::UTF8.GetBytes("synthetic-two")) ($fixtureTime.AddMinutes(1).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")) ("0" * 64)
     Write-RemoteIndex @($badEntry, $entry)
-    Invoke-PullCase "interrupted-ciphertext-transfer" 22 "INTERRUPT"
+    Invoke-PullCase "interrupted-archive-transfer" 22 "INTERRUPT"
     Invoke-PullCase "checksum-mismatch-preserves-valid-copy" 12 ""
     $corruptedDownload = Get-OutputStatus
     if ($corruptedDownload.valid_backup_count -ne 1 -or (Test-Path -LiteralPath (Join-Path $local $badEntry.archive_name))) { throw "corrupted download must not become a verified copy" }
 
-    $truncated = Add-RemoteBackup "truncated.dump.age" ([Text.Encoding]::UTF8.GetBytes("complete-archive")) ($fixtureTime.AddMinutes(2).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    $truncated = Add-RemoteBackup "backup-2026-10-24.tar.gz" ([Text.Encoding]::UTF8.GetBytes("complete-archive")) ($fixtureTime.AddMinutes(2).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     [IO.File]::WriteAllText((Join-Path $remote $truncated.archive_name), "short")
     Write-RemoteIndex @($truncated, $entry)
     Invoke-PullCase "truncated-transfer-preserves-sole-copy" 12 ""
 
     $missingEntry = [ordered]@{
-        manifest_name = "fitminiapp-20261018T120200Z.dump.age.manifest.json"
-        archive_name = "fitminiapp-20261018T120200Z.dump.age"
+        manifest_name = "backup-2026-10-20.tar.gz.manifest.json"
+        archive_name = "backup-2026-10-20.tar.gz"
         archive_size_bytes = 4
         archive_sha256 = ("1" * 64)
         created_at_utc = "2026-10-18T12:02:00Z"
         published_at_utc = "2026-10-18T12:02:00Z"
-        archive_format = "age-v1"
-        age_version = "v1.3.2"
-        recipient = ("age1" + ("q" * 58))
+        archive_format = "tar-gzip-pg-custom"
+
         verification_status = "format_verified_pg_restore_list"
     }
     Write-RemoteIndex @($missingEntry, $entry)
     Invoke-PullCase "missing-manifest" 11 ""
 
     $unsafeEntry = [ordered]@{
-        manifest_name = "../outside.dump.age.manifest.json"
-        archive_name = "../outside.dump.age"
+        manifest_name = "../outside.tar.gz.manifest.json"
+        archive_name = "../outside.tar.gz"
         archive_size_bytes = 4
         archive_sha256 = ("2" * 64)
         created_at_utc = "2026-10-18T12:02:00Z"
         published_at_utc = "2026-10-18T12:02:00Z"
-        archive_format = "age-v1"
-        age_version = "v1.3.2"
-        recipient = ("age1" + ("q" * 58))
+        archive_format = "tar-gzip-pg-custom"
+
         verification_status = "format_verified_pg_restore_list"
     }
     Write-RemoteIndex @($unsafeEntry, $entry)
     Invoke-PullCase "unsafe-index-name" 12 ""
-    if (Test-Path -LiteralPath (Join-Path $root "outside.dump.age")) { throw "unsafe manifest/index name escaped the local root" }
+    if (Test-Path -LiteralPath (Join-Path $root "outside.tar.gz")) { throw "unsafe manifest/index name escaped the local root" }
 
     Write-RemoteIndex @($entry)
     Invoke-PullCase "pinned-host-key-rejection" 20 "HOST_KEY"
@@ -394,7 +394,7 @@ exit 0
     $lockStream = [IO.File]::Open($config.lock_file, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     try { Invoke-PullCase "concurrent-lock" 24 "" } finally { $lockStream.Dispose() }
 
-    $concurrentEntry = Add-RemoteBackup "fitminiapp-20261018T121000Z.dump.age" ([Text.Encoding]::UTF8.GetBytes("synthetic-concurrent")) ($fixtureTime.AddMinutes(10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    $concurrentEntry = Add-RemoteBackup "backup-2026-10-21.tar.gz" ([Text.Encoding]::UTF8.GetBytes("synthetic-concurrent")) ($fixtureTime.AddMinutes(10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($concurrentEntry, $entry)
     [IO.File]::WriteAllText($holdPath, "hold", (New-Object Text.UTF8Encoding($false)))
     Remove-Item -LiteralPath $startedPath -Force -ErrorAction SilentlyContinue
@@ -428,7 +428,7 @@ exit 0
         if ($null -ne $firstProcess -and -not $firstProcess.HasExited) { $firstProcess.Kill() }
     }
 
-    $diskEntry = Add-RemoteBackup "fitminiapp-20261018T120300Z.dump.age" ([Text.Encoding]::UTF8.GetBytes("synthetic-three")) ($fixtureTime.AddMinutes(3).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    $diskEntry = Add-RemoteBackup "backup-2026-10-22.tar.gz" ([Text.Encoding]::UTF8.GetBytes("synthetic-three")) ($fixtureTime.AddMinutes(3).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($diskEntry, $entry)
     $config.minimum_free_bytes = [int64]1000000000000000
     Write-JsonFile $configPath $config
@@ -443,19 +443,15 @@ exit 0
         throw "failed pull with a fresh copy must expose NETWORK while preserving local HEALTHY state"
     }
 
-    $localManifests = @(Get-ChildItem -LiteralPath $local -Filter "*.manifest.json" -File)
-    foreach ($manifestPath in $localManifests) {
-        $stale = Get-Content -LiteralPath $manifestPath.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-        $stale.created_at_utc = "2020-01-01T00:00:00Z"
-        $stale.published_at_utc = "2020-01-01T00:00:00Z"
-        Write-JsonFile $manifestPath.FullName $stale
-    }
+    Set-TestTime ($fixtureTime.AddDays(2))
     Invoke-PullCase "failed-pull-with-stale-copy" 22 "NETWORK"
     $failedStale = Get-OutputStatus
     if ($failedStale.state -ne "NETWORK" -or $failedStale.freshness_state -ne "STALE" -or $failedStale.last_failure_code -ne "NETWORK") {
         throw "failed pull with a stale copy must expose NETWORK and STALE separately"
     }
 
+    Set-TestTime ($fixtureTime.AddHours(1))
+    Remove-Item -LiteralPath "$($config.status_file).failure" -Force -ErrorAction SilentlyContinue
     Copy-Item -LiteralPath (Join-Path $remote $entry.manifest_name) -Destination (Join-Path $local $entry.manifest_name) -Force
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.manifest_name) -Destination (Join-Path $local $concurrentEntry.manifest_name) -Force
     Invoke-PullCase "successful-pull-after-failure" 0 ""
@@ -509,36 +505,31 @@ exit 0
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.archive_name) -Destination $corruptArchivePath -Force
 
     foreach ($days in @(9, 8, 6)) {
-        $old = Add-RemoteBackup "retention-$days.dump.age" ([Text.Encoding]::UTF8.GetBytes("retention-$days")) ($fixtureTime.AddDays(-$days).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+        $old = Add-RemoteBackup ("backup-" + $fixtureTime.AddDays(-$days).ToString("yyyy-MM-dd") + ".tar.gz") ([Text.Encoding]::UTF8.GetBytes("retention-$days")) ($fixtureTime.AddDays(-$days).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
         Copy-Item -LiteralPath (Join-Path $remote $old.archive_name) -Destination (Join-Path $local $old.archive_name)
         Copy-Item -LiteralPath (Join-Path $remote $old.manifest_name) -Destination (Join-Path $local $old.manifest_name)
     }
-    $rotationLock = [IO.File]::Open((Join-Path $local "retention-9.dump.age.manifest.json"), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    $rotationLock = [IO.File]::Open((Join-Path $local "backup-2026-10-09.tar.gz.manifest.json"), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
     try { Invoke-PullCase "rotation-failure-preserves-verified-copies" 26 "" } finally { $rotationLock.Dispose() }
     Invoke-PullCase "seven-day-rotation" 0 ""
     $rotated = Get-OutputStatus
     if ($rotated.rotated_count -ne 2 -or $rotated.valid_backup_count -ne 3) { throw "rotation must remove exactly the two expired copies" }
     foreach ($days in @(9, 8)) {
-        foreach ($suffix in @(".dump.age", ".dump.age.manifest.json")) {
-            if (Test-Path -LiteralPath (Join-Path $local "retention-$days$suffix")) { throw "expired backup was not removed" }
+        foreach ($suffix in @(".tar.gz", ".tar.gz.manifest.json")) {
+            if (Test-Path -LiteralPath (Join-Path $local ("backup-" + $fixtureTime.AddDays(-$days).ToString("yyyy-MM-dd") + $suffix))) { throw "expired backup was not removed" }
         }
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $local "retention-6.dump.age"))) { throw "rotation removed an in-window backup" }
+    if (-not (Test-Path -LiteralPath (Join-Path $local "backup-2026-10-12.tar.gz"))) { throw "rotation removed an in-window backup" }
 
     # Advance archive age without running a pull: models the interval while the PC is off.
     $statusBeforeOffline = (Get-FileHash -LiteralPath $config.status_file -Algorithm SHA256).Hash
-    foreach ($manifestPath in @(Get-ChildItem -LiteralPath $local -Filter "*.manifest.json" -File)) {
-        $offline = Get-Content -LiteralPath $manifestPath.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
-        $offline.created_at_utc = $fixtureTime.AddDays(-10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
-        $offline.published_at_utc = $offline.created_at_utc
-        Write-JsonFile $manifestPath.FullName $offline
-    }
+    Set-TestTime ($fixtureTime.AddDays(10))
     $offlineStatus = Invoke-StatusCase "pc-offline-stale-without-pull" 10
     if ($offlineStatus.valid_backup_count -ne 3 -or $offlineStatus.freshness_state -ne "STALE") { throw "offline copies must remain valid but stale" }
     if ((Get-FileHash -LiteralPath $config.status_file -Algorithm SHA256).Hash -ne $statusBeforeOffline) { throw "Status must not rewrite the last pull receipt" }
     Invoke-PullCase "offline-vps-failure-preserves-expired-copies" 22 "NETWORK"
 
-    $catchup = Add-RemoteBackup "catchup.dump.age" ([Text.Encoding]::UTF8.GetBytes("after-offline")) ($fixtureTime.AddMinutes(15).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
+    $catchup = Add-RemoteBackup "backup-2026-10-28.tar.gz" ([Text.Encoding]::UTF8.GetBytes("after-offline")) ($fixtureTime.AddDays(10).ToString("yyyy-MM-dd'T'HH:mm:ss'Z'"))
     Write-RemoteIndex @($catchup, $concurrentEntry, $entry)
     Invoke-PullCase "pc-restart-catchup-and-minimum-two" 0 ""
     $caughtUp = Get-OutputStatus
@@ -546,7 +537,7 @@ exit 0
         throw "catchup must download the new archive and preserve two verified copies even outside retention"
     }
 
-    foreach ($backupPath in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.dump.age" -or $_.Name -like "*.manifest.json" })) {
+    foreach ($backupPath in @(Get-ChildItem -LiteralPath $local -File | Where-Object { $_.Name -like "*.tar.gz" -or $_.Name -like "*.manifest.json" })) {
         Remove-Item -LiteralPath $backupPath.FullName -Force
     }
     $missingStatus = Invoke-StatusCase "missing-local-copies" 11
@@ -559,12 +550,9 @@ exit 0
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.archive_name) -Destination (Join-Path $local $concurrentEntry.archive_name) -Force
     Copy-Item -LiteralPath (Join-Path $remote $concurrentEntry.manifest_name) -Destination (Join-Path $local $concurrentEntry.manifest_name) -Force
 
-    $config.encryption_at_rest.approved = $false
+    $config.python_path = ""
     Write-JsonFile $configPath $config
-    Invoke-PullCase "encryption-approval-gate" 25 ""
-    $config.encryption_at_rest.approved = "false"
-    Write-JsonFile $configPath $config
-    Invoke-PullCase "encryption-approval-type-gate" 25 ""
+    Invoke-PullCase "missing-validator-runtime" 25 ""
     [IO.File]::WriteAllText($configPath, "{", (New-Object Text.UTF8Encoding($false)))
     Invoke-PullCase "malformed-config" 25 ""
     [IO.File]::WriteAllText($configPath, "[]", (New-Object Text.UTF8Encoding($false)))

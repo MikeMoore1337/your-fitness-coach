@@ -8,14 +8,13 @@ generic runtime-cleanup candidate.
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -25,30 +24,34 @@ except ImportError:  # pragma: no cover - Windows developer hosts do not publish
 
 try:
     from scripts.backup_manifest import (
-        AGE_VERSION,
         BackupManifestError,
         build_index,
         build_manifest,
+        create_tar_archive,
+        format_utc,
         index_entry,
         manifest_name_for,
+        parse_utc,
         read_index,
         read_manifest,
-        require_age_file,
         sha256_file,
+        validate_tar_archive,
         write_json_atomic,
     )
 except ModuleNotFoundError:  # direct `python scripts/db_maintenance.py` invocation
     from backup_manifest import (
-        AGE_VERSION,
         BackupManifestError,
         build_index,
         build_manifest,
+        create_tar_archive,
+        format_utc,
         index_entry,
         manifest_name_for,
+        parse_utc,
         read_index,
         read_manifest,
-        require_age_file,
         sha256_file,
+        validate_tar_archive,
         write_json_atomic,
     )
 
@@ -222,35 +225,7 @@ def _validate_published_entry(root: Path, entry: dict[str, object]) -> None:
         raise BackupManifestError("published archive size does not match its manifest")
     if manifest["archive_sha256"] != sha256_file(archive):
         raise BackupManifestError("published archive digest does not match its manifest")
-    require_age_file(archive)
-
-
-def _encrypt_archive(source: Path, output: Path, *, recipient: str, age_path: Path) -> None:
-    """Use only a byte-pinned official binary; never resolve age from PATH."""
-    pins = json.loads(Path(__file__).with_name("age-toolchain.json").read_text(encoding="utf-8"))
-    platform = "windows-amd64" if os.name == "nt" else "linux-amd64"
-    if not age_path.is_absolute() or sha256_file(age_path) != pins[platform]["age_sha256"]:
-        raise ValueError("age executable must be an absolute path to the pinned official binary")
-    version = subprocess.run(
-        [str(age_path), "--version"], check=True, capture_output=True, text=True
-    )
-    if version.stdout.strip() != AGE_VERSION:
-        raise ValueError("unsupported age executable version")
-    subprocess.run(
-        [
-            str(age_path),
-            "--encrypt",
-            "--recipient",
-            recipient,
-            "--output",
-            str(output),
-            str(source),
-        ],
-        check=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-    )
-    require_age_file(output)
+    validate_tar_archive(archive)
 
 
 def publish_backup(
@@ -259,15 +234,13 @@ def publish_backup(
     publish_dir: Path,
     database_major: str,
     schema_revision: str,
-    recipient: str,
-    age_path: Path,
     created_at: datetime | None = None,
     retain: int = 7,
 ) -> tuple[Path, Path, tuple[str, ...]]:
     """Publish one verified archive and its index, with rotation after commit."""
 
-    if retain < 2:
-        raise ValueError("published retention must keep at least two backups")
+    if retain < 1:
+        raise ValueError("retention days must be positive")
     root = _artifact_path(publish_dir)
     if root == BACKUP_DIR or not root.is_relative_to(BACKUP_DIR):
         raise ValueError("publish directory must be a child of the backup directory")
@@ -276,13 +249,15 @@ def publish_backup(
         raise ValueError("plaintext staging must be separate from the SFTP publish directory")
     if source.suffix != ".dump" or not source.is_file():
         raise ValueError("publication requires an existing private .dump")
-    target = root / (source.name + ".age")
+    created_at = created_at or datetime.now(UTC)
+    date = created_at.astimezone(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    target = root / f"backup-{date}.tar.gz"
 
     with _publisher_lock(root):
         # Legacy exports require an explicit migration, never an automatic downgrade or deletion.
         if any(
             path.name not in {"index.json", ".publish.lock"}
-            and not path.name.endswith((".dump.age", ".dump.age.manifest.json"))
+            and not path.name.endswith((".tar.gz", ".tar.gz.manifest.json"))
             for path in root.iterdir()
         ):
             raise ValueError(
@@ -294,31 +269,43 @@ def publish_backup(
             current_entries = list(read_index(index_path)["backups"])
             for entry in current_entries:
                 _validate_published_entry(root, entry)
-                if entry["recipient"] != recipient:
-                    raise ValueError("recipient changed; use a separately approved key migration")
         if target.exists():
-            raise FileExistsError("refusing to overwrite published ciphertext")
+            raise FileExistsError("refusing to overwrite published archive")
         _verify_archive(source)
-        with tempfile.TemporaryDirectory(prefix=".age-", dir=BACKUP_DIR) as staging:
-            encrypted = Path(staging) / target.name
-            _encrypt_archive(source, encrypted, recipient=recipient, age_path=age_path)
+        with tempfile.TemporaryDirectory(prefix=".tar-", dir=BACKUP_DIR) as staging:
+            packed = Path(staging) / target.name
+            create_tar_archive(
+                source,
+                packed,
+                {
+                    "schema_version": 1,
+                    "database_major": database_major,
+                    "schema_revision": schema_revision,
+                    "created_at_utc": format_utc(created_at),
+                },
+            )
             manifest = build_manifest(
-                encrypted,
+                packed,
                 database_major=database_major,
                 schema_revision=schema_revision,
-                recipient=recipient,
                 created_at=created_at,
             )
-            encrypted.replace(target)
+            packed.replace(target)
         manifest_path = root / manifest_name_for(target.name)
-        write_json_atomic(manifest_path, manifest)
+        write_json_atomic(manifest_path, manifest, group_readable=True)
         current_entries = [
             entry for entry in current_entries if entry["archive_name"] != target.name
         ]
         current_entries.append(index_entry(manifest))
-        retained_entries = build_index(current_entries)["backups"][:retain]
+        ordered = build_index(current_entries)["backups"]
+        cutoff = datetime.now(UTC) - timedelta(days=retain)
+        retained_entries = [
+            entry
+            for position, entry in enumerate(ordered)
+            if position < 2 or parse_utc(entry["created_at_utc"], field="created_at_utc") >= cutoff
+        ]
         # index.json is the commit marker: it is replaced only after all metadata is complete.
-        write_json_atomic(index_path, build_index(retained_entries))
+        write_json_atomic(index_path, build_index(retained_entries), group_readable=True)
 
         warnings: list[str] = []
         retained_names = {str(entry["archive_name"]) for entry in retained_entries}
@@ -342,25 +329,24 @@ def create_published_backup(
     publish_dir: Path,
     database_major: str,
     schema_revision: str,
-    recipient: str,
-    age_path: Path,
     retain: int = 7,
 ) -> tuple[Path, Path, Path, tuple[str, ...]]:
     root = _artifact_path(publish_dir)
     target = _artifact_path(output)
-    if target.parent != root or not target.name.endswith(".dump.age"):
-        raise ValueError("published archive must be directly below the publish directory")
     created_at = datetime.now(UTC)
+    date = created_at.astimezone(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    if target.parent != root or target.name != f"backup-{date}.tar.gz":
+        raise ValueError("published archive must be directly below the publish directory")
+    if target.exists():
+        raise FileExistsError("daily backup already exists; refusing to overwrite")
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".dump-", dir=BACKUP_DIR) as staging:
-        archive = create_backup(Path(staging) / target.name.removesuffix(".age"))
+        archive = create_backup(Path(staging) / "database.dump")
         manifest, index, warnings = publish_backup(
             archive,
             publish_dir=root,
             database_major=database_major,
             schema_revision=schema_revision,
-            recipient=recipient,
-            age_path=age_path,
             created_at=created_at,
             retain=retain,
         )
@@ -425,18 +411,10 @@ def main() -> int:
         help="Alembic revision for published metadata (queried when omitted)",
     )
     backup_parser.add_argument(
-        "--age-recipient", help="native age public recipient; required for publication"
-    )
-    backup_parser.add_argument(
-        "--age-path",
-        type=Path,
-        help="absolute path to byte-pinned age binary; required for publication",
-    )
-    backup_parser.add_argument(
         "--retain-published",
         type=int,
         default=7,
-        help="number of published archives to retain; minimum is two",
+        help="retention in days; always preserve the newest two verified archives",
     )
 
     restore_parser = subparsers.add_parser(
@@ -461,11 +439,8 @@ def main() -> int:
                 print(f"Backup created: {created}")
                 return 0
             publish_dir = _artifact_path(args.publish_dir)
-            if not args.age_recipient or args.age_path is None:
-                raise ValueError(
-                    "publication requires --age-recipient and --age-path; no plaintext fallback"
-                )
-            output = args.output or publish_dir / f"fitminiapp-{_timestamp()}.dump.age"
+            date = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+            output = args.output or publish_dir / f"backup-{date}.tar.gz"
             database_major = args.database_major or _database_major()
             schema_revision = args.schema_revision or _schema_revision()
             created, manifest, index, warnings = create_published_backup(
@@ -473,8 +448,6 @@ def main() -> int:
                 publish_dir=publish_dir,
                 database_major=database_major,
                 schema_revision=schema_revision,
-                recipient=args.age_recipient,
-                age_path=args.age_path,
                 retain=args.retain_published,
             )
             print(f"Backup created: {created}")

@@ -1,414 +1,381 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import gzip
+import json
+import os
+import struct
+import tarfile
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
-from scripts import backup_manifest, db_maintenance
-
-RECIPIENT = "age1" + "q" * 58
-HEADER = backup_manifest.AGE_HEADER
-AGE_PATH = Path("/synthetic/age")
+from scripts import backup_manifest as bm
+from scripts import db_maintenance as db
 
 
-def test_manifest_is_format_verified_but_not_restore_verified(tmp_path: Path) -> None:
-    archive = tmp_path / "fitminiapp-20261018T120000Z.dump.age"
-    archive.write_bytes(HEADER + b"synthetic-ciphertext")
+def synthetic_dump() -> bytes:
+    """Hand-built PG16 custom fixture: no database access and no pg_dump execution.
 
-    manifest = backup_manifest.build_manifest(
+    Layout: PostgreSQL REL_16_STABLE pg_backup_archiver.c WriteHead/WriteToc.
+    The one schema entry executes only this synthetic SQL during isolated restore.
+    """
+
+    def integer(value: int) -> bytes:
+        return bytes([int(value < 0)]) + struct.pack("<I", abs(value))
+
+    def text(value: str | None) -> bytes:
+        if value is None:
+            return integer(-1)
+        data = value.encode("ascii")
+        return integer(len(data)) + data
+
+    sql = """CREATE TABLE public.parents(id serial PRIMARY KEY, payload bytea NOT NULL);
+CREATE TABLE public.children(id serial PRIMARY KEY, parent_id integer REFERENCES public.parents);
+INSERT INTO public.parents(payload) VALUES (decode('00ff10','hex'));
+INSERT INTO public.children(parent_id) VALUES (1);
+CREATE TABLE public.alembic_version(version_num text PRIMARY KEY);
+INSERT INTO public.alembic_version VALUES ('synthetic_849');
+"""
+    header = b"PGDMP" + bytes([1, 15, 0, 4, 8, 1, 0])
+    header += b"".join(integer(n) for n in [0, 0, 3, 22, 9, 126, 0])
+    header += text("synthetic_only") + text("16.15") + text("16.15")
+    toc = integer(1) + integer(1) + integer(0)
+    toc += text("0") + text("0") + text("parents") + text("TABLE") + integer(1)
+    toc += b"".join(text(v) for v in [sql, "", "", "public", "", "heap", "postgres", "false", None])
+    return header + toc + bytes([3]) + bytes(8)
+
+
+def make_archive(root: Path, created: datetime | None = None) -> Path:
+    created = created or bm.utc_now()
+    root.mkdir(parents=True, exist_ok=True)
+    dump = root / "fixture.dump"
+    dump.write_bytes(synthetic_dump())
+    date = created.astimezone(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
+    archive = root / f"backup-{date}.tar.gz"
+    bm.create_tar_archive(
+        dump,
         archive,
-        database_major="16",
-        schema_revision="20261018_01",
-        recipient=RECIPIENT,
-        created_at=datetime(2026, 10, 18, 12, tzinfo=timezone.utc),  # noqa: UP017 - Python 3.10 support.
-    )
-
-    assert manifest["verification_status"] == "format_verified_pg_restore_list"
-    assert manifest["restore_status"] == "not_run"
-    assert backup_manifest.validate_manifest(manifest) == manifest
-
-    restored = dict(manifest, restore_status="restore_verified")
-    with pytest.raises(backup_manifest.BackupManifestError, match="restore_status"):
-        backup_manifest.validate_manifest(restored)
-
-
-def test_index_rejects_duplicate_archives() -> None:
-    entry = {
-        "manifest_name": "one.dump.age.manifest.json",
-        "archive_name": "one.dump.age",
-        "archive_size_bytes": 1,
-        "archive_sha256": "0" * 64,
-        "created_at_utc": "2026-10-18T12:00:00Z",
-        "published_at_utc": "2026-10-18T12:00:00Z",
-        "verification_status": "format_verified_pg_restore_list",
-        "archive_format": "age-v1",
-        "age_version": "v1.3.2",
-        "recipient": RECIPIENT,
-    }
-
-    with pytest.raises(backup_manifest.BackupManifestError, match="duplicate"):
-        backup_manifest.build_index([entry, entry])
-
-
-def test_manifest_and_index_reject_timestamps_beyond_fixed_clock_skew() -> None:
-    now = datetime(2026, 10, 19, 12, tzinfo=timezone.utc)  # noqa: UP017 - Python 3.10 support.
-    archive = Path("synthetic.dump.age")
-    manifest = {
-        "schema_version": 2,
-        "kind": "yfc-backup-manifest",
-        "source": "vps",
-        "archive_name": archive.name,
-        "manifest_name": backup_manifest.manifest_name_for(archive.name),
-        "archive_size_bytes": 1,
-        "archive_sha256": "0" * 64,
-        "created_at_utc": "2026-10-19T12:06:00Z",
-        "published_at_utc": "2026-10-19T12:00:00Z",
-        "database_major": "16",
-        "schema_revision": "20261018_01",
-        "archive_format": "age-v1",
-        "age_version": "v1.3.2",
-        "recipient": RECIPIENT,
-        "verification_status": "format_verified_pg_restore_list",
-        "restore_status": "not_run",
-        "application_identity": {
-            "status": "not_provided",
-            "git_sha": "unknown",
-            "backend_image_digest": "unknown",
-            "bot_image_digest": "unknown",
+        {
+            "schema_version": 1,
+            "database_major": "16",
+            "schema_revision": "synthetic_849",
+            "created_at_utc": bm.format_utc(created),
         },
-        "coverage": {"postgresql": "included"},
-    }
-
-    with pytest.raises(backup_manifest.BackupManifestError, match="too far in the future"):
-        backup_manifest.validate_manifest(manifest, now=now)
-
-    future_published = dict(
-        manifest,
-        created_at_utc="2026-10-19T12:00:00Z",
-        published_at_utc="2026-10-19T12:06:00Z",
     )
-    with pytest.raises(backup_manifest.BackupManifestError, match="too far in the future"):
-        backup_manifest.validate_manifest(future_published, now=now)
-
-    within_tolerance = dict(
-        manifest,
-        created_at_utc="2026-10-19T12:05:00Z",
-        published_at_utc="2026-10-19T12:05:00Z",
-    )
-    assert backup_manifest.validate_manifest(within_tolerance, now=now) == within_tolerance
-
-    entry = backup_manifest.index_entry(within_tolerance, now=now)
-    future_entry = dict(entry, published_at_utc="2026-10-19T12:06:00Z")
-    future_index = {
-        "schema_version": 2,
-        "kind": "yfc-backup-index",
-        "generated_at_utc": "2026-10-19T12:00:00Z",
-        "backups": [future_entry],
-    }
-    with pytest.raises(backup_manifest.BackupManifestError, match="too far in the future"):
-        backup_manifest.validate_index(future_index, now=now)
+    return archive
 
 
-def test_index_validation_rejects_duplicate_or_unsafe_entries() -> None:
-    entry = {
-        "manifest_name": "one.dump.age.manifest.json",
-        "archive_name": "one.dump.age",
-        "archive_size_bytes": 1,
-        "archive_sha256": "0" * 64,
-        "created_at_utc": "2026-10-18T12:00:00Z",
-        "published_at_utc": "2026-10-18T12:00:00Z",
-        "verification_status": "format_verified_pg_restore_list",
-        "archive_format": "age-v1",
-        "age_version": "v1.3.2",
-        "recipient": RECIPIENT,
-    }
-    index = {
-        "schema_version": 2,
-        "kind": "yfc-backup-index",
-        "generated_at_utc": "2026-10-18T12:00:00Z",
-        "backups": [entry, entry],
-    }
-
-    with pytest.raises(backup_manifest.BackupManifestError, match="duplicate"):
-        backup_manifest.validate_index(index)
-
-    with pytest.raises(backup_manifest.BackupManifestError, match="safe file name"):
-        backup_manifest.validate_index(
-            {**index, "backups": [{**entry, "archive_name": "../outside.dump.age"}]}
-        )
+def manifest_for(path: Path) -> dict:
+    return bm.build_manifest(path, database_major="16", schema_revision="synthetic_849")
 
 
-def test_publish_rechecks_archive_and_writes_index_commit_marker(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    artifacts = tmp_path / ".artifacts"
-    root = artifacts / "operations" / "backups" / "offhost"
-    archive = root.parent / "private" / "fitminiapp-20261018T120000Z.dump"
-    archive.parent.mkdir(parents=True)
-    archive.write_bytes(HEADER + b"synthetic-ciphertext")
-    monkeypatch.setattr(db_maintenance, "ROOT", tmp_path)
-    monkeypatch.setattr(db_maintenance, "ARTIFACTS", artifacts)
-    monkeypatch.setattr(db_maintenance, "BACKUP_DIR", artifacts / "operations" / "backups")
-    verified: list[Path] = []
-    monkeypatch.setattr(db_maintenance, "_verify_archive", lambda path: verified.append(path))
-
-    root.mkdir(exist_ok=True)
-    manifest_path, index_path, warnings = db_maintenance.publish_backup(
-        archive,
-        publish_dir=root,
-        age_path=AGE_PATH,
-        database_major="16",
-        schema_revision="20261018_01",
-        recipient=RECIPIENT,
-    )
-
-    assert manifest_path.is_file()
-    assert index_path.is_file()
-    assert warnings == ()
-    assert verified == [archive]
-    published_entry = backup_manifest.read_index(index_path)["backups"][0]
-    assert published_entry["archive_name"] == archive.name + ".age"
-    assert published_entry["published_at_utc"]
-
-
-def test_publish_refuses_to_rotate_when_existing_index_target_is_corrupt(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    artifacts = tmp_path / ".artifacts"
-    root = artifacts / "operations" / "backups" / "offhost"
-    old_archive = root / "fitminiapp-20261017T120000Z.dump.age"
-    new_archive = root.parent / "private" / "fitminiapp-20261018T120000Z.dump"
-    root.mkdir(parents=True)
-    old_archive.write_bytes(HEADER + b"old")
-    old_manifest = backup_manifest.build_manifest(
-        old_archive,
-        database_major="16",
-        schema_revision="20261017_01",
-        recipient=RECIPIENT,
-    )
-    backup_manifest.write_json_atomic(root / old_manifest["manifest_name"], old_manifest)
-    backup_manifest.write_json_atomic(
-        root / "index.json", backup_manifest.build_index([old_manifest])
-    )
-    before = (root / "index.json").read_bytes()
-    old_archive.write_bytes(HEADER + b"bad")
-    new_archive.parent.mkdir(exist_ok=True)
-    new_archive.write_bytes(b"new")
-
-    monkeypatch.setattr(db_maintenance, "ROOT", tmp_path)
-    monkeypatch.setattr(db_maintenance, "ARTIFACTS", artifacts)
-    monkeypatch.setattr(db_maintenance, "BACKUP_DIR", artifacts / "operations" / "backups")
-    monkeypatch.setattr(db_maintenance, "_verify_archive", lambda path: None)
-
-    with pytest.raises(backup_manifest.BackupManifestError, match="digest"):
-        db_maintenance.publish_backup(
-            new_archive,
-            publish_dir=root,
-            age_path=AGE_PATH,
-            database_major="16",
-            schema_revision="20261018_01",
-            recipient=RECIPIENT,
-        )
-
-    assert (root / "index.json").read_bytes() == before
-
-
-def test_publish_keeps_retained_copies_when_rotation_is_partial(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    artifacts = tmp_path / ".artifacts"
-    root = artifacts / "operations" / "backups" / "offhost"
-    root.mkdir(parents=True)
-
-    def write_existing(name: str, content: bytes, created_at: datetime) -> dict[str, object]:
-        archive = root / name
-        archive.write_bytes(HEADER + content)
-        manifest = backup_manifest.build_manifest(
-            archive,
-            database_major="16",
-            schema_revision="20261018_01",
-            recipient=RECIPIENT,
-            created_at=created_at,
-            published_at=created_at,
-        )
-        backup_manifest.write_json_atomic(root / manifest["manifest_name"], manifest)
-        return manifest
-
-    oldest = write_existing(
-        "fitminiapp-20261016T120000Z.dump.age",
-        b"oldest",
-        datetime(2026, 10, 16, 12, tzinfo=timezone.utc),  # noqa: UP017 - Python 3.10 support.
-    )
-    retained = write_existing(
-        "fitminiapp-20261017T120000Z.dump.age",
-        b"retained",
-        datetime(2026, 10, 17, 12, tzinfo=timezone.utc),  # noqa: UP017 - Python 3.10 support.
-    )
-    backup_manifest.write_json_atomic(
-        root / "index.json", backup_manifest.build_index([oldest, retained])
-    )
-    new_archive = root.parent / "private" / "fitminiapp-20261018T120000Z.dump"
-    new_archive.parent.mkdir(exist_ok=True)
-    new_archive.write_bytes(b"new")
-
-    monkeypatch.setattr(db_maintenance, "ROOT", tmp_path)
-    monkeypatch.setattr(db_maintenance, "ARTIFACTS", artifacts)
-    monkeypatch.setattr(db_maintenance, "BACKUP_DIR", artifacts / "operations" / "backups")
-    monkeypatch.setattr(db_maintenance, "_verify_archive", lambda path: None)
-    original_unlink = Path.unlink
-
-    def fail_oldest_archive(self: Path, *args: object, **kwargs: object) -> None:
-        if self == root / oldest["archive_name"]:
-            raise OSError("synthetic rotation failure")
-        original_unlink(self, *args, **kwargs)
-
-    monkeypatch.setattr(Path, "unlink", fail_oldest_archive)
-
-    _, index_path, warnings = db_maintenance.publish_backup(
-        new_archive,
-        publish_dir=root,
-        age_path=AGE_PATH,
-        database_major="16",
-        schema_revision="20261018_01",
-        recipient=RECIPIENT,
-        created_at=datetime(2026, 10, 18, 12, tzinfo=timezone.utc),  # noqa: UP017 - Python 3.10 support.
-        retain=2,
-    )
-
-    assert warnings == ("rotation could not remove fitminiapp-20261016T120000Z.dump.age",)
-    assert {
-        entry["archive_name"] for entry in backup_manifest.read_index(index_path)["backups"]
-    } == {new_archive.name + ".age", retained["archive_name"]}
-    assert (root / (new_archive.name + ".age")).is_file()
-    assert (root / retained["archive_name"]).is_file()
-    assert (
-        root / oldest["archive_name"]
-    ).is_file()  # orphan is preserved, not mistaken for a verified entry.
-    assert not (root / oldest["manifest_name"]).exists()
-
-
-@pytest.fixture(autouse=True)
-def synthetic_encrypt(monkeypatch: pytest.MonkeyPatch) -> None:
-    def encrypt(source: Path, output: Path, **kwargs: object) -> None:
-        output.write_bytes(HEADER + source.read_bytes())
-
-    monkeypatch.setattr(db_maintenance, "_encrypt_archive", encrypt)
+def test_archive_manifest_index_roundtrip_and_safe_unpack(tmp_path: Path) -> None:
+    archive = make_archive(tmp_path)
+    manifest = manifest_for(archive)
+    if os.name != "nt":
+        assert archive.stat().st_mode & 0o777 == 0o640
+        previous_umask = os.umask(0o077)
+        try:
+            private_archive = make_archive(tmp_path / "private")
+            assert private_archive.stat().st_mode & 0o777 == 0o600
+        finally:
+            os.umask(previous_umask)
+    bm.write_json_atomic(tmp_path / manifest["manifest_name"], manifest)
+    index = bm.build_index([manifest])
+    assert bm.validate_index(index) == index
+    assert manifest["archive_sha256"] == bm.sha256_file(archive)
+    assert manifest["schema_version"] == 3 and manifest["restore_status"] == "not_run"
+    assert "recipient" not in manifest and "age_version" not in manifest
+    output = tmp_path / "unpacked"
+    bm.unpack_archive(archive, output)
+    assert (output / "database.dump").read_bytes() == synthetic_dump()
+    assert {p.name for p in output.iterdir()} == {"database.dump", "recovery.json"}
+    with pytest.raises(FileExistsError):
+        bm.unpack_archive(archive, output)
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
     [
-        ("schema_version", 1),
-        ("schema_version", "2"),
-        ("schema_version", 2.0),
+        ("schema_version", 2),
+        ("schema_version", "3"),
+        ("schema_version", 3.0),
         ("schema_version", True),
-        ("archive_format", "pg-custom"),
-        ("age_version", "v1.2.1"),
-        ("recipient", "AGE-SECRET-KEY-private"),
-        ("archive_name", "plaintext.dump"),
-        ("archive_size_bytes", "200"),
+        ("archive_format", "age-v1"),
+        ("archive_name", "../outside.tar.gz"),
+        ("archive_name", "backup-2026-99-99.tar.gz"),
+        ("archive_name", "legacy.dump.age"),
+        ("archive_size_bytes", "100"),
         ("archive_size_bytes", True),
         ("archive_size_bytes", 0),
+        ("archive_sha256", "0"),
+        ("created_at_utc", "2999-01-01T00:00:00Z"),
     ],
 )
-def test_encrypted_manifest_rejects_downgrade_and_wrong_types(
-    tmp_path: Path,
-    field: str,
-    value: object,
-) -> None:
-    archive = tmp_path / "one.dump.age"
-    archive.write_bytes(HEADER + b"synthetic")
-    manifest = backup_manifest.build_manifest(
-        archive,
-        database_major="16",
-        schema_revision="test",
-        recipient=RECIPIENT,
-    )
-    with pytest.raises(backup_manifest.BackupManifestError):
-        backup_manifest.validate_manifest({**manifest, field: value})
-    if field != "schema_version":
-        entry = backup_manifest.index_entry(manifest)
-        with pytest.raises(backup_manifest.BackupManifestError):
-            backup_manifest.build_index([{**entry, field: value}])
+def test_manifest_and_index_reject_bad_metadata(tmp_path: Path, field: str, value: object) -> None:
+    manifest = manifest_for(make_archive(tmp_path))
+    with pytest.raises(bm.BackupManifestError):
+        bm.validate_manifest({**manifest, field: value})
+    entry = bm.index_entry(manifest)
+    if field == "schema_version":
+        with pytest.raises(bm.BackupManifestError):
+            bm.validate_index({**bm.build_index([manifest]), field: value})
+    else:
+        with pytest.raises(bm.BackupManifestError):
+            bm.build_index([{**entry, field: value}])
 
 
-def test_plaintext_renamed_to_age_cannot_get_manifest(tmp_path: Path) -> None:
-    archive = tmp_path / "renamed.dump.age"
-    archive.write_bytes(b"PGDMP plaintext")
-    with pytest.raises(backup_manifest.BackupManifestError, match="binary age"):
-        backup_manifest.build_manifest(
-            archive,
-            database_major="16",
-            schema_revision="test",
-            recipient=RECIPIENT,
+def test_duplicates_and_future_index_rejected(tmp_path: Path) -> None:
+    manifest = manifest_for(make_archive(tmp_path))
+    with pytest.raises(bm.BackupManifestError, match="duplicate"):
+        bm.build_index([manifest, manifest])
+    with pytest.raises(bm.BackupManifestError, match="future"):
+        bm.validate_index(
+            {**bm.build_index([manifest]), "generated_at_utc": "2999-01-01T00:00:00Z"}
         )
+
+
+@pytest.mark.parametrize("damage", ["truncated", "crc", "raw-dump", "tar-checksum", "trailing"])
+def test_corrupt_archive_rejected_before_output(tmp_path: Path, damage: str) -> None:
+    archive = make_archive(tmp_path)
+    data = archive.read_bytes()
+    if damage == "truncated":
+        data = data[:-8]
+    elif damage == "crc":
+        data = data[:-8] + bytes([data[-8] ^ 1]) + data[-7:]
+    elif damage == "raw-dump":
+        data = synthetic_dump()
+    else:
+        raw = bytearray(gzip.decompress(data))
+        if damage == "tar-checksum":
+            raw[0] ^= 1
+        else:
+            raw += b"unexpected"
+        data = gzip.compress(raw)
+    archive.write_bytes(data)
+    with pytest.raises(bm.BackupManifestError):
+        bm.unpack_archive(archive, tmp_path / "out")
+    assert not (tmp_path / "out").exists()
 
 
 @pytest.mark.parametrize(
-    "failure", ["encrypt", "space", "manifest", "index", "legacy", "recipient"]
+    ("name", "kind"),
+    [
+        ("../escape", tarfile.REGTYPE),
+        ("/absolute", tarfile.REGTYPE),
+        ("C:/escape", tarfile.REGTYPE),
+        ("..\\escape", tarfile.REGTYPE),
+        ("database.dump", tarfile.SYMTYPE),
+        ("database.dump", tarfile.LNKTYPE),
+        ("database.dump", tarfile.CHRTYPE),
+        ("database.dump", tarfile.FIFOTYPE),
+        ("database.dump", tarfile.DIRTYPE),
+        ("extra.txt", tarfile.REGTYPE),
+        ("database.dump", tarfile.REGTYPE),
+        ("pax", tarfile.XHDTYPE),
+    ],
 )
-def test_failed_publication_keeps_previous_copy_and_commit_marker(
-    tmp_path: Path,
+def test_unsafe_tar_rejected_even_with_valid_outer_hash(
+    tmp_path: Path, name: str, kind: bytes
+) -> None:
+    good = make_archive(tmp_path)
+    raw = gzip.decompress(good.read_bytes())
+    # Inject after the two legitimate files, before the end marker.
+    with tarfile.open(good) as stream:
+        last = stream.getmembers()[-1]
+        end = last.offset_data + ((last.size + 511) // 512) * 512
+    member = tarfile.TarInfo(name)
+    member.type = kind
+    if kind in {tarfile.SYMTYPE, tarfile.LNKTYPE}:
+        member.linkname = "../escape"
+    raw = raw[:end] + member.tobuf(format=tarfile.USTAR_FORMAT) + bytes(1024)
+    good.write_bytes(gzip.compress(raw))
+    assert len(bm.sha256_file(good)) == 64
+    with pytest.raises(bm.BackupManifestError):
+        bm.unpack_archive(good, tmp_path / "out")
+    assert not (tmp_path / "out").exists() and not (tmp_path.parent / "escape").exists()
+
+
+@pytest.fixture()
+def publisher(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "backups"
+    root.mkdir()
+    monkeypatch.setattr(db, "BACKUP_DIR", root)
+    monkeypatch.setattr(db, "_verify_archive", lambda path: None)
+    return root
+
+
+def publish(root: Path, created: datetime | None = None, retain: int = 7) -> tuple:
+    private = root / "private"
+    private.mkdir(exist_ok=True)
+    source = private / "synthetic.dump"
+    source.write_bytes(synthetic_dump())
+    return db.publish_backup(
+        source,
+        publish_dir=root / "export",
+        database_major="16",
+        schema_revision="synthetic_849",
+        created_at=created,
+        retain=retain,
+    )
+
+
+def test_publication_rechecks_dump_then_commits_index(
+    publisher: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    verified = []
+    monkeypatch.setattr(db, "_verify_archive", lambda path: verified.append(path))
+    manifest, index, warnings = publish(publisher)
+    assert verified == [publisher / "private" / "synthetic.dump"]
+    assert warnings == ()
+    entry = bm.read_index(index)["backups"][0]
+    assert bm.index_entry(bm.read_manifest(manifest)) == entry
+    db._validate_published_entry(index.parent, entry)
+    before = {p.name: p.read_bytes() for p in index.parent.iterdir()}
+    with pytest.raises(FileExistsError):
+        publish(publisher)
+    assert before == {p.name: p.read_bytes() for p in index.parent.iterdir()}
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX SFTP permission contract")
+def test_sftp_export_metadata_group_readable_after_index_replacement(publisher: Path) -> None:
+    now = bm.utc_now()
+    original_umask = os.umask(0o027)
+    try:
+        first_manifest, index, _ = publish(publisher, now - timedelta(days=1))
+        second_manifest, index, _ = publish(publisher, now)
+    finally:
+        os.umask(original_umask)
+    entries = bm.read_index(index)["backups"]
+    assert len(entries) == 2
+    for metadata in (first_manifest, second_manifest, index):
+        assert metadata.stat().st_mode & 0o777 == 0o640
+        assert metadata.stat().st_gid == os.getgid()
+    for entry in entries:
+        archive = index.parent / entry["archive_name"]
+        assert archive.stat().st_mode & 0o777 == 0o640
+        assert archive.stat().st_gid == os.getgid()
+    private_metadata = publisher / "private" / "private.json"
+    bm.write_json_atomic(private_metadata, {"private": True})
+    assert private_metadata.stat().st_mode & 0o777 == 0o600
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX SFTP permission contract")
+def test_group_readable_json_failure_keeps_existing_index(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    index = tmp_path / "index.json"
+    bm.write_json_atomic(index, {"version": 1}, group_readable=True)
+    original = index.read_bytes()
+
+    def reject_mode(*args: object) -> None:
+        raise OSError("synthetic chmod failure")
+
+    monkeypatch.setattr(bm.os, "fchmod", reject_mode)
+    with pytest.raises(OSError, match="chmod failure"):
+        bm.write_json_atomic(index, {"version": 2}, group_readable=True)
+    assert index.read_bytes() == original
+    assert not list(tmp_path.glob("*.partial"))
+
+
+def test_retention_keeps_two_good_even_when_all_expired(publisher: Path) -> None:
+    now = bm.utc_now()
+    for days in (10, 9, 8):
+        _, index, _ = publish(publisher, now - timedelta(days=days))
+    entries = bm.read_index(index)["backups"]
+    assert len(entries) == 2
+    assert all((index.parent / entry["archive_name"]).is_file() for entry in entries)
+    assert len(list(index.parent.glob("*.tar.gz"))) == 2
+    publish(publisher, now - timedelta(days=6))
+    assert len(bm.read_index(index)["backups"]) == 2
+
+
+def test_corrupt_existing_copy_blocks_rotation_and_preserves_other_copy(publisher: Path) -> None:
+    now = bm.utc_now()
+    publish(publisher, now - timedelta(days=10))
+    _, index, _ = publish(publisher, now - timedelta(days=9))
+    old = index.parent / bm.read_index(index)["backups"][0]["archive_name"]
+    old.write_bytes(b"corrupt")
+    before = {p.name: p.read_bytes() for p in index.parent.iterdir()}
+    with pytest.raises(bm.BackupManifestError):
+        publish(publisher)
+    assert before == {p.name: p.read_bytes() for p in index.parent.iterdir()}
+
+
+@pytest.mark.parametrize("failure", ["pack", "space", "manifest", "index", "legacy", "rotation"])
+def test_failed_publication_preserves_two_previous_copies(
+    publisher: Path,
     monkeypatch: pytest.MonkeyPatch,
     failure: str,
 ) -> None:
-    root = tmp_path / "backups"
-    export = root / "offhost"
-    private = root / "private"
-    export.mkdir(parents=True)
-    private.mkdir()
-    monkeypatch.setattr(db_maintenance, "BACKUP_DIR", root)
-    monkeypatch.setattr(db_maintenance, "_verify_archive", lambda path: None)
-    old = export / "old.dump.age"
-    old.write_bytes(HEADER + b"old")
-    old_manifest = backup_manifest.build_manifest(
-        old,
-        database_major="16",
-        schema_revision="test",
-        recipient=RECIPIENT,
-    )
-    backup_manifest.write_json_atomic(export / old_manifest["manifest_name"], old_manifest)
-    backup_manifest.write_json_atomic(
-        export / "index.json", backup_manifest.build_index([old_manifest])
-    )
-    before = {p.name: p.read_bytes() for p in export.iterdir()}
-    source = private / "new.dump"
-    source.write_bytes(b"PGDMP synthetic")
-    original_write = db_maintenance.write_json_atomic
+    now = bm.utc_now()
+    publish(publisher, now - timedelta(days=2))
+    _, index, _ = publish(publisher, now - timedelta(days=1))
+    before = {p.name: p.read_bytes() for p in index.parent.iterdir()}
+    write = db.write_json_atomic
 
-    def fail_encrypt(*args: object, **kwargs: object) -> None:
-        if failure == "space":
-            raise OSError(28, "synthetic no space")
-        raise RuntimeError("synthetic age failure")
-
-    def fail_metadata(path: Path, value: object) -> None:
-        if (failure == "manifest" and path.name.endswith("manifest.json")) or (
+    def fail_write(path: Path, value: dict, *, group_readable: bool = False) -> None:
+        if (failure == "manifest" and path.name.endswith(".manifest.json")) or (
             failure == "index" and path.name == "index.json"
         ):
-            raise OSError("synthetic publication failure")
-        original_write(path, value)
+            raise OSError("synthetic metadata failure")
+        write(path, value, group_readable=group_readable)
 
-    if failure in {"encrypt", "space"}:
-        monkeypatch.setattr(db_maintenance, "_encrypt_archive", fail_encrypt)
-    monkeypatch.setattr(db_maintenance, "write_json_atomic", fail_metadata)
+    def fail_pack(*args: object) -> None:
+        raise OSError("synthetic pack/space failure")
+
+    monkeypatch.setattr(db, "write_json_atomic", fail_write)
+    if failure in {"pack", "space"}:
+        monkeypatch.setattr(db, "create_tar_archive", fail_pack)
     if failure == "legacy":
-        (export / "legacy.dump").write_bytes(b"preserve legacy")
-    with pytest.raises((RuntimeError, OSError, ValueError)):
-        db_maintenance.publish_backup(
-            source,
-            publish_dir=export,
-            database_major="16",
-            schema_revision="test",
-            recipient=("age1" + "p" * 58) if failure == "recipient" else RECIPIENT,
-            age_path=AGE_PATH,
-        )
+        (index.parent / "old.dump.age").write_bytes(b"legacy-preserved")
+    if failure == "rotation":
+        unlink = Path.unlink
+
+        def fail_unlink(path: Path, *args: object, **kwargs: object) -> None:
+            if path.name in before:
+                raise OSError("synthetic rotation failure")
+            unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "unlink", fail_unlink)
+        _, _, warnings = publish(publisher, retain=1)
+        assert warnings
+    else:
+        with pytest.raises((OSError, ValueError)):
+            publish(publisher)
     for name, content in before.items():
-        assert (export / name).read_bytes() == content
-    assert not list(export.glob("*.partial"))
-    assert not list(root.glob(".age-*"))
-    assert not (export / source.name).exists()
+        if name != "index.json" or failure != "rotation":
+            assert (index.parent / name).read_bytes() == content
+    assert not list(publisher.glob(".tar-*"))
     if failure == "legacy":
-        assert (export / "legacy.dump").read_bytes() == b"preserve legacy"
+        assert (index.parent / "old.dump.age").read_bytes() == b"legacy-preserved"
+
+
+def test_windows_bom_sidecar_and_recovery_mismatch(tmp_path: Path) -> None:
+    archive = make_archive(tmp_path)
+    manifest = manifest_for(archive)
+    path = tmp_path / manifest["manifest_name"]
+    path.write_text(json.dumps(manifest), encoding="utf-8-sig")
+    assert bm.read_manifest(path) == manifest
+    with pytest.raises(bm.BackupManifestError, match="does not match"):
+        bm.build_manifest(archive, database_major="17", schema_revision="synthetic_849")
+
+
+def test_disabled_schedule_and_storage_contract() -> None:
+    import xml.etree.ElementTree as et
+
+    directory = (
+        Path(__file__).resolve().parents[1] / "docs/operations/v11-rec-01-off-host-backup-recovery"
+    )
+    config = json.loads((directory / "windows-pull.config.example.json").read_text())
+    assert (
+        config["retention_days"],
+        config["minimum_valid_backups"],
+        config["stale_after_hours"],
+    ) == (7, 2, 26)
+    assert "encryption_at_rest" not in config and config["python_path"]
+    task = et.parse(directory / "windows-pull-task.example.xml")
+    ns = {"t": "http://schemas.microsoft.com/windows/2004/02/mit/task"}
+    assert [node.text for node in task.findall(".//t:Enabled", ns)] == ["false", "false"]
+    assert task.find(".//t:Interval", ns).text == "PT1H"
+    assert task.find(".//t:StartBoundary", ns).text.endswith("00:30:00+03:00")
