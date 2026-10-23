@@ -32,6 +32,51 @@ class _ConflictingBot:
         raise TelegramConflictError(method=method, message="terminated by other getUpdates request")
 
 
+
+def test_successful_real_getupdates_iteration_marks_polling_healthy(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    """Only a completed getUpdates round-trip, not Docker Up, proves health."""
+    path = tmp_path / "polling.json"
+    monkeypatch.setattr(bot_module.settings, "bot_polling_health_path", str(path))
+
+    class ReturnedUpdatesBot:
+        id = 123
+        session = _FakeSession()
+
+        async def __call__(self, method, **kwargs):
+            return [SimpleNamespace(update_id=7)]
+
+    async def run() -> None:
+        listener = StableDispatcher._listen_updates(ReturnedUpdatesBot())
+        try:
+            assert (await anext(listener)).update_id == 7
+        finally:
+            await listener.aclose()
+
+    asyncio.run(run())
+    payload = json.loads(path.read_text())
+    assert payload["state"] == "healthy"
+    assert payload["evidence"] == "getupdates_success"
+
+
+def test_polling_conflict_reports_unhealthy_evidence(
+    tmp_path: Path, monkeypatch,
+) -> None:
+    path = tmp_path / "polling.json"
+    monkeypatch.setattr(bot_module.settings, "bot_polling_health_path", str(path))
+
+    async def run() -> None:
+        listener = StableDispatcher._listen_updates(_ConflictingBot())
+        with pytest.raises(PollingConflict):
+            await anext(listener)
+
+    asyncio.run(run())
+    payload = json.loads(path.read_text())
+    assert payload["state"] == "unhealthy"
+    assert payload["evidence"] == "polling_conflict"
+
+
 def test_dispatcher_escalates_polling_conflict_without_retrying():
     async def consume_updates() -> None:
         updates = StableDispatcher._listen_updates(_ConflictingBot())
