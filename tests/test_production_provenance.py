@@ -587,6 +587,7 @@ def test_full_snapshot_combines_container_process_lock_and_startup_evidence(
             raise PermissionError("secret-lock-name")
 
         monkeypatch.setattr(provenance, "_bot_process_owner", denied)
+
         # Model the same denied access in the container fallback. Otherwise
         # this test runs a real subprocess through the fake Docker Popen and
         # its failure depends on the Python version, not the provenance gate.
