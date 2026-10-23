@@ -695,3 +695,93 @@ def test_real_linux_kernel_flock_owner(tmp_path):
         finally:
             process.terminate()
             process.wait(timeout=10)
+
+
+def test_restricted_host_proc_uses_nonroot_container_proof(monkeypatch):
+    def denied(_pid):
+        raise PermissionError("host /proc/host-pid/environ is not readable")
+
+    calls = []
+    monkeypatch.setattr(provenance, "_bot_process_owner", denied)
+    monkeypatch.setattr(
+        provenance,
+        "_bot_process_owner_in_container",
+        lambda container_id, pid: calls.append((container_id, pid)) or "123",
+    )
+    assert provenance._bot_process_owner_with_container_fallback(CONTAINER_ID, 1234) == "123"
+    assert calls == [(CONTAINER_ID, 1234)]
+
+
+def test_restricted_proc_does_not_fallback_on_invalid_host_lock(monkeypatch):
+    monkeypatch.setattr(
+        provenance,
+        "_bot_process_owner",
+        lambda _pid: (_ for _ in ()).throw(
+            provenance.ProvenanceError("bot exclusive kernel FLOCK owner is unverified")
+        ),
+    )
+    monkeypatch.setattr(
+        provenance,
+        "_bot_process_owner_in_container",
+        lambda *_args: pytest.fail("invalid owner must never be treated as permissions"),
+    )
+    with pytest.raises(provenance.ProvenanceError, match="FLOCK"):
+        provenance._bot_process_owner_with_container_fallback(CONTAINER_ID, 1234)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
+def test_container_probe_requires_same_uid_and_matches_host_starttime(monkeypatch):
+    current_pid = os.getpid()
+    host_stat = (Path("/proc") / str(current_pid) / "stat").read_text()
+    starttime = host_stat.rsplit(")", 1)[1].split()[19]
+    executed = []
+
+    def run(command, **kwargs):
+        executed.append((command, kwargs))
+        return subprocess.CompletedProcess(
+            command, 0, stdout=json.dumps({"verified": True, "starttime": starttime})
+        )
+
+    monkeypatch.setattr(provenance.subprocess, "run", run)
+    assert provenance._bot_process_owner_in_container(CONTAINER_ID, current_pid) == starttime
+    command, options = executed[0]
+    assert command[:5] == ["docker", "exec", "--user", "10001:10001", CONTAINER_ID]
+    assert command[5:7] == ["python", "-c"]
+    assert "_BOT_CONTAINER_OWNER_PROBE" not in command[7]
+    assert "FLOCK" in command[7]
+    assert options["timeout"] == 20
+    assert options["check"] is True
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        "{}",
+        '{"verified": false, "starttime": "1"}',
+        '{"verified": true, "starttime": "unrelated"}',
+        '{"verified": true, "starttime": "1", "token": "sensitive"}',
+        "invalid-json",
+    ],
+)
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
+def test_container_probe_fails_closed_on_untrusted_response(monkeypatch, output):
+    current_pid = os.getpid()
+    monkeypatch.setattr(
+        provenance.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout=output),
+    )
+    with pytest.raises((provenance.ProvenanceError, ValueError)):
+        provenance._bot_process_owner_in_container(CONTAINER_ID, current_pid)
+
+
+@pytest.mark.skipif(sys.platform != "linux", reason="requires /proc on Linux")
+def test_container_probe_fails_closed_if_docker_exec_denied(monkeypatch):
+    current_pid = os.getpid()
+
+    def fail(command, **_kwargs):
+        raise subprocess.CalledProcessError(1, command, stderr="secret-token-not-for-logs")
+
+    monkeypatch.setattr(provenance.subprocess, "run", fail)
+    with pytest.raises(subprocess.CalledProcessError):
+        provenance._bot_process_owner_in_container(CONTAINER_ID, current_pid)
