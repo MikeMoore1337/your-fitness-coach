@@ -32,9 +32,9 @@ class _ConflictingBot:
         raise TelegramConflictError(method=method, message="terminated by other getUpdates request")
 
 
-
 def test_successful_real_getupdates_iteration_marks_polling_healthy(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     """Only a completed getUpdates round-trip, not Docker Up, proves health."""
     path = tmp_path / "polling.json"
@@ -61,7 +61,8 @@ def test_successful_real_getupdates_iteration_marks_polling_healthy(
 
 
 def test_polling_conflict_reports_unhealthy_evidence(
-    tmp_path: Path, monkeypatch,
+    tmp_path: Path,
+    monkeypatch,
 ) -> None:
     path = tmp_path / "polling.json"
     monkeypatch.setattr(bot_module.settings, "bot_polling_health_path", str(path))
