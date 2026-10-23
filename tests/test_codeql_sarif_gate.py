@@ -203,8 +203,11 @@ def test_polling_heartbeat_group_only_read_exception_is_exact(tmp_path: Path) ->
         (status_path, 71, "py/path-injection", True),
     ):
         evidence = _sarif(
-            security_severity="7.8", level="warning",
-            rule_id=rule, path=path, line=line,
+            security_severity="7.8",
+            level="warning",
+            rule_id=rule,
+            path=path,
+            line=line,
         )
         found = codeql_sarif_gate.evaluate(_write(tmp_path, evidence))
         assert len(found) == 1
