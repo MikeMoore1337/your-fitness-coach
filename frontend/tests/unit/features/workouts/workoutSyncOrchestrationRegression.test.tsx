@@ -104,6 +104,9 @@ describe('QA: delayed GET and idempotency conflict', () => {
     expect(
       client.getQueryData<Workout>(['workout', 'today'])?.exercises[0]?.sets[0]?.is_completed,
     ).toBe(true);
+    expect(client.getQueryData<Workout>(['workout', 'today'])?.exercises[0]?.sets[0]?.version).toBe(
+      2,
+    );
     expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0);
   });
 
@@ -138,9 +141,51 @@ describe('QA: delayed GET and idempotency conflict', () => {
     });
     await waitFor(() => expect(result.current.syncState).toBe('conflict'));
     expect(accepted).toBe(false);
+    expect(result.current.message).toBe(
+      'Этот идентификатор изменения уже использован с другими данными',
+    );
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(sentMutationIds).toHaveLength(1);
     expect(loadActiveWorkoutQueue(7, 42).queue[0]?.mutation_id).toBe(sentMutationIds[0]);
     expect(loadActiveWorkoutQueue(7, 42).queue[0]?.values.is_completed).toBe(true);
+  });
+
+  it('rebases a normal version conflict and retries with the same mutation ID', async () => {
+    const client = makeClient();
+    const requests: Array<{ mutation_id: string; expected_version: number }> = [];
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, options) => {
+      const payload = JSON.parse(String(options?.body)) as {
+        mutation_id: string;
+        expected_version: number;
+      };
+      requests.push(payload);
+      if (requests.length === 1) {
+        return new Response(
+          JSON.stringify({
+            detail: {
+              code: 'workout_set_version_conflict',
+              message: 'Версия подхода устарела',
+              current: { ...saved, is_completed: false, version: 2 },
+            },
+          }),
+          { status: 409 },
+        );
+      }
+      return new Response(JSON.stringify(saved), { status: 200 });
+    });
+    const { result } = renderHook(() => useActiveWorkoutQueue(7, workout), {
+      wrapper: makeWrapper(client),
+    });
+
+    let accepted = false;
+    await act(async () => {
+      accepted = await result.current.enqueue(201, 1, complete, true);
+    });
+
+    expect(accepted).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(requests[1]?.mutation_id).toBe(requests[0]?.mutation_id);
+    expect(requests[1]?.expected_version).toBe(2);
+    expect(loadActiveWorkoutQueue(7, 42).queue).toHaveLength(0);
   });
 });
