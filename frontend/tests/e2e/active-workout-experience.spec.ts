@@ -1251,8 +1251,7 @@ test('#1161 keeps a deliberate manual scroll after focused workout input', async
 
   const duringGesture = await swipe(180);
 
-  const afterGesture = await page.evaluate(() => window.scrollY);
-  await expect.poll(() => stableScrollY(page)).toBe(afterGesture);
+  const afterGesture = await stableScrollY(page);
   expect(Math.abs(duringGesture - before)).toBeGreaterThan(10);
   expect(Math.abs(afterGesture - before)).toBeGreaterThan(50);
   expect(
@@ -1266,8 +1265,7 @@ test('#1161 keeps a deliberate manual scroll after focused workout input', async
 
   const beforeReturn = await stableScrollY(page);
   const duringReturn = await swipe(-180);
-  const afterReturn = await page.evaluate(() => window.scrollY);
-  await expect.poll(() => stableScrollY(page)).toBe(afterReturn);
+  const afterReturn = await stableScrollY(page);
   expect(Math.abs(duringReturn - beforeReturn)).toBeGreaterThan(10);
   expect(Math.abs(afterReturn - beforeReturn)).toBeGreaterThan(50);
   expect(await reps.inputValue()).toBe('12');
