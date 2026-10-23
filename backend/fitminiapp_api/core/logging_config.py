@@ -60,6 +60,7 @@ SAFE_EVENT_NAMES = frozenset(
         "telegram_delivery_skipped",
         "unhandled_exception",
         "worker_drain_requested",
+        "worker_failed",
         "worker_started",
         "worker_stopped",
         "weekly_digest_delivery_batch_completed",

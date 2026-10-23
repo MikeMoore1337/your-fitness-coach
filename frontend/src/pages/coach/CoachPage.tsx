@@ -56,6 +56,7 @@ import {
   type CoachTab,
 } from '../../shared/navigation/router';
 import { LIVE_DATA_REFETCH_INTERVAL_MS } from '../../shared/sync';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import { coachClientProfileDraftStorageKey } from '../../shared/userScopedStorage';
 import { handleTabKeyDown } from '../../shared/ui/tabs';
 import { DateInput } from '../../shared/ui/PickerInput';
@@ -1157,24 +1158,14 @@ export default function CoachPage({
   const { toast, confirm } = useFeedback();
   const queryClient = useQueryClient();
   const searchParams = new URLSearchParams(search);
-  const initialClientId = (() => {
-    const value = searchParams.get('client_id');
-    if (!value || !/^\d+$/.test(value)) return null;
-    const clientId = Number(value);
-    return Number.isSafeInteger(clientId) && clientId > 0 ? clientId : null;
-  })();
+  const initialClientId = positiveIntegerParam(searchParams, 'client_id');
   const routeTab = initialClientId ? 'clients' : coachTabFromSearch(search);
   const routeTool = coachToolFromSearch(searchParams.get('tool'));
   const [localTab, setLocalTab] = useState<CoachTab>(routeTab);
   const [localTool, setLocalTool] = useState<CoachTool | null>(routeTool);
   const tab = runtime.kind === 'demo' ? localTab : routeTab;
   const activeTool = runtime.kind === 'demo' ? localTool : routeTool;
-  const initialWorkoutId = (() => {
-    const value = searchParams.get('workout_id');
-    if (!value || !/^\d+$/.test(value)) return null;
-    const workoutId = Number(value);
-    return Number.isSafeInteger(workoutId) && workoutId > 0 ? workoutId : null;
-  })();
+  const initialWorkoutId = positiveIntegerParam(searchParams, 'workout_id');
   const initialAttentionFocus =
     searchParams.get('focus') === 'weekly_check_in' ? ('weekly_check_in' as const) : null;
   const initialReviewWorkspaceFocus = searchParams.get('focus') === 'review_workspace';

@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from threading import Barrier, Lock
+from threading import Barrier
 
 import pytest
 from alembic.migration import MigrationContext
@@ -17,7 +17,6 @@ from sqlalchemy import (
     MetaData,
     Table,
     create_engine,
-    event,
     inspect,
 )
 from sqlalchemy.orm import joinedload
@@ -619,38 +618,19 @@ def test_concurrent_repeat_confirmations_consume_one_preview(client) -> None:
     assert preview.status_code == 200, preview.text
     payload = {**request, "preview_token": preview.json()["preview_token"]}
 
-    preview_reads = 0
-    preview_reads_lock = Lock()
-    release_reads = Barrier(2)
+    request_barrier = Barrier(2)
 
-    def synchronize_preview_reads(
-        _conn, _cursor, statement, _parameters, _context, _executemany
-    ) -> None:
-        nonlocal preview_reads
-        if "food_diary_repeat_previews" not in statement or "token_hash" not in statement:
-            return
-        with preview_reads_lock:
-            preview_reads += 1
-        release_reads.wait(timeout=5)
+    def confirm(key: str):
+        request_barrier.wait(timeout=5)
+        return client.post(
+            "/api/v1/nutrition/diary/copy/product",
+            headers={**headers, "Idempotency-Key": key},
+            json=payload,
+        )
 
-    event.listen(engine, "before_cursor_execute", synchronize_preview_reads)
-    try:
-        request_barrier = Barrier(2)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        responses = list(executor.map(confirm, ("repeat-race-a", "repeat-race-b")))
 
-        def confirm(key: str):
-            request_barrier.wait(timeout=5)
-            return client.post(
-                "/api/v1/nutrition/diary/copy/product",
-                headers={**headers, "Idempotency-Key": key},
-                json=payload,
-            )
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            responses = list(executor.map(confirm, ("repeat-race-a", "repeat-race-b")))
-    finally:
-        event.remove(engine, "before_cursor_execute", synchronize_preview_reads)
-
-    assert preview_reads == 2
     assert sorted(response.status_code for response in responses) == [201, 409]
     with get_session_context() as db:
         user = db.query(User).filter(User.telegram_user_id == telegram_user_id).one()

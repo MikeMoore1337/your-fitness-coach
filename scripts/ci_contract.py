@@ -128,6 +128,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 cwd="frontend",
             ),
             _cmd("frontend-build", "npx", "vite", "build", cwd="frontend"),
+            _cmd("frontend-performance", "npm", "run", "perf:check", cwd="frontend"),
             _cmd(
                 "frontend-ui-audit-pr",
                 "npm",

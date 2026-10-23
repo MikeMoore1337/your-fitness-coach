@@ -97,6 +97,11 @@ def _stored_day_status(db: Session, user: User, diary_date: date) -> FoodDiaryDa
     return db.get(FoodDiaryDayStatus, (user.id, diary_date))
 
 
+def _lock_diary_user(db: Session, user: User) -> None:
+    # Day status and entry snapshots must be read and written in one per-account order.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+
+
 def _ensure_day_accepts_entries(db: Session, user: User, diary_date: date) -> None:
     status = _stored_day_status(db, user, diary_date)
     if status is not None and status.status == "fasted":
@@ -356,6 +361,7 @@ def create_food_diary_entry(
     payload: FoodDiaryEntryCreate,
     idempotency_key: str | None = None,
 ) -> FoodDiaryEntryResponse:
+    _lock_diary_user(db, user)
     _validate_diary_date(user, payload.diary_date)
     _ensure_day_accepts_entries(db, user, payload.diary_date)
     key = _normalize_idempotency_key(idempotency_key) if idempotency_key is not None else None
@@ -541,6 +547,7 @@ def create_food_diary_batch(
     template_id: int | None = None,
     commit: bool = True,
 ) -> FoodDiaryBatchResponse:
+    _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
     fingerprint = _batch_request_fingerprint(
         operation_kind,
@@ -626,6 +633,7 @@ def update_food_diary_entry(
     entry_id: int,
     payload: FoodDiaryEntryUpdate,
 ) -> FoodDiaryEntryResponse:
+    _lock_diary_user(db, user)
     entry = (
         db.query(FoodDiaryEntry)
         .filter(FoodDiaryEntry.id == entry_id, FoodDiaryEntry.user_id == user.id)
@@ -701,6 +709,7 @@ def update_food_diary_entry(
 
 
 def delete_food_diary_entry(db: Session, user: User, entry_id: int) -> None:
+    _lock_diary_user(db, user)
     entry = (
         db.query(FoodDiaryEntry)
         .filter(FoodDiaryEntry.id == entry_id, FoodDiaryEntry.user_id == user.id)
@@ -814,6 +823,7 @@ def set_food_diary_day_status(
     user: User,
     payload: FoodDiaryDayStatusUpdate,
 ) -> FoodDiaryDayResponse:
+    _lock_diary_user(db, user)
     _validate_diary_date(user, payload.diary_date)
     stored = _stored_day_status(db, user, payload.diary_date)
     has_entries = (
@@ -1178,6 +1188,7 @@ def _perform_copy(
     target_date: date,
     target_meal_type: MealType | None,
 ) -> FoodDiaryCopyResponse:
+    _lock_diary_user(db, user)
     key = _normalize_idempotency_key(idempotency_key)
     fingerprint = _request_fingerprint(scope, payload)
     replay = _existing_copy_operation(db, user, key, fingerprint, record_replay=True)

@@ -918,6 +918,13 @@ async def main() -> None:
             stop_requested,
             news_publication_ready=news_publication_ready,
         )
+    except Exception as exc:
+        logger.critical(
+            "worker_failed",
+            exc_info=exc,
+            extra={"reason": type(exc).__name__},
+        )
+        raise
     finally:
         stop_requested.set()
         await heartbeat_task
