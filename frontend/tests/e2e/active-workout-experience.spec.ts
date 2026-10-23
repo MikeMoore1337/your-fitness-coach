@@ -1805,6 +1805,30 @@ test('P1 completion preserves rest when navigation unmounts the pending workout'
   await expect(page.locator('[aria-current="step"]')).toHaveAttribute('data-workout-set-id', '202');
 });
 
+test('P1 lock and resume completion starts the measured rest panel', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 844 });
+  const server = await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const current = page.locator('[data-workout-set-id="201"]');
+  await current.getByLabel(/^Вес,/).fill('40');
+  await current.getByLabel(/^Повторы,/).fill('8');
+  await setDocumentVisibility(page, 'hidden');
+  await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+  await setDocumentVisibility(page, 'visible');
+  await page.evaluate(() => window.dispatchEvent(new Event('pageshow')));
+
+  await Promise.all([
+    waitForCompletedSetPatch(page, 201),
+    current.getByRole('button', { name: /^Завершить:/ }).click(),
+  ]);
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.locator('.active-workout-rest__actual-value strong')).toHaveText('0:00');
+  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+});
+
 for (const theme of ['dark', 'light'] as const) {
   test(`P1 storage rejection keeps fields and current set without rest ${theme}`, async ({
     page,

@@ -2,6 +2,11 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RestTimer } from '../../../../src/features/workouts/TodayWorkout';
 import { activeWorkoutRestKey } from '../../../../src/features/workouts/activeWorkoutQueue';
+import {
+  beginMeasuredRest,
+  updateMeasuredRest,
+} from '../../../../src/features/workouts/restSessions';
+import { legacyWorkoutRestStorageKey } from '../../../../src/shared/userScopedStorage';
 
 vi.mock('../../../../src/shared/telegram/useTelegram', () => ({ haptic: vi.fn() }));
 
@@ -44,6 +49,43 @@ afterEach(() => {
 });
 
 describe('RestTimer', () => {
+  it('does not resurrect a deadline-only legacy timer after resume', () => {
+    localStorage.removeItem(key);
+    localStorage.setItem(legacyWorkoutRestStorageKey(42), JSON.stringify(initialTime + 90_000));
+
+    mount();
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(localStorage.getItem(legacyWorkoutRestStorageKey(42))).toBeNull();
+  });
+
+  it('restores the measured panel when resume follows a durable rest journal', () => {
+    localStorage.removeItem(key);
+    expect(beginMeasuredRest(7, 42, 201, 90, initialTime)).not.toBeNull();
+
+    mount();
+
+    expect(screen.getByRole('complementary')).toHaveTextContent('ФАКТ');
+    expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  });
+
+  it('ignores a replayed completion event after its measured rest is terminal', () => {
+    localStorage.removeItem(key);
+    expect(beginMeasuredRest(7, 42, 201, 90, initialTime)).not.toBeNull();
+    expect(updateMeasuredRest(7, 42, 201, 'complete', initialTime + 30_000)).not.toBeNull();
+
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+
+    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+  });
+
   it('uses an uppercase FACT label with a real, explicitly stoppable measured clock', () => {
     mount();
     act(() => {
