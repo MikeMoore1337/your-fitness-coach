@@ -1,4 +1,8 @@
 x-backend-image: &backend-image
+  # OCR/export spill and worker heartbeat still need disk-backed /tmp.
+  # Defer read_only/tmpfs until peak usage and the VPS memory budget are verified.
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
   image: ${BACKEND_IMAGE:-yfc-backend:local}
   build:
     context: .
@@ -7,6 +11,10 @@ x-backend-image: &backend-image
       VITE_PWA_ENABLED: ${VITE_PWA_ENABLED:-true}
 
 x-bot-image: &bot-image
+  # Polling locks and atomic profile-sync state stay on bot_polling_lock.
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
   image: ${BOT_IMAGE:-yfc-bot:local}
   build:
     context: .
@@ -170,6 +178,9 @@ services:
 
   edge:
     image: ${CADDY_IMAGE:-caddy:2-alpine}
+    # Deployment copies candidate Caddyfiles to /tmp before validate/reload.
+    # Keep image capabilities: dropping ALL prevents executing file-capability Caddy.
+    security_opt: [no-new-privileges:true]
     restart: unless-stopped
     entrypoint: ["/bin/sh", "/usr/local/bin/edge-entrypoint.sh"]
     environment:
