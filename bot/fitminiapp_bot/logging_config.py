@@ -33,6 +33,7 @@ SAFE_EVENT_NAMES = frozenset(
         "support_response_undeliverable",
         "telegram_account_link_failed",
         "telegram_polling_failed",
+        "telegram_polling_conflict",
         "telegram_polling_recovered",
         "telegram_polling_retry_scheduled",
         "telegram_polling_started",

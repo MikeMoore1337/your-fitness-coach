@@ -672,6 +672,7 @@ jobs:
              (.services.worker.health == "healthy") and
              (.services.bot.revision == $expected) and
              (.services.bot.status == "running") and
+             (.services.bot.polling_owner.verified == true) and
              (.services.bot.runtime_markers.polling_file_lock_acquired == true) and
              (.services.bot.runtime_markers.telegram_polling_started == true) and
              (any(.summaries[]?; .target_revision == $expected and .verdict == "active"))' \
@@ -759,6 +760,7 @@ jobs:
              (.services.bot.status == "running") and
              (.services.bot.immutable_image == true) and
              ((.services.bot.image_ref | type) == "string" and (.services.bot.image_ref | contains("@sha256:"))) and
+             (.services.bot.polling_owner.verified == true) and
              (.services.bot.runtime_markers.polling_file_lock_acquired == true) and
              (.services.bot.runtime_markers.telegram_polling_started == true) and
              (any(.summaries[]?; .target_revision == $expected and .verdict == "active"))' \

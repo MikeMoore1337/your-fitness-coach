@@ -26,6 +26,7 @@ import { parseProgressView } from '../../features/workouts/progressPeriods';
 import '../../styles/pulse-concepts.css';
 import '../../styles/semantic-cards.css';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 
 const NotificationsPanel = lazy(() =>
   import('../../features/account/NotificationsPanel').then((module) => ({
@@ -190,24 +191,18 @@ function requestedProgressReturn(search: string): string | undefined {
   }
 }
 
-function positiveId(value: string | null): number | null {
-  if (!value || !/^\d+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
-}
-
 function requestedWorkoutFeedback(search: string): {
   workoutId: number;
   commentId: number | null;
   workoutExerciseId: number | null;
 } | null {
   const params = new URLSearchParams(search);
-  const workoutId = positiveId(params.get('workout_id'));
+  const workoutId = positiveIntegerParam(params, 'workout_id');
   if (!workoutId) return null;
   return {
     workoutId,
-    commentId: positiveId(params.get('comment_id')),
-    workoutExerciseId: positiveId(params.get('workout_exercise_id')),
+    commentId: positiveIntegerParam(params, 'comment_id'),
+    workoutExerciseId: positiveIntegerParam(params, 'workout_exercise_id'),
   };
 }
 
@@ -217,9 +212,9 @@ function requestedHistoricalProgramWorkout(search: string): {
   workoutId: number;
 } | null {
   const params = new URLSearchParams(search);
-  const workoutId = positiveId(params.get('workout_id'));
-  const programId = positiveId(params.get('program_history'));
-  const revisionNumber = positiveId(params.get('program_revision'));
+  const workoutId = positiveIntegerParam(params, 'workout_id');
+  const programId = positiveIntegerParam(params, 'program_history');
+  const revisionNumber = positiveIntegerParam(params, 'program_revision');
   return workoutId && programId && revisionNumber ? { workoutId, programId, revisionNumber } : null;
 }
 
@@ -270,7 +265,7 @@ export default function MiniAppPage({
   const nutritionHydrationOpen = requestedHydrationQuick(search);
   const reportHandoffId =
     section === 'progress'
-      ? positiveId(new URLSearchParams(search).get('report_handoff_id'))
+      ? positiveIntegerParam(new URLSearchParams(search), 'report_handoff_id')
       : null;
   const sectionMotion = useSemanticMotion<HTMLDivElement>(section, {
     animateInitial: section === 'progress',
@@ -353,7 +348,7 @@ export default function MiniAppPage({
     );
   }, [toast]);
   const programStart = section === 'programs' ? requestedProgramStart(search) : null;
-  const programHistoryId = positiveId(new URLSearchParams(search).get('program_history'));
+  const programHistoryId = positiveIntegerParam(new URLSearchParams(search), 'program_history');
   const programManagementOpen =
     section === 'programs' &&
     (requestedProgramView(search) === 'manage' ||

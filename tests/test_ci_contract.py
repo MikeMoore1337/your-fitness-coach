@@ -783,3 +783,13 @@ def test_optional_local_checks_use_ci_groups_without_release_evidence() -> None:
     assert "task_session" not in source_text
     assert "pre_push" not in source_text
     assert ".artifacts/tasks" not in source_text
+
+
+def test_frontend_performance_budget_is_checked_after_build() -> None:
+    commands = ci_contract.COMMAND_GROUPS["frontend-checks"].commands
+    names = [command.name for command in commands]
+    index = names.index("frontend-build")
+    guard = commands[index + 1]
+    assert guard.name == "frontend-performance"
+    assert guard.cwd == "frontend"
+    assert guard.argv == ("npm", "run", "perf:check")

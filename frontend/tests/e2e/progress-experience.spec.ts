@@ -39,6 +39,26 @@ const TASK_111_SCREENSHOTS = resolve(
 
 type NutritionReportState = 'partial' | 'no-data' | 'long';
 
+const REDUCED_MOTION_MAX_DURATION_MS = 0.01;
+const CSS_TIME_TOKEN = /^([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?)(ms|s)$/i;
+
+function hasOnlyReducedMotionDurations(value: string): boolean {
+  const durations = value.split(',');
+  return (
+    durations.length > 0 &&
+    durations.every((duration) => {
+      const match = CSS_TIME_TOKEN.exec(duration.trim());
+      if (!match) return false;
+      const unit = match[2];
+      if (!unit) return false;
+      const amount = Number(match[1]);
+      if (!Number.isFinite(amount) || amount < 0) return false;
+      const durationMs = amount * (unit.toLowerCase() === 's' ? 1_000 : 1);
+      return durationMs <= REDUCED_MOTION_MAX_DURATION_MS + Number.EPSILON;
+    })
+  );
+}
+
 const CAPTURE_PROGRESS_865 = process.env.CAPTURE_PROGRESS_865;
 const CAPTURE_970_AFTER = process.env.CAPTURE_970_AFTER === '1';
 const WORKTREE_ROOT = resolve(process.cwd(), '..');
@@ -2953,11 +2973,26 @@ for (const theme of ['light', 'dark'] as const) {
   }
 }
 
+test('reduced-motion duration matcher follows the CSS time contract', () => {
+  for (const value of ['0s', '1e-05s', '0.01ms', '0s, 0.01ms']) {
+    expect(hasOnlyReducedMotionDurations(value)).toBe(true);
+  }
+  for (const value of ['150ms', '0s, 150ms', '0.01px', 'invalid']) {
+    expect(hasOnlyReducedMotionDurations(value)).toBe(false);
+  }
+});
+
 test('canonical charts and icons remain operable in forced colors and reduced motion', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ forcedColors: 'active', reducedMotion: 'reduce' });
+  expect(
+    await page.evaluate(() => ({
+      forcedColors: matchMedia('(forced-colors: active)').matches,
+      reducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+    })),
+  ).toEqual({ forcedColors: true, reducedMotion: true });
   await mockProgress(page);
   await page.goto('/app?section=progress');
   await page.getByRole('button', { name: 'Клиент' }).click();
@@ -2984,12 +3019,11 @@ test('canonical charts and icons remain operable in forced colors and reduced mo
       .first()
       .evaluate((line) => getComputedStyle(line).stroke),
   ).not.toBe('none');
-  expect(
-    await chart
-      .locator('.data-viz-chart__point-ring')
-      .first()
-      .evaluate((point) => getComputedStyle(point).transitionDuration),
-  ).toBe('0s');
+  const transitionDuration = await chart
+    .locator('.data-viz-chart__point-ring')
+    .first()
+    .evaluate((point) => getComputedStyle(point).transitionDuration);
+  expect(hasOnlyReducedMotionDurations(transitionDuration)).toBe(true);
   await expect
     .poll(() =>
       page.evaluate(

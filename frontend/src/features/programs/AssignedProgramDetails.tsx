@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../../shared/api/client';
 import type { ApiSchemas } from '../../shared/api/types';
 import { AppLink } from '../../shared/navigation/router';
+import { positiveIntegerParam } from '../../shared/navigation/routeParams';
 import {
   Badge,
   Button,
@@ -86,11 +87,13 @@ function earlierDate(left: string, right: string): string {
 
 function returnContext(programId: number): { revision: number | null; shouldOpen: boolean } {
   const params = new URLSearchParams(window.location.search);
-  if (params.get('program_history') !== String(programId)) {
+  if (
+    params.get('program_history') !== String(programId) ||
+    positiveIntegerParam(params, 'program_history') !== programId
+  ) {
     return { revision: null, shouldOpen: false };
   }
-  const value = params.get('program_revision');
-  const revision = value && /^\d+$/.test(value) ? Number(value) : null;
+  const revision = positiveIntegerParam(params, 'program_revision');
   return { revision, shouldOpen: true };
 }
 

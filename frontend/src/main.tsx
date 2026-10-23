@@ -1,9 +1,6 @@
 import { StrictMode, lazy, Suspense, useEffect, useLayoutEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './app/AuthProvider';
-import { AuthGate } from './app/AuthGate';
-import { OnboardingGate } from './app/OnboardingGate';
 import { ErrorBoundary } from './app/ErrorBoundary';
 import { FeedbackProvider } from './shared/ui/FeedbackProvider';
 import { GlassInteractions } from './shared/ui/GlassInteractions';
@@ -11,22 +8,14 @@ import { OnlineStatus } from './shared/ui/OnlineStatus';
 import { LoadingState } from './shared/ui/common';
 import { isTelegramLaunch } from './shared/telegram/launch';
 import { applyPlatformTheme, useTelegram } from './shared/telegram/useTelegram';
-import {
-  NavigationProvider,
-  PERSONAL_WORKSPACE_RETURN_STATE,
-  Redirect,
-  useNavigation,
-} from './shared/navigation/router';
-import { hasExplicitAppDestination } from './shared/auth/redirects';
+import { NavigationProvider, Redirect, useNavigation } from './shared/navigation/router';
 import {
   isPublicKnowledgePath,
   publicKnowledgePathFromLegacyRoute,
 } from './shared/navigation/knowledgeRoutes';
-import { clearAllDemoSessions } from './features/demo/demoApi';
 import { PwaProvider } from './shared/pwa/PwaProvider';
 import { captureFirstTouchAttribution } from './shared/analytics/attribution';
 import { LANDING_AUDIENCE_ROUTES } from './pages/landing/landingAudience';
-import { isTrainerIntentLocation } from './shared/auth/trainerIntent';
 import './styles/legacy.css';
 import './styles/fonts.css';
 import './styles/design-system.css';
@@ -87,7 +76,6 @@ function isPublicLandingRoute(path: string): boolean {
   );
 }
 
-const MiniAppPage = lazy(() => import('./pages/miniapp/MiniAppPage'));
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
@@ -103,12 +91,27 @@ const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const JoinCoachPage = lazy(() => import('./pages/join/JoinCoachPage'));
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'));
-const TrainerIntentFlow = lazy(() =>
-  import('./features/trainer/TrainerIntentFlow').then((module) => ({
-    default: module.TrainerIntentFlow,
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const AuthProvider = lazy(() =>
+  import('./app/AuthProvider').then((module) => ({
+    default: module.AuthProvider,
   })),
 );
-const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
+const OnboardingGate = lazy(() =>
+  import('./app/OnboardingGate').then((module) => ({
+    default: module.OnboardingGate,
+  })),
+);
+const AuthenticatedRoute = lazy(() =>
+  import('./app/AuthenticatedRoutes').then((module) => ({
+    default: module.AuthenticatedRoute,
+  })),
+);
+const AuthenticatedAppPage = lazy(() =>
+  import('./app/AuthenticatedAppPage').then((module) => ({
+    default: module.AuthenticatedAppPage,
+  })),
+);
 function loadTelegramSdk(): Promise<void> {
   if (!isTelegramLaunch(window.location) || window.Telegram?.WebApp) {
     return Promise.resolve();
@@ -129,36 +132,6 @@ const queryClient = new QueryClient({
     mutations: { retry: 0 },
   },
 });
-
-function AuthenticatedRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <AuthProvider>
-      <AuthGate>{children}</AuthGate>
-    </AuthProvider>
-  );
-}
-
-function AuthenticatedAppRoute() {
-  const { user } = useAuth();
-  const { search, path } = useNavigation();
-  if (isTrainerIntentLocation(path, search, window.location.hash)) {
-    return <TrainerIntentFlow />;
-  }
-  const isIntentionalPersonalReturn =
-    window.history.state?.[PERSONAL_WORKSPACE_RETURN_STATE] === true;
-  if (
-    user?.is_coach &&
-    !isIntentionalPersonalReturn &&
-    !hasExplicitAppDestination(search, window.location.hash)
-  ) {
-    return <Redirect to="/coach" />;
-  }
-  return (
-    <OnboardingGate>
-      <MiniAppPage />
-    </OnboardingGate>
-  );
-}
 
 function AppRoutes() {
   const { path } = useNavigation();
@@ -230,12 +203,7 @@ function AppRoutes() {
       );
     }
   }
-  if (path === '/app')
-    return (
-      <AuthenticatedRoute>
-        <AuthenticatedAppRoute />
-      </AuthenticatedRoute>
-    );
+  if (path === '/app') return <AuthenticatedAppPage />;
   if (path === '/app/report')
     return (
       <AuthenticatedRoute>
@@ -330,6 +298,7 @@ async function bootstrap(): Promise<void> {
   captureFirstTouchAttribution();
   initializeYandexMetrica();
   if (window.location.pathname === '/demo' && isTelegramLaunch(window.location)) {
+    const { clearAllDemoSessions } = await import('./features/demo/demoApi');
     clearAllDemoSessions();
   }
   renderApp();

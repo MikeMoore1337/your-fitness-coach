@@ -87,6 +87,9 @@ const entrySource = readFileSync(entryJsPath, "utf8");
 if (entrySource.includes("WHO Guidelines on Physical Activity")) {
   failures.push("initial JS contains the lazy public content manifest");
 }
+if (entrySource.includes("fit_demo_sessions_v1")) {
+  failures.push("initial JS eagerly contains demo-only session state");
+}
 if ((entry.css ?? []).some((file) => file.includes("DataViz"))) {
   failures.push(
     "initial CSS eagerly contains the route-scoped DataViz stylesheet",
