@@ -60,7 +60,30 @@ for (const width of [360, 390, 430, 1440]) {
           await expect(sheet.locator(':focus')).toHaveCount(1);
           await page.keyboard.press('Escape');
           await expect(sheet).toBeHidden();
-          await expect(add).toBeFocused();
+          try {
+            await expect(add).toBeFocused();
+          } catch (error) {
+            const focusState = await page.evaluate(() => {
+              const trigger = document.querySelector<HTMLElement>('[data-testid="quick-add-trigger"]');
+              const active = document.activeElement;
+              const style = trigger ? getComputedStyle(trigger) : null;
+              return {
+                activeTag: active?.tagName ?? null,
+                activeLabel: active?.getAttribute('aria-label') ?? null,
+                activeTestId: active?.getAttribute('data-testid') ?? null,
+                triggerConnected: trigger?.isConnected ?? false,
+                triggerInertAncestor: Boolean(trigger?.closest('[inert]')),
+                triggerDisplay: style?.display ?? null,
+                triggerVisibility: style?.visibility ?? null,
+                dialogPresent: Boolean(document.querySelector('[data-testid="quick-add-layer"]')),
+              };
+            });
+            await testInfo.attach('quick-add-focus-failure', {
+              body: JSON.stringify(focusState, null, 2),
+              contentType: 'application/json',
+            });
+            throw error;
+          }
         }
       }
       for (const [name, url] of [
