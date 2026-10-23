@@ -1156,6 +1156,121 @@ test('#1099 keeps scroll stable after keyboard input and server ACK', async ({ p
   ).toEqual([]);
 });
 
+test('#1161 keeps a deliberate manual scroll after focused workout input', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName !== 'chromium',
+    'Chromium CDP provides the deterministic touch swipe input',
+  );
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    localStorage.setItem('app-theme', 'dark');
+    const viewport = new EventTarget() as EventTarget & {
+      height: number;
+      width: number;
+      offsetTop: number;
+    };
+    Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+    const calls: string[] = [];
+    Object.assign(window, { __yfc1161ScrollCalls: calls });
+    for (const method of ['scrollBy', 'scrollTo'] as const) {
+      const original = window[method].bind(window);
+      window[method] = (options?: ScrollToOptions | number, y?: number) => {
+        calls.push(method);
+        if (typeof options === 'number') original(options, y ?? 0);
+        else original(options);
+      };
+    }
+  });
+  const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('40');
+  await first.getByLabel(/^Повторы,/).fill('10');
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+
+  const row = page.locator('[data-workout-set-id="202"]');
+  const weight = row.getByLabel(/^Вес,/);
+  const reps = row.getByLabel(/^Повторы,/);
+  await weight.fill('85');
+  await reps.fill('12');
+  await expect.poll(() => server.readSet(202).actual_weight).toBe(85);
+  await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as EventTarget & { height: number };
+    viewport.height = 420;
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  await reps.focus();
+  const before = await stableScrollY(page);
+  await page.evaluate(() => {
+    (window as Window & { __yfc1161ScrollCalls?: string[] }).__yfc1161ScrollCalls!.length = 0;
+  });
+  const patchCountBeforeGesture = server.patches.length;
+
+  const rowBox = (await row.boundingBox())!;
+  const swipeX = rowBox.x + 5;
+  const swipeY = Math.min(620, Math.max(160, rowBox.y + rowBox.height - 20));
+  const touch = await page.context().newCDPSession(page);
+  await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  const swipe = async (deltaY: number) => {
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ id: 1, x: swipeX, y: swipeY }],
+    });
+    for (let step = 1; step <= 8; step += 1) {
+      await touch.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ id: 1, x: swipeX, y: swipeY + (deltaY * step) / 8 }],
+      });
+      if (step === 2) {
+        await page.evaluate(
+          (offsetTop) => {
+            const viewport = window.visualViewport as EventTarget & { offsetTop: number };
+            viewport.offsetTop = offsetTop;
+            viewport.dispatchEvent(new Event('scroll'));
+          },
+          deltaY > 0 ? 1 : 2,
+        );
+      }
+    }
+    const duringGesture = await page.evaluate(() => window.scrollY);
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    return duringGesture;
+  };
+
+  const duringGesture = await swipe(180);
+
+  const afterGesture = await stableScrollY(page);
+  expect(Math.abs(duringGesture - before)).toBeGreaterThan(10);
+  expect(Math.abs(afterGesture - before)).toBeGreaterThan(50);
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __yfc1161ScrollCalls?: string[] }).__yfc1161ScrollCalls,
+    ),
+  ).toEqual([]);
+  expect(await reps.inputValue()).toBe('12');
+  expect(server.patches).toHaveLength(patchCountBeforeGesture);
+  expect(server.readSet(202).is_completed).toBe(false);
+
+  const beforeReturn = await stableScrollY(page);
+  const duringReturn = await swipe(-180);
+  const afterReturn = await stableScrollY(page);
+  expect(Math.abs(duringReturn - beforeReturn)).toBeGreaterThan(10);
+  expect(Math.abs(afterReturn - beforeReturn)).toBeGreaterThan(50);
+  expect(await reps.inputValue()).toBe('12');
+});
+
 test.describe('#1001 completion navigation', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
