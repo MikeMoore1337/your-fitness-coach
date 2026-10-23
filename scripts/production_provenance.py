@@ -277,6 +277,113 @@ def _bot_process_owner(pid: int, *, proc_root: Path = Path("/proc")) -> str:
     return identity[19]
 
 
+
+# The deploy user cannot ptrace UID 10001 on production. Run a bounded read-only
+# check *as that same UID* inside the already verified bot container instead.
+# Never run this probe as root or treat missing data as a valid owner.
+_BOT_CONTAINER_OWNER_PROBE = r"""
+import hashlib
+import json
+import os
+from pathlib import Path
+
+process = Path("/proc/1")
+def starttime():
+    fields = (process / "stat").read_text().rsplit(")", 1)[1].split()
+    if fields[0] in {"Z", "X", "x"}:
+        raise ValueError("bot process not live")
+    return fields[19]
+
+before = starttime()
+command = (process / "cmdline").read_bytes().split(b"\0")
+if len(command) != 4 or command[1:] != [b"-m", b"fitminiapp_bot.bot", b""]:
+    raise ValueError("unexpected bot command")
+if not Path(os.fsdecode(command[0])).name.startswith("python"):
+    raise ValueError("unexpected bot executable")
+
+environment = dict(
+    part.split(b"=", 1)
+    for part in (process / "environ").read_bytes().split(b"\0")
+    if b"=" in part
+)
+token = environment.get(b"TELEGRAM_BOT_TOKEN")
+directory = os.fsdecode(environment.get(b"BOT_POLLING_LOCK_DIR", b"/var/lock/fitminiapp-bot"))
+if not token or not directory.startswith("/"):
+    raise ValueError("missing polling identity")
+
+name = hashlib.sha256(token).hexdigest()[:24]
+lock = Path(directory) / ("polling-" + name + ".lock")
+stat = lock.stat()
+inode = (stat.st_dev, stat.st_ino)
+descriptors = [fd for fd in (process / "fd").iterdir()
+               if (fd.stat().st_dev, fd.stat().st_ino) == inode]
+if len(descriptors) != 1:
+    raise ValueError("polling descriptor not unique")
+
+locks = []
+for line in Path("/proc/locks").read_text().splitlines():
+    parts = line.split()
+    if len(parts) != 8:
+        continue
+    device = parts[5].split(":")
+    if len(device) != 3:
+        continue
+    if (os.makedev(int(device[0], 16), int(device[1], 16)), int(device[2])) == inode:
+        locks.append(parts[1:])
+if len(locks) != 1 or locks[0][:4] != ["FLOCK", "ADVISORY", "WRITE", "1"] \
+        or locks[0][-2:] != ["0", "EOF"]:
+    raise ValueError("kernel flock owner not verified")
+fdinfo = (process / "fdinfo" / descriptors[0].name).read_text()
+if not any(line.split()[2:] == locks[0]
+           for line in fdinfo.splitlines() if line.startswith("lock:")):
+    raise ValueError("fdinfo does not match kernel flock")
+if starttime() != before:
+    raise ValueError("process identity changed")
+print(json.dumps({"verified": True, "starttime": before}, separators=(",", ":")))
+"""
+
+
+def _bot_process_owner_in_container(container_id: str, host_pid: int) -> str:
+    """Verify polling FLOCK as the bot UID when host /proc is access-restricted."""
+    host_process = Path("/proc") / str(host_pid) / "stat"
+
+    def host_starttime() -> str:
+        fields = host_process.read_text().rsplit(")", 1)[1].split()
+        if fields[0] in {"Z", "X", "x"}:
+            raise ProvenanceError("bot host process is not live")
+        return fields[19]
+
+    before = host_starttime()
+    completed = subprocess.run(
+        [
+            "docker", "exec", "--user", "10001:10001",
+            container_id, "python", "-c", _BOT_CONTAINER_OWNER_PROBE,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=20,
+    )
+    evidence = json.loads(completed.stdout)
+    if (
+        not isinstance(evidence, dict)
+        or evidence != {"verified": True, "starttime": before}
+        or host_starttime() != before
+    ):
+        raise ProvenanceError("bot container polling ownership evidence does not match host")
+    return before
+
+
+def _bot_process_owner_with_container_fallback(container_id: str, host_pid: int) -> str:
+    try:
+        return _bot_process_owner(host_pid)
+    except PermissionError:
+        # Docker exec is not a privilege escalation: bot/Dockerfile uses UID 10001.
+        # An unsuccessful same-UID probe remains a hard release blocker.
+        return _bot_process_owner_in_container(container_id, host_pid)
+
+
 def _bot_runtime_snapshot(container: dict[str, object]) -> dict[str, object]:
     try:
         state = container["State"]
@@ -292,11 +399,11 @@ def _bot_runtime_snapshot(container: dict[str, object]) -> dict[str, object]:
             or not started_at.endswith("Z")
         ):
             raise ProvenanceError("bot container identity evidence incomplete")
-        before = _bot_process_owner(pid)
+        before = _bot_process_owner_with_container_fallback(container_id, pid)
         if _run(["docker", "top", container_id, "-eo", "pid"]).split() != ["PID", str(pid)]:
             raise ProvenanceError("bot container process ownership is ambiguous")
         markers = _bot_startup_markers(container_id, started_at)
-        after = _bot_process_owner(pid)
+        after = _bot_process_owner_with_container_fallback(container_id, pid)
         if _run(["docker", "top", container_id, "-eo", "pid"]).split() != ["PID", str(pid)]:
             raise ProvenanceError("bot container process ownership is ambiguous")
         current = _json_command(["docker", "inspect", container_id])
