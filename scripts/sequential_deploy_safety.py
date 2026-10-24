@@ -66,16 +66,38 @@ SELECT json_build_object(
 
 # Run only in inspected application containers. Match established socket inode to
 # an owning process, not application_name (which any client can forge).
-# Docker healthchecks also run ``python -c`` inside these containers. Ignore that
-# short-lived helper only when it owns no PostgreSQL socket; an extra process with
-# a DB socket remains a hard topology failure.
-SOCKET_PROBE_PROCESS_RULE = r"""
+# Keep these two signatures aligned with the backend and worker ``healthcheck.test``
+# commands in docker-compose.yml; other inline Python remains an application process.
+SOCKET_PROBE_HEALTHCHECK_COMMANDS = (
+    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)",
+    "import os,time; from fitminiapp_api.core.config import settings; age=time.time()-os.path.getmtime('/tmp/fitminiapp-worker-heartbeat'); assert age < max(120, settings.worker_poll_seconds * 3 + 30)",
+)
+
+# Docker healthchecks also run ``python -c`` inside these containers. Ignore only
+# the two known short-lived helpers when they own no PostgreSQL socket; an extra
+# process with a DB socket remains a hard topology failure.
+SOCKET_PROBE_PROCESS_RULE = (
+    r"""
+KNOWN_HEALTHCHECK_COMMANDS = """
+    + repr(SOCKET_PROBE_HEALTHCHECK_COMMANDS)
+    + r"""
+def is_known_healthcheck(arguments):
+    if len(arguments) < 3 or arguments[1] != b'-c':
+        return False
+    if any(arguments[3:]):
+        return False
+    try:
+        return arguments[2].decode('utf-8') in KNOWN_HEALTHCHECK_COMMANDS
+    except UnicodeDecodeError:
+        return False
+
 def application_process_count(processes, db_socket_inodes):
     return sum(
-        not inline_python or bool(process_sockets & db_socket_inodes)
-        for inline_python, process_sockets in processes
+        not known_healthcheck or bool(process_sockets & db_socket_inodes)
+        for known_healthcheck, process_sockets in processes
     )
 """
+)
 
 SOCKET_PROBE = (
     r"""
@@ -101,10 +123,10 @@ for process in root.iterdir():
         if command.startswith(('python', 'uvicorn')):
             try:
                 arguments = (process / 'cmdline').read_bytes().split(b'\0')
-                inline_python = command.startswith('python') and len(arguments) > 1 and arguments[1] == b'-c'
+                known_healthcheck = command.startswith('python') and is_known_healthcheck(arguments)
             except (FileNotFoundError, PermissionError):
-                inline_python = False
-            matching_processes.append((inline_python, process_sockets))
+                known_healthcheck = False
+            matching_processes.append((known_healthcheck, process_sockets))
     except FileNotFoundError:
         pass
 def endpoint(value, ipv6):

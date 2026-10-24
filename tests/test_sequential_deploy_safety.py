@@ -24,15 +24,29 @@ def snapshot():
     }
 
 
-def test_socket_probe_ignores_database_free_inline_healthcheck_processes():
+def test_socket_probe_ignores_only_known_database_free_healthchecks():
     assert safety.SOCKET_PROBE_PROCESS_RULE in safety.SOCKET_PROBE
     namespace = {}
     exec(safety.SOCKET_PROBE_PROCESS_RULE, namespace)
+    is_known_healthcheck = namespace["is_known_healthcheck"]
     count = namespace["application_process_count"]
+
+    backend = [b"python", b"-c", safety.SOCKET_PROBE_HEALTHCHECK_COMMANDS[0].encode(), b""]
+    worker = [b"python", b"-c", safety.SOCKET_PROBE_HEALTHCHECK_COMMANDS[1].encode(), b""]
+    unknown_inline = [b"python", b"-c", b"print('not a Docker healthcheck')", b""]
+    unknown_command = [b"python", b"worker.py", b""]
+    extra_argument = [*backend[:-1], b"unexpected", b""]
+
+    assert is_known_healthcheck(backend)
+    assert is_known_healthcheck(worker)
+    assert not is_known_healthcheck(unknown_inline)
+    assert not is_known_healthcheck(unknown_command)
+    assert not is_known_healthcheck(extra_argument)
 
     assert count([(False, set()), (True, set())], set()) == 1
     assert count([(False, set()), (True, {"db-socket"})], {"db-socket"}) == 2
-    assert count([(False, set()), (False, set())], set()) == 2
+    for unknown in (unknown_inline, unknown_command, extra_argument):
+        assert count([(False, set()), (is_known_healthcheck(unknown), set())], set()) == 2
 
 
 def container(name="backend", *, running=True, restart="no", exit_code=0):
