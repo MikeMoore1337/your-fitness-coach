@@ -159,6 +159,52 @@ def test_live_attribution_works_without_application_name_and_without_backend_obs
     assert guard.last_report["backup"] == 72
 
 
+def test_transient_unmatched_client_requires_two_fresh_clean_checks(guard, monkeypatch):
+    observations = 0
+    sleeps = []
+
+    def observe(_):
+        nonlocal observations
+        observations += 1
+        if observations == 1:
+            return (
+                snapshot(),
+                [{"pid": 42, "start": "now", "address": None, "port": -1}],
+                {"172.20.0.2"},
+            )
+        return snapshot(), [], {"172.20.0.2"}
+
+    monkeypatch.setattr(guard, "observe", observe)
+    monkeypatch.setattr(safety.time, "sleep", sleeps.append)
+    guard.check(frozenset({"backend"}))
+
+    assert observations == 5  # failed join, then two complete two-snapshot checks
+    assert sleeps == [0.15, 0.15]
+
+
+def test_persistent_unmatched_client_blocks_after_bounded_rechecks(guard, monkeypatch):
+    observations = 0
+    sleeps = []
+
+    def observe(_):
+        nonlocal observations
+        observations += 1
+        return (
+            snapshot(),
+            [{"pid": 43, "start": "now", "address": None, "port": -1}],
+            {"172.20.0.2"},
+        )
+
+    monkeypatch.setattr(guard, "observe", observe)
+    monkeypatch.setattr(safety.time, "sleep", sleeps.append)
+
+    with pytest.raises(safety.SafetyError, match="unknown_or_unreleased_database_client"):
+        guard.check(frozenset({"backend"}))
+
+    assert observations == 5
+    assert sleeps == [0.15] * 4
+
+
 @pytest.mark.parametrize("name", ["backend-blue", "worker-green", "setup", "bot-blue"])
 def test_unexpected_slot_or_orphaned_setup_blocks_before_launch(guard, monkeypatch, name):
     monkeypatch.setattr(guard, "inventory", lambda: [container(), container(name)])
