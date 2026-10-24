@@ -77,7 +77,6 @@
 }
 .program-preview-source {
   padding: 12px 0;
-  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.82rem;
 }

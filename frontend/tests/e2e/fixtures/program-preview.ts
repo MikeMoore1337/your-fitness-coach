@@ -178,13 +178,13 @@ export async function previewGesture(page: Page, browserName: string, dx: number
     await page.mouse.move(x, y);
     await page.mouse.wheel(-dx, -dy);
   }
+  let previous: number | undefined;
   await expect
     .poll(async () => {
-      const first = await content.evaluate((node) => node.scrollTop);
-      await page.evaluate(
-        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
-      );
-      return Math.abs(first - (await content.evaluate((node) => node.scrollTop)));
+      const current = await content.evaluate((node) => node.scrollTop);
+      const delta = previous === undefined ? Infinity : Math.abs(previous - current);
+      previous = current;
+      return delta;
     })
     .toBeLessThanOrEqual(1);
 }
