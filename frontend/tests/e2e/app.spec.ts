@@ -1,11 +1,205 @@
 import path from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
+import { installTelegramHarness } from './fixtures/mobile-tma';
 
 test.use({ serviceWorkers: 'block' });
+
+test.describe('универсальная геометрия предпросмотра #1185', () => {
+  test.use({ hasTouch: true });
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      for (const surface of width === 393 && theme === 'dark'
+        ? ['browser', 'pwa', 'telegram']
+        : ['browser']) {
+        test(`${width}px ${theme} ${surface}: шаблоны, свои, активные и тренерские программы`, async ({
+          context,
+          browserName,
+        }, testInfo) => {
+          test.setTimeout(120_000);
+          const templates = previewTemplates();
+          const evidence = process.env.PREVIEW_EVIDENCE_DIR;
+          const directory =
+            evidence &&
+            path.join(
+              evidence,
+              browserName,
+              `${width}-${theme}${surface === 'browser' ? '' : `-${surface}`}`,
+            );
+          if (directory) mkdirSync(directory, { recursive: true });
+          for (const template of templates) {
+            const page = await context.newPage();
+            await page.setViewportSize({ width, height: 900 });
+            await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+            await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+            if (surface === 'pwa')
+              await page.addInitScript(() => {
+                Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+              });
+            if (surface === 'telegram')
+              await installTelegramHarness(page, {
+                colorScheme: theme,
+                platform: 'ios',
+                viewportHeight: 900,
+                viewportStableHeight: 900,
+                safeAreaInset: { top: 28, right: 0, bottom: 20, left: 0 },
+                contentSafeAreaInset: { top: 44, right: 0, bottom: 16, left: 0 },
+              });
+            await mockApi(page);
+            await page.route('**/api/v1/programs/templates/mine', (route) =>
+              route.fulfill({ json: [template] }),
+            );
+            await page.goto('/app?section=programs&view=manage');
+            if (surface !== 'telegram') await page.getByRole('button', { name: 'Клиент' }).click();
+            if (!template.is_active_for_current_user) await openCard(page, 'Программы и шаблоны');
+            await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+            const trigger = template.is_active_for_current_user
+              ? page.getByRole('button', { name: 'Посмотреть план', exact: true })
+              : page.getByRole('button', {
+                  name: `Посмотреть ${template.is_example ? 'шаблон' : 'программу'} «${template.title}»`,
+                  exact: true,
+                });
+            await trigger.click();
+            const dialog = page.getByRole('dialog', { name: template.title, exact: true });
+            const content = dialog.locator('.program-example-modal__content');
+            const summaries = dialog.locator('.program-example-day > summary');
+            await expect(dialog).toBeVisible();
+            await dialog.evaluate((node) =>
+              Promise.all(
+                node
+                  .getAnimations({ subtree: true })
+                  .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+                  .map((animation) => animation.finished),
+              ),
+            );
+            await expect(summaries).toHaveCount(template.days.length);
+            const backgroundY = await page.evaluate(() => window.scrollY);
+            const measurements: Array<{
+              state: string;
+              metrics: Awaited<ReturnType<typeof measurePreview>>;
+            }> = [];
+            const capture = async (state: string, screenshot = true) => {
+              await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+              const metrics = await measurePreview(page);
+              measurements.push({ state, metrics });
+              expect
+                .soft(metrics.horizontalOverflow, `${template.key}/${state}: overflow`)
+                .toEqual([]);
+              expect.soft(metrics.horizontalDrift, `${template.key}/${state}: drift`).toEqual([]);
+              expect
+                .soft(metrics.clippedText, `${template.key}/${state}: text clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.clippedControls, `${template.key}/${state}: control clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.verticalScrollers, `${template.key}/${state}: scroll ownership`)
+                .toEqual(['div.program-example-modal__content']);
+              expect.soft(metrics.documentX).toBe(0);
+              expect
+                .soft(Math.abs(metrics.headerGap), `${template.key}/${state}: header edge`)
+                .toBeLessThanOrEqual(1);
+              expect.soft(metrics.documentY).toBe(backgroundY);
+              if (directory && screenshot)
+                await page.screenshot({
+                  path: path.join(directory, `${template.key}-${state}.png`),
+                  animations: 'disabled',
+                  scale: 'css',
+                });
+            };
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(0);
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('collapsed');
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('top');
+            await summaries.first().evaluate((node) => node.scrollIntoView({ block: 'center' }));
+            await capture('first');
+            for (let day = 1; day < template.days.length; day++) {
+              await summaries.nth(day).focus();
+              await page.keyboard.press('Enter');
+              expect.soft((await measurePreview(page)).horizontalOverflow).toEqual([]);
+            }
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(
+              template.days.length,
+            );
+            await content.evaluate((node) =>
+              node.scrollTo({
+                top: (node.scrollHeight - node.clientHeight) / 2,
+                behavior: 'instant',
+              }),
+            );
+            await capture('middle');
+            const startY = await content.evaluate((node) => node.scrollTop);
+            await previewGesture(page, browserName, -100, 0);
+            await capture('horizontal');
+            await previewGesture(page, browserName, 100, -100);
+            await capture('diagonal', false);
+            await previewGesture(page, browserName, 0, -150);
+            expect.soft(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(startY);
+            await capture('gestures');
+            await content.evaluate((node) =>
+              node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }),
+            );
+            await expect
+              .poll(() =>
+                content.evaluate((node) => node.scrollHeight - node.clientHeight - node.scrollTop),
+              )
+              .toBeLessThanOrEqual(1);
+            await capture('bottom');
+            await expect(
+              dialog.locator('.program-example-day').last().locator('li').last(),
+            ).toBeVisible();
+            const actions = dialog.locator('.program-example-modal__actions');
+            await expect(actions).toBeInViewport({ ratio: 1 });
+            if (template.key === 'coach') {
+              await expect(actions).toContainText('Эта программа назначена тренером');
+              await expect(actions.locator('button')).toHaveCount(0);
+            } else {
+              await expect(
+                actions.getByRole('button', { name: 'Создать копию', exact: true }),
+              ).toBeVisible();
+              await actions.getByRole('button', { name: 'Выбрать', exact: true }).click();
+              await expect(
+                actions.getByRole('button', { name: 'Выбрана', exact: true }),
+              ).toBeVisible();
+              await expect(
+                actions.getByRole('button', {
+                  name:
+                    template.key === 'phul' ? 'Уже запущена' : 'Настроить расписание и запустить',
+                  exact: true,
+                }),
+              ).toBeVisible();
+            }
+            if (directory)
+              writeFileSync(
+                path.join(directory, `${template.key}-metrics.json`),
+                JSON.stringify(measurements, null, 2),
+              );
+            await dialog.locator('.program-example-modal__close').click();
+            await expect(dialog).toHaveCount(0);
+            await expect(trigger).toBeFocused();
+            await page.close();
+          }
+          testInfo.annotations.push({
+            type: 'gesture evidence',
+            description:
+              browserName === 'chromium'
+                ? 'CDP native touch input; synthetic device'
+                : 'Native wheel input; WebKit touch-drag unavailable',
+          });
+        });
+      }
+    }
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
@@ -45,69 +239,6 @@ function fullBodyThreeDayDays() {
       day_number: 3,
       title: 'Всё тело C',
       exercises: [exercise(1002, 'Приседания')],
-    },
-  ];
-}
-
-function nsunsFourDayDays() {
-  const exercise = (id: number, title: string, notes: string) => ({
-    id,
-    exercise_id: 1,
-    exercise_title: title,
-    metric_type: 'strength',
-    prescribed_sets: 7,
-    prescribed_reps: '5+',
-    prescribed_duration_minutes: null,
-    rest_seconds: 180,
-    notes,
-    superset_group: null,
-    superset_order: null,
-    has_guide: true,
-  });
-  return [
-    {
-      id: 400,
-      day_number: 1,
-      title: 'День 1 · Жим лёжа + жим стоя',
-      exercises: [
-        exercise(
-          4000,
-          'Жим лёжа со штангой в силовой стойке',
-          'T1 — основной подъём; веса по процентам от тренировочного максимума; последний подход — максимум повторений (AMRAP).',
-        ),
-        exercise(
-          4001,
-          'Жим штанги стоя над головой',
-          'T2 — второй базовый подъём; длинная подпись для проверки переноса строк на iPhone.',
-        ),
-      ],
-    },
-    {
-      id: 401,
-      day_number: 2,
-      title: 'День 2 · Присед + становая сумо',
-      exercises: [
-        exercise(4010, 'Приседание со штангой на спине', 'T1 — основной подъём.'),
-        exercise(4011, 'Становая тяга сумо со штангой', 'T2 — второй базовый подъём.'),
-      ],
-    },
-    {
-      id: 402,
-      day_number: 3,
-      title: 'День 3 · Жим стоя + жим лёжа',
-      exercises: [
-        exercise(4020, 'Жим штанги стоя над головой', 'T1 — основной подъём.'),
-        exercise(4021, 'Жим лёжа со штангой в силовой стойке', 'T2 — второй базовый подъём.'),
-      ],
-    },
-    {
-      id: 403,
-      day_number: 4,
-      title: 'День 4 · Становая тяга + присед',
-      exercises: [
-        exercise(4030, 'Становая тяга со штангой', 'T1 — основной подъём.'),
-        exercise(4031, 'Приседание со штангой на спине', 'T2 — второй базовый подъём.'),
-      ],
     },
   ];
 }
@@ -182,7 +313,6 @@ async function mockApi(
     notificationItems = [] as Array<Record<string, unknown>>,
     telegramLinked = true,
     staleNotificationIds = [] as number[],
-    extraTemplates = [] as Array<Record<string, unknown>>,
   } = {},
 ) {
   let role: 'client' | 'coach' | 'admin' = 'client';
@@ -973,7 +1103,6 @@ async function mockApi(
               },
             ],
           },
-          ...extraTemplates,
         ],
       });
     if (path.endsWith('/programs/templates/recommendation')) {
@@ -2695,29 +2824,7 @@ test('поля профиля и питания выровнены на деск
 
 test('поля адаптируются к разным iPhone, а пример программы открывает состав', async ({ page }) => {
   await page.setViewportSize({ width: 440, height: 956 });
-  await mockApi(page, {
-    extraTemplates: [
-      {
-        id: 14,
-        title: 'nSuns - 4-дневная программа',
-        slug: 'nsuns-4d',
-        goal: 'strength',
-        level: 'intermediate',
-        owner_user_id: null,
-        is_public: true,
-        is_example: true,
-        is_assigned_to_current_user: false,
-        is_active_for_current_user: false,
-        can_edit: false,
-        program_metadata: {
-          days_per_week: 4,
-          equipment: ['Штанга', 'Скамья', 'Силовая стойка'],
-          level: 'intermediate',
-        },
-        days: nsunsFourDayDays(),
-      },
-    ],
-  });
+  await mockApi(page);
   let staleAssignmentSent = false;
   await page.route('**/api/v1/programs/templates/10', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
@@ -2888,99 +2995,6 @@ test('поля адаптируются к разным iPhone, а пример 
       animations: 'disabled',
     });
   }
-
-  const nsuns = page.getByRole('button', {
-    name: 'Посмотреть шаблон «nSuns - 4-дневная программа»',
-  });
-  await nsuns.click();
-  const nsunsDialog = page.locator('.program-example-modal');
-  const nsunsPanel = page.locator('.program-example-modal__panel');
-  const nsunsContent = page.locator('.program-example-modal__content');
-  await expect(nsunsDialog).toBeVisible();
-  const measurePreviewGeometry = () =>
-    page.evaluate(() => {
-      const selectors = [
-        '.program-example-modal',
-        '.program-example-modal__panel',
-        '.program-example-modal__content',
-        '.program-example-modal__head',
-        '.program-example-modal__actions',
-        '.program-example-modal__secondary-actions',
-      ];
-      const panel = document.querySelector<HTMLElement>('.program-example-modal__panel');
-      return {
-        documentElementScrollWidth: document.documentElement.scrollWidth,
-        bodyScrollWidth: document.body.scrollWidth,
-        containers: selectors.map((selector) => {
-          const element = document.querySelector<HTMLElement>(selector);
-          if (!element) return null;
-          const rect = element.getBoundingClientRect();
-          return {
-            selector,
-            clientWidth: element.clientWidth,
-            scrollWidth: element.scrollWidth,
-            rect: { x: rect.x, width: rect.width, right: rect.right },
-          };
-        }),
-        scrollableContainers: panel
-          ? Array.from(panel.querySelectorAll<HTMLElement>('*'))
-              .filter((element) => {
-                const styles = getComputedStyle(element);
-                return (
-                  ['auto', 'scroll'].includes(styles.overflowY) &&
-                  element.scrollHeight > element.clientHeight + 1
-                );
-              })
-              .map((element) => `.${element.classList[0] ?? element.tagName.toLowerCase()}`)
-          : [],
-        actionButtons: Array.from(
-          document.querySelectorAll<HTMLElement>('.program-example-modal__actions button'),
-        ).map((element) => ({
-          label: element.textContent?.trim(),
-          clientWidth: element.clientWidth,
-          scrollWidth: element.scrollWidth,
-        })),
-      };
-    });
-  for (const width of [320, 360, 393, 430]) {
-    await page.setViewportSize({ width, height: 900 });
-    const metrics = await measurePreviewGeometry();
-    expect(metrics.documentElementScrollWidth).toBeLessThanOrEqual(width + 1);
-    expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(width + 1);
-    expect(metrics.scrollableContainers).toEqual(['.program-example-modal__content']);
-    for (const container of metrics.containers) {
-      expect(container).not.toBeNull();
-      expect(container!.scrollWidth).toBeLessThanOrEqual(container!.clientWidth + 1);
-      expect(container!.rect.x).toBeGreaterThanOrEqual(-1);
-      expect(container!.rect.right).toBeLessThanOrEqual(width + 1);
-    }
-    expect(
-      metrics.actionButtons.every((button) => button.scrollWidth <= button.clientWidth + 1),
-    ).toBe(true);
-    if (width === 320 || width === 393) {
-      for (const theme of ['dark', 'light'] as const) {
-        await setTheme(theme);
-        await page.screenshot({
-          path: path.join(previewEvidenceDir, `issue-1185-nsuns-${theme}-${width}.png`),
-          animations: 'disabled',
-        });
-      }
-    }
-  }
-  await nsunsContent.evaluate((element) => {
-    element.scrollTo({ left: element.scrollWidth, top: element.scrollHeight, behavior: 'instant' });
-  });
-  await expect.poll(() => nsunsContent.evaluate((element) => element.scrollTop > 0)).toBe(true);
-  expect(await nsunsContent.evaluate((element) => element.scrollLeft)).toBe(0);
-  const longNsunsExercise = nsunsPanel.getByText('Жим лёжа со штангой в силовой стойке').first();
-  await longNsunsExercise.scrollIntoViewIfNeeded();
-  await expect(longNsunsExercise).toBeVisible();
-  await expect(nsunsDialog.getByText('Выбрать', { exact: true })).toBeVisible();
-  await expect(nsunsDialog.getByText('Создать копию', { exact: true })).toBeVisible();
-  await expect(nsunsDialog.getByText('Назначить по расписанию', { exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(nsunsDialog).toHaveCount(0);
-  await expect(nsuns).toBeFocused();
 
   await example.click();
   const previewDialog = page.locator('.program-example-modal');
