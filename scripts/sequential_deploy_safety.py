@@ -66,24 +66,70 @@ SELECT json_build_object(
 
 # Run only in inspected application containers. Match established socket inode to
 # an owning process, not application_name (which any client can forge).
-SOCKET_PROBE = r"""
+# Keep these two signatures aligned with the backend and worker ``healthcheck.test``
+# commands in docker-compose.yml; other inline Python remains an application process.
+SOCKET_PROBE_HEALTHCHECK_COMMANDS = (
+    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=4)",
+    "import os,time; from fitminiapp_api.core.config import settings; age=time.time()-os.path.getmtime('/tmp/fitminiapp-worker-heartbeat'); assert age < max(120, settings.worker_poll_seconds * 3 + 30)",
+)
+
+# Docker healthchecks also run ``python -c`` inside these containers. Ignore only
+# the two known short-lived helpers when they own no PostgreSQL socket; an extra
+# process with a DB socket remains a hard topology failure.
+SOCKET_PROBE_PROCESS_RULE = (
+    r"""
+KNOWN_HEALTHCHECK_COMMANDS = """
+    + repr(SOCKET_PROBE_HEALTHCHECK_COMMANDS)
+    + r"""
+def is_known_healthcheck(arguments):
+    if len(arguments) < 3 or arguments[1] != b'-c':
+        return False
+    if any(arguments[3:]):
+        return False
+    try:
+        return arguments[2].decode('utf-8') in KNOWN_HEALTHCHECK_COMMANDS
+    except UnicodeDecodeError:
+        return False
+
+def application_process_count(processes, db_socket_inodes):
+    return sum(
+        not known_healthcheck or bool(process_sockets & db_socket_inodes)
+        for known_healthcheck, process_sockets in processes
+    )
+"""
+)
+
+SOCKET_PROBE = (
+    r"""
 import ipaddress, json, os, pathlib
+"""
+    + SOCKET_PROBE_PROCESS_RULE
+    + r"""
 root = pathlib.Path('/proc')
 owners = set()
-python_processes = 0
+matching_processes = []
 for process in root.iterdir():
     if not process.name.isdigit() or int(process.name) == os.getpid():
         continue
     try:
         command = (process / 'comm').read_text().strip()
-        python_processes += command.startswith(('python', 'uvicorn'))
+        process_sockets = set()
         for fd in (process / 'fd').iterdir():
             try:
                 link = os.readlink(fd)
                 if link.startswith('socket:['):
-                    owners.add(link[8:-1])
+                    inode = link[8:-1]
+                    owners.add(inode)
+                    process_sockets.add(inode)
             except FileNotFoundError:
                 pass
+        if command.startswith(('python', 'uvicorn')):
+            try:
+                arguments = (process / 'cmdline').read_bytes().split(b'\0')
+                known_healthcheck = command.startswith('python') and is_known_healthcheck(arguments)
+            except (FileNotFoundError, PermissionError):
+                known_healthcheck = False
+            matching_processes.append((known_healthcheck, process_sockets))
     except FileNotFoundError:
         pass
 def endpoint(value, ipv6):
@@ -95,14 +141,22 @@ def endpoint(value, ipv6):
         ip = ip.ipv4_mapped
     return str(ip), int(port, 16)
 rows = []
+db_socket_inodes = set()
 for filename in ('tcp', 'tcp6'):
     for line in (root / 'net' / filename).read_text().splitlines()[1:]:
         fields = line.split()
         if fields[3] == '01' and fields[9] in owners:
-            rows.append([*endpoint(fields[1], filename == 'tcp6'),
-                         *endpoint(fields[2], filename == 'tcp6')])
-print(json.dumps({'processes': python_processes, 'sockets': rows}))
+            local = endpoint(fields[1], filename == 'tcp6')
+            remote = endpoint(fields[2], filename == 'tcp6')
+            if remote[1] == 5432:
+                db_socket_inodes.add(fields[9])
+            rows.append([*local, *remote])
 """
+    + r"""
+print(json.dumps({'processes': application_process_count(matching_processes, db_socket_inodes),
+                  'sockets': rows}))
+"""
+)
 
 ENGINE_PROBE = """
 import json
