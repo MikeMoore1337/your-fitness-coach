@@ -2151,11 +2151,15 @@ export function TodayWorkout({
     let pointerStartY = 0;
     let correctionPending = false;
     let focusedRow: Element | null = null;
+    let focusedRowScrollY: number | null = null;
+    let focusOriginScrollY: number | null = null;
     let focusResetFrame: number | undefined;
     const telegramSurface = isTelegramSurface();
     const standalonePwa = !telegramSurface && isPwaStandalone();
+    const root = document.documentElement;
     let focusPlacementPending = false;
     let focusGeometry: number[] = [];
+    if (standalonePwa) root.dataset.yfcPwaFocusPlacement = 'true';
     const safeArea = standalonePwa ? document.createElement('div') : null;
     if (safeArea) {
       safeArea.style.cssText =
@@ -2179,15 +2183,21 @@ export function TodayWorkout({
         const input = document.activeElement as HTMLElement;
         const controls = input.closest('.active-workout-set__controls') ?? input;
         const box = controls.getBoundingClientRect();
+        const inputBox = input.getBoundingClientRect();
+        // iOS can settle the visual viewport by a small fraction of the field height.
+        const visibilityTolerance = standalonePwa ? Math.max(1, inputBox.height * 0.05) : 1;
         const viewport = window.visualViewport;
         const top = viewport?.offsetTop ?? 0;
         let bottom = top + (viewport?.height ?? window.innerHeight);
         const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
-        const safeTop = Math.max(
-          top + (safeArea?.getBoundingClientRect().height ?? 0),
-          timer && timer.bottom > top && timer.top < bottom ? timer.bottom : top,
-        );
-        const inputBox = input.getBoundingClientRect();
+        let safeTop = top + (safeArea?.getBoundingClientRect().height ?? 0);
+        if (
+          !standalonePwa &&
+          timer &&
+          timer.bottom > top &&
+          timer.top < bottom
+        )
+          safeTop = Math.max(safeTop, timer.bottom);
         if (standalonePwa) {
           const dockElement = document.getElementById('appBottomNav');
           const dock = dockElement?.getBoundingClientRect();
@@ -2199,6 +2209,15 @@ export function TodayWorkout({
             dock.top > safeTop
           )
             bottom = Math.min(bottom, dock.top);
+          // Do not reserve a sticky panel that is not covering the active field.
+          if (
+            timer &&
+            timer.bottom > top &&
+            timer.top < bottom &&
+            timer.bottom > inputBox.top &&
+            timer.top < inputBox.bottom
+          )
+            safeTop = Math.max(safeTop, timer.bottom);
           const geometry = [top, bottom, safeTop, window.scrollY, inputBox.top, inputBox.bottom];
           if (
             geometry.some(
@@ -2210,14 +2229,21 @@ export function TodayWorkout({
             keepFieldsVisible();
             return;
           }
-          if (inputBox.top >= safeTop - 1 && inputBox.bottom <= bottom + 1) return;
+          if (
+            inputBox.top >= safeTop - visibilityTolerance &&
+            inputBox.bottom <= bottom + visibilityTolerance
+          )
+            return;
         }
-        const target = box.height <= bottom - safeTop ? box : inputBox;
+        const topOccluded = inputBox.top < safeTop - visibilityTolerance;
+        const target =
+          standalonePwa && !topOccluded ? inputBox : box.height <= bottom - safeTop ? box : inputBox;
         const delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
         // Ignore subpixel observer noise; visible displacement still gets corrected.
         if (Math.abs(delta) > 1) {
           window.scrollBy({ top: delta, behavior: 'instant' });
+          if (standalonePwa) focusedRowScrollY = window.scrollY;
         }
       });
     };
@@ -2225,6 +2251,12 @@ export function TodayWorkout({
       pointerActive = true;
       manualScroll = false;
       pointerStartY = event.clientY;
+      focusOriginScrollY =
+        standalonePwa &&
+        event.target instanceof Element &&
+        Boolean(event.target.closest('.active-workout-set'))
+          ? window.scrollY
+          : null;
     };
     const pointerMove = (event: PointerEvent) => {
       if (!pointerActive || Math.abs(event.clientY - pointerStartY) <= 8) return;
@@ -2235,10 +2267,13 @@ export function TodayWorkout({
     const pointerEnd = () => {
       pointerActive = false;
       if (manualScroll) {
+        if (standalonePwa && focusedRow) focusedRowScrollY = window.scrollY;
         correctionPending = false;
+        focusOriginScrollY = null;
         return;
       }
       if (correctionPending) keepFieldsVisible();
+      focusOriginScrollY = null;
     };
     const viewport = window.visualViewport;
     let viewportTop = viewport?.offsetTop;
@@ -2285,13 +2320,29 @@ export function TodayWorkout({
       ) {
         if (focusedRow !== row) {
           // Stop an in-flight completion scroll before the keyboard takes over positioning.
-          window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
+          const origin = standalonePwa ? focusOriginScrollY : null;
+          const targetScrollY = origin ?? window.scrollY;
+          window.scrollTo({ top: targetScrollY, left: window.scrollX, behavior: 'instant' });
           focusedRow = row;
+          focusedRowScrollY = targetScrollY;
+        } else if (
+          standalonePwa &&
+          (focusOriginScrollY !== null || focusedRowScrollY !== null) &&
+          Math.abs(
+            window.scrollY - (focusOriginScrollY ?? focusedRowScrollY!),
+          ) > 1
+        ) {
+          // Undo only a real native focus pan; typing itself never repositions the document.
+          const targetScrollY = focusOriginScrollY ?? focusedRowScrollY!;
+          window.scrollTo({ top: targetScrollY, left: window.scrollX, behavior: 'instant' });
+          focusedRowScrollY = targetScrollY;
         }
         observer.observe(row);
       } else {
         focusedRow = null;
+        focusedRowScrollY = null;
       }
+      focusOriginScrollY = null;
       keepFieldsVisible();
     };
     const focusOut = () => {
@@ -2303,6 +2354,7 @@ export function TodayWorkout({
           !document.activeElement?.matches('.active-workout-rir button')
         ) {
           focusedRow = null;
+          focusedRowScrollY = null;
           focusPlacementPending = false;
         }
       });
@@ -2326,6 +2378,7 @@ export function TodayWorkout({
       if (focusResetFrame !== undefined) window.cancelAnimationFrame(focusResetFrame);
       observer.disconnect();
       safeArea?.remove();
+      if (standalonePwa) delete root.dataset.yfcPwaFocusPlacement;
       document.removeEventListener('focusin', focus);
       document.removeEventListener('focusout', focusOut);
       document.removeEventListener('input', input, true);

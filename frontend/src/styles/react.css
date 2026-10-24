@@ -5699,6 +5699,14 @@ button.today-text-link {
     var(--yfc-layout-safe-top, 0px) + var(--yfc-active-workout-rest-clearance, 124px)
   );
 }
+html[data-yfc-pwa-focus-placement='true']
+  .active-workout:has(.active-workout-rest)
+  :is(input, [data-workout-field='done']) {
+  scroll-margin-block-start: 0px;
+}
+html[data-yfc-pwa-focus-placement='true'] .active-workout {
+  overflow-anchor: none;
+}
 .active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
   display: none;
 }
