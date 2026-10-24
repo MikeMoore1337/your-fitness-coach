@@ -2151,8 +2151,6 @@ export function TodayWorkout({
     let pointerStartY = 0;
     let correctionPending = false;
     let focusedRow: Element | null = null;
-    let focusedRowScrollY: number | null = null;
-    let focusOriginScrollY: number | null = null;
     let focusResetFrame: number | undefined;
     const telegramSurface = isTelegramSurface();
     const standalonePwa = !telegramSurface && isPwaStandalone();
@@ -2180,6 +2178,11 @@ export function TodayWorkout({
         correctionPending = false;
         const editingRir = document.activeElement?.matches('.active-workout-rir button');
         if (!editingWorkoutField() && !editingRir) return;
+        if (standalonePwa && editingWorkoutField()) {
+          // Standalone iOS owns focus visibility; app scroll would compete with native keyboard pan.
+          focusPlacementPending = false;
+          return;
+        }
         const input = document.activeElement as HTMLElement;
         const controls = input.closest('.active-workout-set__controls') ?? input;
         const box = controls.getBoundingClientRect();
@@ -2242,7 +2245,6 @@ export function TodayWorkout({
         // Ignore subpixel observer noise; visible displacement still gets corrected.
         if (Math.abs(delta) > 1) {
           window.scrollBy({ top: delta, behavior: 'instant' });
-          if (standalonePwa) focusedRowScrollY = window.scrollY;
         }
       });
     };
@@ -2250,12 +2252,6 @@ export function TodayWorkout({
       pointerActive = true;
       manualScroll = false;
       pointerStartY = event.clientY;
-      focusOriginScrollY =
-        standalonePwa &&
-        event.target instanceof Element &&
-        Boolean(event.target.closest('.active-workout-set'))
-          ? window.scrollY
-          : null;
     };
     const pointerMove = (event: PointerEvent) => {
       if (!pointerActive || Math.abs(event.clientY - pointerStartY) <= 8) return;
@@ -2266,13 +2262,10 @@ export function TodayWorkout({
     const pointerEnd = () => {
       pointerActive = false;
       if (manualScroll) {
-        if (standalonePwa && focusedRow) focusedRowScrollY = window.scrollY;
         correctionPending = false;
-        focusOriginScrollY = null;
         return;
       }
       if (correctionPending) keepFieldsVisible();
-      focusOriginScrollY = null;
     };
     const viewport = window.visualViewport;
     let viewportTop = viewport?.offsetTop;
@@ -2319,27 +2312,14 @@ export function TodayWorkout({
       ) {
         if (focusedRow !== row) {
           // Stop an in-flight completion scroll before the keyboard takes over positioning.
-          const origin = standalonePwa ? focusOriginScrollY : null;
-          const targetScrollY = origin ?? window.scrollY;
-          window.scrollTo({ top: targetScrollY, left: window.scrollX, behavior: 'instant' });
+          if (!standalonePwa)
+            window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
           focusedRow = row;
-          focusedRowScrollY = targetScrollY;
-        } else if (
-          standalonePwa &&
-          (focusOriginScrollY !== null || focusedRowScrollY !== null) &&
-          Math.abs(window.scrollY - (focusOriginScrollY ?? focusedRowScrollY!)) > 1
-        ) {
-          // Undo only a real native focus pan; typing itself never repositions the document.
-          const targetScrollY = focusOriginScrollY ?? focusedRowScrollY!;
-          window.scrollTo({ top: targetScrollY, left: window.scrollX, behavior: 'instant' });
-          focusedRowScrollY = targetScrollY;
         }
         observer.observe(row);
       } else {
         focusedRow = null;
-        focusedRowScrollY = null;
       }
-      focusOriginScrollY = null;
       keepFieldsVisible();
     };
     const focusOut = () => {
@@ -2351,7 +2331,6 @@ export function TodayWorkout({
           !document.activeElement?.matches('.active-workout-rir button')
         ) {
           focusedRow = null;
-          focusedRowScrollY = null;
           focusPlacementPending = false;
         }
       });
@@ -2448,6 +2427,7 @@ export function TodayWorkout({
   }, [completionNavigation, currentSetId]);
 
   useEffect(() => {
+    if (!isTelegramSurface() && isPwaStandalone()) return;
     if (pendingActiveCount !== 0 || autosaveSetId.current !== currentSetId || editingWorkoutField())
       return;
     const frame = window.requestAnimationFrame(() => {

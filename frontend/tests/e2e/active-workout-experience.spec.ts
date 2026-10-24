@@ -1385,9 +1385,7 @@ test.describe('#1099 standalone PWA keyboard path', () => {
     'upper-staged-no-rest',
     'upper-native-scroll-no-rest',
   ] as const) {
-    test(`#1099 PWA minimally places the ${placement} field after native focus pan`, async ({
-      page,
-    }, info) => {
+    test(`#1099 PWA keeps ${placement} input placement native-owned`, async ({ page }, info) => {
       const { server, weight, reps } = await prepareIssue1099KeyboardCase(page, 'pwa', {
         verifyPwaServiceWorker: false,
         withRest: !placement.endsWith('no-rest'),
@@ -1432,7 +1430,9 @@ test.describe('#1099 standalone PWA keyboard path', () => {
               viewport.offsetTop + viewport.height,
               dockVisible ? dock.top : Infinity,
             ),
+            scrollMarginBlock: getComputedStyle(input).scrollMarginBlock,
             scrollMarginBlockStart: getComputedStyle(input).scrollMarginBlockStart,
+            scrollPaddingBlock: getComputedStyle(document.documentElement).scrollPaddingBlock,
           };
         });
       await weight.evaluate((input, position) => {
@@ -1452,21 +1452,11 @@ test.describe('#1099 standalone PWA keyboard path', () => {
       }, placement);
       await settleViewport(page);
       const beforeFocus = await readGeometry();
-      expect(beforeFocus.scrollMarginBlockStart).toBe('0px');
       await page.evaluate(() => {
         (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
       });
       // These viewport events model native iOS focus-pan, without an application scroll call.
       await weight.evaluate((input, position) => {
-        if (position === 'lower-then-upper-overlap') {
-          const win = window as Window & { __yfc1099ScrollFeedback?: () => void };
-          win.__yfc1099ScrollFeedback = () => {
-            delete win.__yfc1099ScrollFeedback;
-            const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
-            viewport.offsetTop = input.getBoundingClientRect().top - 40;
-            viewport.dispatchEvent(new Event('scroll'));
-          };
-        }
         input.focus({ preventScroll: true });
         const viewport = window.visualViewport as VisualViewport & {
           height: number;
@@ -1502,7 +1492,27 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         });
         await settleViewport(page);
       }
+      if (placement === 'lower' || placement === 'lower-then-upper-overlap') {
+        // Model the native focus pan needed only for a field actually below the keyboard.
+        await page.evaluate(() => {
+          const input = document.activeElement as HTMLElement;
+          const viewport = window.visualViewport!;
+          const dock = document.getElementById('appBottomNav')!;
+          const dockVisible = getComputedStyle(dock).visibility !== 'hidden';
+          const safeBottom = Math.min(
+            viewport.offsetTop + viewport.height,
+            dockVisible ? dock.getBoundingClientRect().top : Infinity,
+          );
+          const delta = Math.max(0, input.getBoundingClientRect().bottom - safeBottom);
+          if (delta > 0)
+            (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+              .__yfc1099NativeScrollTo!({ top: scrollY + delta, behavior: 'instant' });
+        });
+        await settleViewport(page);
+      }
       const afterFocus = await readGeometry();
+      expect(afterFocus.scrollMarginBlock).toBe('0px');
+      expect(afterFocus.scrollPaddingBlock).toBe('0px');
       const calls = await page.evaluate(
         () =>
           (window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] })
@@ -1518,29 +1528,13 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         path: info.outputPath(`pwa-focus-${placement}.png`),
         animations: 'disabled',
       });
-      expect(afterFocus.fieldTop).toBeGreaterThanOrEqual(afterFocus.safeTop - 1);
-      expect(afterFocus.fieldBottom).toBeLessThanOrEqual(afterFocus.safeBottom + 1);
-      const corrections = calls.filter((call) => call.method === 'scrollBy');
-      const expectedCorrectionCount =
-        placement === 'middle' || placement === 'upper'
-          ? 0
-          : placement.endsWith('no-rest') || placement === 'lower-then-upper-overlap'
-            ? 2
-            : 1;
-      expect(corrections).toHaveLength(expectedCorrectionCount);
-      if (placement === 'upper') expect(corrections).toEqual([]);
-      if (placement.startsWith('upper') && placement !== 'upper')
-        expect(corrections.every((call) => call.top < 0)).toBe(true);
-      if (placement === 'lower') expect(corrections[0]!.top).toBeGreaterThan(0);
-      if (placement === 'lower-then-upper-overlap') {
-        expect(corrections[0]!.top).toBeGreaterThan(0);
-        expect(corrections[1]!.top).toBeLessThan(0);
+      if (!placement.endsWith('no-rest')) {
+        expect(afterFocus.fieldTop).toBeGreaterThanOrEqual(afterFocus.safeTop - 1);
+        expect(afterFocus.fieldBottom).toBeLessThanOrEqual(afterFocus.safeBottom + 1);
       }
-      if (placement === 'lower') {
-        expect(
-          Math.abs(corrections[0]!.top - (beforeFocus.fieldBottom - afterFocus.safeBottom)),
-        ).toBeLessThanOrEqual(1);
-      }
+      // PWA focus placement must not compete with native focus-pan, even when the viewport
+      // reports another intermediate position before the first digit is entered.
+      expect(calls).toEqual([]);
       // Even before typing, viewport feedback must not scroll an already visible input.
       await page.evaluate(() => {
         const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
@@ -1555,7 +1549,7 @@ test.describe('#1099 standalone PWA keyboard path', () => {
               window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] }
             ).__yfc1099ScrollCalls!.filter((call) => call.method === 'scrollBy').length,
         ),
-      ).toBe(corrections.length);
+      ).toBe(0);
 
       await page.evaluate(() => {
         (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
@@ -1642,6 +1636,20 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         const viewport = window.visualViewport as VisualViewport & { height: number };
         viewport.height = 420;
         viewport.dispatchEvent(new Event('resize'));
+      });
+      await page.evaluate(() => {
+        const input = document.activeElement as HTMLElement;
+        const viewport = window.visualViewport!;
+        const dock = document.getElementById('appBottomNav')!;
+        const dockVisible = getComputedStyle(dock).visibility !== 'hidden';
+        const safeBottom = Math.min(
+          viewport.offsetTop + viewport.height,
+          dockVisible ? dock.getBoundingClientRect().top : Infinity,
+        );
+        const delta = Math.max(0, input.getBoundingClientRect().bottom - safeBottom);
+        if (delta > 0)
+          (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+            .__yfc1099NativeScrollTo!({ top: scrollY + delta, behavior: 'instant' });
       });
       await settleViewport(page);
       const reopened = await readGeometry();
@@ -1767,6 +1775,34 @@ test.describe('#1099 standalone PWA keyboard path', () => {
     ).toBeLessThanOrEqual(1);
     expect(server.readSet(202).is_completed).toBe(false);
     expect(row).toBeVisible();
+  });
+
+  test('#1099 PWA does not scroll when a blurred input receives its ACK', async ({ page }) => {
+    const { server, weight } = await prepareIssue1099KeyboardCase(page, 'pwa', {
+      verifyPwaServiceWorker: false,
+    });
+    await weight.focus();
+    const patchCount = server.patches.length;
+    await page.evaluate(() => {
+      (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+    });
+    const release = server.holdNextPatch();
+    await weight.fill('50');
+    await expect.poll(() => server.patches.length).toBeGreaterThan(patchCount);
+    await weight.blur();
+    release();
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
+    );
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls,
+      ),
+    ).toEqual([]);
   });
 });
 

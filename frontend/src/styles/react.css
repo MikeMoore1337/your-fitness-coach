@@ -5700,9 +5700,14 @@ button.today-text-link {
   );
 }
 html[data-yfc-pwa-focus-placement='true']
-  .active-workout:has(.active-workout-rest)
-  :is(input, [data-workout-field='done']) {
-  scroll-margin-block-start: 0px;
+  .app-shell--design-v2
+  #appContent
+  .active-workout
+  :is(input, [data-workout-field='done']):focus {
+  scroll-margin-block: 0px;
+}
+html[data-yfc-pwa-focus-placement='true']:has(#appContent .active-workout) {
+  scroll-padding-block: 0px;
 }
 html[data-yfc-pwa-focus-placement='true'] .active-workout {
   overflow-anchor: none;
