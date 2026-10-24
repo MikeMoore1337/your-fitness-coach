@@ -1,11 +1,205 @@
 import path from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { openDetailsByHeading as openCard } from './fixtures/locators';
 import { contextualReminderTemplates, emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
+import { measurePreview, previewGesture, previewTemplates } from './fixtures/program-preview';
+import { installTelegramHarness } from './fixtures/mobile-tma';
 
 test.use({ serviceWorkers: 'block' });
+
+test.describe('универсальная геометрия предпросмотра #1185', () => {
+  test.use({ hasTouch: true });
+  for (const width of [320, 360, 393, 430]) {
+    for (const theme of ['dark', 'light'] as const) {
+      for (const surface of width === 393 && theme === 'dark'
+        ? ['browser', 'pwa', 'telegram']
+        : ['browser']) {
+        test(`${width}px ${theme} ${surface}: шаблоны, свои, активные и тренерские программы`, async ({
+          context,
+          browserName,
+        }, testInfo) => {
+          test.setTimeout(120_000);
+          const templates = previewTemplates();
+          const evidence = process.env.PREVIEW_EVIDENCE_DIR;
+          const directory =
+            evidence &&
+            path.join(
+              evidence,
+              browserName,
+              `${width}-${theme}${surface === 'browser' ? '' : `-${surface}`}`,
+            );
+          if (directory) mkdirSync(directory, { recursive: true });
+          for (const template of templates) {
+            const page = await context.newPage();
+            await page.setViewportSize({ width, height: 900 });
+            await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+            await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+            if (surface === 'pwa')
+              await page.addInitScript(() => {
+                Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+              });
+            if (surface === 'telegram')
+              await installTelegramHarness(page, {
+                colorScheme: theme,
+                platform: 'ios',
+                viewportHeight: 900,
+                viewportStableHeight: 900,
+                safeAreaInset: { top: 28, right: 0, bottom: 20, left: 0 },
+                contentSafeAreaInset: { top: 44, right: 0, bottom: 16, left: 0 },
+              });
+            await mockApi(page);
+            await page.route('**/api/v1/programs/templates/mine', (route) =>
+              route.fulfill({ json: [template] }),
+            );
+            await page.goto('/app?section=programs&view=manage');
+            if (surface !== 'telegram') await page.getByRole('button', { name: 'Клиент' }).click();
+            if (!template.is_active_for_current_user) await openCard(page, 'Программы и шаблоны');
+            await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+            const trigger = template.is_active_for_current_user
+              ? page.getByRole('button', { name: 'Посмотреть план', exact: true })
+              : page.getByRole('button', {
+                  name: `Посмотреть ${template.is_example ? 'шаблон' : 'программу'} «${template.title}»`,
+                  exact: true,
+                });
+            await trigger.click();
+            const dialog = page.getByRole('dialog', { name: template.title, exact: true });
+            const content = dialog.locator('.program-example-modal__content');
+            const summaries = dialog.locator('.program-example-day > summary');
+            await expect(dialog).toBeVisible();
+            await dialog.evaluate((node) =>
+              Promise.all(
+                node
+                  .getAnimations({ subtree: true })
+                  .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+                  .map((animation) => animation.finished),
+              ),
+            );
+            await expect(summaries).toHaveCount(template.days.length);
+            const backgroundY = await page.evaluate(() => window.scrollY);
+            const measurements: Array<{
+              state: string;
+              metrics: Awaited<ReturnType<typeof measurePreview>>;
+            }> = [];
+            const capture = async (state: string, screenshot = true) => {
+              await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+              const metrics = await measurePreview(page);
+              measurements.push({ state, metrics });
+              expect
+                .soft(metrics.horizontalOverflow, `${template.key}/${state}: overflow`)
+                .toEqual([]);
+              expect.soft(metrics.horizontalDrift, `${template.key}/${state}: drift`).toEqual([]);
+              expect
+                .soft(metrics.clippedText, `${template.key}/${state}: text clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.clippedControls, `${template.key}/${state}: control clipping`)
+                .toEqual([]);
+              expect
+                .soft(metrics.verticalScrollers, `${template.key}/${state}: scroll ownership`)
+                .toEqual(['div.program-example-modal__content']);
+              expect.soft(metrics.documentX).toBe(0);
+              expect
+                .soft(Math.abs(metrics.headerGap), `${template.key}/${state}: header edge`)
+                .toBeLessThanOrEqual(1);
+              expect.soft(metrics.documentY).toBe(backgroundY);
+              if (directory && screenshot)
+                await page.screenshot({
+                  path: path.join(directory, `${template.key}-${state}.png`),
+                  animations: 'disabled',
+                  scale: 'css',
+                });
+            };
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(0);
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('collapsed');
+            await summaries.first().focus();
+            await page.keyboard.press('Enter');
+            await content.evaluate((node) => node.scrollTo({ top: 0, behavior: 'instant' }));
+            await capture('top');
+            await summaries.first().evaluate((node) => node.scrollIntoView({ block: 'center' }));
+            await capture('first');
+            for (let day = 1; day < template.days.length; day++) {
+              await summaries.nth(day).focus();
+              await page.keyboard.press('Enter');
+              expect.soft((await measurePreview(page)).horizontalOverflow).toEqual([]);
+            }
+            await expect(dialog.locator('.program-example-day[open]')).toHaveCount(
+              template.days.length,
+            );
+            await content.evaluate((node) =>
+              node.scrollTo({
+                top: (node.scrollHeight - node.clientHeight) / 2,
+                behavior: 'instant',
+              }),
+            );
+            await capture('middle');
+            const startY = await content.evaluate((node) => node.scrollTop);
+            await previewGesture(page, browserName, -100, 0);
+            await capture('horizontal');
+            await previewGesture(page, browserName, 100, -100);
+            await capture('diagonal', false);
+            await previewGesture(page, browserName, 0, -150);
+            expect.soft(await content.evaluate((node) => node.scrollTop)).toBeGreaterThan(startY);
+            await capture('gestures');
+            await content.evaluate((node) =>
+              node.scrollTo({ top: node.scrollHeight, behavior: 'instant' }),
+            );
+            await expect
+              .poll(() =>
+                content.evaluate((node) => node.scrollHeight - node.clientHeight - node.scrollTop),
+              )
+              .toBeLessThanOrEqual(1);
+            await capture('bottom');
+            await expect(
+              dialog.locator('.program-example-day').last().locator('li').last(),
+            ).toBeVisible();
+            const actions = dialog.locator('.program-example-modal__actions');
+            await expect(actions).toBeInViewport({ ratio: 1 });
+            if (template.key === 'coach') {
+              await expect(actions).toContainText('Эта программа назначена тренером');
+              await expect(actions.locator('button')).toHaveCount(0);
+            } else {
+              await expect(
+                actions.getByRole('button', { name: 'Создать копию', exact: true }),
+              ).toBeVisible();
+              await actions.getByRole('button', { name: 'Выбрать', exact: true }).click();
+              await expect(
+                actions.getByRole('button', { name: 'Выбрана', exact: true }),
+              ).toBeVisible();
+              await expect(
+                actions.getByRole('button', {
+                  name:
+                    template.key === 'phul' ? 'Уже запущена' : 'Настроить расписание и запустить',
+                  exact: true,
+                }),
+              ).toBeVisible();
+            }
+            if (directory)
+              writeFileSync(
+                path.join(directory, `${template.key}-metrics.json`),
+                JSON.stringify(measurements, null, 2),
+              );
+            await dialog.locator('.program-example-modal__close').click();
+            await expect(dialog).toHaveCount(0);
+            await expect(trigger).toBeFocused();
+            await page.close();
+          }
+          testInfo.annotations.push({
+            type: 'gesture evidence',
+            description:
+              browserName === 'chromium'
+                ? 'CDP native touch input; synthetic device'
+                : 'Native wheel input; WebKit touch-drag unavailable',
+          });
+        });
+      }
+    }
+  }
+});
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/v1/public/articles*', (route) => route.fulfill({ json: [] }));
@@ -2773,7 +2967,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(example).not.toContainText('beginner');
   const previewEvidenceDir = path.resolve(
     '..',
-    '.artifacts/runtime/tests/playwright/redesign-visual-issue-997',
+    '.artifacts/runtime/tests/playwright/issue-1185-program-preview',
   );
   mkdirSync(previewEvidenceDir, { recursive: true });
   const originalViewport = page.viewportSize();

@@ -9,12 +9,23 @@
 }
 .program-example-modal__content {
   flex: 1 1 auto;
+  box-sizing: border-box;
+  /* The shared card child cap must not clamp this full-bleed scroll surface. */
+  max-width: none;
   min-height: 0;
   min-width: 0;
+  margin-top: -20px;
+  margin-inline: -20px;
+  padding-inline: 20px;
+  width: calc(100% + 40px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scroll-padding-block: 12px;
   -webkit-overflow-scrolling: touch;
+}
+.program-example-modal__head {
+  top: 0;
+  margin-top: 0;
 }
 .program-example-modal__kind {
   display: inline-flex;
@@ -66,12 +77,20 @@
 }
 .program-preview-source {
   padding: 12px 0;
-  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 0.82rem;
 }
 .program-example-days {
   padding-top: 0;
+}
+.program-example-day {
+  position: relative;
+}
+.program-example-day > .sr-only {
+  top: 0;
+  left: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 .program-example-day summary {
   min-height: 44px;
@@ -95,6 +114,8 @@
   flex-wrap: wrap;
   margin: 18px -20px 0;
   padding: 12px 20px max(12px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)));
+  max-width: none;
+  width: calc(100% + 40px);
   border-top: 1px solid var(--border);
   background: var(--card-bg);
 }
