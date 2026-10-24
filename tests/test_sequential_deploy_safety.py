@@ -26,6 +26,9 @@ def snapshot():
 
 def test_socket_probe_ignores_only_known_database_free_healthchecks():
     assert safety.SOCKET_PROBE_PROCESS_RULE in safety.SOCKET_PROBE
+    assert safety.SOCKET_PROBE.index("def is_known_healthcheck") < safety.SOCKET_PROBE.index(
+        "known_healthcheck = command.startswith"
+    )
     namespace = {}
     exec(safety.SOCKET_PROBE_PROCESS_RULE, namespace)
     is_known_healthcheck = namespace["is_known_healthcheck"]

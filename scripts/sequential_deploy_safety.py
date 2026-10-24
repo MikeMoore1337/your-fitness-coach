@@ -102,6 +102,9 @@ def application_process_count(processes, db_socket_inodes):
 SOCKET_PROBE = (
     r"""
 import ipaddress, json, os, pathlib
+"""
+    + SOCKET_PROBE_PROCESS_RULE
+    + r"""
 root = pathlib.Path('/proc')
 owners = set()
 matching_processes = []
@@ -149,7 +152,6 @@ for filename in ('tcp', 'tcp6'):
                 db_socket_inodes.add(fields[9])
             rows.append([*local, *remote])
 """
-    + SOCKET_PROBE_PROCESS_RULE
     + r"""
 print(json.dumps({'processes': application_process_count(matching_processes, db_socket_inodes),
                   'sockets': rows}))
