@@ -5676,7 +5676,7 @@ button.today-text-link {
 }
 .active-workout-rest {
   position: sticky;
-  top: var(--yfc-layout-safe-top, 0px);
+  top: calc(var(--yfc-layout-safe-top, 0px) + var(--yfc-visual-viewport-offset-top, 0px));
   z-index: 30;
   pointer-events: auto;
   display: grid;
