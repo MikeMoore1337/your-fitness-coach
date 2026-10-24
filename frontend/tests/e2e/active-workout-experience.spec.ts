@@ -1398,9 +1398,11 @@ test.describe('#1099 standalone PWA keyboard path', () => {
     const probe = await stopIssue1099FrameProbe(page);
     const lifecycle = await page.evaluate(
       () =>
-        (window as Window & {
-          __yfc1099Lifecycle?: Array<Record<string, unknown>>;
-        }).__yfc1099Lifecycle ?? [],
+        (
+          window as Window & {
+            __yfc1099Lifecycle?: Array<Record<string, unknown>>;
+          }
+        ).__yfc1099Lifecycle ?? [],
     );
     const report = { initialScrollY, initialCalls, lifecycle, ...probe };
     await writeFile(
@@ -1431,9 +1433,9 @@ test.describe('#1099 standalone PWA keyboard path', () => {
     );
     expect(await weight.inputValue()).toBe('50');
     expect(await reps.inputValue()).toBe('12');
-    expect(lifecycle.filter((event) => event.source === 'visualViewport.scroll').length).toBeGreaterThan(
-      0,
-    );
+    expect(
+      lifecycle.filter((event) => event.source === 'visualViewport.scroll').length,
+    ).toBeGreaterThan(0);
     expect(
       lifecycle.filter((event) => event.source === 'visualViewport.resize').length,
     ).toBeGreaterThan(0);
@@ -1451,9 +1453,9 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         ),
       ),
     ).toBeLessThanOrEqual(1);
-    expect(Math.abs((await page.evaluate(() => window.scrollY)) - initialScrollY)).toBeLessThanOrEqual(
-      1,
-    );
+    expect(
+      Math.abs((await page.evaluate(() => window.scrollY)) - initialScrollY),
+    ).toBeLessThanOrEqual(1);
     expect(server.readSet(202).is_completed).toBe(false);
     expect(row).toBeVisible();
   });
