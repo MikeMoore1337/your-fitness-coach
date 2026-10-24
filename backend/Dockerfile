@@ -22,11 +22,13 @@ COPY --from=ghcr.io/astral-sh/uv:0.11.32@sha256:df4cae8f3a96d175e2e5f992e5975500
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         fonts-dejavu-core \
+        libbrotli1=1.1.0-2+deb13u1 \
         libexpat1 \
         libgl1 \
         tesseract-ocr \
         tesseract-ocr-eng \
         tesseract-ocr-rus \
+    && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libbrotli1)" ge "1.1.0-2+deb13u1" \
     && dpkg --compare-versions "$(dpkg-query -W -f='${Version}' libexpat1)" ge "2.9.0-1~deb13u1" \
     && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml uv.lock ./
