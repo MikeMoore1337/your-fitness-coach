@@ -420,7 +420,23 @@ class SequentialSafety:
 
     def check(self, expected: frozenset[str], *, disarmed: bool = True) -> None:
         try:
-            self._check(expected, disarmed=disarmed)
+            # A connection can disappear between the PostgreSQL snapshot and
+            # the /proc socket probe. Retry only this attribution race, with
+            # two complete, consecutive clean checks before proceeding.
+            clean_checks = 0
+            for attempt in range(5):
+                try:
+                    self._check(expected, disarmed=disarmed)
+                except SafetyError as error:
+                    if str(error) != "unknown_or_unreleased_database_client" or attempt == 4:
+                        raise
+                    clean_checks = 0
+                else:
+                    clean_checks += 1
+                    if attempt == 0 or clean_checks == 2:
+                        return
+                time.sleep(0.15)
+            raise SafetyError("unknown_or_unreleased_database_client")
         except SafetyError:
             raise
         except Exception:
