@@ -167,9 +167,11 @@ def test_transient_unmatched_client_requires_two_fresh_clean_checks(guard, monke
         nonlocal observations
         observations += 1
         if observations == 1:
-            return snapshot(), [{"pid": 42, "start": "now", "address": None, "port": -1}], {
-                "172.20.0.2"
-            }
+            return (
+                snapshot(),
+                [{"pid": 42, "start": "now", "address": None, "port": -1}],
+                {"172.20.0.2"},
+            )
         return snapshot(), [], {"172.20.0.2"}
 
     monkeypatch.setattr(guard, "observe", observe)
@@ -187,9 +189,11 @@ def test_persistent_unmatched_client_blocks_after_bounded_rechecks(guard, monkey
     def observe(_):
         nonlocal observations
         observations += 1
-        return snapshot(), [{"pid": 43, "start": "now", "address": None, "port": -1}], {
-            "172.20.0.2"
-        }
+        return (
+            snapshot(),
+            [{"pid": 43, "start": "now", "address": None, "port": -1}],
+            {"172.20.0.2"},
+        )
 
     monkeypatch.setattr(guard, "observe", observe)
     monkeypatch.setattr(safety.time, "sleep", sleeps.append)
