@@ -1531,6 +1531,7 @@ export function RestTimer({
     typeof document !== 'undefined' && document.visibilityState === 'hidden',
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
+  const hasDeadline = Boolean(deadline);
   const measuredElapsedSeconds =
     measuredRest && !measuredRest.needs_review
       ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
@@ -1766,6 +1767,27 @@ export function RestTimer({
       if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
     }
   }, [compact, completedNotice]);
+
+  useLayoutEffect(() => {
+    const element = panel.current;
+    const parent = element?.parentElement;
+    if (!element || !parent) return;
+    const updateClearance = () => {
+      const height = element.getBoundingClientRect().height;
+      if (height > 0) {
+        // Focus scrolling positions the input, so reserve the label/control offset too.
+        parent.style.setProperty('--yfc-active-workout-rest-clearance', `${height + 20}px`);
+      }
+    };
+    updateClearance();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateClearance);
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      parent.style.removeProperty('--yfc-active-workout-rest-clearance');
+    };
+  }, [hasDeadline, compact, completedNotice]);
 
   if (!deadline && !completedNotice) return null;
   return (
@@ -2124,6 +2146,8 @@ export function TodayWorkout({
     let manualScroll = false;
     let pointerStartY = 0;
     let correctionPending = false;
+    let focusedRow: Element | null = null;
+    let focusResetFrame: number | undefined;
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
@@ -2188,13 +2212,31 @@ export function TodayWorkout({
         row &&
         (editingWorkoutField() || document.activeElement?.matches('.active-workout-rir button'))
       ) {
-        // Stop an in-flight completion scroll before the keyboard takes over positioning.
-        window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
+        if (focusedRow !== row) {
+          // Stop an in-flight completion scroll before the keyboard takes over positioning.
+          window.scrollTo({ top: window.scrollY, left: window.scrollX, behavior: 'instant' });
+          focusedRow = row;
+        }
         observer.observe(row);
+      } else {
+        focusedRow = null;
       }
       keepFieldsVisible();
     };
+    const focusOut = () => {
+      if (focusResetFrame !== undefined) window.cancelAnimationFrame(focusResetFrame);
+      focusResetFrame = window.requestAnimationFrame(() => {
+        focusResetFrame = undefined;
+        if (
+          !editingWorkoutField() &&
+          !document.activeElement?.matches('.active-workout-rir button')
+        ) {
+          focusedRow = null;
+        }
+      });
+    };
     document.addEventListener('focusin', focus);
+    document.addEventListener('focusout', focusOut);
     document.addEventListener('pointerdown', pointerDown, true);
     document.addEventListener('pointermove', pointerMove, true);
     document.addEventListener('pointerup', pointerEnd, true);
@@ -2204,8 +2246,10 @@ export function TodayWorkout({
     window.addEventListener('resize', keepFieldsVisible);
     return () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
+      if (focusResetFrame !== undefined) window.cancelAnimationFrame(focusResetFrame);
       observer.disconnect();
       document.removeEventListener('focusin', focus);
+      document.removeEventListener('focusout', focusOut);
       document.removeEventListener('pointerdown', pointerDown, true);
       document.removeEventListener('pointermove', pointerMove, true);
       document.removeEventListener('pointerup', pointerEnd, true);

@@ -5695,7 +5695,9 @@ button.today-text-link {
   display: none;
 }
 .active-workout:has(.active-workout-rest) :is(input, [data-workout-field='done']) {
-  scroll-margin-block-start: calc(var(--yfc-layout-safe-top, 0px) + 124px);
+  scroll-margin-block-start: calc(
+    var(--yfc-layout-safe-top, 0px) + var(--yfc-active-workout-rest-clearance, 124px)
+  );
 }
 .active-workout:has(.active-workout-rest:not(.is-compact)) .active-workout-set__contextual-help {
   display: none;

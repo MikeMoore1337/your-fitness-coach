@@ -943,6 +943,340 @@ async function expectScrollYStable(page: Page, before: number) {
   expect(Math.abs(after - before)).toBeLessThanOrEqual(1);
 }
 
+type Issue1099Frame = {
+  time: number;
+  scrollY: number;
+  viewportTop: number;
+  viewportHeight: number;
+  panelTop: number | null;
+  panelBottom: number | null;
+  panelRelativeTop: number | null;
+  activeTop: number | null;
+  activeBottom: number | null;
+  activeControlsTop: number | null;
+  cssViewportOffsetTop: number;
+  restClearance: string;
+  activeScrollMargin: string;
+};
+
+type Issue1099Probe = {
+  frames: Issue1099Frame[];
+  scrollEvents: Array<{ source: string; scrollY: number; viewportTop: number }>;
+  scrollCalls: Array<{ method: string; top: number; time: number }>;
+};
+
+async function prepareIssue1099KeyboardCase(page: Page) {
+  await page.setViewportSize({ width: 393, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const viewport = new EventTarget() as EventTarget & {
+      height: number;
+      width: number;
+      offsetTop: number;
+    };
+    Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+    const calls: Array<{ method: string; top: number; time: number }> = [];
+    Object.assign(window, { __yfc1099ScrollCalls: calls });
+    for (const method of ['scrollBy', 'scrollTo'] as const) {
+      const original = window[method].bind(window);
+      window[method] = (options?: ScrollToOptions | number, y?: number) => {
+        const top = typeof options === 'number' ? (y ?? 0) : (options?.top ?? window.scrollY);
+        calls.push({ method, top, time: performance.now() });
+        if (typeof options === 'number') original(options, y ?? 0);
+        else original(options);
+      };
+    }
+  });
+  const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('40');
+  await first.getByLabel(/^Повторы,/).fill('10');
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+
+  const row = page.locator('[data-workout-set-id="202"]');
+  const weight = row.getByLabel(/^Вес,/);
+  const reps = row.getByLabel(/^Повторы,/);
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as EventTarget & { height: number; offsetTop: number };
+    Object.assign(viewport, { height: 420, offsetTop: 0 });
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  return { server, row, weight, reps };
+}
+
+async function startIssue1099FrameProbe(page: Page) {
+  await page.evaluate(() => {
+    const win = window as Window & {
+      __yfc1099FrameProbe?: {
+        frames: Issue1099Frame[];
+        scrollEvents: Array<{ source: string; scrollY: number; viewportTop: number }>;
+        running: boolean;
+      };
+    };
+    const probe = {
+      frames: [],
+      scrollEvents: [],
+      running: true,
+    } as {
+      frames: Issue1099Frame[];
+      scrollEvents: Array<{ source: string; scrollY: number; viewportTop: number }>;
+      running: boolean;
+    };
+    const viewport = window.visualViewport;
+    const readFrame = () => {
+      const panel = document.querySelector<HTMLElement>('.active-workout-rest');
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const panelBox = panel?.getBoundingClientRect();
+      const activeBox = active?.getBoundingClientRect();
+      const controlsBox = active
+        ?.closest<HTMLElement>('.active-workout-set__controls')
+        ?.getBoundingClientRect();
+      const viewportTop = viewport?.offsetTop ?? 0;
+      const safeTop =
+        Number.parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue('--yfc-layout-safe-top'),
+        ) || 0;
+      probe.frames.push({
+        time: performance.now(),
+        scrollY: window.scrollY,
+        viewportTop,
+        viewportHeight: viewport?.height ?? window.innerHeight,
+        panelTop: panelBox?.top ?? null,
+        panelBottom: panelBox?.bottom ?? null,
+        panelRelativeTop: panelBox ? panelBox.top - viewportTop - safeTop : null,
+        activeTop: activeBox?.top ?? null,
+        activeBottom: activeBox?.bottom ?? null,
+        activeControlsTop: controlsBox?.top ?? null,
+        cssViewportOffsetTop:
+          Number.parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue(
+              '--yfc-visual-viewport-offset-top',
+            ),
+          ) || 0,
+        restClearance: getComputedStyle(
+          document.querySelector<HTMLElement>('.active-workout') ?? document.documentElement,
+        ).getPropertyValue('--yfc-active-workout-rest-clearance'),
+        activeScrollMargin: active ? getComputedStyle(active).scrollMarginBlockStart : '',
+      });
+      if (probe.running) requestAnimationFrame(readFrame);
+    };
+    const recordScroll = (source: string) =>
+      probe.scrollEvents.push({
+        source,
+        scrollY: window.scrollY,
+        viewportTop: window.visualViewport?.offsetTop ?? 0,
+      });
+    window.addEventListener('scroll', () => recordScroll('window'), { passive: true });
+    viewport?.addEventListener('scroll', () => recordScroll('visualViewport'), { passive: true });
+    win.__yfc1099FrameProbe = probe;
+    requestAnimationFrame(readFrame);
+  });
+}
+
+async function stopIssue1099FrameProbe(page: Page): Promise<Issue1099Probe> {
+  return page.evaluate(() => {
+    const win = window as Window & {
+      __yfc1099FrameProbe?: {
+        frames: Issue1099Frame[];
+        scrollEvents: Array<{ source: string; scrollY: number; viewportTop: number }>;
+        running: boolean;
+      };
+      __yfc1099ScrollCalls?: Array<{ method: string; top: number; time: number }>;
+    };
+    const probe = win.__yfc1099FrameProbe;
+    if (!probe) throw new Error('Issue #1099 frame probe was not installed');
+    probe.running = false;
+    return {
+      frames: probe.frames,
+      scrollEvents: probe.scrollEvents,
+      scrollCalls: win.__yfc1099ScrollCalls ?? [],
+    };
+  });
+}
+
+test('#1099 scenario A keeps input geometry stable after initial keyboard correction', async ({
+  page,
+}, info) => {
+  const { server, row, weight, reps } = await prepareIssue1099KeyboardCase(page);
+  await weight.focus();
+  await settleViewport(page);
+  const initialScrollY = await page.evaluate(() => window.scrollY);
+  const initialCalls = await page.evaluate(
+    () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls ?? [],
+  );
+  await page.evaluate(() => {
+    (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+  });
+  await startIssue1099FrameProbe(page);
+
+  for (const [weightValue, repsValue] of [
+    ['50', '12'],
+    ['55', '11'],
+    ['50', '12'],
+  ] as const) {
+    await weight.focus();
+    await weight.fill('');
+    await weight.pressSequentially(weightValue);
+    await expect.poll(() => server.readSet(202).actual_weight).toBe(Number(weightValue));
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await reps.focus();
+    await reps.fill('');
+    await reps.pressSequentially(repsValue);
+    await expect.poll(() => server.readSet(202).actual_reps).toBe(Number(repsValue));
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  }
+
+  const probe = await stopIssue1099FrameProbe(page);
+  const report = { initialScrollY, initialCalls, ...probe };
+  await writeFile(
+    info.outputPath('issue-1099-input-geometry.json'),
+    JSON.stringify(report, null, 2),
+  );
+  await info.attach('issue-1099-input-geometry.json', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  await page.screenshot({
+    path: info.outputPath('issue-1099-input.png'),
+    animations: 'disabled',
+  });
+
+  expect(await weight.inputValue()).toBe('50');
+  expect(await reps.inputValue()).toBe('12');
+  expect(probe.scrollCalls).toEqual([]);
+  const inputFrames = probe.frames.filter(
+    (
+      frame,
+    ): frame is Issue1099Frame & {
+      activeTop: number;
+      activeBottom: number;
+      activeControlsTop: number;
+      panelBottom: number;
+    } =>
+      frame.activeTop !== null &&
+      frame.activeBottom !== null &&
+      frame.activeControlsTop !== null &&
+      frame.panelBottom !== null,
+  );
+  expect(inputFrames.length).toBeGreaterThan(0);
+  const inputScrollYs = inputFrames.map((frame) => frame.scrollY);
+  expect(Math.max(...inputScrollYs) - Math.min(...inputScrollYs)).toBeLessThanOrEqual(1);
+  expect(Math.min(...inputFrames.map((frame) => frame.activeControlsTop))).toBeGreaterThanOrEqual(
+    Math.max(...inputFrames.map((frame) => frame.panelBottom)) - 1,
+  );
+  expect(
+    Math.max(
+      ...inputFrames.map(
+        (frame) => frame.activeBottom - (frame.viewportTop + frame.viewportHeight),
+      ),
+    ),
+  ).toBeLessThanOrEqual(1);
+  expect(server.readSet(202).is_completed).toBe(false);
+  expect(
+    Math.abs((await page.evaluate(() => window.scrollY)) - initialScrollY),
+  ).toBeLessThanOrEqual(1);
+  expect(row).toBeVisible();
+});
+
+test('#1099 scenario B keeps the rest panel stable during a real touch swipe', async ({
+  page,
+}, info) => {
+  test.skip(test.info().project.name !== 'chromium', 'CDP provides deterministic touch drag input');
+  const { server, row, reps } = await prepareIssue1099KeyboardCase(page);
+  await reps.fill('12');
+  await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
+  await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  await reps.focus();
+  await settleViewport(page);
+  const rowBox = (await row.boundingBox())!;
+  const swipeX = rowBox.x + 5;
+  const swipeY = Math.min(620, Math.max(160, rowBox.y + rowBox.height - 20));
+  const touch = await page.context().newCDPSession(page);
+  await touch.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  await page.evaluate(() => {
+    (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+  });
+  await startIssue1099FrameProbe(page);
+  const patchCountBeforeGesture = server.patches.length;
+
+  const swipe = async (deltaY: number) => {
+    await touch.send('Input.dispatchTouchEvent', {
+      type: 'touchStart',
+      touchPoints: [{ id: 1, x: swipeX, y: swipeY }],
+    });
+    for (let step = 1; step <= 10; step += 1) {
+      await touch.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ id: 1, x: swipeX, y: swipeY + (deltaY * step) / 10 }],
+      });
+      if (step === 3 || step === 6 || step === 9) {
+        await page.evaluate(
+          (offsetTop) => {
+            const viewport = window.visualViewport as EventTarget & { offsetTop: number };
+            viewport.offsetTop = offsetTop;
+            viewport.dispatchEvent(new Event('scroll'));
+          },
+          step === 3 ? 2 : step === 6 ? 7 : 3,
+        );
+      }
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+      );
+    }
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await settleViewport(page);
+  };
+
+  const before = await page.evaluate(() => window.scrollY);
+  await swipe(-180);
+  const middle = await page.evaluate(() => window.scrollY);
+  await swipe(180);
+  const after = await page.evaluate(() => window.scrollY);
+  const probe = await stopIssue1099FrameProbe(page);
+  const report = { before, middle, after, ...probe };
+  await writeFile(
+    info.outputPath('issue-1099-rest-swipe-geometry.json'),
+    JSON.stringify(report, null, 2),
+  );
+  await info.attach('issue-1099-rest-swipe-geometry.json', {
+    body: JSON.stringify(report, null, 2),
+    contentType: 'application/json',
+  });
+  await page.screenshot({
+    path: info.outputPath('issue-1099-rest-swipe.png'),
+    animations: 'disabled',
+  });
+
+  expect(Math.abs(middle - before)).toBeGreaterThan(50);
+  expect(Math.abs(after - middle)).toBeGreaterThan(50);
+  expect(probe.scrollCalls).toEqual([]);
+  const panelPositions = probe.frames
+    .map((frame) => frame.panelRelativeTop)
+    .filter((position): position is number => position !== null);
+  expect(panelPositions.length).toBeGreaterThan(0);
+  expect(Math.max(...panelPositions) - Math.min(...panelPositions)).toBeLessThanOrEqual(1);
+  expect(
+    await page.evaluate(() =>
+      Array.from(document.querySelectorAll<HTMLButtonElement>('.active-workout-rest button')).map(
+        (button) => {
+          const box = button.getBoundingClientRect();
+          const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+          return Boolean(hit && (hit === button || button.contains(hit)));
+        },
+      ),
+    ),
+  ).toEqual([true, true, true, true]);
+  expect(await reps.inputValue()).toBe('12');
+  expect(server.readSet(202).is_completed).toBe(false);
+  expect(server.patches).toHaveLength(patchCountBeforeGesture);
+});
+
 test.describe('#1001 keyboard input stability', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
@@ -5860,7 +6194,7 @@ for (const theme of ['light', 'dark'] as const) {
       await set.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
       const rest = page.locator('.active-workout-rest');
       await expect(rest.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
-      await expect(rest).toContainText('Факт');
+      await expect(rest).toContainText('ФАКТ');
       const folder = resolve(
         process.cwd(),
         '..',
