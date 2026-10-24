@@ -52,7 +52,11 @@ import {
   trackGrowthEvent,
   trackProductEvent,
 } from '../../shared/analytics/productEvents';
-import { PWA_SAFE_UPDATE_EVENT } from '../../shared/pwa/pwaRuntime';
+import {
+  isPwaStandalone,
+  isTelegramSurface,
+  PWA_SAFE_UPDATE_EVENT,
+} from '../../shared/pwa/pwaRuntime';
 import { ProgressionGuidance } from './ProgressionGuidance';
 import { useScreenWakeLock } from './useScreenWakeLock';
 import { AiCoachContextualEntry } from '../ai/AiCoachContextualEntry';
@@ -2148,10 +2152,15 @@ export function TodayWorkout({
     let correctionPending = false;
     let focusedRow: Element | null = null;
     let focusResetFrame: number | undefined;
+    const telegramSurface = isTelegramSurface();
+    const standalonePwa = !telegramSurface && isPwaStandalone();
+    let browserViewportPan = false;
     const keepFieldsVisible = () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       frame = window.requestAnimationFrame(() => {
         if (manualScroll) return;
+        // iOS standalone may pan the visual viewport without changing its height while typing.
+        if (standalonePwa && browserViewportPan) return;
         // A pressed control must stay under the pointer until its click is delivered.
         if (pointerActive) {
           correctionPending = true;
@@ -2198,14 +2207,41 @@ export function TodayWorkout({
     };
     const viewport = window.visualViewport;
     let viewportTop = viewport?.offsetTop;
+    let viewportHeight = viewport?.height ?? window.innerHeight;
+    let windowHeight = window.innerHeight;
     const panViewport = () => {
-      if (viewport?.offsetTop === viewportTop) return;
-      viewportTop = viewport?.offsetTop;
+      const nextTop = viewport?.offsetTop ?? 0;
+      if (nextTop === viewportTop) return;
+      viewportTop = nextTop;
+      if (standalonePwa) {
+        browserViewportPan = Math.abs(nextTop) > 0.5;
+        return;
+      }
       keepFieldsVisible();
+    };
+    const resizeViewport = () => {
+      const nextHeight = viewport?.height ?? window.innerHeight;
+      const changed = Math.abs(nextHeight - viewportHeight) > 0.5;
+      viewportHeight = nextHeight;
+      if (!standalonePwa || changed) {
+        browserViewportPan = false;
+        keepFieldsVisible();
+      }
+    };
+    const resizeWindow = () => {
+      const changed = Math.abs(window.innerHeight - windowHeight) > 0.5;
+      windowHeight = window.innerHeight;
+      if (!standalonePwa || changed) {
+        browserViewportPan = false;
+        keepFieldsVisible();
+      }
     };
     const observer = new ResizeObserver(keepFieldsVisible);
     const focus = () => {
       manualScroll = false;
+      if (standalonePwa && Math.abs(viewport?.offsetTop ?? 0) <= 0.5) {
+        browserViewportPan = false;
+      }
       observer.disconnect();
       const row = document.activeElement?.closest('.active-workout-set');
       if (
@@ -2241,9 +2277,9 @@ export function TodayWorkout({
     document.addEventListener('pointermove', pointerMove, true);
     document.addEventListener('pointerup', pointerEnd, true);
     document.addEventListener('pointercancel', pointerEnd, true);
-    viewport?.addEventListener('resize', keepFieldsVisible);
+    viewport?.addEventListener('resize', resizeViewport);
     viewport?.addEventListener('scroll', panViewport);
-    window.addEventListener('resize', keepFieldsVisible);
+    window.addEventListener('resize', resizeWindow);
     return () => {
       if (frame !== undefined) window.cancelAnimationFrame(frame);
       if (focusResetFrame !== undefined) window.cancelAnimationFrame(focusResetFrame);
@@ -2254,9 +2290,9 @@ export function TodayWorkout({
       document.removeEventListener('pointermove', pointerMove, true);
       document.removeEventListener('pointerup', pointerEnd, true);
       document.removeEventListener('pointercancel', pointerEnd, true);
-      viewport?.removeEventListener('resize', keepFieldsVisible);
+      viewport?.removeEventListener('resize', resizeViewport);
       viewport?.removeEventListener('scroll', panViewport);
-      window.removeEventListener('resize', keepFieldsVisible);
+      window.removeEventListener('resize', resizeWindow);
     };
   }, []);
 

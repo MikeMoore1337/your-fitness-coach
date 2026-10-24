@@ -82,6 +82,14 @@ test('serves the install manifest, canonical icons and service worker contract',
     undefined,
     { timeout: 10_000 },
   );
+  if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)))) {
+    await page.reload();
+  }
+  await page.waitForFunction(
+    () => navigator.serviceWorker.controller?.scriptURL.endsWith('/sw.js') ?? false,
+    undefined,
+    { timeout: 10_000 },
+  );
 
   const cacheKeys = await page.evaluate(async () => {
     const names = await caches.keys();

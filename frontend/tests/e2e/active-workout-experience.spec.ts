@@ -965,9 +965,39 @@ type Issue1099Probe = {
   scrollCalls: Array<{ method: string; top: number; time: number }>;
 };
 
-async function prepareIssue1099KeyboardCase(page: Page) {
+type Issue1099Surface = 'browser' | 'pwa' | 'telegram';
+
+async function prepareIssue1099KeyboardCase(
+  page: Page,
+  surface: Issue1099Surface = 'browser',
+  options: { verifyPwaServiceWorker?: boolean } = {},
+) {
   await page.setViewportSize({ width: 393, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  if (surface === 'pwa') {
+    await page.addInitScript(() => {
+      const nativeMatchMedia = window.matchMedia.bind(window);
+      window.matchMedia = (query: string) => {
+        const result = nativeMatchMedia(query);
+        if (query === '(display-mode: standalone)') {
+          Object.defineProperty(result, 'matches', { configurable: true, value: true });
+        }
+        return result;
+      };
+      Object.defineProperty(navigator, 'standalone', {
+        configurable: true,
+        value: true,
+      });
+    });
+  }
+  if (surface === 'telegram') {
+    await installTelegramHarness(page, {
+      platform: 'ios',
+      colorScheme: 'dark',
+      viewportHeight: 844,
+      viewportStableHeight: 844,
+    });
+  }
   await page.addInitScript(() => {
     const viewport = new EventTarget() as EventTarget & {
       height: number;
@@ -977,11 +1007,30 @@ async function prepareIssue1099KeyboardCase(page: Page) {
     Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
     const calls: Array<{ method: string; top: number; time: number }> = [];
-    Object.assign(window, { __yfc1099ScrollCalls: calls });
+    const lifecycle: Array<{
+      source: string;
+      time: number;
+      height: number;
+      offsetTop: number;
+      innerHeight: number;
+    }> = [];
+    const recordLifecycle = (source: string) =>
+      lifecycle.push({
+        source,
+        time: performance.now(),
+        height: viewport.height,
+        offsetTop: viewport.offsetTop,
+        innerHeight,
+      });
+    viewport.addEventListener('resize', () => recordLifecycle('visualViewport.resize'));
+    viewport.addEventListener('scroll', () => recordLifecycle('visualViewport.scroll'));
+    window.addEventListener('resize', () => recordLifecycle('window.resize'));
+    Object.assign(window, { __yfc1099ScrollCalls: calls, __yfc1099Lifecycle: lifecycle });
     for (const method of ['scrollBy', 'scrollTo'] as const) {
       const original = window[method].bind(window);
       window[method] = (options?: ScrollToOptions | number, y?: number) => {
         const top = typeof options === 'number' ? (y ?? 0) : (options?.top ?? window.scrollY);
+        recordLifecycle(`${method}(${top})`);
         calls.push({ method, top, time: performance.now() });
         if (typeof options === 'number') original(options, y ?? 0);
         else original(options);
@@ -989,8 +1038,23 @@ async function prepareIssue1099KeyboardCase(page: Page) {
     }
   });
   const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
-  await page.goto('/app');
-  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.goto(surface === 'telegram' ? '/app?tgWebAppPlatform=ios' : '/app');
+  if (surface === 'pwa' && options.verifyPwaServiceWorker !== false) {
+    await page.waitForFunction(async () => {
+      const registration = await navigator.serviceWorker.getRegistration('/');
+      return Boolean(registration?.active);
+    });
+    if (!(await page.evaluate(() => Boolean(navigator.serviceWorker.controller)))) {
+      await page.reload();
+    }
+    await page.waitForFunction(() => {
+      const controller = navigator.serviceWorker.controller;
+      return Boolean(controller?.scriptURL.endsWith('/sw.js'));
+    });
+  }
+  if (surface !== 'telegram') {
+    await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  }
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const first = page.locator('[data-workout-set-id="201"]');
   await first.getByLabel(/^Вес,/).fill('40');
@@ -1275,6 +1339,158 @@ test('#1099 scenario B keeps the rest panel stable during a real touch swipe', a
   expect(await reps.inputValue()).toBe('12');
   expect(server.readSet(202).is_completed).toBe(false);
   expect(server.patches).toHaveLength(patchCountBeforeGesture);
+});
+
+test.describe('#1099 standalone PWA keyboard path', () => {
+  test.use({ serviceWorkers: 'block' });
+
+  test('#1099 PWA keeps input geometry stable during viewport pan events', async ({
+    page,
+  }, info) => {
+    const { server, row, weight, reps } = await prepareIssue1099KeyboardCase(page, 'pwa', {
+      verifyPwaServiceWorker: false,
+    });
+    await weight.focus();
+    await settleViewport(page);
+    const initialScrollY = await page.evaluate(() => window.scrollY);
+    const initialCalls = await page.evaluate(
+      () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls ?? [],
+    );
+    await page.evaluate(() => {
+      (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+    });
+    await startIssue1099FrameProbe(page);
+
+    const emitPwaViewportEvents = async (offsetTop: number) => {
+      await page.evaluate((nextOffsetTop) => {
+        const viewport = window.visualViewport as EventTarget & {
+          offsetTop: number;
+        };
+        viewport.offsetTop = nextOffsetTop;
+        viewport.dispatchEvent(new Event('scroll'));
+        viewport.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('resize'));
+      }, offsetTop);
+      await page.evaluate(
+        () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+      );
+    };
+
+    for (const [weightValue, repsValue] of [
+      ['50', '12'],
+      ['55', '11'],
+      ['50', '12'],
+    ] as const) {
+      await weight.focus();
+      await weight.fill('');
+      await weight.pressSequentially(weightValue);
+      await emitPwaViewportEvents(2);
+      await expect.poll(() => server.readSet(202).actual_weight).toBe(Number(weightValue));
+      await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+      await reps.focus();
+      await reps.fill('');
+      await reps.pressSequentially(repsValue);
+      await emitPwaViewportEvents(7);
+      await expect.poll(() => server.readSet(202).actual_reps).toBe(Number(repsValue));
+      await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    }
+
+    const probe = await stopIssue1099FrameProbe(page);
+    const lifecycle = await page.evaluate(
+      () =>
+        (window as Window & {
+          __yfc1099Lifecycle?: Array<Record<string, unknown>>;
+        }).__yfc1099Lifecycle ?? [],
+    );
+    const report = { initialScrollY, initialCalls, lifecycle, ...probe };
+    await writeFile(
+      info.outputPath('issue-1099-pwa-input-geometry.json'),
+      JSON.stringify(report, null, 2),
+    );
+    await info.attach('issue-1099-pwa-input-geometry.json', {
+      body: JSON.stringify(report, null, 2),
+      contentType: 'application/json',
+    });
+    await page.screenshot({
+      path: info.outputPath('issue-1099-pwa-before.png'),
+      animations: 'disabled',
+    });
+    const inputFrames = probe.frames.filter(
+      (
+        frame,
+      ): frame is Issue1099Frame & {
+        activeTop: number;
+        activeBottom: number;
+        activeControlsTop: number;
+        panelBottom: number;
+      } =>
+        frame.activeTop !== null &&
+        frame.activeBottom !== null &&
+        frame.activeControlsTop !== null &&
+        frame.panelBottom !== null,
+    );
+    expect(await weight.inputValue()).toBe('50');
+    expect(await reps.inputValue()).toBe('12');
+    expect(lifecycle.filter((event) => event.source === 'visualViewport.scroll').length).toBeGreaterThan(
+      0,
+    );
+    expect(
+      lifecycle.filter((event) => event.source === 'visualViewport.resize').length,
+    ).toBeGreaterThan(0);
+    expect(probe.scrollCalls).toEqual([]);
+    expect(inputFrames.length).toBeGreaterThan(0);
+    const inputScrollYs = inputFrames.map((frame) => frame.scrollY);
+    expect(Math.max(...inputScrollYs) - Math.min(...inputScrollYs)).toBeLessThanOrEqual(1);
+    expect(Math.min(...inputFrames.map((frame) => frame.activeTop))).toBeGreaterThanOrEqual(
+      Math.max(...inputFrames.map((frame) => frame.panelBottom)) - 1,
+    );
+    expect(
+      Math.max(
+        ...inputFrames.map(
+          (frame) => frame.activeBottom - (frame.viewportTop + frame.viewportHeight),
+        ),
+      ),
+    ).toBeLessThanOrEqual(1);
+    expect(Math.abs((await page.evaluate(() => window.scrollY)) - initialScrollY)).toBeLessThanOrEqual(
+      1,
+    );
+    expect(server.readSet(202).is_completed).toBe(false);
+    expect(row).toBeVisible();
+  });
+});
+
+test('#1099 TMA control keeps the same input sequence stable', async ({ page }) => {
+  const { server, weight, reps } = await prepareIssue1099KeyboardCase(page, 'telegram');
+  await weight.focus();
+  await settleViewport(page);
+  const initialScrollY = await page.evaluate(() => window.scrollY);
+  await page.evaluate(() => {
+    (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+  });
+  for (const [weightValue, repsValue] of [
+    ['50', '12'],
+    ['55', '11'],
+    ['50', '12'],
+  ] as const) {
+    await weight.focus();
+    await weight.fill('');
+    await weight.pressSequentially(weightValue);
+    await expect.poll(() => server.readSet(202).actual_weight).toBe(Number(weightValue));
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+    await reps.focus();
+    await reps.fill('');
+    await reps.pressSequentially(repsValue);
+    await expect.poll(() => server.readSet(202).actual_reps).toBe(Number(repsValue));
+    await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+  }
+  expect(await weight.inputValue()).toBe('50');
+  expect(await reps.inputValue()).toBe('12');
+  expect(await page.evaluate(() => window.scrollY)).toBe(initialScrollY);
+  expect(
+    await page.evaluate(
+      () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls,
+    ),
+  ).toEqual([]);
 });
 
 test.describe('#1001 keyboard input stability', () => {
