@@ -49,6 +49,69 @@ function fullBodyThreeDayDays() {
   ];
 }
 
+function nsunsFourDayDays() {
+  const exercise = (id: number, title: string, notes: string) => ({
+    id,
+    exercise_id: 1,
+    exercise_title: title,
+    metric_type: 'strength',
+    prescribed_sets: 7,
+    prescribed_reps: '5+',
+    prescribed_duration_minutes: null,
+    rest_seconds: 180,
+    notes,
+    superset_group: null,
+    superset_order: null,
+    has_guide: true,
+  });
+  return [
+    {
+      id: 400,
+      day_number: 1,
+      title: 'День 1 · Жим лёжа + жим стоя',
+      exercises: [
+        exercise(
+          4000,
+          'Жим лёжа со штангой в силовой стойке',
+          'T1 — основной подъём; веса по процентам от тренировочного максимума; последний подход — максимум повторений (AMRAP).',
+        ),
+        exercise(
+          4001,
+          'Жим штанги стоя над головой',
+          'T2 — второй базовый подъём; длинная подпись для проверки переноса строк на iPhone.',
+        ),
+      ],
+    },
+    {
+      id: 401,
+      day_number: 2,
+      title: 'День 2 · Присед + становая сумо',
+      exercises: [
+        exercise(4010, 'Приседание со штангой на спине', 'T1 — основной подъём.'),
+        exercise(4011, 'Становая тяга сумо со штангой', 'T2 — второй базовый подъём.'),
+      ],
+    },
+    {
+      id: 402,
+      day_number: 3,
+      title: 'День 3 · Жим стоя + жим лёжа',
+      exercises: [
+        exercise(4020, 'Жим штанги стоя над головой', 'T1 — основной подъём.'),
+        exercise(4021, 'Жим лёжа со штангой в силовой стойке', 'T2 — второй базовый подъём.'),
+      ],
+    },
+    {
+      id: 403,
+      day_number: 4,
+      title: 'День 4 · Становая тяга + присед',
+      exercises: [
+        exercise(4030, 'Становая тяга со штангой', 'T1 — основной подъём.'),
+        exercise(4031, 'Приседание со штангой на спине', 'T2 — второй базовый подъём.'),
+      ],
+    },
+  ];
+}
+
 async function captureTask293Evidence(page: Page, fileName: string): Promise<void> {
   if (!TASK_293_EVIDENCE_DIR) return;
   await page.screenshot({ path: path.resolve(TASK_293_EVIDENCE_DIR, fileName), fullPage: true });
@@ -119,6 +182,7 @@ async function mockApi(
     notificationItems = [] as Array<Record<string, unknown>>,
     telegramLinked = true,
     staleNotificationIds = [] as number[],
+    extraTemplates = [] as Array<Record<string, unknown>>,
   } = {},
 ) {
   let role: 'client' | 'coach' | 'admin' = 'client';
@@ -909,6 +973,7 @@ async function mockApi(
               },
             ],
           },
+          ...extraTemplates,
         ],
       });
     if (path.endsWith('/programs/templates/recommendation')) {
@@ -2630,7 +2695,29 @@ test('поля профиля и питания выровнены на деск
 
 test('поля адаптируются к разным iPhone, а пример программы открывает состав', async ({ page }) => {
   await page.setViewportSize({ width: 440, height: 956 });
-  await mockApi(page);
+  await mockApi(page, {
+    extraTemplates: [
+      {
+        id: 14,
+        title: 'nSuns - 4-дневная программа',
+        slug: 'nsuns-4d',
+        goal: 'strength',
+        level: 'intermediate',
+        owner_user_id: null,
+        is_public: true,
+        is_example: true,
+        is_assigned_to_current_user: false,
+        is_active_for_current_user: false,
+        can_edit: false,
+        program_metadata: {
+          days_per_week: 4,
+          equipment: ['Штанга', 'Скамья', 'Силовая стойка'],
+          level: 'intermediate',
+        },
+        days: nsunsFourDayDays(),
+      },
+    ],
+  });
   let staleAssignmentSent = false;
   await page.route('**/api/v1/programs/templates/10', async (route) => {
     if (route.request().method() !== 'GET') return route.continue();
@@ -2773,7 +2860,7 @@ test('поля адаптируются к разным iPhone, а пример 
   await expect(example).not.toContainText('beginner');
   const previewEvidenceDir = path.resolve(
     '..',
-    '.artifacts/runtime/tests/playwright/redesign-visual-issue-997',
+    '.artifacts/runtime/tests/playwright/issue-1185-program-preview',
   );
   mkdirSync(previewEvidenceDir, { recursive: true });
   const originalViewport = page.viewportSize();
@@ -2801,6 +2888,99 @@ test('поля адаптируются к разным iPhone, а пример 
       animations: 'disabled',
     });
   }
+
+  const nsuns = page.getByRole('button', {
+    name: 'Посмотреть шаблон «nSuns - 4-дневная программа»',
+  });
+  await nsuns.click();
+  const nsunsDialog = page.locator('.program-example-modal');
+  const nsunsPanel = page.locator('.program-example-modal__panel');
+  const nsunsContent = page.locator('.program-example-modal__content');
+  await expect(nsunsDialog).toBeVisible();
+  const measurePreviewGeometry = () =>
+    page.evaluate(() => {
+      const selectors = [
+        '.program-example-modal',
+        '.program-example-modal__panel',
+        '.program-example-modal__content',
+        '.program-example-modal__head',
+        '.program-example-modal__actions',
+        '.program-example-modal__secondary-actions',
+      ];
+      const panel = document.querySelector<HTMLElement>('.program-example-modal__panel');
+      return {
+        documentElementScrollWidth: document.documentElement.scrollWidth,
+        bodyScrollWidth: document.body.scrollWidth,
+        containers: selectors.map((selector) => {
+          const element = document.querySelector<HTMLElement>(selector);
+          if (!element) return null;
+          const rect = element.getBoundingClientRect();
+          return {
+            selector,
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            rect: { x: rect.x, width: rect.width, right: rect.right },
+          };
+        }),
+        scrollableContainers: panel
+          ? Array.from(panel.querySelectorAll<HTMLElement>('*'))
+              .filter((element) => {
+                const styles = getComputedStyle(element);
+                return (
+                  ['auto', 'scroll'].includes(styles.overflowY) &&
+                  element.scrollHeight > element.clientHeight + 1
+                );
+              })
+              .map((element) => `.${element.classList[0] ?? element.tagName.toLowerCase()}`)
+          : [],
+        actionButtons: Array.from(
+          document.querySelectorAll<HTMLElement>('.program-example-modal__actions button'),
+        ).map((element) => ({
+          label: element.textContent?.trim(),
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+        })),
+      };
+    });
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 900 });
+    const metrics = await measurePreviewGeometry();
+    expect(metrics.documentElementScrollWidth).toBeLessThanOrEqual(width + 1);
+    expect(metrics.bodyScrollWidth).toBeLessThanOrEqual(width + 1);
+    expect(metrics.scrollableContainers).toEqual(['.program-example-modal__content']);
+    for (const container of metrics.containers) {
+      expect(container).not.toBeNull();
+      expect(container!.scrollWidth).toBeLessThanOrEqual(container!.clientWidth + 1);
+      expect(container!.rect.x).toBeGreaterThanOrEqual(-1);
+      expect(container!.rect.right).toBeLessThanOrEqual(width + 1);
+    }
+    expect(
+      metrics.actionButtons.every((button) => button.scrollWidth <= button.clientWidth + 1),
+    ).toBe(true);
+    if (width === 320 || width === 393) {
+      for (const theme of ['dark', 'light'] as const) {
+        await setTheme(theme);
+        await page.screenshot({
+          path: path.join(previewEvidenceDir, `issue-1185-nsuns-${theme}-${width}.png`),
+          animations: 'disabled',
+        });
+      }
+    }
+  }
+  await nsunsContent.evaluate((element) => {
+    element.scrollTo({ left: element.scrollWidth, top: element.scrollHeight, behavior: 'instant' });
+  });
+  await expect.poll(() => nsunsContent.evaluate((element) => element.scrollTop > 0)).toBe(true);
+  expect(await nsunsContent.evaluate((element) => element.scrollLeft)).toBe(0);
+  const longNsunsExercise = nsunsPanel.getByText('Жим лёжа со штангой в силовой стойке').first();
+  await longNsunsExercise.scrollIntoViewIfNeeded();
+  await expect(longNsunsExercise).toBeVisible();
+  await expect(nsunsDialog.getByText('Выбрать', { exact: true })).toBeVisible();
+  await expect(nsunsDialog.getByText('Создать копию', { exact: true })).toBeVisible();
+  await expect(nsunsDialog.getByText('Назначить по расписанию', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(nsunsDialog).toHaveCount(0);
+  await expect(nsuns).toBeFocused();
 
   await example.click();
   const previewDialog = page.locator('.program-example-modal');
