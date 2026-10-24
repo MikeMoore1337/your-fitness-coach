@@ -66,24 +66,45 @@ SELECT json_build_object(
 
 # Run only in inspected application containers. Match established socket inode to
 # an owning process, not application_name (which any client can forge).
-SOCKET_PROBE = r"""
+# Docker healthchecks also run ``python -c`` inside these containers. Ignore that
+# short-lived helper only when it owns no PostgreSQL socket; an extra process with
+# a DB socket remains a hard topology failure.
+SOCKET_PROBE_PROCESS_RULE = r"""
+def application_process_count(processes, db_socket_inodes):
+    return sum(
+        not inline_python or bool(process_sockets & db_socket_inodes)
+        for inline_python, process_sockets in processes
+    )
+"""
+
+SOCKET_PROBE = (
+    r"""
 import ipaddress, json, os, pathlib
 root = pathlib.Path('/proc')
 owners = set()
-python_processes = 0
+matching_processes = []
 for process in root.iterdir():
     if not process.name.isdigit() or int(process.name) == os.getpid():
         continue
     try:
         command = (process / 'comm').read_text().strip()
-        python_processes += command.startswith(('python', 'uvicorn'))
+        process_sockets = set()
         for fd in (process / 'fd').iterdir():
             try:
                 link = os.readlink(fd)
                 if link.startswith('socket:['):
-                    owners.add(link[8:-1])
+                    inode = link[8:-1]
+                    owners.add(inode)
+                    process_sockets.add(inode)
             except FileNotFoundError:
                 pass
+        if command.startswith(('python', 'uvicorn')):
+            try:
+                arguments = (process / 'cmdline').read_bytes().split(b'\0')
+                inline_python = command.startswith('python') and len(arguments) > 1 and arguments[1] == b'-c'
+            except (FileNotFoundError, PermissionError):
+                inline_python = False
+            matching_processes.append((inline_python, process_sockets))
     except FileNotFoundError:
         pass
 def endpoint(value, ipv6):
@@ -95,14 +116,23 @@ def endpoint(value, ipv6):
         ip = ip.ipv4_mapped
     return str(ip), int(port, 16)
 rows = []
+db_socket_inodes = set()
 for filename in ('tcp', 'tcp6'):
     for line in (root / 'net' / filename).read_text().splitlines()[1:]:
         fields = line.split()
         if fields[3] == '01' and fields[9] in owners:
-            rows.append([*endpoint(fields[1], filename == 'tcp6'),
-                         *endpoint(fields[2], filename == 'tcp6')])
-print(json.dumps({'processes': python_processes, 'sockets': rows}))
+            local = endpoint(fields[1], filename == 'tcp6')
+            remote = endpoint(fields[2], filename == 'tcp6')
+            if remote[1] == 5432:
+                db_socket_inodes.add(fields[9])
+            rows.append([*local, *remote])
 """
+    + SOCKET_PROBE_PROCESS_RULE
+    + r"""
+print(json.dumps({'processes': application_process_count(matching_processes, db_socket_inodes),
+                  'sockets': rows}))
+"""
+)
 
 ENGINE_PROBE = """
 import json

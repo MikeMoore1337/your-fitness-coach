@@ -24,6 +24,17 @@ def snapshot():
     }
 
 
+def test_socket_probe_ignores_database_free_inline_healthcheck_processes():
+    assert safety.SOCKET_PROBE_PROCESS_RULE in safety.SOCKET_PROBE
+    namespace = {}
+    exec(safety.SOCKET_PROBE_PROCESS_RULE, namespace)
+    count = namespace["application_process_count"]
+
+    assert count([(False, set()), (True, set())], set()) == 1
+    assert count([(False, set()), (True, {"db-socket"})], {"db-socket"}) == 2
+    assert count([(False, set()), (False, set())], set()) == 2
+
+
 def container(name="backend", *, running=True, restart="no", exit_code=0):
     return {
         "id": name,
