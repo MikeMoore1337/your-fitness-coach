@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { emptyHydrationDay } from './fixtures/platform-api';
@@ -970,7 +970,7 @@ type Issue1099Surface = 'browser' | 'pwa' | 'telegram';
 async function prepareIssue1099KeyboardCase(
   page: Page,
   surface: Issue1099Surface = 'browser',
-  options: { verifyPwaServiceWorker?: boolean } = {},
+  options: { verifyPwaServiceWorker?: boolean; withRest?: boolean } = {},
 ) {
   await page.setViewportSize({ width: 393, height: 844 });
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
@@ -1005,6 +1005,7 @@ async function prepareIssue1099KeyboardCase(
       offsetTop: number;
     };
     Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+    Object.defineProperty(viewport, 'pageTop', { get: () => scrollY + viewport.offsetTop });
     Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
     const calls: Array<{ method: string; top: number; time: number }> = [];
     const lifecycle: Array<{
@@ -1026,6 +1027,7 @@ async function prepareIssue1099KeyboardCase(
     viewport.addEventListener('scroll', () => recordLifecycle('visualViewport.scroll'));
     window.addEventListener('resize', () => recordLifecycle('window.resize'));
     Object.assign(window, { __yfc1099ScrollCalls: calls, __yfc1099Lifecycle: lifecycle });
+    Object.assign(window, { __yfc1099NativeScrollTo: window.scrollTo.bind(window) });
     for (const method of ['scrollBy', 'scrollTo'] as const) {
       const original = window[method].bind(window);
       window[method] = (options?: ScrollToOptions | number, y?: number) => {
@@ -1034,6 +1036,9 @@ async function prepareIssue1099KeyboardCase(
         calls.push({ method, top, time: performance.now() });
         if (typeof options === 'number') original(options, y ?? 0);
         else original(options);
+        if (method === 'scrollBy') {
+          (window as Window & { __yfc1099ScrollFeedback?: () => void }).__yfc1099ScrollFeedback?.();
+        }
       };
     }
   });
@@ -1059,9 +1064,11 @@ async function prepareIssue1099KeyboardCase(
   const first = page.locator('[data-workout-set-id="201"]');
   await first.getByLabel(/^Вес,/).fill('40');
   await first.getByLabel(/^Повторы,/).fill('10');
-  await first.getByRole('button', { name: /^Завершить:/ }).click();
-  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
-  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  if (options.withRest !== false) {
+    await first.getByRole('button', { name: /^Завершить:/ }).click();
+    await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+    await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+  }
 
   const row = page.locator('[data-workout-set-id="202"]');
   const weight = row.getByLabel(/^Вес,/);
@@ -1248,11 +1255,11 @@ test('#1099 scenario A keeps input geometry stable after initial keyboard correc
   expect(row).toBeVisible();
 });
 
-test('#1099 scenario B keeps the rest panel stable during a real touch swipe', async ({
-  page,
-}, info) => {
+async function verifyIssue1099RestSwipe(page: Page, info: TestInfo, surface: 'browser' | 'pwa') {
   test.skip(test.info().project.name !== 'chromium', 'CDP provides deterministic touch drag input');
-  const { server, row, reps } = await prepareIssue1099KeyboardCase(page);
+  const { server, row, reps } = await prepareIssue1099KeyboardCase(page, surface, {
+    verifyPwaServiceWorker: false,
+  });
   await reps.fill('12');
   await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
   await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
@@ -1339,10 +1346,276 @@ test('#1099 scenario B keeps the rest panel stable during a real touch swipe', a
   expect(await reps.inputValue()).toBe('12');
   expect(server.readSet(202).is_completed).toBe(false);
   expect(server.patches).toHaveLength(patchCountBeforeGesture);
-});
+}
+
+for (const surface of ['browser', 'pwa'] as const) {
+  test(`#1099 scenario B keeps the rest panel stable during a real touch swipe in ${surface}`, async ({
+    page,
+  }, info) => {
+    await verifyIssue1099RestSwipe(page, info, surface);
+  });
+}
 
 test.describe('#1099 standalone PWA keyboard path', () => {
   test.use({ serviceWorkers: 'block' });
+
+  for (const placement of [
+    'upper',
+    'middle',
+    'lower',
+    'lower-then-upper-overlap',
+    'upper-staged-no-rest',
+    'upper-native-scroll-no-rest',
+  ] as const) {
+    test(`#1099 PWA minimally places the ${placement} field after native focus pan`, async ({
+      page,
+    }, info) => {
+      const { server, weight, reps } = await prepareIssue1099KeyboardCase(page, 'pwa', {
+        verifyPwaServiceWorker: false,
+        withRest: !placement.endsWith('no-rest'),
+      });
+      if (placement.endsWith('no-rest')) {
+        await page.setViewportSize({
+          width: placement === 'upper-staged-no-rest' ? 360 : 430,
+          height: 844,
+        });
+        await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+      }
+      const readGeometry = () =>
+        weight.evaluate((input) => {
+          const viewport = window.visualViewport!;
+          const field = input.getBoundingClientRect();
+          const controls = input.closest('.active-workout-set__controls')!.getBoundingClientRect();
+          const rest = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
+          const dock = document.getElementById('appBottomNav')!.getBoundingClientRect();
+          const measure = document.createElement('div');
+          measure.style.cssText =
+            'position:fixed;visibility:hidden;height:var(--yfc-layout-safe-top)';
+          document.body.append(measure);
+          const inset = measure.getBoundingClientRect().height;
+          measure.remove();
+          const dockVisible =
+            getComputedStyle(document.getElementById('appBottomNav')!).visibility !== 'hidden';
+          return {
+            scrollY,
+            offsetTop: viewport.offsetTop,
+            pageTop: viewport.pageTop,
+            height: viewport.height,
+            fieldTop: field.top,
+            fieldBottom: field.bottom,
+            controlsTop: controls.top,
+            controlsBottom: controls.bottom,
+            restTop: rest?.top ?? null,
+            restBottom: rest?.bottom ?? null,
+            dockTop: dock.top,
+            safeTop: Math.max(viewport.offsetTop + inset, rest?.bottom ?? 0),
+            keyboardTop: viewport.offsetTop + viewport.height,
+            safeBottom: Math.min(
+              viewport.offsetTop + viewport.height,
+              dockVisible ? dock.top : Infinity,
+            ),
+          };
+        });
+      await weight.evaluate((input, position) => {
+        (document.activeElement as HTMLElement)?.blur();
+        const viewport = window.visualViewport as VisualViewport & {
+          height: number;
+          offsetTop: number;
+        };
+        Object.assign(viewport, { height: 844, offsetTop: 0 });
+        viewport.dispatchEvent(new Event('resize'));
+        viewport.dispatchEvent(new Event('scroll'));
+        if (position.endsWith('no-rest')) {
+          document.documentElement.style.setProperty('--yfc-layout-safe-top', '24px');
+        }
+        const fieldTop = position.startsWith('upper') ? 240 : position === 'middle' ? 420 : 650;
+        window.scrollBy({ top: input.getBoundingClientRect().top - fieldTop, behavior: 'instant' });
+      }, placement);
+      await settleViewport(page);
+      const beforeFocus = await readGeometry();
+      await page.evaluate(() => {
+        (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+      });
+      // These viewport events model native iOS focus-pan, without an application scroll call.
+      await weight.evaluate((input, position) => {
+        if (position === 'lower-then-upper-overlap') {
+          const win = window as Window & { __yfc1099ScrollFeedback?: () => void };
+          win.__yfc1099ScrollFeedback = () => {
+            delete win.__yfc1099ScrollFeedback;
+            const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
+            viewport.offsetTop = input.getBoundingClientRect().top - 40;
+            viewport.dispatchEvent(new Event('scroll'));
+          };
+        }
+        input.focus({ preventScroll: true });
+        const viewport = window.visualViewport as VisualViewport & {
+          height: number;
+          offsetTop: number;
+        };
+        Object.assign(viewport, {
+          height: 420,
+          offsetTop: position.startsWith('upper') ? input.getBoundingClientRect().top + 20 : 150,
+        });
+        viewport.dispatchEvent(new Event('resize'));
+        viewport.dispatchEvent(new Event('scroll'));
+      }, placement);
+      await settleViewport(page);
+      if (placement === 'upper-staged-no-rest') {
+        // Native focus animation can resume after a plateau, before the first typed digit.
+        await page.evaluate(() => {
+          const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
+          viewport.offsetTop += 40;
+          viewport.dispatchEvent(new Event('scroll'));
+        });
+        await settleViewport(page);
+      }
+      if (placement === 'upper-native-scroll-no-rest') {
+        // Model the native document-scroll part independently from application scroll calls.
+        await page.evaluate(() => {
+          (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
+            .__yfc1099NativeScrollTo!({ top: scrollY + 40, behavior: 'instant' });
+        });
+        await settleViewport(page);
+      }
+      const afterFocus = await readGeometry();
+      const calls = await page.evaluate(
+        () =>
+          (window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] })
+            .__yfc1099ScrollCalls!,
+      );
+      const report = { placement, beforeFocus, afterFocus, calls };
+      await writeFile(info.outputPath('focus-placement.json'), JSON.stringify(report, null, 2));
+      await info.attach('focus-placement.json', {
+        body: JSON.stringify(report, null, 2),
+        contentType: 'application/json',
+      });
+      await page.screenshot({
+        path: info.outputPath(`pwa-focus-${placement}.png`),
+        animations: 'disabled',
+      });
+      expect(afterFocus.fieldTop).toBeGreaterThanOrEqual(afterFocus.safeTop - 1);
+      expect(afterFocus.fieldBottom).toBeLessThanOrEqual(afterFocus.safeBottom + 1);
+      const corrections = calls.filter((call) => call.method === 'scrollBy');
+      expect(corrections).toHaveLength(
+        placement === 'middle'
+          ? 0
+          : placement.endsWith('no-rest') || placement === 'lower-then-upper-overlap'
+            ? 2
+            : 1,
+      );
+      if (placement.startsWith('upper'))
+        expect(corrections.every((call) => call.top < 0)).toBe(true);
+      if (placement === 'lower') expect(corrections[0]!.top).toBeGreaterThan(0);
+      if (placement === 'lower-then-upper-overlap') {
+        expect(corrections[0]!.top).toBeGreaterThan(0);
+        expect(corrections[1]!.top).toBeLessThan(0);
+      }
+      if (placement === 'upper') {
+        expect(
+          Math.abs(corrections[0]!.top - (beforeFocus.controlsTop - afterFocus.safeTop)),
+        ).toBeLessThanOrEqual(1);
+      }
+      if (placement === 'lower') {
+        expect(
+          Math.abs(corrections[0]!.top - (beforeFocus.controlsBottom - afterFocus.safeBottom)),
+        ).toBeLessThanOrEqual(1);
+      }
+      // Even before typing, viewport feedback must not scroll an already visible input.
+      await page.evaluate(() => {
+        const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
+        viewport.offsetTop += 2;
+        viewport.dispatchEvent(new Event('scroll'));
+      });
+      await settleViewport(page);
+      expect(
+        await page.evaluate(
+          () =>
+            (
+              window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] }
+            ).__yfc1099ScrollCalls!.filter((call) => call.method === 'scrollBy').length,
+        ),
+      ).toBe(corrections.length);
+
+      await page.evaluate(() => {
+        (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls!.length = 0;
+      });
+      const positionedY = await page.evaluate(() => scrollY);
+      let typingY: number | undefined;
+      for (const [field, value] of [
+        [weight, '50'],
+        [reps, '12'],
+        [weight, '55'],
+        [weight, '50'],
+      ] as const) {
+        await field.evaluate((input) => input.focus({ preventScroll: true }));
+        await page.keyboard.press('ControlOrMeta+A');
+        await page.keyboard.type(value);
+        await expect.poll(() => activeWorkoutQueueLength(page)).toBe(0);
+        // Unchanged-height viewport noise and ACK must not restart placement while typing.
+        await page.evaluate(() => {
+          const viewport = window.visualViewport as VisualViewport & { offsetTop: number };
+          viewport.offsetTop += 2;
+          viewport.dispatchEvent(new Event('scroll'));
+          viewport.dispatchEvent(new Event('resize'));
+        });
+        await settleViewport(page);
+        if (typingY === undefined) typingY = await page.evaluate(() => scrollY);
+        else await expectScrollYStable(page, typingY);
+      }
+      await expect.poll(() => server.readSet(202).actual_weight).toBe(50);
+      await expect.poll(() => server.readSet(202).actual_reps).toBe(12);
+      expect(server.readSet(202).is_completed).toBe(false);
+      await writeFile(
+        info.outputPath('typing-placement.json'),
+        JSON.stringify(
+          {
+            positionedY,
+            geometry: await readGeometry(),
+            calls: await page.evaluate(
+              () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls,
+            ),
+          },
+          null,
+          2,
+        ),
+      );
+      await expectScrollYStable(page, typingY!);
+      expect(
+        await page.evaluate(
+          () => (window as Window & { __yfc1099ScrollCalls?: unknown[] }).__yfc1099ScrollCalls,
+        ),
+      ).toEqual([]);
+      await expect(weight).toBeFocused();
+      await weight.evaluate((input) => {
+        input.blur();
+        const viewport = window.visualViewport as VisualViewport & {
+          height: number;
+          offsetTop: number;
+        };
+        Object.assign(viewport, { height: 844, offsetTop: 0 });
+        viewport.dispatchEvent(new Event('resize'));
+        viewport.dispatchEvent(new Event('scroll'));
+      });
+      await settleViewport(page);
+      await expectScrollYStable(page, typingY!);
+      if (!placement.endsWith('no-rest')) {
+        await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+      }
+      await weight.evaluate((input) => {
+        input.focus({ preventScroll: true });
+        const viewport = window.visualViewport as VisualViewport & { height: number };
+        viewport.height = 420;
+        viewport.dispatchEvent(new Event('resize'));
+      });
+      await settleViewport(page);
+      const reopened = await readGeometry();
+      expect(reopened.fieldTop).toBeGreaterThanOrEqual(reopened.safeTop - 1);
+      expect(reopened.fieldBottom).toBeLessThanOrEqual(reopened.safeBottom + 1);
+      await expect(weight).toHaveValue('50');
+      await expect(reps).toHaveValue('12');
+      await expect(weight).toBeFocused();
+    });
+  }
 
   test('#1099 PWA keeps input geometry stable during viewport pan events', async ({
     page,
