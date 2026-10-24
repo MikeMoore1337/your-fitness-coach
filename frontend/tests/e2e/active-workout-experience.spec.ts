@@ -1271,6 +1271,209 @@ test('#1161 keeps a deliberate manual scroll after focused workout input', async
   expect(await reps.inputValue()).toBe('12');
 });
 
+type RestPanelProbe = {
+  phase: string;
+  scrollY: number;
+  viewport: { top: number; bottom: number; height: number };
+  safeTop: number;
+  panel: { top: number; bottom: number; height: number; position: string };
+  fullPanelVisible: boolean;
+  nearViewportTop: boolean;
+  buttonHits: boolean[];
+  scrollEvents: Array<{ source: string; scrollY: number; viewportTop: number }>;
+  scrollAncestors: Array<{
+    tag: string;
+    className: string;
+    overflowY: string;
+    position: string;
+    transform: string;
+    contain: string;
+    scrollHeight: number;
+    clientHeight: number;
+  }>;
+};
+
+async function readRestPanelProbe(page: Page, phase: string): Promise<RestPanelProbe> {
+  return page.evaluate((label) => {
+    const panel = document.querySelector<HTMLElement>('.active-workout-rest');
+    if (!panel) throw new Error('Active rest panel is missing');
+    const visualViewport = window.visualViewport;
+    const viewportTop = visualViewport?.offsetTop ?? 0;
+    const viewportHeight = visualViewport?.height ?? window.innerHeight;
+    const viewportBottom = viewportTop + viewportHeight;
+    const panelBox = panel.getBoundingClientRect();
+    const safeTop =
+      Number.parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue('--yfc-layout-safe-top'),
+      ) || 0;
+    const scrollAncestors = [];
+    let ancestor = panel.parentElement;
+    while (ancestor) {
+      const style = getComputedStyle(ancestor);
+      if (
+        ancestor.scrollHeight > ancestor.clientHeight ||
+        ['auto', 'overlay', 'scroll'].includes(style.overflowY)
+      ) {
+        scrollAncestors.push({
+          tag: ancestor.tagName,
+          className: typeof ancestor.className === 'string' ? ancestor.className : '',
+          overflowY: style.overflowY,
+          position: style.position,
+          transform: style.transform,
+          contain: style.contain,
+          scrollHeight: ancestor.scrollHeight,
+          clientHeight: ancestor.clientHeight,
+        });
+      }
+      ancestor = ancestor.parentElement;
+    }
+    const buttonHits = Array.from(panel.querySelectorAll<HTMLButtonElement>('button')).map(
+      (button) => {
+        const box = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+        return Boolean(hit && (hit === button || button.contains(hit)));
+      },
+    );
+    const scrollEvents =
+      (
+        window as unknown as {
+          __yfc1165ScrollEvents?: Array<{ source: string; scrollY: number; viewportTop: number }>;
+        }
+      ).__yfc1165ScrollEvents ?? [];
+    return {
+      phase: label,
+      scrollY: window.scrollY,
+      viewport: { top: viewportTop, bottom: viewportBottom, height: viewportHeight },
+      safeTop,
+      panel: {
+        top: panelBox.top,
+        bottom: panelBox.bottom,
+        height: panelBox.height,
+        position: getComputedStyle(panel).position,
+      },
+      fullPanelVisible:
+        panelBox.top >= viewportTop + safeTop - 1 && panelBox.bottom <= viewportBottom + 1,
+      nearViewportTop: panelBox.top <= viewportTop + safeTop + 3,
+      buttonHits,
+      scrollEvents: scrollEvents.slice(-20),
+      scrollAncestors,
+    };
+  }, phase);
+}
+
+async function run1165GeometryCase(
+  page: Page,
+  width: number,
+  theme: 'dark' | 'light',
+  phase: string,
+  info: {
+    outputPath: (path: string) => string;
+    attach: (name: string, options: { body: string; contentType: string }) => Promise<void>;
+  },
+) {
+  await page.setViewportSize({ width, height: 844 });
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((value) => {
+    localStorage.setItem('app-theme', value);
+    const viewport = new EventTarget() as EventTarget & {
+      height: number;
+      width: number;
+      offsetTop: number;
+    };
+    Object.assign(viewport, { height: 844, width: innerWidth, offsetTop: 0 });
+    Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
+  }, theme);
+  const server = await mockActiveWorkout(page, false, 'approved_animated', false, null, true);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('40');
+  await first.getByLabel(/^Повторы,/).fill('10');
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
+
+  const panel = page.locator('.active-workout-rest');
+  const panelDocumentTop = await panel.evaluate(
+    (element) => element.getBoundingClientRect().top + scrollY,
+  );
+  await page.evaluate(() => {
+    const events: Array<{ source: string; scrollY: number; viewportTop: number }> = [];
+    const record = (source: string) =>
+      events.push({
+        source,
+        scrollY: window.scrollY,
+        viewportTop: window.visualViewport?.offsetTop ?? 0,
+      });
+    window.addEventListener('scroll', () => record('window'), { passive: true });
+    window.visualViewport?.addEventListener('scroll', () => record('visualViewport'), {
+      passive: true,
+    });
+    Object.assign(window, { __yfc1165ScrollEvents: events });
+  });
+  const maxScroll = await page.evaluate(() => {
+    const scrolling = document.scrollingElement ?? document.documentElement;
+    return Math.max(0, scrolling.scrollHeight - window.innerHeight);
+  });
+  const scrollPoints = [
+    Math.min(maxScroll, panelDocumentTop + 80),
+    Math.min(maxScroll, Math.round(maxScroll * 0.55)),
+    maxScroll,
+  ];
+  const probes: RestPanelProbe[] = [];
+  for (const [index, top] of scrollPoints.entries()) {
+    await page.evaluate((value) => window.scrollTo({ top: value, behavior: 'instant' }), top);
+    await settleViewport(page);
+    probes.push(await readRestPanelProbe(page, `scroll-${index}`));
+    await page.screenshot({
+      path: info.outputPath(`issue-1165-${phase}-${theme}-${width}-scroll-${index}.png`),
+      fullPage: false,
+      animations: 'disabled',
+    });
+  }
+
+  await page.evaluate(() => {
+    const viewport = window.visualViewport as EventTarget & { height: number; offsetTop: number };
+    Object.assign(viewport, { height: 420, offsetTop: 20 });
+    viewport.dispatchEvent(new Event('resize'));
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  const nextWeight = page.locator('[data-workout-set-id="202"]').getByLabel(/^Вес,/);
+  await nextWeight.focus();
+  await settleViewport(page);
+  probes.push(await readRestPanelProbe(page, 'keyboard'));
+  await page.screenshot({
+    path: info.outputPath(`issue-1165-${phase}-${theme}-${width}-keyboard.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
+  await info.attach(`issue-1165-${phase}-${theme}-${width}.json`, {
+    body: JSON.stringify(probes, null, 2),
+    contentType: 'application/json',
+  });
+  return probes;
+}
+
+for (const width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1165 rest panel geometry at ${width}px ${theme}`, async ({ page }, info) => {
+      const phase = process.env.YFC_1165_EVIDENCE_PHASE ?? 'after';
+      const probes = await run1165GeometryCase(page, width, theme, phase, info);
+      const failures = probes.flatMap((probe) => {
+        const issues = [];
+        if (!probe.fullPanelVisible) issues.push(`${probe.phase}: panel clipped by viewport`);
+        if (probe.phase !== 'scroll-0' && !probe.nearViewportTop)
+          issues.push(`${probe.phase}: panel is not pinned to viewport top`);
+        if (probe.buttonHits.some((hit) => !hit))
+          issues.push(`${probe.phase}: timer button hit test failed`);
+        return issues;
+      });
+      expect(failures, JSON.stringify({ width, theme, probes }, null, 2)).toEqual([]);
+    });
+  }
+}
+
 test.describe('#1001 completion navigation', () => {
   test.use({
     isMobile: async ({ browserName }, provide) => provide(browserName !== 'firefox'),
