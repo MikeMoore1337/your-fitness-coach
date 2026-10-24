@@ -11,6 +11,13 @@ BLOCKING_NON_SECURITY_LEVELS = {"error"}
 
 ValidatedFindingKey = tuple[str, str, int]
 VALIDATED_NON_EXPLOITABLE_FINDINGS: dict[ValidatedFindingKey, str] = {
+    ("py/overly-permissive-file", "bot/fitminiapp_bot/polling_health.py", 71): (
+        "A group-only 0640 heartbeat is required for the dedicated hermes-infra-read SSH "
+        "reader; the producing bot runs as UID 10001. The only output is a bounded "
+        "fixed-schema timestamp/state with no tokens or user identifiers, written atomically "
+        "inside an explicitly owner-provisioned 2750 bind directory with the reader's GID. "
+        "Other users have no read/traverse access; the path and permissions are tested."
+    ),
     ("py/overly-permissive-file", "scripts/backup_manifest.py", 187): (
         "Owner-selected unencrypted backups deliberately allow the dedicated read-only SFTP "
         "group to read 0640 archives. O_EXCL creation preserves stricter umask, private staging "

@@ -34,6 +34,7 @@ from .feedback import handle_feedback_start_payload, open_feedback_flow
 from .feedback import router as feedback_router
 from .logging_config import configure_logging
 from .news_editorial import router as news_editorial_router
+from .polling_health import write_polling_health
 from .public_profile import (
     MENU_BUTTON_LABEL,
     canonical_mini_app_url,
@@ -58,6 +59,12 @@ logger = logging.getLogger(__name__)
 
 TelegramLinkOutcome = Literal["linked", "already_linked", "invalid", "conflict", "failed"]
 TELEGRAM_LINK_PAYLOAD_PATTERN = re.compile(r"link_([A-Za-z0-9_-]{32,128})\Z")
+
+
+def _polling_evidence(state: str, evidence: str) -> None:
+    path = settings.bot_polling_health_path
+    if path and not write_polling_health(path, state, evidence):
+        logger.warning("polling_health_write_failed")
 
 
 class PollingConflict(RuntimeError):
@@ -88,8 +95,10 @@ class StableDispatcher(Dispatcher):
             try:
                 updates = await bot(get_updates, **request_kwargs)
             except TelegramConflictError as exc:
+                _polling_evidence("unhealthy", "polling_conflict")
                 raise PollingConflict("telegram_polling_conflict") from exc
             except Exception as exc:
+                _polling_evidence("unhealthy", "getupdates_error")
                 failed = True
                 logger.error(
                     "telegram_polling_failed",
@@ -105,6 +114,7 @@ class StableDispatcher(Dispatcher):
                 await backoff.asleep()
                 continue
 
+            _polling_evidence("healthy", "getupdates_success")
             if failed:
                 logger.info(
                     "telegram_polling_recovered",
@@ -643,6 +653,7 @@ async def main() -> None:
         conflict = False
         menu_button_task: asyncio.Task[None] | None = None
         try:
+            _polling_evidence("unknown", "polling_starting")
             logger.info("telegram_polling_starting")
             menu_button_task = asyncio.create_task(sync_default_menu_button_in_background(bot))
             await dp.start_polling(bot)
@@ -658,6 +669,10 @@ async def main() -> None:
                     menu_button_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await menu_button_task
+            # Keep the observed conflict until a real successful getUpdates;
+            # do not overwrite proof with generic shutdown/unknown.
+            if not conflict:
+                _polling_evidence("unknown", "polling_stopped")
             polling_lock.release()
 
         if not conflict:
