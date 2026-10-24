@@ -2191,12 +2191,7 @@ export function TodayWorkout({
         let bottom = top + (viewport?.height ?? window.innerHeight);
         const timer = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
         let safeTop = top + (safeArea?.getBoundingClientRect().height ?? 0);
-        if (
-          !standalonePwa &&
-          timer &&
-          timer.bottom > top &&
-          timer.top < bottom
-        )
+        if (!standalonePwa && timer && timer.bottom > top && timer.top < bottom)
           safeTop = Math.max(safeTop, timer.bottom);
         if (standalonePwa) {
           const dockElement = document.getElementById('appBottomNav');
@@ -2237,7 +2232,11 @@ export function TodayWorkout({
         }
         const topOccluded = inputBox.top < safeTop - visibilityTolerance;
         const target =
-          standalonePwa && !topOccluded ? inputBox : box.height <= bottom - safeTop ? box : inputBox;
+          standalonePwa && !topOccluded
+            ? inputBox
+            : box.height <= bottom - safeTop
+              ? box
+              : inputBox;
         const delta =
           target.top < safeTop ? target.top - safeTop : Math.max(0, target.bottom - bottom);
         // Ignore subpixel observer noise; visible displacement still gets corrected.
@@ -2328,9 +2327,7 @@ export function TodayWorkout({
         } else if (
           standalonePwa &&
           (focusOriginScrollY !== null || focusedRowScrollY !== null) &&
-          Math.abs(
-            window.scrollY - (focusOriginScrollY ?? focusedRowScrollY!),
-          ) > 1
+          Math.abs(window.scrollY - (focusOriginScrollY ?? focusedRowScrollY!)) > 1
         ) {
           // Undo only a real native focus pan; typing itself never repositions the document.
           const targetScrollY = focusOriginScrollY ?? focusedRowScrollY!;

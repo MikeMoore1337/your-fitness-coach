@@ -1604,12 +1604,11 @@ test.describe('#1099 standalone PWA keyboard path', () => {
       );
       await expectScrollYStable(page, typingY!, 4);
       expect(
-        await page.evaluate(
-          () =>
-            (
-              (window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] })
-                .__yfc1099ScrollCalls ?? []
-            ).filter((call) => call.method === 'scrollBy'),
+        await page.evaluate(() =>
+          (
+            (window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] })
+              .__yfc1099ScrollCalls ?? []
+          ).filter((call) => call.method === 'scrollBy'),
         ),
       ).toEqual([]);
       expect(
@@ -1618,9 +1617,7 @@ test.describe('#1099 standalone PWA keyboard path', () => {
             (
               (window as Window & { __yfc1099ScrollCalls?: Issue1099Probe['scrollCalls'] })
                 .__yfc1099ScrollCalls ?? []
-            ).every(
-              (call) => call.method === 'scrollTo' && Math.abs(call.top - positionedY) <= 1,
-            ),
+            ).every((call) => call.method === 'scrollTo' && Math.abs(call.top - positionedY) <= 1),
           positionedY,
         ),
       ).toBe(true);
