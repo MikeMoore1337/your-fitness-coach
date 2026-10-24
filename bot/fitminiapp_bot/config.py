@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("BOT_POLLING_ENABLED", "TELEGRAM_BOT_POLLING_ENABLED"),
     )
     bot_polling_lock_dir: str = "/var/lock/fitminiapp-bot"
+    bot_polling_health_path: str = ""  # Opt-in read-only observer; no change to bot runtime.
     bot_conflict_retry_seconds: int = Field(default=300, ge=30)
     bot_profile_sync_state_path: str = "/var/lock/fitminiapp-bot/profile-sync-state.json"
     telegram_bot_proxy_url: str = Field(default="", validation_alias="TELEGRAM_BOT_PROXY_URL")
