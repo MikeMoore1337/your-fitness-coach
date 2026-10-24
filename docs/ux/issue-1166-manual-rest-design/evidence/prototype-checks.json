@@ -1,0 +1,8286 @@
+{
+  "baseline": "02e1ebb7a332d9b9050a819e2fb6de8f8bcd165b",
+  "evidence": "STANDALONE_SYNTHETIC_DESIGN_ONLY",
+  "results": [
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 282,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 282,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 320,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 322,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 322,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 360,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 347,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 347,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 393,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 384,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.84375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 384,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 430,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 874,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 874,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "chromium",
+      "width": 1440,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 282,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 67.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 84.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 282,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 320,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 322,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 80,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 100,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 322,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 360,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 347,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 87.6875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 109.625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 347,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 393,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 384,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 99.0625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 99.078125,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 123.859375,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 384,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 430,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 874,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "dark",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(184, 184, 184)",
+      "bodyColor": "rgb(245, 245, 245)",
+      "background": "rgb(9, 11, 11)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "running",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "hidden",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Показать таймер",
+          "w": 126.46875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "shown",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "stopped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "new",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "skipped",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "expired",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "pending",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начинаем…",
+          "w": 95.96875,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "queued",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "error",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Стоп",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+30 сек",
+          "w": 270.65625,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "+60 сек",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Пропустить",
+          "w": 270.671875,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Скрыть панель таймера",
+          "w": 44,
+          "h": 44,
+          "clipped": false
+        },
+        {
+          "text": "Повторить сохранение",
+          "w": 874,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "conflict",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Сверить",
+          "w": 73.28125,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    },
+    {
+      "engine": "webkit",
+      "width": 1440,
+      "theme": "light",
+      "state": "ineligible",
+      "pass": true,
+      "failures": [],
+      "overflow": false,
+      "overlap": false,
+      "buttons": [
+        {
+          "text": "Начать отдых",
+          "w": 106.09375,
+          "h": 44,
+          "clipped": false
+        }
+      ],
+      "mutedColor": "rgb(96, 96, 96)",
+      "bodyColor": "rgb(21, 21, 21)",
+      "background": "rgb(255, 255, 255)",
+      "fonts": true
+    }
+  ]
+}
