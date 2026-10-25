@@ -355,9 +355,8 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 allowed = owner == "op" and function.attr in {"execute", "get_bind"}
             elif phase == "rest_unique_swap":
                 allowed = (
-                    (owner == "op" and function.attr in {"execute", "get_bind", "batch_alter_table"})
-                    or (owner == "batch" and function.attr == "drop_constraint")
-                )
+                    owner == "op" and function.attr in {"execute", "get_bind", "batch_alter_table"}
+                ) or (owner == "batch" and function.attr == "drop_constraint")
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -448,20 +447,23 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         raise OnlineMigrationError(f"{path} rest uniqueness swap SQL must be exact")
     links = _parent_links(upgrade)
     executions = [c for c in _op_calls(upgrade) if c.func.attr == "execute"]
-    if len(executions) != 3 or not all(
-        _is_in_postgresql_branch(c, links) for c in executions
-    ):
+    if len(executions) != 3 or not all(_is_in_postgresql_branch(c, links) for c in executions):
         raise OnlineMigrationError(f"{path} rest unique swap SQL must be PostgreSQL-only")
     binds = [c for c in _op_calls(upgrade) if c.func.attr == "get_bind"]
     batches = [c for c in _op_calls(upgrade) if c.func.attr == "batch_alter_table"]
     drops = [
-        c for c in ast.walk(upgrade)
-        if isinstance(c, ast.Call) and isinstance(c.func, ast.Attribute)
+        c
+        for c in ast.walk(upgrade)
+        if isinstance(c, ast.Call)
+        and isinstance(c.func, ast.Attribute)
         and isinstance(c.func.value, ast.Name)
-        and c.func.value.id == "batch" and c.func.attr == "drop_constraint"
+        and c.func.value.id == "batch"
+        and c.func.attr == "drop_constraint"
     ]
     if (
-        len(binds) != 1 or len(batches) != 1 or len(drops) != 1
+        len(binds) != 1
+        or len(batches) != 1
+        or len(drops) != 1
         or not _is_in_non_postgresql_branch(batches[0], links)
         or not _is_in_non_postgresql_branch(drops[0], links)
         or len(batches[0].args) != 1
@@ -478,7 +480,8 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
     ):
         raise OnlineMigrationError(f"{path} rest unique swap SQLite branch must be exact")
     batch_with = [
-        n for n in ast.walk(upgrade)
+        n
+        for n in ast.walk(upgrade)
         if isinstance(n, ast.With)
         and any(
             isinstance(item.context_expr, ast.Call)
@@ -658,7 +661,9 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
             )
-        if phase in {"constraint_swap", "rest_unique_swap"} and not _is_in_postgresql_branch(node, links):
+        if phase in {"constraint_swap", "rest_unique_swap"} and not _is_in_postgresql_branch(
+            node, links
+        ):
             raise OnlineMigrationError(
                 f"{path} constraint_swap SQL must be gated to the PostgreSQL branch"
             )
@@ -699,7 +704,9 @@ def validate_added_migration(path: Path) -> None:
                 f"{path} uses op.{operation}, which is not allowlisted for online constraint_swap"
             )
         elif phase == "rest_unique_swap" and operation not in {
-            "execute", "get_bind", "batch_alter_table"
+            "execute",
+            "get_bind",
+            "batch_alter_table",
         }:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for rest_unique_swap"
