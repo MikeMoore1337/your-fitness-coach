@@ -623,7 +623,12 @@ _MIGRATION_PREFIXES = (
     "backend/fitminiapp_api/db/",
     "backend/fitminiapp_api/models/",
 )
-_MIGRATED_STACK_TEST_PATHS = frozenset({"frontend/tests/integration/migrated-stack.spec.ts"})
+_MIGRATED_STACK_TEST_PATHS = frozenset(
+    {
+        "frontend/tests/integration/migrated-stack.spec.ts",
+        "tests/integration/test_migrated_stack.py",
+    }
+)
 _PYTHON_CI_SCRIPT_PATHS = frozenset({"scripts/run_pytest.py", "scripts/pytest_shard.py"})
 _BACKUP_PYTHON_PATHS = frozenset(
     {
