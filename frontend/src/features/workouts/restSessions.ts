@@ -361,11 +361,11 @@ export function restartMeasuredRest(
   const records = loadRestJournal(userId, workoutId);
   const predecessor = records.find((row) => row.start_mutation_id === predecessorStartMutationId);
   if (!predecessor || !['completed', 'skipped'].includes(predecessor.status)) return null;
-  if (records.some((row) => row.status === 'running')) return null;
   const existing = records.find(
     (row) => row.restart_of_start_mutation_id === predecessorStartMutationId,
   );
   if (existing) return existing.status === 'running' ? existing : null;
+  if (records.some((row) => row.status === 'running')) return null;
   const startedAt = new Date(at).toISOString();
   const created: LocalRestSession = {
     source_set_id: predecessor.source_set_id,
