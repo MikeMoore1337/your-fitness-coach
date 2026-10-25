@@ -63,7 +63,7 @@ jobs:
             file="${item#*|}"
             test -f "$file"
             printf '\n// synthetic JTI experiment only\n' >> "$file"
-            (cd .pilot/jev-upstream && corepack pnpm exec tsx src/cli/index.ts \
+            (cd .pilot/jev-upstream && ./node_modules/.bin/tsx src/cli/index.ts \
               select --static --json --root "$GITHUB_WORKSPACE/frontend" --base HEAD \
               > "$GITHUB_WORKSPACE/.artifacts/jev-static-pilot/${name}.json")
             git restore -- "$file"
