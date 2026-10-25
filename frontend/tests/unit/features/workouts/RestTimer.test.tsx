@@ -268,9 +268,11 @@ describe('RestTimer', () => {
   it('hides and reopens an active rest without resetting its measured interval', () => {
     mount();
     act(() => {
-      window.dispatchEvent(new CustomEvent('fit:rest', {
-        detail: { workoutId: 42, setId: 201, seconds: 90 },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
     });
     const originalId = loadRestJournal(7, 42)[0]?.start_mutation_id;
     act(() => vi.advanceTimersByTime(12_000));
@@ -290,9 +292,11 @@ describe('RestTimer', () => {
   it('starts another interval only after stopping the previous one, without completing a set', () => {
     mount();
     act(() => {
-      window.dispatchEvent(new CustomEvent('fit:rest', {
-        detail: { workoutId: 42, setId: 201, seconds: 90 },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
     });
     act(() => vi.advanceTimersByTime(20_000));
     fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
@@ -303,7 +307,10 @@ describe('RestTimer', () => {
 
     const sessions = loadRestJournal(7, 42);
     expect(sessions).toHaveLength(2);
-    expect(sessions[0]).toMatchObject({ status: 'completed', start_mutation_id: original.start_mutation_id });
+    expect(sessions[0]).toMatchObject({
+      status: 'completed',
+      start_mutation_id: original.start_mutation_id,
+    });
     expect(sessions[1]).toMatchObject({
       source_set_id: 201,
       status: 'running',
@@ -317,9 +324,11 @@ describe('RestTimer', () => {
   it('retains a skipped interval when the user explicitly starts a new one', () => {
     mount();
     act(() => {
-      window.dispatchEvent(new CustomEvent('fit:rest', {
-        detail: { workoutId: 42, setId: 201, seconds: 90 },
-      }));
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
     });
     fireEvent.click(screen.getByRole('button', { name: 'Пропустить' }));
     expect(loadRestJournal(7, 42)[0]?.status).toBe('skipped');
@@ -340,5 +349,4 @@ describe('RestTimer', () => {
     expect(loadRestJournal(7, 42)[1]?.restart_of_start_mutation_id).toBe(first.start_mutation_id);
     expect(screen.getByRole('timer')).toHaveTextContent('1:30');
   });
-
 });

@@ -177,9 +177,9 @@ describe('measured rest journal #960', () => {
       ended_at: previous.ended_at,
       source: 'USER_CONFIRMED',
     });
-    expect(restartMeasuredRest(11, 56, initial.start_mutation_id, at + 61_000)?.start_mutation_id).toBe(
-      restart.start_mutation_id,
-    );
+    expect(
+      restartMeasuredRest(11, 56, initial.start_mutation_id, at + 61_000)?.start_mutation_id,
+    ).toBe(restart.start_mutation_id);
     expect(updateMeasuredRest(11, 56, 987, 'complete', at + 78_000)?.start_mutation_id).toBe(
       restart.start_mutation_id,
     );
@@ -215,5 +215,4 @@ describe('measured rest journal #960', () => {
     expect(restartMeasuredRest(11, 56, initial.start_mutation_id)).toBeNull();
     expect(loadRestJournal(11, 56)).toHaveLength(1);
   });
-
 });

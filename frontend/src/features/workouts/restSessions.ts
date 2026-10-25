@@ -207,7 +207,9 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
     for (const value of recoveries) {
       const start = value?.start;
       if (!validStartRecovery(start)) continue;
-      const existing = valid.find((session) => session.start_mutation_id === start.start_mutation_id);
+      const existing = valid.find(
+        (session) => session.start_mutation_id === start.start_mutation_id,
+      );
       if (existing) {
         if (existing.server_id === undefined && start.server_id !== undefined) {
           existing.server_id = start.server_id;
@@ -267,7 +269,12 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
           row.source = lastTerminal.corrected ? 'USER_CORRECTED' : 'USER_CONFIRMED';
           row.measured_seconds = lastTerminal.corrected
             ? (lastTerminal.corrected_seconds ?? null)
-            : Math.max(0, Math.floor((Date.parse(row.ended_at ?? row.started_at) - Date.parse(row.started_at)) / 1000));
+            : Math.max(
+                0,
+                Math.floor(
+                  (Date.parse(row.ended_at ?? row.started_at) - Date.parse(row.started_at)) / 1000,
+                ),
+              );
         }
       }
     }
@@ -405,7 +412,9 @@ export function updateMeasuredRest(
   correctedSeconds?: number,
 ): LocalRestSession | null {
   const records = loadRestJournal(userId, workoutId);
-  const row = records.find((item) => item.source_set_id === sourceSetId && item.status === 'running');
+  const row = records.find(
+    (item) => item.source_set_id === sourceSetId && item.status === 'running',
+  );
   if (!row) return null;
   // Variant C: unresolved background returns must be explicitly corrected or skipped.
   if (
@@ -453,7 +462,8 @@ export function updateMeasuredRest(
     row.background_since = undefined;
     if (effectiveAction === 'complete') {
       entry.ended_at = occurredAt;
-      row.measured_seconds = correctedSeconds ?? Math.max(0, Math.floor((at - Date.parse(row.started_at)) / 1000));
+      row.measured_seconds =
+        correctedSeconds ?? Math.max(0, Math.floor((at - Date.parse(row.started_at)) / 1000));
       row.source = correctedSeconds === undefined ? 'USER_CONFIRMED' : 'USER_CORRECTED';
     } else {
       row.measured_seconds = null;
@@ -471,7 +481,9 @@ export function updateMeasuredRest(
 
 export function acknowledgeRestPlan(userId: number, workoutId: number, sourceSetId: number): void {
   const records = loadRestJournal(userId, workoutId);
-  const row = records.find((item) => item.source_set_id === sourceSetId && item.status === 'running');
+  const row = records.find(
+    (item) => item.source_set_id === sourceSetId && item.status === 'running',
+  );
   if (!row || row.notified) return;
   row.notified = true;
   saveRestJournal(userId, workoutId, records);
@@ -586,7 +598,10 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
             )
           : null;
         // The predecessor's start AND stop/skip must be persisted before restart.
-        if (row.restart_of_start_mutation_id && (!predecessor?.server_id || predecessor.pending.length)) {
+        if (
+          row.restart_of_start_mutation_id &&
+          (!predecessor?.server_id || predecessor.pending.length)
+        ) {
           continue;
         }
         try {

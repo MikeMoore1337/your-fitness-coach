@@ -331,14 +331,16 @@ describe('rest journal concurrent mutation preservation #960', () => {
     });
 
     updateMeasuredRest(31, 44, 72, 'skip', start + 35_000);
-    mockApi.mockImplementationOnce(() => Promise.resolve({
-      id: 111,
-      workout_id: 44,
-      source_set_id: 72,
-      started_at: repeat.started_at,
-      version: 2,
-      status: 'skipped',
-    }));
+    mockApi.mockImplementationOnce(() =>
+      Promise.resolve({
+        id: 111,
+        workout_id: 44,
+        source_set_id: 72,
+        started_at: repeat.started_at,
+        version: 2,
+        status: 'skipped',
+      }),
+    );
     await syncRestJournal(31, 44);
     expect(loadRestJournal(31, 44)[0]).toMatchObject({ server_id: 110, status: 'completed' });
     expect(loadRestJournal(31, 44)[1]).toMatchObject({ server_id: 111, status: 'skipped' });
@@ -378,5 +380,4 @@ describe('rest journal concurrent mutation preservation #960', () => {
     expect(loadRestJournal(31, 44)[1]?.start_mutation_id).toBe(repeat.start_mutation_id);
     expect(loadRestJournal(31, 44)[1]).not.toHaveProperty('server_id');
   });
-
 });

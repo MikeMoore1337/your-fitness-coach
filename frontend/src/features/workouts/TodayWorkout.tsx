@@ -1553,7 +1553,9 @@ export function RestTimer({
     !restRecords.some((row) => row.restart_of_start_mutation_id === latestRest.start_mutation_id)
       ? latestRest
       : null;
-  const restIsUnconfirmed = Boolean(measuredRest && (!measuredRest.server_id || measuredRest.pending.length));
+  const restIsUnconfirmed = Boolean(
+    measuredRest && (!measuredRest.server_id || measuredRest.pending.length),
+  );
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const measuredElapsedSeconds =
@@ -1861,7 +1863,9 @@ export function RestTimer({
         <div className="active-workout-rest__collapsed">
           <div>
             <strong>Отдых идёт</strong>
-            <span>ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}</span>
+            <span>
+              ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+            </span>
           </div>
           <Button
             type="button"
@@ -1877,256 +1881,258 @@ export function RestTimer({
           </Button>
         </div>
       ) : (
-      <>
-      <div className="active-workout-rest__time" hidden={showCompact}>
-        <span>Отдых</span>
-        <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
-          {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
-        </strong>
-      </div>
-      <div className="active-workout-rest__next" hidden={showCompact}>
-        <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-        <span>{nextPosition}</span>
-      </div>
-      {measuredRest && !showCompact && (
-        <div className="active-workout-rest__actual">
-          <div className="active-workout-rest__actual-value">
-            <span>ФАКТ</span>
-            <strong aria-label="Время по отметке пользователя" aria-live="off">
-              {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+        <>
+          <div className="active-workout-rest__time" hidden={showCompact}>
+            <span>Отдых</span>
+            <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
+              {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
             </strong>
           </div>
-          {!measuredRest.needs_review && (
-            <button
-              className="active-workout-rest__stop"
-              type="button"
-              aria-label="Завершить отдых"
-              onClick={() => {
-                const stoppedAt = Date.now();
-                const result = updateMeasuredRest(
-                  userId,
-                  workoutId,
-                  measuredRest.source_set_id,
-                  'complete',
-                  stoppedAt,
-                );
-                setMeasuredRest(null);
-                removeStorage(storageKey);
-                setDeadline(0);
-                setNow(stoppedAt);
-                setCompletedNotice(
-                  result?.status === 'completed'
-                    ? 'Отдых завершён по отметке'
-                    : 'Нет достоверного замера отдыха',
-                );
-                compactNotice();
-              }}
-            >
-              Стоп
-            </button>
-          )}
-        </div>
-      )}
-      {measuredRest?.needs_review && !showCompact && (
-        <section
-          className="active-workout-rest__recovery"
-          role="group"
-          aria-label="Уточнение фактического отдыха"
-        >
-          <strong>Вы забыли завершить отдых?</strong>
-          <p>
-            Приложение было неактивно, поэтому прошедшее время не считается достоверным замером.
-          </p>
-          <label htmlFor={`rest-recovery-${workoutId}`}>
-            Сколько вы фактически отдыхали (минуты)?
-          </label>
-          <input
-            id={`rest-recovery-${workoutId}`}
-            type="text"
-            inputMode="decimal"
-            className="ui-input"
-            placeholder="Например, 2,5"
-            value={recoveredMinutes}
-            onChange={(event) => {
-              setRecoveredMinutes(event.target.value);
-              setRecoveryValidation('');
-            }}
-          />
-          {recoveryValidation && <span role="alert">{recoveryValidation}</span>}
-          <div className="active-workout-rest__recovery-actions">
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                const value = Number(recoveredMinutes.trim().replace(',', '.'));
-                const correctedSeconds = Math.round(value * 60);
-                if (
-                  !recoveredMinutes.trim() ||
-                  !Number.isFinite(value) ||
-                  correctedSeconds < 0 ||
-                  correctedSeconds > 86400
-                ) {
-                  setRecoveryValidation('Введите время от 0 до 1440 минут');
-                  return;
-                }
-                const result = updateMeasuredRest(
-                  userId,
-                  workoutId,
-                  measuredRest.source_set_id,
-                  'complete',
-                  Date.now(),
-                  correctedSeconds,
-                );
-                if (result?.status !== 'completed') {
-                  setRecoveryValidation('Не удалось сохранить уточнение. Попробуйте ещё раз.');
-                  return;
-                }
-                setMeasuredRest(null);
-                removeStorage(storageKey);
-                setDeadline(0);
-                setCompletedNotice('Отдых сохранён по вашей отметке');
-                compactNotice();
-              }}
-            >
-              Сохранить время
-            </Button>
-            <Button
-              variant="secondary"
-              type="button"
-              onClick={() => {
-                updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
-                setMeasuredRest(null);
-                removeStorage(storageKey);
-                setDeadline(0);
-                setCompletedNotice('Отдых не учитывается');
-                compactNotice();
-              }}
-            >
-              Не учитывать
-            </Button>
+          <div className="active-workout-rest__next" hidden={showCompact}>
+            <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
+            <span>{nextPosition}</span>
           </div>
-        </section>
-      )}
-      <div
-        className="active-workout-rest__actions"
-        hidden={showCompact || Boolean(measuredRest?.needs_review)}
-      >
-        {[30, 60].map((extraSeconds) => (
-          <Button
-            key={extraSeconds}
-            aria-label={`+${extraSeconds} сек`}
-            type="button"
-            glass="clear"
-            variant="secondary"
-            aria-disabled={Boolean(completedNotice)}
-            tabIndex={completedNotice ? -1 : undefined}
-            onClick={() => {
-              if (!deadline || completedNotice) return;
-              const currentTime = Date.now();
-              const nextSession = measuredRest
-                ? updateMeasuredRest(
-                    userId,
-                    workoutId,
-                    measuredRest.source_set_id,
-                    extraSeconds === 30 ? 'add30' : 'add60',
-                    currentTime,
-                  )
-                : null;
-              const nextDeadline =
-                nextSession?.deadline ?? Math.max(deadline, currentTime) + extraSeconds * 1000;
-              if (nextSession) setMeasuredRest(nextSession);
-              setNow(currentTime);
-              setDeadline(nextDeadline);
-              writeStorage(storageKey, nextDeadline);
-              setAnnouncement(`К отдыху добавлено ${extraSeconds} секунд`);
-            }}
-          >
-            <Icon name="plus" size={16} /> {extraSeconds} сек
-          </Button>
-        ))}
-        <Button
-          type="button"
-          glass="clear"
-          variant="secondary"
-          aria-disabled={Boolean(completedNotice)}
-          tabIndex={completedNotice ? -1 : undefined}
-          onClick={() => {
-            if (completedNotice) return;
-            if (measuredRest) {
-              updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
-              setMeasuredRest(null);
-            }
-            removeStorage(storageKey);
-            setDeadline(0);
-            setNow(Date.now());
-            setCompletedNotice(`Отдых пропущен · ${nextPosition}`);
-            compactNotice();
-          }}
-        >
-          Пропустить
-        </Button>
-        {measuredRest?.status === 'running' && !measuredRest.needs_review && (
-          <button
-            type="button"
-            className="active-workout-rest__collapse"
-            aria-label="Свернуть таймер"
-            onClick={() => {
-              captureLayoutAnchor();
-              setCollapsed(true);
-              writeStorage(`${storageKey}:panel-collapsed`, true);
-            }}
-          >
-            <Icon name="chevron-down" size={20} />
-          </button>
-        )}
-      </div>
-      {showCompact && (
-        <>
-          <span className="active-workout-rest__complete-copy">
-            {completedNotice ?? (latestRest?.status === 'skipped' ? 'Отдых пропущен' : 'Отдых завершён')}
-          </span>
-          {latestRest?.status === 'completed' && latestRest.measured_seconds != null && (
-            <span className="active-workout-rest__complete-copy">
-              ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
-            </span>
+          {measuredRest && !showCompact && (
+            <div className="active-workout-rest__actual">
+              <div className="active-workout-rest__actual-value">
+                <span>ФАКТ</span>
+                <strong aria-label="Время по отметке пользователя" aria-live="off">
+                  {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
+                </strong>
+              </div>
+              {!measuredRest.needs_review && (
+                <button
+                  className="active-workout-rest__stop"
+                  type="button"
+                  aria-label="Завершить отдых"
+                  onClick={() => {
+                    const stoppedAt = Date.now();
+                    const result = updateMeasuredRest(
+                      userId,
+                      workoutId,
+                      measuredRest.source_set_id,
+                      'complete',
+                      stoppedAt,
+                    );
+                    setMeasuredRest(null);
+                    removeStorage(storageKey);
+                    setDeadline(0);
+                    setNow(stoppedAt);
+                    setCompletedNotice(
+                      result?.status === 'completed'
+                        ? 'Отдых завершён по отметке'
+                        : 'Нет достоверного замера отдыха',
+                    );
+                    compactNotice();
+                  }}
+                >
+                  Стоп
+                </button>
+              )}
+            </div>
           )}
-          {restartCandidate && (
+          {measuredRest?.needs_review && !showCompact && (
+            <section
+              className="active-workout-rest__recovery"
+              role="group"
+              aria-label="Уточнение фактического отдыха"
+            >
+              <strong>Вы забыли завершить отдых?</strong>
+              <p>
+                Приложение было неактивно, поэтому прошедшее время не считается достоверным замером.
+              </p>
+              <label htmlFor={`rest-recovery-${workoutId}`}>
+                Сколько вы фактически отдыхали (минуты)?
+              </label>
+              <input
+                id={`rest-recovery-${workoutId}`}
+                type="text"
+                inputMode="decimal"
+                className="ui-input"
+                placeholder="Например, 2,5"
+                value={recoveredMinutes}
+                onChange={(event) => {
+                  setRecoveredMinutes(event.target.value);
+                  setRecoveryValidation('');
+                }}
+              />
+              {recoveryValidation && <span role="alert">{recoveryValidation}</span>}
+              <div className="active-workout-rest__recovery-actions">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    const value = Number(recoveredMinutes.trim().replace(',', '.'));
+                    const correctedSeconds = Math.round(value * 60);
+                    if (
+                      !recoveredMinutes.trim() ||
+                      !Number.isFinite(value) ||
+                      correctedSeconds < 0 ||
+                      correctedSeconds > 86400
+                    ) {
+                      setRecoveryValidation('Введите время от 0 до 1440 минут');
+                      return;
+                    }
+                    const result = updateMeasuredRest(
+                      userId,
+                      workoutId,
+                      measuredRest.source_set_id,
+                      'complete',
+                      Date.now(),
+                      correctedSeconds,
+                    );
+                    if (result?.status !== 'completed') {
+                      setRecoveryValidation('Не удалось сохранить уточнение. Попробуйте ещё раз.');
+                      return;
+                    }
+                    setMeasuredRest(null);
+                    removeStorage(storageKey);
+                    setDeadline(0);
+                    setCompletedNotice('Отдых сохранён по вашей отметке');
+                    compactNotice();
+                  }}
+                >
+                  Сохранить время
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
+                    setMeasuredRest(null);
+                    removeStorage(storageKey);
+                    setDeadline(0);
+                    setCompletedNotice('Отдых не учитывается');
+                    compactNotice();
+                  }}
+                >
+                  Не учитывать
+                </Button>
+              </div>
+            </section>
+          )}
+          <div
+            className="active-workout-rest__actions"
+            hidden={showCompact || Boolean(measuredRest?.needs_review)}
+          >
+            {[30, 60].map((extraSeconds) => (
+              <Button
+                key={extraSeconds}
+                aria-label={`+${extraSeconds} сек`}
+                type="button"
+                glass="clear"
+                variant="secondary"
+                aria-disabled={Boolean(completedNotice)}
+                tabIndex={completedNotice ? -1 : undefined}
+                onClick={() => {
+                  if (!deadline || completedNotice) return;
+                  const currentTime = Date.now();
+                  const nextSession = measuredRest
+                    ? updateMeasuredRest(
+                        userId,
+                        workoutId,
+                        measuredRest.source_set_id,
+                        extraSeconds === 30 ? 'add30' : 'add60',
+                        currentTime,
+                      )
+                    : null;
+                  const nextDeadline =
+                    nextSession?.deadline ?? Math.max(deadline, currentTime) + extraSeconds * 1000;
+                  if (nextSession) setMeasuredRest(nextSession);
+                  setNow(currentTime);
+                  setDeadline(nextDeadline);
+                  writeStorage(storageKey, nextDeadline);
+                  setAnnouncement(`К отдыху добавлено ${extraSeconds} секунд`);
+                }}
+              >
+                <Icon name="plus" size={16} /> {extraSeconds} сек
+              </Button>
+            ))}
             <Button
               type="button"
-              variant="secondary"
               glass="clear"
-              onClick={startNewRest}
+              variant="secondary"
+              aria-disabled={Boolean(completedNotice)}
+              tabIndex={completedNotice ? -1 : undefined}
+              onClick={() => {
+                if (completedNotice) return;
+                if (measuredRest) {
+                  updateMeasuredRest(userId, workoutId, measuredRest.source_set_id, 'skip');
+                  setMeasuredRest(null);
+                }
+                removeStorage(storageKey);
+                setDeadline(0);
+                setNow(Date.now());
+                setCompletedNotice(`Отдых пропущен · ${nextPosition}`);
+                compactNotice();
+              }}
             >
-              Начать отдых
+              Пропустить
             </Button>
+            {measuredRest?.status === 'running' && !measuredRest.needs_review && (
+              <button
+                type="button"
+                className="active-workout-rest__collapse"
+                aria-label="Свернуть таймер"
+                onClick={() => {
+                  captureLayoutAnchor();
+                  setCollapsed(true);
+                  writeStorage(`${storageKey}:panel-collapsed`, true);
+                }}
+              >
+                <Icon name="chevron-down" size={20} />
+              </button>
+            )}
+          </div>
+          {showCompact && (
+            <>
+              <span className="active-workout-rest__complete-copy">
+                {completedNotice ??
+                  (latestRest?.status === 'skipped' ? 'Отдых пропущен' : 'Отдых завершён')}
+              </span>
+              {latestRest?.status === 'completed' && latestRest.measured_seconds != null && (
+                <span className="active-workout-rest__complete-copy">
+                  ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                </span>
+              )}
+              {restartCandidate && (
+                <Button type="button" variant="secondary" glass="clear" onClick={startNewRest}>
+                  Начать отдых
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="secondary"
+                glass="clear"
+                onClick={() => {
+                  captureLayoutAnchor();
+                  setCompletedNotice(null);
+                  setCompact(false);
+                }}
+              >
+                Скрыть
+              </Button>
+            </>
           )}
-          <Button
-            type="button"
-            variant="secondary"
-            glass="clear"
-            onClick={() => {
-              captureLayoutAnchor();
-              setCompletedNotice(null);
-              setCompact(false);
-            }}
-          >
-            Скрыть
-          </Button>
+          {((measuredRest && restIsUnconfirmed) ||
+            (!measuredRest &&
+              latestRest &&
+              (!latestRest.server_id || latestRest.pending.length > 0))) && (
+            <p className="active-workout-rest__sync" role="status">
+              {typeof navigator !== 'undefined' && !navigator.onLine
+                ? 'Нет сети · отдых ожидает сохранения'
+                : 'Отдых сохраняется…'}
+            </p>
+          )}
+          {restSaveError && (
+            <p className="active-workout-rest__sync" role="alert">
+              {restSaveError}
+            </p>
+          )}
+          <span className="sr-only" role="status" aria-atomic="true">
+            {completedNotice ?? announcement}
+          </span>
         </>
-      )}
-      {((measuredRest && restIsUnconfirmed) ||
-        (!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length > 0))) && (
-        <p className="active-workout-rest__sync" role="status">
-          {typeof navigator !== 'undefined' && !navigator.onLine
-            ? 'Нет сети · отдых ожидает сохранения'
-            : 'Отдых сохраняется…'}
-        </p>
-      )}
-      {restSaveError && <p className="active-workout-rest__sync" role="alert">{restSaveError}</p>}
-      <span className="sr-only" role="status" aria-atomic="true">
-        {completedNotice ?? announcement}
-      </span>
-      </>
       )}
     </aside>
   );
