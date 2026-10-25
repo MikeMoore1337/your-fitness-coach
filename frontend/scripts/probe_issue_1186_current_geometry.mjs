@@ -10,7 +10,15 @@ const playwrightRoot = process.env.YFC_PLAYWRIGHT_NODE_MODULES
 const { chromium } = require(playwrightRoot);
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const poster = readFileSync(
-  join(repoRoot, 'backend', 'assets', 'exercise-guides', 'exercises-media', 'incline-bench-press', 'poster-1280.jpg'),
+  join(
+    repoRoot,
+    'backend',
+    'assets',
+    'exercise-guides',
+    'exercises-media',
+    'incline-bench-press',
+    'poster-1280.jpg',
+  ),
 ).toString('base64');
 const outputPath = join(
   repoRoot,

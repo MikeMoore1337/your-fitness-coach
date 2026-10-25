@@ -31,7 +31,9 @@ mkdirSync(outputDir, { recursive: true });
 
 const server = createServer((request, response) => {
   try {
-    const requestPath = decodeURIComponent(new URL(request.url ?? '/', 'http://127.0.0.1').pathname);
+    const requestPath = decodeURIComponent(
+      new URL(request.url ?? '/', 'http://127.0.0.1').pathname,
+    );
     const absolutePath = resolve(repoRoot, `.${requestPath}`);
     if (!absolutePath.startsWith(repoRoot) || requestPath.includes('..')) {
       response.writeHead(403).end();
@@ -83,51 +85,60 @@ try {
       await page.goto(`http://127.0.0.1:${address.port}${prototypePath}?theme=${theme}`, {
         waitUntil: 'networkidle',
       });
-      await page.waitForFunction(
-        () => [...document.querySelectorAll('video[data-frame-time]')].every((video) => video.dataset.frameReady === 'true'),
-        undefined,
-        { timeout: 10_000 },
-      ).catch(() => undefined);
+      await page
+        .waitForFunction(
+          () =>
+            [...document.querySelectorAll('video[data-frame-time]')].every(
+              (video) => video.dataset.frameReady === 'true',
+            ),
+          undefined,
+          { timeout: 10_000 },
+        )
+        .catch(() => undefined);
       await page.waitForTimeout(250);
       frameChecks.push(
-        ...(await page.evaluate(({ theme: currentTheme, width: currentWidth }) =>
-          [...document.querySelectorAll('video[data-frame-time]')].map((video) => ({
-            theme: currentTheme,
-            viewport_width: currentWidth,
-            requested_position: Number(video.dataset.frameTime ?? 0),
-            current_time: Number(video.currentTime.toFixed(3)),
-            duration: Number(Number.isFinite(video.duration) ? video.duration.toFixed(3) : 0),
-            video_width: video.videoWidth,
-            video_height: video.videoHeight,
-            ready_state: video.readyState,
-          })),
-        { theme, width })),
+        ...(await page.evaluate(
+          ({ theme: currentTheme, width: currentWidth }) =>
+            [...document.querySelectorAll('video[data-frame-time]')].map((video) => ({
+              theme: currentTheme,
+              viewport_width: currentWidth,
+              requested_position: Number(video.dataset.frameTime ?? 0),
+              current_time: Number(video.currentTime.toFixed(3)),
+              duration: Number(Number.isFinite(video.duration) ? video.duration.toFixed(3) : 0),
+              video_width: video.videoWidth,
+              video_height: video.videoHeight,
+              ready_state: video.readyState,
+            })),
+          { theme, width },
+        )),
       );
       await page.screenshot({
         path: join(outputDir, `${theme}-${width}.png`),
         fullPage: true,
       });
       geometry.push(
-        ...(await page.evaluate(({ theme: currentTheme, width: currentWidth }) =>
-          [...document.querySelectorAll('.candidate')].map((candidate) => {
-            const surface = candidate.querySelector('.media-surface');
-            const image = candidate.querySelector('img');
-            const rect = surface?.getBoundingClientRect();
-            const imageRect = image?.getBoundingClientRect();
-            return {
-              theme: currentTheme,
-              viewport_width: currentWidth,
-              candidate: candidate.querySelector('h3')?.textContent?.trim() ?? 'unknown',
-              surface_width: rect?.width ?? null,
-              surface_height: rect?.height ?? null,
-              surface_delta: rect ? Number(Math.abs(rect.width - rect.height).toFixed(3)) : null,
-              image_width: imageRect?.width ?? null,
-              image_height: imageRect?.height ?? null,
-              image_natural_width: image?.naturalWidth ?? null,
-              image_natural_height: image?.naturalHeight ?? null,
-            };
-          }),
-        { theme, width })),
+        ...(await page.evaluate(
+          ({ theme: currentTheme, width: currentWidth }) =>
+            [...document.querySelectorAll('.candidate')].map((candidate) => {
+              const surface = candidate.querySelector('.media-surface');
+              const image = candidate.querySelector('img');
+              const rect = surface?.getBoundingClientRect();
+              const imageRect = image?.getBoundingClientRect();
+              return {
+                theme: currentTheme,
+                viewport_width: currentWidth,
+                candidate: candidate.querySelector('h3')?.textContent?.trim() ?? 'unknown',
+                surface_width: rect?.width ?? null,
+                surface_height: rect?.height ?? null,
+                surface_delta: rect ? Number(Math.abs(rect.width - rect.height).toFixed(3)) : null,
+                image_width: imageRect?.width ?? null,
+                image_height: imageRect?.height ?? null,
+                image_natural_width: image?.naturalWidth ?? null,
+                image_natural_height: image?.naturalHeight ?? null,
+              };
+            }),
+          { theme, width },
+        )),
       );
       await page.close();
     }
@@ -148,8 +159,14 @@ console.log(
       screenshots: themes.length * widths.length,
       geometry_records: geometry.length,
       frame_records: frameChecks.length,
-      max_square_delta: Math.max(...geometry.filter((item) => item.candidate !== 'Текущее поведение: fallback picture').map((item) => item.surface_delta ?? 0)),
-      current_wide_height: geometry.find((item) => item.candidate === 'Текущее поведение: fallback picture')?.surface_height ?? null,
+      max_square_delta: Math.max(
+        ...geometry
+          .filter((item) => item.candidate !== 'Текущее поведение: fallback picture')
+          .map((item) => item.surface_delta ?? 0),
+      ),
+      current_wide_height:
+        geometry.find((item) => item.candidate === 'Текущее поведение: fallback picture')
+          ?.surface_height ?? null,
     },
     null,
     2,
