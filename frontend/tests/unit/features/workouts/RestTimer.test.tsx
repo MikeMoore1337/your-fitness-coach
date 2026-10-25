@@ -299,10 +299,10 @@ describe('RestTimer', () => {
       );
     });
     fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
-    expect(screen.getByText('Отдых завершён по отметке')).toBeVisible();
+    expect(screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy')).toHaveTextContent('Отдых завершён по отметке');
 
     fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
-    expect(screen.queryByText('Отдых завершён по отметке')).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Скрыть' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
 
