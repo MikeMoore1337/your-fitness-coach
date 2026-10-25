@@ -1554,6 +1554,8 @@ export function RestTimer({
       ? latestRest
       : null;
   const restIsUnconfirmed = Boolean(measuredRest && (!measuredRest.server_id || measuredRest.pending.length));
+  const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
+  const showCompact = compact || restoredTerminal;
   const measuredElapsedSeconds =
     measuredRest && !measuredRest.needs_review
       ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
@@ -1798,7 +1800,7 @@ export function RestTimer({
       const delta = anchor.element.getBoundingClientRect().top - anchor.top;
       if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
     }
-  }, [collapsed, compact, completedNotice]);
+  }, [collapsed, showCompact, completedNotice]);
 
   useLayoutEffect(() => {
     const element = panel.current;
@@ -1819,7 +1821,7 @@ export function RestTimer({
       observer?.disconnect();
       parent.style.removeProperty('--yfc-active-workout-rest-clearance');
     };
-  }, [hasDeadline, collapsed, compact, completedNotice]);
+  }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
   const startNewRest = () => {
     if (!restartCandidate || restRecords.some((row) => row.status === 'running')) return;
@@ -1847,7 +1849,7 @@ export function RestTimer({
     <aside
       ref={panel}
       {...glassProps('tinted')}
-      className={`active-workout-rest${completedNotice ? ' active-workout-rest--complete' : ''}${compact || collapsed ? ' is-compact' : ''}`}
+      className={`active-workout-rest${completedNotice || restoredTerminal ? ' active-workout-rest--complete' : ''}${showCompact || collapsed ? ' is-compact' : ''}`}
       aria-label="Отдых между подходами"
       onMouseDown={(event) => {
         if (event.target instanceof Element && event.target.closest('button'))
@@ -1876,17 +1878,17 @@ export function RestTimer({
         </div>
       ) : (
       <>
-      <div className="active-workout-rest__time" hidden={compact}>
+      <div className="active-workout-rest__time" hidden={showCompact}>
         <span>Отдых</span>
         <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
           {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
         </strong>
       </div>
-      <div className="active-workout-rest__next" hidden={compact}>
+      <div className="active-workout-rest__next" hidden={showCompact}>
         <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
         <span>{nextPosition}</span>
       </div>
-      {measuredRest && !compact && (
+      {measuredRest && !showCompact && (
         <div className="active-workout-rest__actual">
           <div className="active-workout-rest__actual-value">
             <span>ФАКТ</span>
@@ -1925,7 +1927,7 @@ export function RestTimer({
           )}
         </div>
       )}
-      {measuredRest?.needs_review && !compact && (
+      {measuredRest?.needs_review && !showCompact && (
         <section
           className="active-workout-rest__recovery"
           role="group"
@@ -2007,7 +2009,7 @@ export function RestTimer({
       )}
       <div
         className="active-workout-rest__actions"
-        hidden={compact || Boolean(measuredRest?.needs_review)}
+        hidden={showCompact || Boolean(measuredRest?.needs_review)}
       >
         {[30, 60].map((extraSeconds) => (
           <Button
@@ -2078,9 +2080,11 @@ export function RestTimer({
           </button>
         )}
       </div>
-      {compact && (
+      {showCompact && (
         <>
-          <span className="active-workout-rest__complete-copy">{completedNotice}</span>
+          <span className="active-workout-rest__complete-copy">
+            {completedNotice ?? (latestRest?.status === 'skipped' ? 'Отдых пропущен' : 'Отдых завершён')}
+          </span>
           {latestRest?.status === 'completed' && latestRest.measured_seconds != null && (
             <span className="active-workout-rest__complete-copy">
               ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
