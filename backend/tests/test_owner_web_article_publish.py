@@ -1,4 +1,5 @@
 """Root owner can release an educational article without fabricated scientific signoff."""
+
 from __future__ import annotations
 
 import hashlib
@@ -68,15 +69,19 @@ def test_owner_direct_publish_preserves_unverified_claims(client, monkeypatch) -
         assert all(entry["review_status"] == "pending" for entry in article.claim_source_matrix)
         assert article.domain_reviewer is None
         assert article.evidence_level == "limited"
-        revision = db.query(WebArticleRevision).filter(
-            WebArticleRevision.article_id == article.id
-        ).one()
+        revision = (
+            db.query(WebArticleRevision).filter(WebArticleRevision.article_id == article.id).one()
+        )
         assert revision.status == "published"
         assert revision.snapshot["metadata"]["independent_scientific_review"] == "not_attested"
-        events = db.query(AuditEvent).filter(
-            AuditEvent.action == "web_article.published",
-            AuditEvent.resource_id == article.id,
-        ).all()
+        events = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_id == article.id,
+            )
+            .all()
+        )
         assert len(events) == 1
         assert events[0].details["editorial_decision"] == "root_owner_publication"
         assert events[0].actor_user_id is not None
@@ -85,8 +90,7 @@ def test_owner_direct_publish_preserves_unverified_claims(client, monkeypatch) -
     assert article_api.status_code == 200, article_api.text
     assert article_api.json()["evidence_level"] == "limited"
     assert all(
-        item["review_status"] == "pending"
-        for item in article_api.json()["claim_source_matrix"]
+        item["review_status"] == "pending" for item in article_api.json()["claim_source_matrix"]
     )
     assert _proposal()["slug"] in client.get("/sitemap.xml").text
 
@@ -100,7 +104,12 @@ def test_only_verified_root_may_direct_publish(client, monkeypatch) -> None:
     assert ordinary_login.status_code == 200
     ordinary_headers = {"Authorization": f"Bearer {ordinary_login.json()['access_token']}"}
     assert client.post(path, json=_body(), headers=ordinary_headers).status_code == 403
-    assert client.post(path, json=_body(acknowledge=False), headers=_root(client, monkeypatch)).status_code == 422
+    assert (
+        client.post(
+            path, json=_body(acknowledge=False), headers=_root(client, monkeypatch)
+        ).status_code
+        == 422
+    )
 
 
 def test_blocked_claims_not_silently_approved(client, monkeypatch) -> None:
