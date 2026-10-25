@@ -1529,7 +1529,10 @@ test.describe('#1099 standalone PWA keyboard path', () => {
         animations: 'disabled',
       });
       if (!placement.endsWith('no-rest')) {
-        expect(afterFocus.fieldTop).toBeGreaterThanOrEqual(afterFocus.safeTop - 1);
+        expect(
+          afterFocus.fieldTop,
+          `#1099 ${placement} geometry: ${JSON.stringify(report)}`,
+        ).toBeGreaterThanOrEqual(afterFocus.safeTop - 1);
         expect(afterFocus.fieldBottom).toBeLessThanOrEqual(afterFocus.safeBottom + 1);
       }
       // PWA focus placement must not compete with native focus-pan, even when the viewport
