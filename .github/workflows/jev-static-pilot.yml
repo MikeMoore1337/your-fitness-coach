@@ -1,0 +1,77 @@
+name: Jev Static Test Impact Research
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/jev-static-pilot.yml
+      - scripts/jev_static_pilot_report.py
+      - tests/test_jev_static_pilot_report.py
+      - docs/development/jev-static-pilot.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jev-static-pilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-only-experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: holasoymalva/jev-test-impact
+          ref: f3bdc84c1e5f2b1852b042506cd857899baf2078
+          path: .pilot/jev-upstream
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
+        with:
+          python-version: '3.14'
+      - name: Run local policy tests
+        run: python -m unittest discover -s tests -p test_jev_static_pilot_report.py -v
+      - name: Build only pinned upstream development dependencies (no postinstall)
+        run: |
+          corepack enable
+          corepack pnpm --dir .pilot/jev-upstream install --frozen-lockfile --ignore-scripts
+      - name: Static-only source evaluations, zero remote inference
+        shell: bash
+        env:
+          TYPESAFE_API_KEY: ''
+          JEV_BASE_URL: ''
+          JEV_MODEL: ''
+        run: |
+          set -Eeuo pipefail
+          mkdir -p .artifacts/jev-static-pilot
+          echo '.pilot/' >> .git/info/exclude
+          echo '.artifacts/jev-static-pilot/' >> .git/info/exclude
+          for item in \
+            'shared-module|frontend/src/shared/queryKeys.ts' \
+            'workout-ui|frontend/src/features/workouts/TodayWorkout.tsx' \
+            'tsconfig|frontend/tsconfig.json' \
+            'lockfile|frontend/package-lock.json'
+          do
+            name="${item%%|*}"
+            file="${item#*|}"
+            test -f "$file"
+            printf '\n// synthetic JTI experiment only\n' >> "$file"
+            corepack pnpm --dir .pilot/jev-upstream exec tsx src/cli/index.ts \
+              select --static --json --root "$GITHUB_WORKSPACE/frontend" --base HEAD \
+              > ".artifacts/jev-static-pilot/${name}.json"
+            git restore -- "$file"
+          done
+          python scripts/jev_static_pilot_report.py --results .artifacts/jev-static-pilot | tee .artifacts/jev-static-pilot/verdict.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: jev-static-only-research
+          path: .artifacts/jev-static-pilot/
+          retention-days: 7
