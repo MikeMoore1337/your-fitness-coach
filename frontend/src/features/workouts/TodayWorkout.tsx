@@ -1558,7 +1558,8 @@ export function RestTimer({
   );
   const isRunningRest = measuredRest?.status === 'running';
   const isCompletedLatestRest = latestRest?.status === 'completed';
-  const nextRestStatusRole = restIsUnconfirmed ? ('status' as const) : undefined;
+  const isSkippedLatestRest = latestRest?.status === 'skipped';
+  const isOfflineRest = typeof navigator !== 'undefined' && !navigator.onLine;
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const measuredElapsedSeconds =
@@ -1880,9 +1881,9 @@ export function RestTimer({
           </div>
           <div className="active-workout-rest__next" hidden={showCompact}>
             <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span role={nextRestStatusRole}>
+            <span>
               {restIsUnconfirmed
-                ? typeof navigator !== 'undefined' && !navigator.onLine
+                ? isOfflineRest
                   ? 'Нет сети · отдых ожидает сохранения'
                   : 'Отдых сохраняется…'
                 : nextPosition}
@@ -2084,7 +2085,7 @@ export function RestTimer({
             <>
               <span className="active-workout-rest__complete-copy">
                 {completedNotice ??
-                  (latestRest?.status === 'skipped' ? 'Отдых пропущен' : 'Отдых завершён')}
+                  (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
               </span>
               {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                 <span className="active-workout-rest__complete-copy">
@@ -2140,7 +2141,7 @@ export function RestTimer({
               latestRest &&
               (!latestRest.server_id || latestRest.pending.length > 0))) && (
             <p className="active-workout-rest__sync" role="status">
-              {typeof navigator !== 'undefined' && !navigator.onLine
+              {isOfflineRest
                 ? 'Нет сети · отдых ожидает сохранения'
                 : 'Отдых сохраняется…'}
             </p>
