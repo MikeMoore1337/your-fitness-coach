@@ -32,6 +32,20 @@ const ISSUE_980_AFTER_DIR = resolve(
   '980-completed-set-20261013',
   'after',
 );
+const CAPTURE_1162_VISUALS = process.env.CAPTURE_1162_VISUALS === '1';
+const ISSUE_1162_CAPTURE_PHASE = process.env.CAPTURE_1162_PHASE ?? 'after';
+const ISSUE_1162_CAPTURE_DIR = resolve(
+  process.env.CAPTURE_1162_DIR ??
+    resolve(
+      process.cwd(),
+      '..',
+      '.artifacts',
+      'tasks',
+      '1162',
+      'evidence',
+      ISSUE_1162_CAPTURE_PHASE,
+    ),
+);
 const ISSUE_996_AFTER_DIR = resolve(
   process.env.YFC_ISSUE_996_AFTER_DIR ??
     resolve(process.cwd(), '..', '.artifacts', 'tasks', '996', 'evidence', 'after'),
@@ -91,6 +105,7 @@ async function mockActiveWorkout(
   targetStarted = false,
   setupMemoryBody: string | null = null,
   longWorkout = false,
+  exerciseTitleOverride: string | null = null,
 ) {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Moscow' });
   let finished = false;
@@ -200,7 +215,9 @@ async function mockActiveWorkout(
       {
         id: 101,
         exercise_id: replacementApplied ? 13 : 11,
-        exercise_title: replacementApplied ? 'Жим гантелей лёжа' : 'Жим штанги лёжа',
+        exercise_title: replacementApplied
+          ? 'Жим гантелей лёжа'
+          : (exerciseTitleOverride ?? 'Жим штанги лёжа'),
         metric_type: 'strength',
         sort_order: 1,
         prescribed_sets: 3,
@@ -814,16 +831,17 @@ async function mockActiveWorkout(
 }
 
 function completedActions(row: Locator) {
-  return row.locator('details.active-workout-set__more-actions');
+  return row.locator('.active-workout-set__completed-actions');
 }
 
-async function openCompletedActions(row: Locator) {
-  const actions = completedActions(row);
-  await expect(actions.locator('summary')).toHaveText('Действия');
-  if ((await actions.getAttribute('open')) === null) {
-    await actions.locator('summary').click();
-  }
-  return actions;
+async function captureIssue1162State(page: Page, info: TestInfo, theme: string, state: string) {
+  if (!CAPTURE_1162_VISUALS) return;
+  await mkdir(ISSUE_1162_CAPTURE_DIR, { recursive: true });
+  const width = page.viewportSize()?.width ?? 'unknown';
+  await page.screenshot({
+    path: resolve(ISSUE_1162_CAPTURE_DIR, `${info.project.name}-${width}-${theme}-${state}.png`),
+    fullPage: false,
+  });
 }
 
 async function activeWorkoutQueueLength(page: Page) {
@@ -4547,6 +4565,159 @@ test('active workout keeps one obvious next action through logging, timer and fi
   expect(JSON.stringify(analyticsEvents)).not.toContain('actual_reps');
 });
 
+type Issue1164Theme = 'light' | 'dark';
+
+const issue1164Viewports = [
+  { width: 320, height: 800 },
+  { width: 360, height: 800 },
+  { width: 393, height: 844 },
+  { width: 430, height: 932 },
+] as const;
+
+async function runIssue1164SpacingScenario(
+  page: Page,
+  theme: Issue1164Theme,
+  viewport: (typeof issue1164Viewports)[number],
+) {
+  await page.setViewportSize(viewport);
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const capture = process.env.YFC_ISSUE_1164_CAPTURE === '1';
+  const directory = resolve(
+    process.cwd(),
+    '..',
+    '.artifacts',
+    'tasks',
+    '1164',
+    'evidence',
+    process.env.YFC_ISSUE_1164_CAPTURE_PHASE ?? 'after',
+    `${theme}-${viewport.width}`,
+  );
+  const captureState = async (name: string, locator: Locator, fullPage = false) => {
+    if (!capture) return;
+    await mkdir(directory, { recursive: true });
+    await locator.screenshot({ path: resolve(directory, `${name}-card.png`) });
+    if (fullPage)
+      await page.screenshot({ path: resolve(directory, `${name}-page.png`), fullPage: true });
+  };
+
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await expect(firstSet).toHaveAttribute('aria-current', 'step');
+  await captureState('01-first-set-initial', firstSet);
+  await firstSet.getByRole('spinbutton', { name: /Вес,/ }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: /Повторы,/ }).fill('8');
+  await Promise.all([
+    waitForCompletedSetPatch(page, 201),
+    firstSet.getByRole('button', { name: /^Завершить:/ }).click(),
+  ]);
+
+  const secondSet = page.locator('[data-workout-set-id="202"]');
+  await expect(secondSet).toHaveAttribute('aria-current', 'step');
+  await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
+  await expect(secondSet.locator('.active-workout-set__context')).toContainText('8–10 повторений');
+  await expect(secondSet.locator('.active-workout-set__context')).toContainText('Отдых 90 с');
+  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await captureState('02-rest-prefill-visible', secondSet, true);
+
+  const measure = async () =>
+    page.evaluate(() => {
+      const row = document.querySelector<HTMLElement>('[data-workout-set-id="202"]');
+      const previous = row?.querySelector<HTMLElement>('.active-workout-set__previous');
+      const prefill = row?.querySelector<HTMLElement>('.active-workout-set__prefill-actions');
+      const context = row?.querySelector<HTMLElement>('.active-workout-set__context');
+      const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+      if (!row || !previous || !prefill || !context || !controls) return null;
+      const prefillStyle = getComputedStyle(prefill);
+      return {
+        rowHeight: row.getBoundingClientRect().height,
+        prefillHeight: prefill.getBoundingClientRect().height,
+        prefillVisibility: prefillStyle.visibility,
+        contextGap: context.getBoundingClientRect().top - previous.getBoundingClientRect().bottom,
+        prefillAfterControlsGap:
+          prefill.getBoundingClientRect().top - controls.getBoundingClientRect().bottom,
+      };
+    });
+
+  const beforePrefill = await measure();
+  expect(beforePrefill).not.toBeNull();
+  expect(beforePrefill!.prefillHeight).toBeGreaterThanOrEqual(44);
+  expect(beforePrefill!.prefillVisibility).toBe('visible');
+  expect(beforePrefill!.contextGap).toBeLessThanOrEqual(24);
+  expect(beforePrefill!.prefillAfterControlsGap).toBeGreaterThanOrEqual(-1);
+
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await expect(secondSet.locator('.active-workout-set__prefill-actions')).toHaveClass(/is-hidden/);
+  const afterPrefill = await measure();
+  expect(afterPrefill).not.toBeNull();
+  expect(afterPrefill!.prefillHeight).toBe(0);
+  expect(afterPrefill!.prefillVisibility).toBe('hidden');
+  expect(afterPrefill!.contextGap).toBeLessThanOrEqual(24);
+  await captureState('03-rest-prefill-dismissed', secondSet, true);
+
+  await secondSet.getByText('Дополнительно', { exact: true }).click();
+  await expect(secondSet.getByLabel('Вид подхода')).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('04-advanced-open', secondSet, true);
+  await secondSet.getByText('Дополнительно', { exact: true }).click();
+  await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
+
+  const weight = secondSet.getByRole('spinbutton', { name: /Вес,/ });
+  await weight.focus();
+  await expect(weight).toBeFocused();
+  await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
+  await expectClearOfBottomDock(
+    secondSet.getByRole('button', { name: /^Завершить:/ }),
+    `${theme} ${viewport.width}px completion`,
+  );
+  const focusedPrefill = await measure();
+  expect(focusedPrefill?.prefillHeight).toBe(0);
+  expect(focusedPrefill?.prefillVisibility).toBe('hidden');
+  await weight.blur();
+  await expect(weight).not.toBeFocused();
+  const afterBlur = await measure();
+  expect(afterBlur?.prefillHeight).toBe(0);
+  if (capture) {
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      resolve(directory, 'geometry.json'),
+      JSON.stringify({ beforePrefill, afterPrefill, focusedPrefill, afterBlur }, null, 2),
+    );
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+
+  await page.getByRole('button', { name: 'Свернуть таймер' }).click();
+  await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('05-rest-collapsed', secondSet, true);
+
+  await page.getByRole('button', { name: 'Показать таймер' }).click();
+  await page.getByRole('button', { name: 'Завершить отдых' }).click();
+  await expect(page.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('06-rest-completed', secondSet, true);
+}
+
+for (const issue1164Theme of ['light', 'dark'] as const) {
+  for (const issue1164Viewport of issue1164Viewports) {
+    test(`#1164 active set spacing ${issue1164Theme} ${issue1164Viewport.width}px`, async ({
+      page,
+    }) => {
+      await runIssue1164SpacingScenario(page, issue1164Theme, issue1164Viewport);
+    });
+  }
+}
+
 test('active workout keeps the current exercise primary and exposes keyboard handoff', async ({
   page,
 }) => {
@@ -5165,12 +5336,12 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
   await expect(
     completedActions(first).getByRole('button', { name: 'Вернуть в работу' }),
-  ).toBeHidden();
+  ).toBeVisible();
 
   await first.getByRole('button', { name: 'Редактировать' }).click();
   await expect(first.getByRole('button', { name: 'Отмена' })).toBeVisible();
   await expect(first.getByRole('button', { name: 'Сохранить' })).toBeVisible();
-  await expect(completedActions(first)).toHaveCount(0);
+  await expect(first.getByRole('button', { name: 'Вернуть в работу' })).toHaveCount(0);
   await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeEnabled();
   const writesBeforeDraft = server.patches.length;
   await first.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('44');
@@ -5200,7 +5371,7 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toBeDisabled();
 
   const writesBeforeCancel = server.patches.length;
-  const actions = await openCompletedActions(first);
+  const actions = completedActions(first);
   await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
   await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
   await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
@@ -5241,7 +5412,7 @@ test('#980 completed cardio results keep their values through edit and reopen', 
   ).toBeDisabled();
   await cardio.getByRole('button', { name: 'Редактировать' }).click();
   await expect(cardio.getByRole('button', { name: 'Отмена' })).toBeVisible();
-  await expect(completedActions(cardio)).toHaveCount(0);
+  await expect(cardio.getByRole('button', { name: 'Вернуть в работу' })).toHaveCount(0);
   const writesBeforeDraft = server.patches.length;
   await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('30');
   await expect.poll(() => server.patches.length).toBe(writesBeforeDraft);
@@ -5263,7 +5434,7 @@ test('#980 completed cardio results keep their values through edit and reopen', 
     cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }),
   ).toBeDisabled();
 
-  const actions = await openCompletedActions(cardio);
+  const actions = completedActions(cardio);
   await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
   await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
   await page.getByRole('dialog').getByRole('button', { name: 'Вернуть в работу' }).click();
@@ -5492,7 +5663,7 @@ test.describe('#980 completed set visual candidate', () => {
         });
       }
 
-      const actions = await openCompletedActions(first);
+      const actions = completedActions(first);
       await actions.getByRole('button', { name: 'Вернуть в работу' }).click();
       await expect(page.getByRole('dialog')).toContainText('Сохранённые результаты останутся');
       if (CAPTURE_980_AFTER) {
@@ -5506,6 +5677,159 @@ test.describe('#980 completed set visual candidate', () => {
       await page.getByRole('button', { name: 'Отмена' }).click();
     });
   }
+});
+
+for (const issue1162Width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1162 completed set actions stay compact and deliberate ${theme} ${issue1162Width}px`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize({ width: issue1162Width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+      const first = page.locator('[data-workout-set-id="201"]');
+      const current = page.locator('[data-workout-set-id="202"]');
+      await first.getByLabel(/^Вес,/).fill('42.5');
+      await first.getByLabel(/^Повторы,/).fill('9');
+      await first.getByRole('button', { name: /^2 —/ }).click();
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+      await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+
+      await expect(current).toHaveAttribute('aria-current', 'step');
+      await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
+      await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('42.5');
+      await expect(first.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('9');
+      await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+      await expect(first.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
+      await expect(first.getByRole('button', { name: 'Действия', exact: true })).toHaveCount(0);
+      await expect(first.locator('.active-workout-set__more-actions')).toHaveCount(0);
+
+      await first.scrollIntoViewIfNeeded();
+      await captureIssue1162State(page, info, theme, '01-completed-actions');
+      const closedLayout = await first.evaluate((row) => {
+        const box = (selector: string) =>
+          row.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        const actions = box('.active-workout-set__completed-actions');
+        const edit = box('[data-workout-action="edit-completed"]');
+        const restore = box('[data-workout-action="reopen-completed"]');
+        const buttonsFit = [
+          ...row.querySelectorAll<HTMLElement>(
+            '[data-workout-action="edit-completed"], [data-workout-action="reopen-completed"]',
+          ),
+        ].map((button) => button.scrollWidth <= button.clientWidth + 1);
+        return {
+          row: rowBox.toJSON(),
+          actions: actions?.toJSON() ?? null,
+          edit: edit?.toJSON() ?? null,
+          restore: restore?.toJSON() ?? null,
+          buttonsFit,
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+        };
+      });
+      expect(closedLayout.documentWidth).toBeLessThanOrEqual(closedLayout.viewportWidth + 1);
+      expect(closedLayout.actions?.right).toBeLessThanOrEqual((closedLayout.row?.right ?? 0) + 1);
+      expect(closedLayout.edit?.height).toBeGreaterThanOrEqual(44);
+      expect(closedLayout.restore?.height).toBeGreaterThanOrEqual(44);
+      expect(closedLayout.restore?.top).toBe(closedLayout.edit?.top);
+      expect(closedLayout.restore?.left).toBeGreaterThanOrEqual(
+        (closedLayout.edit?.right ?? 0) - 1,
+      );
+      expect(closedLayout.buttonsFit).toEqual([true, true]);
+      expect(closedLayout.actions?.height).toBeLessThanOrEqual(52);
+
+      const actions = completedActions(first);
+      await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
+      await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toHaveCount(1);
+
+      const writesBeforeConfirm = server.patches.length;
+      const restore = actions.getByRole('button', { name: 'Вернуть в работу' });
+      await restore.click();
+      await restore.dispatchEvent('click');
+      await expect(page.getByRole('dialog')).toHaveCount(1);
+      expect(server.patches.length).toBe(writesBeforeConfirm);
+      await captureIssue1162State(page, info, theme, '02-reopen-confirmation');
+      await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect.poll(() => server.patches.length).toBe(writesBeforeConfirm);
+      expect(server.readSet(201).is_completed).toBe(true);
+
+      const actionsAfterCancel = completedActions(first);
+      await actionsAfterCancel.getByRole('button', { name: 'Вернуть в работу' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Вернуть в работу' }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(false);
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+      await expect(first).toHaveAttribute('aria-current', 'step');
+      await expect(first.getByRole('button', { name: 'Редактировать' })).toHaveCount(0);
+      await captureIssue1162State(page, info, theme, '03-returned-to-work');
+
+      expect(
+        server.patches.filter((patch) => patch.setId === 201 && patch.body.is_completed === false),
+      ).toHaveLength(1);
+    });
+  }
+}
+
+test('#1162 long exercise titles keep completed actions inline at 320px', async ({ page }) => {
+  const longTitle = 'Жим штанги лёжа с паузой и контролем траектории';
+  const server = await mockActiveWorkout(
+    page,
+    false,
+    'approved_animated',
+    false,
+    null,
+    false,
+    longTitle,
+  );
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.addInitScript((value) => localStorage.setItem('app-theme', value), 'dark');
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const first = page.locator('[data-workout-set-id="201"]');
+  await first.getByLabel(/^Вес,/).fill('42.5');
+  await first.getByLabel(/^Повторы,/).fill('9');
+  await first.getByRole('button', { name: /^2 —/ }).click();
+  await first.getByRole('button', { name: /^Завершить:/ }).click();
+  await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+  await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+
+  const layout = await first.evaluate((row) => {
+    const box = (selector: string) =>
+      row.querySelector<HTMLElement>(selector)?.getBoundingClientRect().toJSON() ?? null;
+    const edit = box('[data-workout-action="edit-completed"]');
+    const restore = box('[data-workout-action="reopen-completed"]');
+    const buttons = [
+      ...row.querySelectorAll<HTMLElement>(
+        '[data-workout-action="edit-completed"], [data-workout-action="reopen-completed"]',
+      ),
+    ];
+    return {
+      title: row.closest('.active-workout-exercise')?.querySelector('h3')?.textContent,
+      edit,
+      restore,
+      documentWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+      buttonsFit: buttons.map((button) => button.scrollWidth <= button.clientWidth + 1),
+    };
+  });
+  expect(layout.title).toBe(longTitle);
+  expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
+  expect(layout.edit?.height).toBeGreaterThanOrEqual(44);
+  expect(layout.restore?.height).toBeGreaterThanOrEqual(44);
+  expect(layout.restore?.top).toBe(layout.edit?.top);
+  expect(layout.buttonsFit).toEqual([true, true]);
 });
 
 test.describe('#980 completed-set geometry regression', () => {
@@ -5612,7 +5936,7 @@ test.describe('#980 completed-set geometry regression', () => {
         const summaryGeometry = await page.evaluate(() =>
           Array.from(
             document.querySelectorAll<HTMLElement>(
-              '.active-workout-set__more-actions > summary, .active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
+              '.active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
             ),
           )
             .map((summary) => {
@@ -6271,13 +6595,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     ).toBeDisabled();
     await expect(context.previous.getByRole('button', { name: 'Редактировать' })).toBeVisible();
     const actions = completedActions(context.previous);
-    await actions.evaluate((element) => {
-      (element as HTMLDetailsElement).open = true;
-    });
     await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
-    await actions.evaluate((element) => {
-      (element as HTMLDetailsElement).open = false;
-    });
     await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
     await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
     await expect(

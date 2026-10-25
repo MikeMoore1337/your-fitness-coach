@@ -147,6 +147,64 @@ class HermesWebArticleIntakeRequest(BaseModel):
     provenance: HermesGenerationProvenance
 
 
+class OwnerWebArticlePublishRequest(BaseModel):
+    """Explicit root-owner editorial release; does not attest scientific verification."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    article: HermesWebArticleProposal
+    acknowledge_unverified_evidence: Literal[True]
+    generated_with_ai: bool = True
+
+
+class OwnerWebArticlePublishResponse(BaseModel):
+    article_id: str
+    slug: str
+    article_status: Literal["published"]
+    content_version: int
+    canonical_url: str
+    editorial_decision: Literal["root_owner_publication"]
+    scientific_verification: Literal["not_attested"]
+
+
+class OwnerArticleReviewRow(BaseModel):
+    """Authenticated Root-only read model; cannot authorize publication."""
+
+    article_id: str
+    slug: str
+    title: str
+    article_status: Literal["draft", "review", "update_required"]
+    content_version: int
+    content_hash: str
+    candidate_id: str | None
+    risk_level: ArticleRiskLevel
+    evidence_level: ArticleEvidenceLevel
+    source_count: int
+    claim_count: int
+    pending_claim_count: int
+    review_blockers: list[str]
+    generated_with_ai: bool
+    research_version: str
+    updated_at: datetime | None
+
+
+class OwnerArticleReviewDetail(OwnerArticleReviewRow):
+    """Exact content and provenance for a human Root decision, never a GO."""
+
+    description: str
+    lead: str
+    body_sections: list[ArticleBodySection]
+    topics: list[str]
+    claims: list[ArticleClaim]
+    sources: list[ArticleSource]
+    claim_source_matrix: list[ArticleClaimSourceMatrixItem]
+    domain_reviewer: ArticlePerson | None
+    provider: str
+    model: str
+    prompt_version: str
+    skill_version: str
+
+
 class WebArticleCard(BaseModel):
     slug: str
     title: str

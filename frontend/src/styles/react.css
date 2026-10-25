@@ -4990,34 +4990,17 @@ button.today-text-link {
   height: 16px;
 }
 .active-workout-set__completed-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-}
-.active-workout-set__more-actions {
   min-width: 0;
 }
-.active-workout-set__more-actions > summary {
+.active-workout-set__completed-actions > .ui-button {
+  min-width: 0;
   min-height: 44px;
-  padding: 8px 0;
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 0.78rem;
-  font-weight: 800;
-  list-style: none;
-}
-.active-workout-set__more-actions > summary::-webkit-details-marker {
-  display: none;
-}
-.active-workout-set__more-actions-body {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0 2px;
-}
-.active-workout-set__more-actions-body .ui-button {
-  min-height: 44px;
+  padding-inline: 8px;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 .active-workout-set__previous {
   margin: -3px 0 0 48px;
@@ -5050,8 +5033,10 @@ button.today-text-link {
   flex-wrap: wrap;
   gap: 8px;
   margin: -3px 0 0 48px;
+  order: 1;
 }
 .active-workout-set__prefill-actions.is-hidden {
+  display: none;
   visibility: hidden;
   pointer-events: none;
 }
@@ -5151,6 +5136,7 @@ button.today-text-link {
   background: var(--secondary-hover);
 }
 .active-workout-set__advanced {
+  order: 2;
   border-top: 1px solid var(--border);
 }
 .active-workout-set__advanced > summary,

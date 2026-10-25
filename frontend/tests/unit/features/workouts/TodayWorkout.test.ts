@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { Workout } from '../../../../src/shared/api/types';
 import {
@@ -102,5 +103,30 @@ describe('resolvePreviousSetValues', () => {
       duration_minutes: 25,
       distance_km: 5,
     });
+  });
+});
+
+describe('active workout prefill layout', () => {
+  it('removes dismissed prefill actions from the layout flow', () => {
+    const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
+    const rule = styles.match(
+      /\.active-workout-set__prefill-actions\.is-hidden\s*\{([^}]*)\}/,
+    )?.[1];
+
+    expect(rule).toContain('display: none;');
+    expect(styles).toMatch(/\.active-workout-set__prefill-actions\s*\{[^}]*order: 1;/s);
+  });
+});
+
+describe('completed action layout', () => {
+  it('keeps completed actions on one compact touch-target row', () => {
+    const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
+
+    expect(styles).toMatch(
+      /\.active-workout-set__completed-actions\s*\{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+    );
+    expect(styles).toMatch(
+      /\.active-workout-set__completed-actions > \.ui-button\s*\{[^}]*min-height: 44px;[^}]*white-space: nowrap;/s,
+    );
   });
 });
