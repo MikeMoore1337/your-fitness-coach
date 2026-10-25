@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Offline read-only verdict for pinned Jev Test Impact --static pilot output."""
+
 from __future__ import annotations
 
 import argparse
@@ -86,7 +87,7 @@ def main() -> int:
         if path.is_file():
             try:
                 samples[name] = parse_upstream_output(path.read_text(encoding="utf-8"))
-            except (ValueError, OSError, UnicodeError):
+            except ValueError, OSError, UnicodeError:
                 samples[name] = {"_invalid": True}
     print(json.dumps(evaluate(samples), ensure_ascii=False, sort_keys=True))
     # An unexpected static miss is a valid NEGATIVE experiment; not a CI failure.
