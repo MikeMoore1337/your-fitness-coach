@@ -26,6 +26,7 @@ export interface TimeSeriesChartProps {
   targetLabel?: string;
   tableCaption?: string;
   unit: string;
+  valueFractionDigits?: number;
   valueLabel?: string;
 }
 
@@ -156,6 +157,7 @@ export function TimeSeriesChart({
   targetLabel = 'Цель',
   tableCaption,
   unit,
+  valueFractionDigits = 1,
   valueLabel = 'Факт',
 }: TimeSeriesChartProps) {
   const titleId = useId();
@@ -285,7 +287,7 @@ export function TimeSeriesChart({
         {points
           .map(
             (point) =>
-              `${point.label}: ${point.value == null ? 'нет значения' : `${formatValue(point.value)} ${unit}`}${point.target == null ? '' : `, цель ${formatValue(point.target)} ${unit}`}`,
+              `${point.label}: ${point.value == null ? 'нет значения' : `${formatValue(point.value, valueFractionDigits)} ${unit}`}${point.target == null ? '' : `, цель ${formatValue(point.target, valueFractionDigits)} ${unit}`}`,
           )
           .join('. ')}
       </p>
@@ -438,11 +440,12 @@ export function TimeSeriesChart({
           <strong>
             {selectedPoint.value == null
               ? 'Нет данных'
-              : `${formatValue(selectedPoint.value)} ${unit}`}
+              : `${formatValue(selectedPoint.value, valueFractionDigits)} ${unit}`}
           </strong>
           {selectedPoint.target != null && (
             <span>
-              {targetLabel.toLowerCase()} {formatValue(selectedPoint.target)} {unit}
+              {targetLabel.toLowerCase()} {formatValue(selectedPoint.target, valueFractionDigits)}{' '}
+              {unit}
             </span>
           )}
           {selectedPoint.href && (
@@ -469,10 +472,14 @@ export function TimeSeriesChart({
               <tr key={point.key}>
                 <th scope="row">{point.label}</th>
                 <td>
-                  {point.value == null ? 'Нет данных' : `${formatValue(point.value)} ${unit}`}
+                  {point.value == null
+                    ? 'Нет данных'
+                    : `${formatValue(point.value, valueFractionDigits)} ${unit}`}
                 </td>
                 <td>
-                  {point.target == null ? 'Не задана' : `${formatValue(point.target)} ${unit}`}
+                  {point.target == null
+                    ? 'Не задана'
+                    : `${formatValue(point.target, valueFractionDigits)} ${unit}`}
                 </td>
                 <td>{point.status ?? 'Подтверждено'}</td>
               </tr>

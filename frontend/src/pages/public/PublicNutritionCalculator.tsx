@@ -19,6 +19,11 @@ import {
   type CardioTraining,
 } from '../../features/nutrition/nutritionCalculatorOptions';
 import { trackGrowthEvent } from '../../shared/analytics/productEvents';
+import {
+  decimalDraftFromValue,
+  hasDecimalScale,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 type NumericField =
   | 'age'
@@ -40,6 +45,10 @@ const initialForm: NutritionCalculatorInput = {
 
 function fieldValue(value: number): number | string {
   return value === 0 ? '' : value;
+}
+
+function decimalValue(value: string): number {
+  return hasDecimalScale(value, 2) ? (parseDecimalDraft(value) ?? Number.NaN) : Number.NaN;
 }
 
 function formatNumber(value: number): string {
@@ -97,12 +106,24 @@ function ResultSummary({ estimate }: { estimate: NutritionEstimate }) {
 
 export default function PublicNutritionCalculator() {
   const [form, setForm] = useState<NutritionCalculatorInput>(initialForm);
+  const [decimalDrafts, setDecimalDrafts] = useState(() => ({
+    weight_kg: decimalDraftFromValue(initialForm.weight_kg),
+    height_cm: decimalDraftFromValue(initialForm.height_cm),
+  }));
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<NutritionEstimate | null>(null);
   const startedTrackedRef = useRef(false);
   const resultTrackedRef = useRef(false);
 
-  const calculation = useMemo(() => calculateNutritionEstimate(form), [form]);
+  const calculation = useMemo(
+    () =>
+      calculateNutritionEstimate({
+        ...form,
+        weight_kg: decimalValue(decimalDrafts.weight_kg),
+        height_cm: decimalValue(decimalDrafts.height_cm),
+      }),
+    [decimalDrafts, form],
+  );
   const errorId = 'public-kbju-calculator-error';
   const helpId = 'public-kbju-calculator-help';
 
@@ -120,6 +141,17 @@ export default function PublicNutritionCalculator() {
   };
 
   const setNumber = (key: NumericField, value: string) => {
+    if (key === 'weight_kg' || key === 'height_cm') {
+      markStarted();
+      setDecimalDrafts((current) => ({ ...current, [key]: value }));
+      setForm((current) => ({
+        ...current,
+        [key]: parseDecimalDraft(value) ?? 0,
+      }));
+      setSubmitted(false);
+      setResult(null);
+      return;
+    }
     const normalized = value.replace(',', '.');
     updateForm({
       [key]: normalized === '' ? 0 : Number(normalized),
@@ -208,13 +240,13 @@ export default function PublicNutritionCalculator() {
           <label>
             <span>Вес, кг</span>
             <input
-              type="number"
+              type="text"
               min="20"
               max="350"
               step="0.01"
               inputMode="decimal"
               autoComplete="off"
-              value={fieldValue(form.weight_kg)}
+              value={decimalDrafts.weight_kg}
               onChange={(event) => setNumber('weight_kg', event.target.value)}
               aria-invalid={submitted && hasError(calculation.errors, 'weight_kg')}
             />
@@ -222,13 +254,13 @@ export default function PublicNutritionCalculator() {
           <label>
             <span>Рост, см</span>
             <input
-              type="number"
+              type="text"
               min="100"
               max="250"
               step="0.01"
               inputMode="decimal"
               autoComplete="off"
-              value={fieldValue(form.height_cm)}
+              value={decimalDrafts.height_cm}
               onChange={(event) => setNumber('height_cm', event.target.value)}
               aria-invalid={submitted && hasError(calculation.errors, 'height_cm')}
             />

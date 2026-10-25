@@ -1,10 +1,50 @@
 from pathlib import Path
 
+import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
 from alembic import command
+
+
+def test_sqlite_numeric_precision_migration_fails_closed_on_excess_fractional_data(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from fitminiapp_api.core import config as app_config
+
+    root = Path(__file__).resolve().parents[2]
+    database_path = tmp_path / "numeric-precision-safety.db"
+    database_url = f"sqlite:///{database_path.as_posix()}"
+    alembic_config = Config(str(root / "backend" / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    monkeypatch.setattr(app_config.settings, "database_url", database_url)
+
+    previous_revision = "0132_rest_interval_unique_swap"
+    command.upgrade(alembic_config, previous_revision)
+    engine = create_engine(database_url)
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text("INSERT INTO users (id, is_coach, is_admin, is_active) VALUES (1, 0, 0, 1)")
+            )
+            connection.execute(
+                text("INSERT INTO user_profiles (id, user_id, height_cm) VALUES (1, 1, 178.251)")
+            )
+    finally:
+        engine.dispose()
+
+    with pytest.raises(RuntimeError, match="Unsafe numeric precision migration"):
+        command.upgrade(alembic_config, "head")
+
+    engine = create_engine(database_url)
+    try:
+        with engine.connect() as connection:
+            assert connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one() == (previous_revision)
+    finally:
+        engine.dispose()
 
 
 def test_sqlite_migration_history_replays_to_head(tmp_path: Path, monkeypatch) -> None:

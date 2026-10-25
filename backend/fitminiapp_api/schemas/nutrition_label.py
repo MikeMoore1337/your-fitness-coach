@@ -27,21 +27,49 @@ LabelDraftStatus = Literal["draft", "confirmed", "cancelled", "expired"]
 class NutritionLabelFactsEdit(StrictModel):
     source_basis: SourceBasis
     serving_size: ServingSize | None = None
-    servings_per_container: Decimal | None = Field(default=None, gt=0, allow_inf_nan=False)
+    servings_per_container: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     package_amount: PackageAmount | None = None
-    energy_kcal: Decimal | None = Field(default=None, ge=0, le=10000, allow_inf_nan=False)
-    energy_kj: Decimal | None = Field(default=None, ge=0, le=50000, allow_inf_nan=False)
-    protein_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    fat_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    saturated_fat_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    trans_fat_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    carbohydrate_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    sugars_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    added_sugars_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    fiber_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    salt_g: Decimal | None = Field(default=None, ge=0, le=1000, allow_inf_nan=False)
-    sodium_mg: Decimal | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
-    cholesterol_mg: Decimal | None = Field(default=None, ge=0, le=100000, allow_inf_nan=False)
+    energy_kcal: Decimal | None = Field(
+        default=None, ge=0, le=10000, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    energy_kj: Decimal | None = Field(
+        default=None, ge=0, le=50000, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    protein_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    fat_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    saturated_fat_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    trans_fat_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    carbohydrate_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    sugars_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    added_sugars_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    fiber_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    salt_g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    sodium_mg: Decimal | None = Field(
+        default=None, ge=0, le=100000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
+    cholesterol_mg: Decimal | None = Field(
+        default=None, ge=0, le=100000, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
 
     @model_validator(mode="after")
     def validate_basis(self) -> NutritionLabelFactsEdit:

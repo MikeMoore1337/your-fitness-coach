@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -43,17 +44,25 @@ class WarmupProposalError(ValueError):
         self.code = code
 
 
+def _json_default(value: object) -> float:
+    if isinstance(value, Decimal):
+        return float(value)
+    raise TypeError(f"Unsupported digest value: {type(value).__name__}")
+
+
 def _digest(document: object) -> str:
-    encoded = json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    encoded = json.dumps(
+        document,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=_json_default,
+    )
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
 def _round_to_half(value: float) -> float:
     return math.floor(value * 2 + 0.5) / 2
-
-
-def _is_half_increment(value: float) -> bool:
-    return math.isclose(value * 2, round(value * 2), abs_tol=1e-9)
 
 
 def _warmup_weights(working_weight_kg: float) -> list[float]:
@@ -76,15 +85,17 @@ def _default_rows(working_weight_kg: float) -> list[dict[str, float | int]]:
 
 
 def _validate_weight(value: float, *, field: str) -> None:
+    value = float(value)
     if not math.isfinite(value) or value <= 0 or value > 1000:
         raise WarmupProposalError(
-            f"{field} должен быть от 0,5 до 1000 кг",
+            f"{field} должен быть больше 0 и не больше 1000 кг",
             status_code=422,
             code="warmup_value_invalid",
         )
-    if not _is_half_increment(value):
+    exponent = Decimal(str(value)).as_tuple().exponent
+    if isinstance(exponent, int) and exponent < -2:
         raise WarmupProposalError(
-            f"{field} указывайте с шагом 0,5 кг",
+            f"{field} указывайте не более чем с двумя знаками после запятой",
             status_code=422,
             code="warmup_value_invalid",
         )
@@ -98,17 +109,18 @@ def _normalize_rows(
     rows: list[WarmupProposalRow],
     *,
     working_weight_kg: float,
-) -> list[dict[str, float | int]]:
+) -> list[dict[str, Decimal | float | int]]:
     if not rows or len(rows) > MAX_ROWS:
         raise WarmupProposalError(
             f"Добавьте от одного до {MAX_ROWS} разминочных подходов",
             status_code=422,
             code="warmup_rows_invalid",
         )
-    normalized: list[dict[str, float | int]] = []
+    normalized: list[dict[str, Decimal | float | int]] = []
     for row in rows:
-        _validate_weight(row.weight_kg, field="Вес разминки")
-        if row.weight_kg > working_weight_kg:
+        weight = Decimal(str(row.weight_kg))
+        _validate_weight(float(weight), field="Вес разминки")
+        if float(weight) > working_weight_kg:
             raise WarmupProposalError(
                 "Вес разминки не может быть выше рабочего веса",
                 status_code=422,
@@ -116,7 +128,7 @@ def _normalize_rows(
             )
         normalized.append(
             {
-                "weight_kg": _round_to_half(row.weight_kg),
+                "weight_kg": weight,
                 "reps": row.reps,
             }
         )
@@ -266,7 +278,7 @@ def _warmup_row_changes(
     workout_id: int,
     workout_exercise_id: int,
     working_weight_kg: float,
-    row: dict[str, float | int],
+    row: dict[str, Decimal | float | int],
     row_index: int,
 ) -> dict[str, Any]:
     return {
@@ -336,15 +348,16 @@ def build_warmup_proposal(
     target = _find_target(workout, workout_exercise_id)
     _find_target_set(target, payload.target_set_id)
     _ensure_target_unstarted(target)
-    _validate_working_weight(payload.working_weight_kg)
-    rows = _default_rows(payload.working_weight_kg)
+    working_weight_kg = float(payload.working_weight_kg)
+    _validate_working_weight(working_weight_kg)
+    rows = _default_rows(working_weight_kg)
     if not rows:
         return {
             "status": "unavailable",
             "workout_id": workout.id,
             "workout_exercise_id": target.id,
             "ruleset_version": RULESET_VERSION,
-            "working_weight_kg": payload.working_weight_kg,
+            "working_weight_kg": working_weight_kg,
             "rows": [],
             "max_rows": MAX_ROWS,
             "state_token": None,
@@ -357,7 +370,7 @@ def build_warmup_proposal(
         "workout_id": workout.id,
         "workout_exercise_id": target.id,
         "ruleset_version": RULESET_VERSION,
-        "working_weight_kg": payload.working_weight_kg,
+        "working_weight_kg": working_weight_kg,
         "rows": rows,
         "max_rows": MAX_ROWS,
         "state_token": state_token,
@@ -365,7 +378,7 @@ def build_warmup_proposal(
             state_token=state_token,
             workout_exercise_id=target.id,
             target_set_id=payload.target_set_id,
-            working_weight_kg=payload.working_weight_kg,
+            working_weight_kg=working_weight_kg,
             rows=rows,
         ),
         "message": (
@@ -382,15 +395,16 @@ def apply_warmup_proposal(
     workout_exercise_id: int,
     payload: WarmupProposalApplyRequest,
 ) -> dict[str, Any]:
-    _validate_working_weight(payload.working_weight_kg)
-    rows = _normalize_rows(payload.rows, working_weight_kg=payload.working_weight_kg)
+    working_weight_kg = float(payload.working_weight_kg)
+    _validate_working_weight(working_weight_kg)
+    rows = _normalize_rows(payload.rows, working_weight_kg=working_weight_kg)
     operation_ids = _operation_ids(payload.mutation_id, len(rows))
     expected_fingerprints = [
         _request_fingerprint(
             _warmup_row_changes(
                 workout_id=workout.id,
                 workout_exercise_id=workout_exercise_id,
-                working_weight_kg=payload.working_weight_kg,
+                working_weight_kg=working_weight_kg,
                 row=row,
                 row_index=index,
             )
@@ -424,12 +438,12 @@ def apply_warmup_proposal(
             "Тренировка изменилась после предложения. Сформируйте разминку заново.",
             code="warmup_stale",
         )
-    default_rows = _default_rows(payload.working_weight_kg)
+    default_rows = _default_rows(working_weight_kg)
     expected_proposal_token = _proposal_token(
         state_token=current_state_token,
         workout_exercise_id=target.id,
         target_set_id=target_set.id,
-        working_weight_kg=payload.working_weight_kg,
+        working_weight_kg=working_weight_kg,
         rows=default_rows,
     )
     if expected_proposal_token != payload.proposal_token:
@@ -445,7 +459,7 @@ def apply_warmup_proposal(
             workout_exercise_id=target.id,
             set_number=last_set_number + index + 1,
             actual_reps=int(row["reps"]),
-            actual_weight=float(row["weight_kg"]),
+            actual_weight=Decimal(str(row["weight_kg"])),
             set_kind="warmup",
             reached_failure=None,
             planned_role="warmup",

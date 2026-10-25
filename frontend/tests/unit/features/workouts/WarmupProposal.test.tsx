@@ -78,13 +78,13 @@ describe('WarmupProposal', () => {
     expect(fetchMock).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Рассчитать предложение' }));
     await screen.findByRole('heading', { name: 'Проверьте подходы' });
-    expect(screen.getByLabelText('Вес разминки, подход 1')).toHaveValue(32);
+    expect(screen.getByLabelText('Вес разминки, подход 1')).toHaveValue('32');
     expect(screen.getByLabelText('Повторы разминки, подход 1')).toHaveValue(8);
 
     await user.clear(screen.getByLabelText('Вес разминки, подход 1'));
     await user.type(screen.getByLabelText('Вес разминки, подход 1'), '30');
     await user.click(screen.getByRole('button', { name: 'Добавить подход' }));
-    expect(screen.getByLabelText('Вес разминки, подход 4')).toHaveValue(null);
+    expect(screen.getByLabelText('Вес разминки, подход 4')).toHaveValue('');
     await user.click(screen.getByRole('button', { name: 'Удалить подход разминки 4' }));
     expect(screen.queryByLabelText('Вес разминки, подход 4')).not.toBeInTheDocument();
 

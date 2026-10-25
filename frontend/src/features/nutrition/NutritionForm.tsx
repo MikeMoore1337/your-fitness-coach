@@ -26,6 +26,11 @@ import {
   strengthTypeOptions,
   type CardioTraining,
 } from './nutritionCalculatorOptions';
+import {
+  decimalDraftFromValue,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 const defaults = nutritionCalculatorDefaults;
 
@@ -86,6 +91,34 @@ function fromInitial(
   };
 }
 
+type NutritionFormDraft = Omit<NutritionCalculatorInput, 'weight_kg' | 'height_cm'> & {
+  weight_kg: string;
+  height_cm: string;
+};
+
+function nutritionFormDraftFromInput(input: NutritionCalculatorInput): NutritionFormDraft {
+  return {
+    ...input,
+    weight_kg: decimalDraftFromValue(input.weight_kg),
+    height_cm: decimalDraftFromValue(input.height_cm),
+  };
+}
+
+function nutritionFormValue(value: string | number | null | undefined): number {
+  const draft = typeof value === 'string' ? value : decimalDraftFromValue(value);
+  if (!draft.trim()) return 0;
+  if (!isCompleteDecimalDraft(draft)) return Number.NaN;
+  return parseDecimalDraft(draft) ?? Number.NaN;
+}
+
+function normalizedNutritionForm(form: NutritionFormDraft): NutritionCalculatorInput {
+  return {
+    ...form,
+    weight_kg: nutritionFormValue(form.weight_kg),
+    height_cm: nutritionFormValue(form.height_cm),
+  };
+}
+
 export function NutritionForm({
   clientId,
   targetTelegramId,
@@ -109,15 +142,19 @@ export function NutritionForm({
   const [mode, setMode] = useState<'calculated' | 'manual'>(
     initial?.source === 'manual' ? 'manual' : 'calculated',
   );
-  const [form, setForm, clearDraft] = usePersistentState<NutritionCalculatorInput>(
+  const [form, setForm, clearDraft] = usePersistentState<NutritionFormDraft>(
     nutritionDraftStorageKey(
       targetTelegramId ? `client_${targetTelegramId}` : `user_${user?.id ?? 'me'}`,
     ),
-    () => fromInitial(initial, targetTelegramId, targetTelegramId ? null : user?.profile),
+    () =>
+      nutritionFormDraftFromInput(
+        fromInitial(initial, targetTelegramId, targetTelegramId ? null : user?.profile),
+      ),
   );
 
   const [weightEdited, setWeightEdited] = useState(false);
-  const calculation = useMemo(() => calculateNutritionEstimate(form), [form]);
+  const normalizedForm = useMemo(() => normalizedNutritionForm(form), [form]);
+  const calculation = useMemo(() => calculateNutritionEstimate(normalizedForm), [normalizedForm]);
   const estimate = calculation.estimate;
 
   const mutation = useMutation({
@@ -125,12 +162,12 @@ export function NutritionForm({
       api<NutritionTarget>('/api/v1/nutrition/targets', {
         method: 'POST',
         body: {
-          ...form,
+          ...normalizedForm,
           record_weight_measurement: weightEdited && !targetTelegramId,
           strength_training_duration_minutes:
-            form.strength_trainings_per_week > 0
-              ? form.strength_training_duration_minutes
-              : form.strength_training_duration_minutes || 60,
+            normalizedForm.strength_trainings_per_week > 0
+              ? normalizedForm.strength_training_duration_minutes
+              : normalizedForm.strength_training_duration_minutes || 60,
           target_telegram_user_id: targetTelegramId || null,
         },
       }),
@@ -162,7 +199,11 @@ export function NutritionForm({
       | 'strength_trainings_per_week'
       | 'strength_training_duration_minutes',
     value: string,
-  ) => setForm({ ...form, [key]: value === '' ? 0 : Number(value) });
+  ) =>
+    setForm({
+      ...form,
+      [key]: key === 'weight_kg' || key === 'height_cm' ? value : value === '' ? 0 : Number(value),
+    } as NutritionFormDraft);
 
   const updateCardio = (index: number, updates: Partial<CardioTraining>) =>
     setForm({
@@ -257,12 +298,13 @@ export function NutritionForm({
                 <label className="field">
                   <span>Вес, кг</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     min="20"
                     max="350"
                     step="0.01"
                     required
-                    value={form.weight_kg || ''}
+                    value={form.weight_kg}
                     onChange={(event) => {
                       setNumber('weight_kg', event.target.value);
                       setWeightEdited(true);
@@ -272,12 +314,13 @@ export function NutritionForm({
                 <label className="field">
                   <span>Рост, см</span>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     min="100"
                     max="250"
                     step="0.01"
                     required
-                    value={form.height_cm || ''}
+                    value={form.height_cm}
                     onChange={(event) => setNumber('height_cm', event.target.value)}
                   />
                 </label>

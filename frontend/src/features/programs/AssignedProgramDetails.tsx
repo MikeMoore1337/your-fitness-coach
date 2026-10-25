@@ -19,6 +19,7 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { Icon } from '../../shared/ui/Icon';
 import { AiAdaptationProposal } from '../ai/AiAdaptationProposal';
 import { ProgressionGuidance } from '../workouts/ProgressionGuidance';
+import { hasDecimalScale, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 import {
   blockStatusLabel,
   buildRevisionPresentation,
@@ -869,6 +870,7 @@ export function AssignedProgramDetails({
               );
               const adjustedWeight =
                 adjustedWeights[proposal.proposal_id] ?? String(proposal.proposed_weight ?? '');
+              const adjustedWeightValue = parseDecimalDraft(adjustedWeight) ?? Number.NaN;
               const alreadyApplied =
                 updates.length > 0 &&
                 updates.every((update) => update.current_weight === update.proposed_weight);
@@ -911,10 +913,11 @@ export function AssignedProgramDetails({
                       >
                         <Input
                           id={`progression-adjust-${proposal.proposal_id}`}
-                          type="number"
+                          inputMode="decimal"
+                          type="text"
                           min="0.01"
                           max="100000"
-                          step="any"
+                          step="0.01"
                           value={adjustedWeight}
                           onChange={(event) =>
                             setAdjustedWeights((current) => ({
@@ -929,8 +932,9 @@ export function AssignedProgramDetails({
                         variant="secondary"
                         disabled={
                           progressionReview.isPending ||
-                          !Number.isFinite(Number(adjustedWeight)) ||
-                          Number(adjustedWeight) <= 0
+                          !Number.isFinite(adjustedWeightValue) ||
+                          adjustedWeightValue <= 0 ||
+                          !hasDecimalScale(adjustedWeight, 2)
                         }
                         onClick={() =>
                           progressionReview.mutate({
@@ -938,7 +942,7 @@ export function AssignedProgramDetails({
                             proposalId: proposal.proposal_id,
                             workoutId: proposal.target_workout_id,
                             decision: 'adjust',
-                            adjustedWeight: Number(adjustedWeight),
+                            adjustedWeight: adjustedWeightValue,
                             expectedRevisionNumber: proposal.target_revision_number,
                             expectedSetVersions,
                           })

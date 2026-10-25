@@ -665,7 +665,7 @@ function SummaryOverview({
                   ? 'Недоступно'
                   : summary.nutrition.average_calories == null
                     ? 'Мало данных'
-                    : `${formatNumber(summary.nutrition.average_calories, 0)} ккал`
+                    : `${formatNumber(summary.nutrition.average_calories, 2)} ккал`
               }
             />
             <ProgressMetricCard
@@ -946,7 +946,9 @@ function BodyChart({ trend }: { trend: BodyTrend }) {
   return (
     <TimeSeriesChart
       ariaLabel={`${bodyMetricLabel(trend)}: ${trend.points
-        .map((point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value, 2)} ${unit}`)
+        .map(
+          (point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value, 2)} ${unit}`,
+        )
         .join(', ')}`}
       metric={bodyMetricLabel(trend)}
       period={`${formatDate(trend.first_measured_on)} — ${formatDate(trend.latest_measured_on)}`}
@@ -956,6 +958,7 @@ function BodyChart({ trend }: { trend: BodyTrend }) {
         value: point.value,
       }))}
       unit={unit}
+      valueFractionDigits={2}
       valueLabel="Замер"
     />
   );
@@ -1056,7 +1059,7 @@ function BodySection({
               <div key={key}>
                 <dt>{label}</dt>
                 <dd>
-                  {value == null ? '—' : formatNumber(value)} <small>{unit}</small>
+                  {value == null ? '—' : formatNumber(value, 2)} <small>{unit}</small>
                 </dd>
               </div>
             ))}
@@ -1224,7 +1227,7 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
                 <dd>
                   {nutrition.target_calories == null
                     ? 'Цель не задана'
-                    : `${formatNumber(nutrition.target_calories, 0)} ккал`}
+                    : `${formatNumber(nutrition.target_calories, 2)} ккал`}
                 </dd>
               </div>
               <div>
@@ -1271,12 +1274,12 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               <strong>
                 {nutrition.average_calories == null
                   ? '—'
-                  : `${formatNumber(nutrition.average_calories, 0)} ккал`}
+                  : `${formatNumber(nutrition.average_calories, 2)} ккал`}
               </strong>
               <small>
                 {nutrition.target_calories == null
                   ? 'Цель не задана'
-                  : `цель ${formatNumber(nutrition.target_calories, 0)} ккал`}
+                  : `цель ${formatNumber(nutrition.target_calories, 2)} ккал`}
               </small>
             </div>
             <div>
@@ -1284,12 +1287,12 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               <strong>
                 {nutrition.average_protein_g == null
                   ? '—'
-                  : `${formatNumber(nutrition.average_protein_g, 0)} г`}
+                  : `${formatNumber(nutrition.average_protein_g, 2)} г`}
               </strong>
               <small>
                 {nutrition.target_protein_g == null
                   ? 'Цель не задана'
-                  : `цель ${formatNumber(nutrition.target_protein_g, 0)} г`}
+                  : `цель ${formatNumber(nutrition.target_protein_g, 2)} г`}
               </small>
             </div>
             <div>
