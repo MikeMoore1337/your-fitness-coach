@@ -65,7 +65,7 @@ jobs:
             printf '\n// synthetic JTI experiment only\n' >> "$file"
             (cd .pilot/jev-upstream && corepack pnpm exec tsx src/cli/index.ts \
               select --static --json --root "$GITHUB_WORKSPACE/frontend" --base HEAD \
-              > ".artifacts/jev-static-pilot/${name}.json"
+              > "$GITHUB_WORKSPACE/.artifacts/jev-static-pilot/${name}.json")
             git restore -- "$file"
           done
           python scripts/jev_static_pilot_report.py --results .artifacts/jev-static-pilot | tee .artifacts/jev-static-pilot/verdict.json
