@@ -2140,7 +2140,7 @@ export function RestTimer({
             (!measuredRest &&
               latestRest &&
               (!latestRest.server_id || latestRest.pending.length > 0))) && (
-            <p className="active-workout-rest__sync" role="status">
+            <p className="active-workout-rest__sync" aria-live="polite">
               {isOfflineRest
                 ? 'Нет сети · отдых ожидает сохранения'
                 : 'Отдых сохраняется…'}
