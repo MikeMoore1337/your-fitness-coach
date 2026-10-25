@@ -1561,6 +1561,9 @@ export function RestTimer({
   const isCompletedLatestRest = latestRest?.status === 'completed';
   const isSkippedLatestRest = latestRest?.status === 'skipped';
   const isOfflineRest = typeof navigator !== 'undefined' && !navigator.onLine;
+  const restPendingLabel = isOfflineRest
+    ? 'Нет сети · отдых ожидает сохранения'
+    : 'Отдых сохраняется…';
   let collapsedRestStatus = 'Отдых идёт';
   if (restSaveError) {
     collapsedRestStatus = restSaveError.startsWith('Конфликт')
@@ -1898,12 +1901,19 @@ export function RestTimer({
           </div>
           <div className="active-workout-rest__next" hidden={showCompact}>
             <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span>{nextPosition}</span>
-            {restIsUnconfirmed && (
-              <span className="active-workout-rest__next-status" aria-live="polite">
-                {isOfflineRest ? 'Отдых не сохранён · нет сети' : 'Отдых сохраняется…'}
-              </span>
-            )}
+            <span className="active-workout-rest__next-meta">
+              <span>{nextPosition}</span>
+              {restIsUnconfirmed && (
+                <span
+                  className="active-workout-rest__next-status"
+                  role="status"
+                  title={restPendingLabel}
+                >
+                  <Icon name={isOfflineRest ? 'cloud-off' : 'cloud-upload'} size={14} />
+                  <span className="sr-only">{restPendingLabel}</span>
+                </span>
+              )}
+            </span>
           </div>
           {measuredRest && !showCompact && (
             <div className="active-workout-rest__actual">

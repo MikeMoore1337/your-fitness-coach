@@ -5753,11 +5753,23 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout {
   font-size: 0.75rem;
   line-height: 1.25;
 }
-.active-workout-rest__next:has(.active-workout-rest__next-status) {
-  gap: 1px;
+.active-workout-rest__next-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.active-workout-rest__next-meta > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .active-workout-rest__next-status {
-  font-size: 0.75rem;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 .active-workout-rest__next strong {
