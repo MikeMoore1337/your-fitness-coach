@@ -340,6 +340,51 @@ def _online_migration_command(active_revision: str, target_revision: str) -> lis
     return command
 
 
+def _production_rest_interval_read_only_preflight() -> None:
+    """Inspect the old live PostgreSQL schema before stopping production writers.
+
+    Executed inside the existing backend container. Uses one read-only SQL
+    transaction and reports only aggregate counts; it never mutates user facts.
+    """
+    code = """
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
+from fitminiapp_api.core.config import settings
+engine = create_engine(settings.database_url, poolclass=NullPool)
+with engine.connect() as connection:
+    connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+    version = int(connection.execute(text("SHOW server_version_num")).scalar_one())
+    revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+    duplicates = connection.execute(text(
+        "SELECT count(*) FROM (SELECT workout_id FROM workout_rest_sessions "
+        "WHERE status = 'running' GROUP BY workout_id HAVING count(*) > 1) c"
+    )).scalar_one()
+    legacy_constraint = connection.execute(text(
+        "SELECT count(*) FROM pg_constraint WHERE "
+        "conrelid = 'workout_rest_sessions'::regclass "
+        "AND conname = 'uq_workout_rest_source_set' AND contype = 'u'"
+    )).scalar_one()
+    intervals = connection.execute(text(
+        "SELECT count(*) FROM workout_rest_sessions"
+    )).scalar_one()
+    if not 160000 <= version < 170000:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: PostgreSQL 16 required")
+    if revision != "0130_workout_rest_sessions":
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: unexpected Alembic revision")
+    if duplicates != 0:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: multiple running intervals")
+    if legacy_constraint != 1:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: source unique constraint missing")
+    print(f"REST_INTERVAL_PREFLIGHT=PASS pg=16 duplicate_workouts=0 rows={intervals}")
+engine.dispose()
+"""
+    output = _compose("exec", "-T", "backend", "python", "-c", code, capture=True)
+    verdict = output.stdout.strip()
+    if not verdict.startswith("REST_INTERVAL_PREFLIGHT=PASS pg=16 "):
+        raise DeploymentError("production rest-interval preflight returned invalid evidence")
+    print(verdict)
+
+
 def _rest_interval_schema_is_forward_only(
     config: DeployConfig, active_revision: str
 ) -> bool:
@@ -1716,6 +1761,12 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
         with _stage(evidence, "pre_stop_capacity"):
             evidence.capacity = _single_slot_capacity()
             safety.check(frozenset({"backend", "worker", "bot"}))
+
+        if forward_only_schema:
+            with _stage(evidence, "rest_interval_production_read_only_preflight"):
+                safety.check(frozenset({"backend", "worker", "bot"}))
+                _production_rest_interval_read_only_preflight()
+                safety.check(frozenset({"backend", "worker", "bot"}))
 
         with _stage(evidence, "maintenance_stop"):
             services_stopped = True
