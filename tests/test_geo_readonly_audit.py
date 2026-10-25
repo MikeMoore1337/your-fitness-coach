@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -69,7 +70,7 @@ def test_executes_only_readonly_audit_with_sanitized_env() -> None:
     report = audit(
         ["/training"],
         execute=True,
-        which=lambda _: "/opt/tools/geo",
+        which=lambda _: str(Path.cwd() / "geo"),
         run=fake_run,
         environment={
             "PATH": "/opt/tools",
@@ -83,7 +84,7 @@ def test_executes_only_readonly_audit_with_sanitized_env() -> None:
     assert report["results"][0]["score_is_tool_heuristic"] is True
     assert len(calls) == 1
     argv, kwargs = calls[0]
-    assert argv == ["/opt/tools/geo", "audit", "--url", f"{CANONICAL_ORIGIN}/training"]
+    assert argv == [str(Path.cwd() / "geo"), "audit", "--url", f"{CANONICAL_ORIGIN}/training"]
     assert kwargs["shell"] is False
     assert kwargs["check"] is False
     assert kwargs["capture_output"] is True
@@ -109,13 +110,13 @@ def test_timeout_and_cli_failure_are_not_reported_as_success() -> None:
         raise subprocess.TimeoutExpired(args[0], timeout=kwargs["timeout"])
 
     with pytest.raises(RuntimeError, match="timed out"):
-        audit(["/"], execute=True, which=lambda _: "/bin/geo", run=timed_out)
+        audit(["/"], execute=True, which=lambda _: str(Path.cwd() / "geo"), run=timed_out)
 
     with pytest.raises(RuntimeError, match="exit code 7"):
         audit(
             ["/"],
             execute=True,
-            which=lambda _: "/bin/geo",
+            which=lambda _: str(Path.cwd() / "geo"),
             run=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 7, "", "secret"),
         )
 
@@ -125,7 +126,7 @@ def test_output_is_bounded_and_does_not_promise_visibility() -> None:
     report = audit(
         ["/"],
         execute=True,
-        which=lambda _: "/bin/geo",
+        which=lambda _: str(Path.cwd() / "geo"),
         run=lambda argv, **kwargs: subprocess.CompletedProcess(argv, 0, text, ""),
     )
     result = report["results"][0]
