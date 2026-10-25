@@ -1570,6 +1570,13 @@ export function RestTimer({
   }
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
+  const restPanelClassName = [
+    'active-workout-rest',
+    completedNotice || restoredTerminal ? 'active-workout-rest--complete' : null,
+    showCompact || collapsed ? 'is-compact' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
   const measuredElapsedSeconds =
     measuredRest && !measuredRest.needs_review
       ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
@@ -1850,7 +1857,7 @@ export function RestTimer({
     <aside
       ref={panel}
       {...glassProps('tinted')}
-      className={`active-workout-rest${completedNotice || restoredTerminal ? ' active-workout-rest--complete' : ''}${showCompact || collapsed ? ' is-compact' : ''}`}
+      className={restPanelClassName}
       aria-label="Отдых между подходами"
       onMouseDown={(event) => {
         if (event.target instanceof Element && event.target.closest('button'))
