@@ -561,3 +561,69 @@ def test_pg16_concurrent_starts_of_different_sets_are_serialized(client):
     ]
     rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=owner).json()
     assert len([r for r in rows if r["status"] == "running"]) == 1
+
+
+def test_pg16_concurrent_restart_same_mutation_is_one_interval(client):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    import pytest
+
+    from fitminiapp_api.db.session import engine
+
+    if engine.dialect.name != "postgresql":
+        pytest.skip("Idempotent concurrent rest start requires PostgreSQL 16")
+    owner = _auth(client, 996025)
+    workout = _new_workout(client, owner)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=owner,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
+    parent = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=owner,
+        json={
+            "source_set_id": sid,
+            "started_at": (datetime.now(UTC) - timedelta(seconds=15)).isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert parent.status_code == 200, parent.text
+    parent_id = parent.json()["id"]
+    assert (
+        client.post(
+            f"/api/v1/workouts/rest-sessions/{parent_id}/actions",
+            headers=owner,
+            json={"action": "skip", "expected_version": 1, "mutation_id": str(uuid4())},
+        ).status_code
+        == 200
+    )
+    payload = {
+        "started_at": datetime.now(UTC).isoformat(),
+        "mutation_id": str(uuid4()),
+    }
+    barrier = Barrier(2)
+
+    def restart(_):
+        barrier.wait(timeout=10)
+        return client.post(
+            f"/api/v1/workouts/rest-sessions/{parent_id}/restart",
+            headers=owner,
+            json=payload,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        responses = list(pool.map(restart, range(2)))
+    assert all(response.status_code == 200 for response in responses), [
+        response.text for response in responses
+    ]
+    assert responses[0].json()["id"] == responses[1].json()["id"]
+    rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=owner).json()
+    assert len(rows) == 2
+    assert len([r for r in rows if r["status"] == "running"]) == 1
