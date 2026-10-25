@@ -374,11 +374,14 @@ def test_rest_restart_creates_new_interval_preserving_history_and_replay(client)
     workout = _new_workout(client, headers)
     wid = workout["id"]
     sid = workout["exercises"][0]["sets"][0]["id"]
-    assert client.patch(
-        f"/api/v1/workouts/sets/{sid}",
-        headers=headers,
-        json={"actual_reps": 8, "is_completed": True},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
     now = datetime.now(UTC)
     initial_start = now - timedelta(seconds=35)
     initial_mutation = str(uuid4())
@@ -394,15 +397,18 @@ def test_rest_restart_creates_new_interval_preserving_history_and_replay(client)
     assert first.status_code == 200, first.text
     parent = first.json()
     assert parent["start_mutation_id"] == initial_mutation
-    assert client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions",
-        headers=headers,
-        json={
-            "source_set_id": sid,
-            "started_at": (now - timedelta(seconds=30)).isoformat(),
-            "mutation_id": initial_mutation,
-        },
-    ).status_code == 409
+    assert (
+        client.post(
+            f"/api/v1/workouts/{wid}/rest-sessions",
+            headers=headers,
+            json={
+                "source_set_id": sid,
+                "started_at": (now - timedelta(seconds=30)).isoformat(),
+                "mutation_id": initial_mutation,
+            },
+        ).status_code
+        == 409
+    )
     finished = client.post(
         f"/api/v1/workouts/rest-sessions/{parent['id']}/actions",
         headers=headers,
@@ -428,19 +434,30 @@ def test_rest_restart_creates_new_interval_preserving_history_and_replay(client)
     assert child["status"] == "running"
     assert child["start_mutation_id"] == mutation
     assert client.post(url, headers=headers, json=request).json()["id"] == child["id"]
-    assert client.post(
-        url,
-        headers=headers,
-        json={**request, "started_at": (now - timedelta(seconds=23)).isoformat()},
-    ).status_code == 409
-    assert client.post(
-        url, headers=headers,
-        json={**request, "mutation_id": str(uuid4())},
-    ).status_code == 409
-    assert client.post(
-        f"/api/v1/workouts/rest-sessions/{child['id']}/restart",
-        headers=headers, json={"started_at": now.isoformat(), "mutation_id": str(uuid4())},
-    ).status_code == 409
+    assert (
+        client.post(
+            url,
+            headers=headers,
+            json={**request, "started_at": (now - timedelta(seconds=23)).isoformat()},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            url,
+            headers=headers,
+            json={**request, "mutation_id": str(uuid4())},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/api/v1/workouts/rest-sessions/{child['id']}/restart",
+            headers=headers,
+            json={"started_at": now.isoformat(), "mutation_id": str(uuid4())},
+        ).status_code
+        == 409
+    )
     rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers).json()
     assert len(rows) == 2
     assert rows[0]["id"] == parent["id"]
@@ -455,15 +472,21 @@ def test_rest_restart_rejects_foreign_predecessor_and_active_another_rest(client
     wid = workout["id"]
     first_set, second_set = (s["id"] for s in workout["exercises"][0]["sets"][:2])
     for sid in (first_set, second_set):
-        assert client.patch(
-            f"/api/v1/workouts/sets/{sid}", headers=owner,
-            json={"actual_reps": 8, "is_completed": True},
-        ).status_code == 200
+        assert (
+            client.patch(
+                f"/api/v1/workouts/sets/{sid}",
+                headers=owner,
+                json={"actual_reps": 8, "is_completed": True},
+            ).status_code
+            == 200
+        )
     started_at = (datetime.now(UTC) - timedelta(seconds=12)).isoformat()
     initial = client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions", headers=owner,
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=owner,
         json={
-            "source_set_id": first_set, "started_at": started_at,
+            "source_set_id": first_set,
+            "started_at": started_at,
             "mutation_id": str(uuid4()),
         },
     )
@@ -473,14 +496,22 @@ def test_rest_restart_rejects_foreign_predecessor_and_active_another_rest(client
     url = f"/api/v1/workouts/rest-sessions/{parent_id}/restart"
     assert client.post(url, headers=stranger, json=request).status_code == 404
     assert client.post(url, headers=owner, json=request).status_code == 409
-    assert client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions", headers=owner,
-        json={**request, "source_set_id": second_set},
-    ).status_code == 409
-    assert client.post(
-        f"/api/v1/workouts/rest-sessions/{parent_id}/actions", headers=owner,
-        json={"action": "skip", "expected_version": 1, "mutation_id": str(uuid4())},
-    ).status_code == 200
+    assert (
+        client.post(
+            f"/api/v1/workouts/{wid}/rest-sessions",
+            headers=owner,
+            json={**request, "source_set_id": second_set},
+        ).status_code
+        == 409
+    )
+    assert (
+        client.post(
+            f"/api/v1/workouts/rest-sessions/{parent_id}/actions",
+            headers=owner,
+            json={"action": "skip", "expected_version": 1, "mutation_id": str(uuid4())},
+        ).status_code
+        == 200
+    )
     assert client.post(url, headers=owner, json=request).status_code == 200
 
 
@@ -499,16 +530,21 @@ def test_pg16_concurrent_starts_of_different_sets_are_serialized(client):
     wid = workout["id"]
     sets = [s["id"] for s in workout["exercises"][0]["sets"][:2]]
     for sid in sets:
-        assert client.patch(
-            f"/api/v1/workouts/sets/{sid}", headers=owner,
-            json={"actual_reps": 8, "is_completed": True},
-        ).status_code == 200
+        assert (
+            client.patch(
+                f"/api/v1/workouts/sets/{sid}",
+                headers=owner,
+                json={"actual_reps": 8, "is_completed": True},
+            ).status_code
+            == 200
+        )
     barrier = Barrier(2)
 
     def submit(sid):
         barrier.wait(timeout=10)
         return client.post(
-            f"/api/v1/workouts/{wid}/rest-sessions", headers=owner,
+            f"/api/v1/workouts/{wid}/rest-sessions",
+            headers=owner,
             json={
                 "source_set_id": sid,
                 "started_at": datetime.now(UTC).isoformat(),
