@@ -228,7 +228,16 @@ def mutate_rest_session(
                 or payload.corrected_seconds is not None
             ):
                 raise HTTPException(status_code=422, detail="Конечное время не требуется")
-            row.ended_at = _now()
+            # An offline skip may be uploaded after a subsequent manual restart.
+            # Keep the actual user-tap timestamp, not the later upload time.
+            # Other terminal actions retain their existing server-time semantics.
+            if payload.action == "skip" and payload.occurred_at is not None:
+                skipped_at = _utc_naive(payload.occurred_at)
+                if skipped_at < row.started_at or skipped_at > _now() + timedelta(minutes=1):
+                    raise HTTPException(status_code=422, detail="Недопустимое время пропуска")
+                row.ended_at = skipped_at
+            else:
+                row.ended_at = _now()
             row.status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
                 payload.action
             ]
