@@ -1069,6 +1069,11 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
             or subprocess.CompletedProcess(args, 0, stdout="", stderr="")
         ),
     )
+    monkeypatch.setattr(
+        deploy,
+        "_production_rest_interval_read_only_preflight",
+        lambda: calls.setdefault("rest_preflights", []).append("passed"),
+    )
     monkeypatch.setattr(deploy, "_switch_gateway", lambda *args: None)
     monkeypatch.setattr(deploy, "_public_smoke", lambda *args, **kwargs: None)
     monkeypatch.setattr(
@@ -1775,3 +1780,59 @@ def test_rest_interval_manifest_fails_closed_before_service_stop(
     with pytest.raises(deploy.DeploymentError, match="manifest"):
         deploy.single_slot_deploy(config)
     assert calls["stops"] == calls["backend_starts"] == calls["consumer_starts"] == []
+
+
+def test_rest_preflight_is_read_only_and_requires_verified_result(monkeypatch) -> None:
+    seen = []
+
+    def compose(*args, **kwargs):
+        seen.append((args, kwargs))
+        return subprocess.CompletedProcess(
+            args, 0, stdout="REST_INTERVAL_PREFLIGHT=PASS pg=16 duplicate_workouts=0 rows=27\\n"
+        )
+
+    monkeypatch.setattr(deploy, "_compose", compose)
+    deploy._production_rest_interval_read_only_preflight()
+    assert len(seen) == 1
+    command, kwargs = seen[0]
+    assert command[:5] == ("exec", "-T", "backend", "python", "-c")
+    assert kwargs == {"capture": True}
+    source = command[5]
+    assert "SET TRANSACTION READ ONLY" in source
+    assert "HAVING count(*) > 1" in source
+    assert "0130_workout_rest_sessions" in source
+    assert "uq_workout_rest_source_set" in source
+    assert not any(s in source.upper() for s in ("INSERT INTO", "UPDATE WORKOUT", "DELETE FROM"))
+
+
+def test_rest_preflight_rejects_unverifiable_output(monkeypatch) -> None:
+    monkeypatch.setattr(
+        deploy, "_compose",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, stdout="unknown"),
+    )
+    with pytest.raises(deploy.DeploymentError, match="invalid evidence"):
+        deploy._production_rest_interval_read_only_preflight()
+
+
+def test_rest_preflight_runs_before_single_slot_stop(tmp_path: Path, monkeypatch) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    path = tmp_path / "deployment-migration-manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["changes"] = [{
+        "status": "A",
+        "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
+    }]
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    order = []
+    monkeypatch.setattr(
+        deploy, "_production_rest_interval_read_only_preflight",
+        lambda: order.append("read-only"),
+    )
+    monkeypatch.setattr(
+        deploy, "_stop_legacy_services",
+        lambda value, **kwargs: order.append("stop"),
+    )
+    evidence = deploy.single_slot_deploy(config)
+    assert evidence.verdict == "active"
+    assert order == ["read-only", "stop"]
