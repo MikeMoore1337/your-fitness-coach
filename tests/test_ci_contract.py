@@ -573,6 +573,14 @@ def test_migrated_stack_browser_spec_routes_to_migration_profile() -> None:
     assert decision["outputs"]["run_migrated_stack"] is True
 
 
+def test_migrated_postgres_python_test_routes_to_migration_profile() -> None:
+    decision = ci_contract.classify_scope(["tests/integration/test_migrated_stack.py"])
+
+    assert decision["profile"] == "migration"
+    assert "migrated-stack" in decision["required_groups"]
+    assert decision["outputs"]["run_migrated_stack"] is True
+
+
 def test_python_sharding_script_requires_python_and_policy_gates() -> None:
     decision = ci_contract.classify_scope(["scripts/pytest_shard.py"])
 
