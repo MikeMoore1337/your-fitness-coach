@@ -10,6 +10,12 @@ Clear Voice написан отдельно для исходной задачи
 
 Подробности лицензий и копии уведомлений: `THIRD_PARTY_NOTICES.md`, `licenses/`.
 
+## Контекстная адаптация stop-slop (#1143, 26 октября 2026)
+
+- [hardikpandya/stop-slop](https://github.com/hardikpandya/stop-slop), MIT, проверяемый upstream commit `8da1f030185bdfe8471220585162991eaeb970e9`: методологический ориентир для диагностирования пустой риторики и механического ритма AI-текста.
+- В `references/patterns.md` добавлены **самостоятельно сформулированные** проверки D01-D08 с контекстными исключениями и YFC/Hermes/Second Brain профильными границами. **Никакой upstream SKILL.md, JS/Python runtime или CLI не копировались и не выполнялись.**
+- Указание на MIT-источник - атрибуция идеи, не обещание эффективности на конкретной модели. Редактура не устанавливает фактологическую достоверность и не разрешает публикацию.
+
 ## Проектные требования
 
 - YFC: репозиторий https://github.com/MikeMoore1337/your-fitness-coach, актуальные `AGENTS.md`, `.agents/skills/evidence-content-editor/SKILL.md`, `.agents/skills/technical-writer/SKILL.md`, `docs/skillspector-development.md`, Hermes PR #922. При интеграции проверяйте актуальный HEAD заново.
