@@ -355,9 +355,11 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                 allowed = owner == "op" and function.attr in {"execute", "get_bind"}
             elif phase == "rest_unique_swap":
                 allowed = (
-                    (owner == "op" and function.attr in {
-                        "execute", "get_bind", "batch_alter_table", "create_index"
-                    })
+                    (
+                        owner == "op"
+                        and function.attr
+                        in {"execute", "get_bind", "batch_alter_table", "create_index"}
+                    )
                     or (owner == "batch" and function.attr == "drop_constraint")
                     or (owner == "sa" and function.attr == "text")
                 )
@@ -448,8 +450,7 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         "SET LOCAL statement_timeout = '30s'",
         "CREATE UNIQUE INDEX uq_workout_rest_initial_source "
         "ON workout_rest_sessions (source_set_id) WHERE predecessor_id IS NULL",
-        "CREATE UNIQUE INDEX uq_workout_rest_predecessor "
-        "ON workout_rest_sessions (predecessor_id)",
+        "CREATE UNIQUE INDEX uq_workout_rest_predecessor ON workout_rest_sessions (predecessor_id)",
         "CREATE UNIQUE INDEX uq_workout_rest_start_mutation "
         "ON workout_rest_sessions (workout_id, start_mutation_id)",
         "CREATE UNIQUE INDEX uq_workout_rest_running_workout "
@@ -459,9 +460,7 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         raise OnlineMigrationError(f"{path} rest uniqueness swap SQL must be exact")
     links = _parent_links(upgrade)
     executions = [c for c in _op_calls(upgrade) if c.func.attr == "execute"]
-    if len(executions) != 7 or not all(
-        _is_in_postgresql_branch(c, links) for c in executions
-    ):
+    if len(executions) != 7 or not all(_is_in_postgresql_branch(c, links) for c in executions):
         raise OnlineMigrationError(f"{path} rest unique swap SQL must be PostgreSQL-only")
     binds = [c for c in _op_calls(upgrade) if c.func.attr == "get_bind"]
     batches = [c for c in _op_calls(upgrade) if c.func.attr == "batch_alter_table"]
@@ -501,21 +500,16 @@ def _validate_rest_unique_swap(path: Path, upgrade: ast.AST, statements: list[st
         or drops[0].keywords[0].value.value != "unique"
     ):
         raise OnlineMigrationError(f"{path} rest unique swap SQLite branch must be exact")
-    for call, (name, columns, where) in zip(
-        index_calls, expected_indexes, strict=True
-    ):
+    for call, (name, columns, where) in zip(index_calls, expected_indexes, strict=True):
         if not _is_in_non_postgresql_branch(call, links):
             raise OnlineMigrationError(f"{path} SQLite indexes must stay in fallback branch")
-        if len(call.args) != 3 or any(
-            not isinstance(item, ast.Constant) for item in call.args[:2]
-        ):
+        if len(call.args) != 3 or any(not isinstance(item, ast.Constant) for item in call.args[:2]):
             raise OnlineMigrationError(f"{path} unexpected rest index signature")
         if (
             call.args[0].value != name
             or call.args[1].value != "workout_rest_sessions"
             or not isinstance(call.args[2], ast.List)
-            or [elt.value for elt in call.args[2].elts if isinstance(elt, ast.Constant)]
-            != columns
+            or [elt.value for elt in call.args[2].elts if isinstance(elt, ast.Constant)] != columns
             or len(call.args[2].elts) != len(columns)
         ):
             raise OnlineMigrationError(f"{path} unexpected rest index columns")
