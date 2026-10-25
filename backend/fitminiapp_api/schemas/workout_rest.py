@@ -15,6 +15,11 @@ class RestStartRequest(BaseModel):
     mutation_id: str = Field(min_length=8, max_length=64)
 
 
+class RestRestartRequest(BaseModel):
+    started_at: datetime
+    mutation_id: str = Field(min_length=8, max_length=64)
+
+
 class RestActionRequest(BaseModel):
     action: RestActionName
     mutation_id: str = Field(min_length=8, max_length=64)
@@ -38,3 +43,4 @@ class RestSessionResponse(BaseModel):
     source: str | None
     quality: str
     version: int
+    start_mutation_id: str | None = None
