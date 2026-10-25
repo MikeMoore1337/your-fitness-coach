@@ -40,8 +40,7 @@ def plan_audits(routes: Sequence[str]) -> list[list[str]]:
     if any(route not in PUBLIC_ROUTES for route in routes):
         raise ValueError("route is not an allowlisted public canonical page")
     return [
-        ["geo", "audit", "--url", f"{CANONICAL_ORIGIN}{route}"]
-        for route in dict.fromkeys(routes)
+        ["geo", "audit", "--url", f"{CANONICAL_ORIGIN}{route}"] for route in dict.fromkeys(routes)
     ]
 
 
@@ -99,14 +98,18 @@ def audit(
             raise RuntimeError("geo audit could not execute; no result verified") from exc
 
         if proc.returncode != 0:
-            raise RuntimeError(f"geo audit failed with exit code {proc.returncode}; no result verified")
-        results.append({
-            "url": command[3],
-            "status": "CLI_EXIT_ZERO",
-            "stdout_excerpt": (proc.stdout or "")[:MAX_OUTPUT_CHARS],
-            "stdout_truncated": len(proc.stdout or "") > MAX_OUTPUT_CHARS,
-            "score_is_tool_heuristic": True,
-        })
+            raise RuntimeError(
+                f"geo audit failed with exit code {proc.returncode}; no result verified"
+            )
+        results.append(
+            {
+                "url": command[3],
+                "status": "CLI_EXIT_ZERO",
+                "stdout_excerpt": (proc.stdout or "")[:MAX_OUTPUT_CHARS],
+                "stdout_truncated": len(proc.stdout or "") > MAX_OUTPUT_CHARS,
+                "score_is_tool_heuristic": True,
+            }
+        )
 
     return {
         "status": "OBSERVED_CLI_RESULTS",
