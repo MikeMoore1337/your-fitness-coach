@@ -3,6 +3,7 @@
 Runs in explicit GitHub Actions compatibility workflow, never product runtime.
 No API keys, no source installers and no user-provided private data.
 """
+
 from __future__ import annotations
 
 import json
@@ -51,21 +52,28 @@ def main() -> int:
                 raise RuntimeError("unexpected LLM call")
             if outcome.recommendation not in ("SAFE", "CAUTION"):
                 raise RuntimeError("unexpected unapproved result")
-            results.append({
-                "language": lang,
-                "recommendation": outcome.recommendation,
-                "severity": outcome.severity,
-                "static_only": True,
-                "scanned_directory": True,
-            })
-        print(json.dumps({
-            "schema": "yfc-h1211-compatibility-v1",
-            "source_pin": guard.SKILLSPECTOR_COMMIT,
-            "platform": os.name,
-            "results": results,
-            "paid_api_calls": 0,
-            "product_runtime_modified": False,
-        }, ensure_ascii=False))
+            results.append(
+                {
+                    "language": lang,
+                    "recommendation": outcome.recommendation,
+                    "severity": outcome.severity,
+                    "static_only": True,
+                    "scanned_directory": True,
+                }
+            )
+        print(
+            json.dumps(
+                {
+                    "schema": "yfc-h1211-compatibility-v1",
+                    "source_pin": guard.SKILLSPECTOR_COMMIT,
+                    "platform": os.name,
+                    "results": results,
+                    "paid_api_calls": 0,
+                    "product_runtime_modified": False,
+                },
+                ensure_ascii=False,
+            )
+        )
     return 0
 
 
