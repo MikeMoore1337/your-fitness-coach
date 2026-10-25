@@ -207,6 +207,28 @@ describe('measured rest journal #960', () => {
     expect(restored[0]?.pending.some((item) => item.action === 'add30')).toBe(false);
   });
 
+  it('keeps an interrupted manual successor associated with the correct interval after stale writes', () => {
+    const start = 12_000_000;
+    const initial = beginMeasuredRest(11, 56, 990, 90, start)!;
+    updateMeasuredRest(11, 56, 990, 'complete', start + 15_000);
+    const staleJournal = localStorage.getItem(restJournalStorageKey(11, 56))!;
+    const repeat = restartMeasuredRest(11, 56, initial.start_mutation_id, start + 20_000)!;
+    beginMeasuredRest(11, 56, 991, 90, start + 45_000);
+    localStorage.setItem(restJournalStorageKey(11, 56), staleJournal);
+
+    const recovered = loadRestJournal(11, 56);
+    expect(recovered).toHaveLength(3);
+    expect(recovered.find((row) => row.start_mutation_id === initial.start_mutation_id)).toMatchObject({
+      status: 'completed',
+      pending: expect.arrayContaining([expect.objectContaining({ action: 'complete' })]),
+    });
+    expect(recovered.find((row) => row.start_mutation_id === repeat.start_mutation_id)).toMatchObject({
+      status: 'interrupted',
+      pending: expect.arrayContaining([expect.objectContaining({ action: 'interrupt' })]),
+    });
+    expect(recovered.find((row) => row.source_set_id === 991)).toMatchObject({ status: 'running' });
+  });
+
   it('does not create a repeat for an active, unknown or interrupted predecessor', () => {
     const start = 10_000_000;
     const initial = beginMeasuredRest(11, 56, 989, 90, start)!;

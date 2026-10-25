@@ -329,6 +329,7 @@ export function beginMeasuredRest(
     row.pending.push(operation);
     writeStorage(actionStorageKey(userId, workoutId, operation.mutation_id), {
       source_set_id: row.source_set_id,
+      session_start_mutation_id: row.start_mutation_id,
       operation,
     });
   }
