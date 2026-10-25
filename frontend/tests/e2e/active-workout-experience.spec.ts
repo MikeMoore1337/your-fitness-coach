@@ -6558,13 +6558,10 @@ test.describe('#914 rest timer pointer lifecycle', () => {
       }),
     ).toBeDisabled();
     await expect(context.previous.getByRole('button', { name: 'Редактировать' })).toBeVisible();
-    const actions = completedActions(context.previous);
-    await actions.evaluate((element) => {
-      (element as HTMLDetailsElement).open = true;
-    });
+    const actions = await openCompletedActions(context.previous);
     await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
-    await actions.evaluate((element) => {
-      (element as HTMLDetailsElement).open = false;
+    await actions.locator('.yfc-disclosure-summary').evaluate((element) => {
+      (element as HTMLElement).click();
     });
     await expect(context.current.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('42.5');
     await expect(context.current.getByLabel('Повторы, Жим штанги лёжа, подход 2')).toHaveValue('9');
