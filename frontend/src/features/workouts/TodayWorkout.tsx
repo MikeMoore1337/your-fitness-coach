@@ -1853,7 +1853,17 @@ export function RestTimer({
       {collapsed && isRunningRest ? (
         <div className="active-workout-rest__collapsed">
           <div>
-            <strong>Отдых идёт</strong>
+            <strong aria-live="polite">
+              {restSaveError
+                ? restSaveError.startsWith('Конфликт')
+                  ? 'Конфликт сохранения'
+                  : 'Ошибка сохранения'
+                : restIsUnconfirmed
+                  ? isOfflineRest
+                    ? 'Нет сети'
+                    : 'Отдых сохраняется…'
+                  : 'Отдых идёт'}
+            </strong>
             <span>
               ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
             </span>
