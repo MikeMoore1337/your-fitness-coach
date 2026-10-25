@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { agentationDevelopmentPlugin } from './devtools/agentation-dev-plugin';
 import type { UserConfig } from 'vite';
 
 type TestReporters = NonNullable<NonNullable<UserConfig['test']>['reporters']>;
