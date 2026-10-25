@@ -327,4 +327,16 @@ describe('RestTimer', () => {
     expect(loadRestJournal(7, 42)[1]?.status).toBe('running');
   });
 
+  it('restores the manual rest action rather than a phantom running timer after reload', () => {
+    const first = beginMeasuredRest(7, 42, 201, 90, initialTime)!;
+    updateMeasuredRest(7, 42, 201, 'complete', initialTime + 42_000);
+    mount();
+    expect(screen.queryByRole('timer', { name: 'Отдых' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(loadRestJournal(7, 42)[1]?.restart_of_start_mutation_id).toBe(first.start_mutation_id);
+    expect(screen.getByRole('timer')).toHaveTextContent('1:30');
+  });
+
 });
