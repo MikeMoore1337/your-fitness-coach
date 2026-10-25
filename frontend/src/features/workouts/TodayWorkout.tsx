@@ -1528,6 +1528,7 @@ export function RestTimer({
   const [recoveredMinutes, setRecoveredMinutes] = useState('');
   const [recoveryValidation, setRecoveryValidation] = useState('');
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  const [terminalNoticeDismissed, setTerminalNoticeDismissed] = useState(false);
   const [collapsed, setCollapsed] = useState(() =>
     readStorage<boolean>(`${activeWorkoutRestKey(userId, workoutId)}:panel-collapsed`, false),
   );
@@ -1617,6 +1618,7 @@ export function RestTimer({
       setNow(acceptedAt);
       setDeadline(nextDeadline);
       setCompletedNotice(null);
+      setTerminalNoticeDismissed(false);
       setCompact(false);
       setCollapsed(false);
       writeStorage(`${storageKey}:panel-collapsed`, false);
@@ -2097,14 +2099,18 @@ export function RestTimer({
           </div>
           {showCompact && (
             <>
-              <span className="active-workout-rest__complete-copy">
-                {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
-              </span>
-              {isCompletedLatestRest && latestRest?.measured_seconds != null && (
+              {!terminalNoticeDismissed && (
                 <span className="active-workout-rest__complete-copy">
-                  ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                  {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
                 </span>
               )}
+              {!terminalNoticeDismissed &&
+                isCompletedLatestRest &&
+                latestRest?.measured_seconds != null && (
+                  <span className="active-workout-rest__complete-copy">
+                    ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+                  </span>
+                )}
               {restartCandidate && (
                 <Button
                   type="button"
@@ -2124,6 +2130,7 @@ export function RestTimer({
                     setMeasuredRest(started);
                     setDeadline(started.deadline);
                     setCompletedNotice(null);
+                    setTerminalNoticeDismissed(false);
                     setCompact(false);
                     setCollapsed(false);
                     setRestSaveError(null);
@@ -2135,18 +2142,21 @@ export function RestTimer({
                   Начать отдых
                 </Button>
               )}
-              <Button
-                type="button"
-                variant="secondary"
-                glass="clear"
-                onClick={() => {
-                  captureLayoutAnchor();
-                  setCompletedNotice(null);
-                  setCompact(false);
-                }}
-              >
-                Скрыть
-              </Button>
+              {!terminalNoticeDismissed && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  glass="clear"
+                  onClick={() => {
+                    captureLayoutAnchor();
+                    setTerminalNoticeDismissed(Boolean(restartCandidate));
+                    setCompletedNotice(null);
+                    setCompact(false);
+                  }}
+                >
+                  Скрыть
+                </Button>
+              )}
             </>
           )}
           {((measuredRest && restIsUnconfirmed && (showCompact || collapsed)) ||
