@@ -744,8 +744,7 @@ def publish_web_article(
         raise WebArticleError("claim_source_explicitly_blocked")
     if not owner_editorial_decision:
         if any(
-            item.get("review_status") != "verified"
-            or item.get("support_level") == "unclear"
+            item.get("review_status") != "verified" or item.get("support_level") == "unclear"
             for item in article.claim_source_matrix
         ):
             raise WebArticleError("claim_source_review_incomplete")
