@@ -2111,7 +2111,7 @@ export function RestTimer({
         </>
       )}
       {(measuredRest && restIsUnconfirmed) ||
-      (!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length) > 0) ? (
+      (!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length > 0)) ? (
         <p className="active-workout-rest__sync" role="status">
           {typeof navigator !== 'undefined' && !navigator.onLine
             ? 'Нет сети · отдых ожидает сохранения'
