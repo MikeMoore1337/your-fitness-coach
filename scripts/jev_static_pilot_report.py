@@ -44,16 +44,28 @@ def evaluate(samples: dict[str, dict]) -> dict:
             findings.append(f"{case}: MISSED_FULL_SUITE_FALLBACK")
         if not require_full and (selected_count is None or selected_count == 0):
             findings.append(f"{case}: NO_SOURCE_TESTS_SELECTED")
-        playwright = sum("tests/e2e/" in x.get("path", "") for x in selected if isinstance(x, dict)) if isinstance(selected, list) else 0
+        playwright = (
+            sum("tests/e2e/" in x.get("path", "") for x in selected if isinstance(x, dict))
+            if isinstance(selected, list)
+            else 0
+        )
         if playwright:
             findings.append(f"{case}: PLAYWRIGHT_SPECS_IN_VITEST_SELECTION")
-        metrics[case] = {"discovered": discovered, "selected": selected_count,
-                         "playwright_selected": playwright,
-                         "changed": changes, "full": full,
-                         "selection_ms": data.get("selectionMs")}
+        metrics[case] = {
+            "discovered": discovered,
+            "selected": selected_count,
+            "playwright_selected": playwright,
+            "changed": changes,
+            "full": full,
+            "selection_ms": data.get("selectionMs"),
+        }
     return {
         "schema": 1,
-        "verdict": "EVIDENCE_INVALID" if invalid_evidence else "NO_GO" if findings else "STATIC_DISCOVERY_PLAUSIBLE_NOT_ADOPTED",
+        "verdict": "EVIDENCE_INVALID"
+        if invalid_evidence
+        else "NO_GO"
+        if findings
+        else "STATIC_DISCOVERY_PLAUSIBLE_NOT_ADOPTED",
         "findings": findings,
         "metrics": metrics,
         "runtime_test_recall": "NOT_MEASURED",
@@ -69,9 +81,14 @@ def parse_upstream_output(raw: str) -> dict:
         return json.loads(text)
     prefix, separator, tail = text.partition("{")
     lines = prefix.strip().splitlines()
-    if not separator or len(prefix) > 256 or len(lines) != 2 or (
-        lines[0] != "Already up to date" or
-        not (lines[1].startswith("Done in ") and " using pnpm v11.5.0" in lines[1])
+    if (
+        not separator
+        or len(prefix) > 256
+        or len(lines) != 2
+        or (
+            lines[0] != "Already up to date"
+            or not (lines[1].startswith("Done in ") and " using pnpm v11.5.0" in lines[1])
+        )
     ):
         raise ValueError("unexpected upstream output format")
     return json.loads("{" + tail)
