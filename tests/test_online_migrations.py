@@ -445,7 +445,10 @@ def test_rest_interval_migrations_use_strict_online_contract() -> None:
 def test_rest_unique_swap_rejects_modified_scope(tmp_path: Path, old: str, new: str) -> None:
     path = (
         Path(__file__).resolve().parents[1]
-        / "backend" / "alembic" / "versions" / "0132_rest_interval_unique_swap.py"
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0132_rest_interval_unique_swap.py"
     )
     source = path.read_text(encoding="utf-8")
     assert old in source
@@ -457,7 +460,10 @@ def test_rest_unique_swap_rejects_modified_scope(tmp_path: Path, old: str, new: 
 def test_rest_unique_swap_rejects_undeclared_migration_name(tmp_path: Path) -> None:
     source = (
         Path(__file__).resolve().parents[1]
-        / "backend" / "alembic" / "versions" / "0132_rest_interval_unique_swap.py"
+        / "backend"
+        / "alembic"
+        / "versions"
+        / "0132_rest_interval_unique_swap.py"
     ).read_text(encoding="utf-8")
     with pytest.raises(OnlineMigrationError, match="unapproved"):
         validate_added_migration(_migration(tmp_path / "9999_unrelated_unique_swap.py", source))
