@@ -1028,6 +1028,18 @@ def _patch_single_slot_runtime(tmp_path: Path, monkeypatch) -> dict[str, list]:
         "consumer_starts": [],
     }
     config = _config(tmp_path)
+    monkeypatch.setenv("DEPLOY_MIGRATION_MANIFEST", "deployment-migration-manifest.json")
+    (tmp_path / "deployment-migration-manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "active_revision": OLD_SHA,
+                "target_revision": NEW_SHA,
+                "changes": [],
+            }
+        ),
+        encoding="utf-8",
+    )
     active_revision_path = config.state_root / "last-successful-revision"
     active_revision_path.parent.mkdir(parents=True)
     active_revision_path.write_text(OLD_SHA + "\n", encoding="utf-8")
@@ -1695,3 +1707,71 @@ def test_rollback_restores_revision_when_failure_follows_successful_revision_wri
     summary = json.loads(next(config.state_root.glob("single-slot-*/summary.json")).read_text())
     assert summary["verdict"] == "rolled back"
     assert len(calls["backend_starts"]) == 2
+
+
+def test_rest_interval_release_disallows_previous_backend_rollback(
+    tmp_path: Path, monkeypatch
+) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    manifest = tmp_path / "deployment-migration-manifest.json"
+    payload = json.loads(manifest.read_text(encoding="utf-8"))
+    payload["changes"] = [{
+        "status": "A",
+        "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
+    }]
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+    assert deploy._rest_interval_schema_is_forward_only(config, OLD_SHA)
+
+    def fail_new_backend(env, value):
+        del value
+        calls["backend_starts"].append(env["BACKEND_IMAGE"])
+        raise deploy.DeploymentError("new backend failed")
+
+    monkeypatch.setattr(deploy, "_start_legacy_backend", fail_new_backend)
+    with pytest.raises(deploy.DeploymentError, match="new backend failed"):
+        deploy.single_slot_deploy(config)
+    # The old backend MUST NOT resume against the schema that admits successors.
+    assert calls["backend_starts"] == ["registry/backend@sha256:" + "b" * 64]
+    assert calls["consumer_starts"] == []
+    summaries = list(config.state_root.glob("single-slot-*/summary.json"))
+    assert len(summaries) == 1
+    summary = json.loads(summaries[0].read_text(encoding="utf-8"))
+    assert summary["verdict"] == "manual intervention required"
+    assert not any(stage["name"] == "single_slot_rollback" for stage in summary["stages"])
+
+
+@pytest.mark.parametrize("change", [
+    {"status": "M", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
+    {"status": "A", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
+])
+def test_rest_interval_immutable_manifest_identifies_forward_fix_only(
+    tmp_path: Path, monkeypatch, change: dict[str, str]
+) -> None:
+    config = _config(tmp_path)
+    _patch_single_slot_runtime(tmp_path, monkeypatch)
+    path = tmp_path / "deployment-migration-manifest.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["changes"] = [change]
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    assert deploy._rest_interval_schema_is_forward_only(config, OLD_SHA)
+
+
+@pytest.mark.parametrize("bad", ["missing", "invalid_json", "incorrect_revision"])
+def test_rest_interval_manifest_fails_closed_before_service_stop(
+    tmp_path: Path, monkeypatch, bad: str
+) -> None:
+    config = _config(tmp_path)
+    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    path = tmp_path / "deployment-migration-manifest.json"
+    if bad == "missing":
+        path.unlink()
+    elif bad == "invalid_json":
+        path.write_text("{", encoding="utf-8")
+    else:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["target_revision"] = OLD_SHA
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(deploy.DeploymentError, match="manifest"):
+        deploy.single_slot_deploy(config)
+    assert calls["stops"] == calls["backend_starts"] == calls["consumer_starts"] == []
