@@ -375,10 +375,8 @@ describe('rest journal concurrent mutation preservation #960', () => {
       version: 1,
     });
     await expect(syncRestJournal(31, 44)).rejects.toThrow('rest_restart_reused_predecessor');
-    expect(loadRestJournal(31, 44)[1]).toMatchObject({
-      start_mutation_id: repeat.start_mutation_id,
-      server_id: undefined,
-    });
+    expect(loadRestJournal(31, 44)[1]?.start_mutation_id).toBe(repeat.start_mutation_id);
+    expect(loadRestJournal(31, 44)[1]).not.toHaveProperty('server_id');
   });
 
 });
