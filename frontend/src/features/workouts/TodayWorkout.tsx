@@ -1798,7 +1798,7 @@ export function RestTimer({
       const delta = anchor.element.getBoundingClientRect().top - anchor.top;
       if (delta) window.scrollBy({ top: delta, behavior: 'instant' });
     }
-  }, [compact, completedNotice]);
+  }, [collapsed, compact, completedNotice]);
 
   useLayoutEffect(() => {
     const element = panel.current;
@@ -1819,7 +1819,7 @@ export function RestTimer({
       observer?.disconnect();
       parent.style.removeProperty('--yfc-active-workout-rest-clearance');
     };
-  }, [hasDeadline, compact, completedNotice]);
+  }, [hasDeadline, collapsed, compact, completedNotice]);
 
   const startNewRest = () => {
     if (!restartCandidate || restRecords.some((row) => row.status === 'running')) return;
@@ -2081,6 +2081,11 @@ export function RestTimer({
       {compact && (
         <>
           <span className="active-workout-rest__complete-copy">{completedNotice}</span>
+          {latestRest?.status === 'completed' && latestRest.measured_seconds != null && (
+            <span className="active-workout-rest__complete-copy">
+              ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
+            </span>
+          )}
           {restartCandidate && (
             <Button
               type="button"
@@ -2105,7 +2110,8 @@ export function RestTimer({
           </Button>
         </>
       )}
-      {measuredRest && restIsUnconfirmed && (
+      {(measuredRest && restIsUnconfirmed) ||
+      (!measuredRest && latestRest && (!latestRest.server_id || latestRest.pending.length) > 0) ? (
         <p className="active-workout-rest__sync" role="status">
           {typeof navigator !== 'undefined' && !navigator.onLine
             ? 'Нет сети · отдых ожидает сохранения'
