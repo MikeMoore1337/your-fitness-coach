@@ -17,6 +17,8 @@ from fitminiapp_api.schemas.admin import (
     AdminUserStatusUpdate,
 )
 from fitminiapp_api.schemas.articles import (
+    OwnerArticleReviewDetail,
+    OwnerArticleReviewRow,
     OwnerWebArticlePublishRequest,
     OwnerWebArticlePublishResponse,
 )
@@ -31,6 +33,10 @@ from fitminiapp_api.services.admin_operations import (
     update_trainer_capability,
     update_user_status,
     user_detail,
+)
+from fitminiapp_api.services.editorial_inbox import (
+    get_root_article_draft,
+    list_root_article_drafts,
 )
 from fitminiapp_api.services.web_articles import (
     WebArticleError,
@@ -148,6 +154,32 @@ def admin_audit(
     _: User = Depends(require_root_admin),
 ) -> list[dict]:
     return list_audit_events(db, limit=limit)
+
+
+@router.get("/articles/drafts", response_model=list[OwnerArticleReviewRow])
+def admin_article_drafts(
+    limit: int = Query(default=25, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=5000),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_root_admin),
+) -> list[OwnerArticleReviewRow]:
+    """Root-only read: no approval or publication side effects."""
+    return list_root_article_drafts(db, limit=limit, offset=offset)
+
+
+@router.get("/articles/drafts/{article_id}", response_model=OwnerArticleReviewDetail)
+def admin_article_draft_detail(
+    article_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_root_admin),
+) -> OwnerArticleReviewDetail:
+    """Owner inspection of exact draft evidence, including pending claims."""
+    if len(article_id) != 32 or any(ch not in "0123456789abcdef" for ch in article_id):
+        raise HTTPException(status_code=404, detail="article_not_found")
+    result = get_root_article_draft(db, article_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="article_not_found")
+    return result
 
 
 @router.post("/articles/publish", response_model=OwnerWebArticlePublishResponse)
