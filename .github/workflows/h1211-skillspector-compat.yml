@@ -41,6 +41,6 @@ jobs:
           UV_NO_PROGRESS: '1'
         run: |
           set -euo pipefail
-          python scripts/h1211_skillspector_smoke.py
+          python -m scripts.h1211_skillspector_smoke
           echo "H1211_PINNED_STATIC_REAL_${{ matrix.os }}=PASS" >> "$GITHUB_STEP_SUMMARY"
           echo "H1211_NO_PRODUCT_RUNTIME=TRUE" >> "$GITHUB_STEP_SUMMARY"
