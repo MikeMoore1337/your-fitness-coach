@@ -9,6 +9,8 @@ test.use({ serviceWorkers: 'block' });
 const thumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const animationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
 const widePosterUrl = '/static/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg';
+const wideVideoUrl =
+  '/static/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4';
 const screenshotRoot =
   process.env.YFC_TASK_513_SCREENSHOT_DIR ??
   resolve(process.cwd(), '..', '.artifacts', 'tasks', '513', 'evidence', 'screenshots');
@@ -135,6 +137,15 @@ const wideGuide = {
           byte_size: 53_251,
         },
       ],
+      video_sources: [
+        {
+          url: wideVideoUrl,
+          mime_type: 'video/mp4',
+          width: 1280,
+          height: 720,
+          byte_size: 101_018,
+        },
+      ],
     },
   ],
   images: [
@@ -187,6 +198,14 @@ async function installWideMediaRoutes(page: Page) {
         contentType: 'image/jpeg',
       }),
   );
+  await page.route(
+    '**/static/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4*',
+    (route) =>
+      route.fulfill({
+        path: '../backend/assets/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4',
+        contentType: 'video/mp4',
+      }),
+  );
 }
 
 async function installWideCatalogRoutes(page: Page) {
@@ -198,7 +217,49 @@ async function installWideCatalogRoutes(page: Page) {
   );
 }
 
-async function installWideActiveWorkoutRoutes(page: Page) {
+async function installWideActiveWorkoutRoutes(page: Page, mediaKind: 'wide' | 'gif' = 'wide') {
+  const media =
+    mediaKind === 'gif'
+      ? {
+          state: 'approved_animated',
+          thumbnailUrl: widePosterUrl,
+          thumbnailSources: [
+            {
+              url: widePosterUrl,
+              mime_type: 'image/jpeg',
+              width: 1280,
+              height: 720,
+              byte_size: 53_251,
+            },
+          ],
+          animationUrl,
+          videoSources: [],
+          preferredMode: 'animation',
+        }
+      : {
+          state: 'approved_static',
+          thumbnailUrl: widePosterUrl,
+          thumbnailSources: [
+            {
+              url: widePosterUrl,
+              mime_type: 'image/jpeg',
+              width: 1280,
+              height: 720,
+              byte_size: 53_251,
+            },
+          ],
+          animationUrl: null,
+          videoSources: [
+            {
+              url: wideVideoUrl,
+              mime_type: 'video/mp4',
+              width: 1280,
+              height: 720,
+              byte_size: 101_018,
+            },
+          ],
+          preferredMode: 'static',
+        };
   await page.route(/\/api\/v1\/workouts\/today(?:\?.*)?$/, (route) =>
     route.fulfill({
       json: {
@@ -222,20 +283,12 @@ async function installWideActiveWorkoutRoutes(page: Page) {
             rest_seconds: 90,
             notes: null,
             has_guide: false,
-            media_state: 'approved_static',
-            media_thumbnail_url: widePosterUrl,
-            media_thumbnail_sources: [
-              {
-                url: widePosterUrl,
-                mime_type: 'image/jpeg',
-                width: 1280,
-                height: 720,
-                byte_size: 53_251,
-              },
-            ],
-            media_animation_url: null,
-            media_video_sources: [],
-            media_preferred_mode: 'static',
+            media_state: media.state,
+            media_thumbnail_url: media.thumbnailUrl,
+            media_thumbnail_sources: media.thumbnailSources,
+            media_animation_url: media.animationUrl,
+            media_video_sources: media.videoSources,
+            media_preferred_mode: media.preferredMode,
             sets: [
               {
                 id: 11861,
@@ -256,6 +309,19 @@ async function installWideActiveWorkoutRoutes(page: Page) {
   );
 }
 
+async function enterActiveWorkout(page: Page) {
+  await page.goto('/app');
+  const continueButton = page.getByRole('button', { name: 'Продолжить тренировку' });
+  const clientEntry = page.getByRole('button', { name: 'Клиент' });
+  await Promise.race([
+    continueButton.waitFor({ state: 'visible', timeout: 10000 }),
+    clientEntry.waitFor({ state: 'visible', timeout: 10000 }),
+  ]);
+  if (!(await continueButton.isVisible())) await clientEntry.click();
+  await expect(continueButton).toBeVisible();
+  await continueButton.click();
+}
+
 async function openCatalogDetail(page: Page) {
   await page.goto('/app?section=catalog');
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('жим штанги лежа');
@@ -268,10 +334,13 @@ async function openCatalogDetail(page: Page) {
 }
 
 async function openWideCatalogDetail(page: Page, colorScheme: 'light' | 'dark') {
-  await page.goto('/app?section=catalog');
+  await page.goto('/app?section=catalog', { waitUntil: 'domcontentloaded' });
   await page.evaluate((theme) => localStorage.setItem('app-theme', theme), colorScheme);
-  await page.reload();
-  await page.getByRole('searchbox', { name: 'Поиск' }).fill('наклонной скамье');
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const search = page.getByRole('searchbox', { name: 'Поиск' });
+  await expect(search).toBeVisible();
+  await expect(search).toBeEditable();
+  await search.fill('наклонной скамье');
   const row = page.locator('.exercise-catalog-item');
   await expect(row).toHaveCount(1);
   await row.getByRole('button', { name: /Техника и детали/ }).click();
@@ -292,6 +361,9 @@ async function expectSquareMediaSurface(locator: Locator, label: string) {
       mediaWidth: mediaRect?.width ?? 0,
       mediaHeight: mediaRect?.height ?? 0,
       objectFit: media ? getComputedStyle(media).objectFit : null,
+      framePolicy: media?.dataset.mediaFrame ?? null,
+      sourceRatio: media?.dataset.mediaSourceRatio ?? null,
+      objectPosition: media ? getComputedStyle(media).objectPosition : null,
       border: style.border,
     };
   });
@@ -299,14 +371,80 @@ async function expectSquareMediaSurface(locator: Locator, label: string) {
     Math.abs(geometry.surfaceWidth - geometry.surfaceHeight),
     `${label}: square surface delta`,
   ).toBeLessThanOrEqual(1);
-  expect(geometry.mediaWidth, `${label}: media must stay inside surface`).toBeLessThanOrEqual(
-    geometry.surfaceWidth + 1,
+  expect(geometry.mediaWidth, `${label}: media must fill surface`).toBeGreaterThanOrEqual(
+    geometry.surfaceWidth - 1,
   );
-  expect(geometry.mediaHeight, `${label}: media must stay inside surface`).toBeLessThanOrEqual(
-    geometry.surfaceHeight + 1,
+  expect(geometry.mediaHeight, `${label}: media must fill surface`).toBeGreaterThanOrEqual(
+    geometry.surfaceHeight - 1,
   );
-  expect(geometry.objectFit, `${label}: preserve full source frame`).toBe('contain');
+  expect(geometry.framePolicy, `${label}: source-aware filled framing`).toBe('filled-square');
+  expect(geometry.objectFit, `${label}: wide source must fill the square`).toBe('cover');
+  expect(geometry.sourceRatio, `${label}: source ratio is recorded`).toBe('1.7778');
   expect(geometry.border, `${label}: no visible frame`).toMatch(/^0px/);
+}
+
+async function expectNativeSquareMediaSurface(locator: Locator, label: string) {
+  const geometry = await locator.evaluate((element) => {
+    const surface = element.getBoundingClientRect();
+    const media = element.querySelector<HTMLElement>('img, video');
+    const mediaRect = media?.getBoundingClientRect();
+    return {
+      surfaceWidth: surface.width,
+      surfaceHeight: surface.height,
+      mediaWidth: mediaRect?.width ?? 0,
+      mediaHeight: mediaRect?.height ?? 0,
+      objectFit: media ? getComputedStyle(media).objectFit : null,
+      framePolicy: media?.dataset.mediaFrame ?? null,
+      sourceRatio: media?.dataset.mediaSourceRatio ?? null,
+      border: getComputedStyle(element).border,
+    };
+  });
+  expect(
+    Math.abs(geometry.surfaceWidth - geometry.surfaceHeight),
+    `${label}: square`,
+  ).toBeLessThanOrEqual(1);
+  expect(geometry.mediaWidth, `${label}: media fills width`).toBeGreaterThanOrEqual(
+    geometry.surfaceWidth - 1,
+  );
+  expect(geometry.mediaHeight, `${label}: media fills height`).toBeGreaterThanOrEqual(
+    geometry.surfaceHeight - 1,
+  );
+  expect(geometry.framePolicy, `${label}: native square policy`).toBe('native-square');
+  expect(geometry.sourceRatio, `${label}: GIF source ratio`).toBe('1');
+  expect(geometry.objectFit, `${label}: square source remains undistorted`).toBe('contain');
+  expect(geometry.border, `${label}: no visible frame`).toMatch(/^0px/);
+}
+
+async function expectMediaClearOfFixedLayers(page: Page, locator: Locator, label: string) {
+  await locator.scrollIntoViewIfNeeded();
+  const overlap = await locator.evaluate((element) => {
+    const target = element.getBoundingClientRect();
+    const layers = [
+      ...document.querySelectorAll<HTMLElement>('#appBottomNav, .active-workout-rest'),
+    ];
+    return layers
+      .filter((layer) => {
+        const style = getComputedStyle(layer);
+        const rect = layer.getBoundingClientRect();
+        return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0
+        );
+      })
+      .some((layer) => {
+        const rect = layer.getBoundingClientRect();
+        return (
+          rect.left < target.right &&
+          rect.right > target.left &&
+          rect.top < target.bottom &&
+          rect.bottom > target.top
+        );
+      });
+  });
+  expect(overlap, `${label}: media must not be covered by dock/rest layer`).toBe(false);
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', /light|dark/);
 }
 
 test('Task 513 owner visual package covers catalog and exercise media states', async ({ page }) => {
@@ -401,7 +539,7 @@ test('Task 513 owner visual package covers catalog and exercise media states', a
   });
 });
 
-test('Issue 1186 keeps wide technique media square without cropping in guide and lightbox', async ({
+test('Issue 1186 fills wide technique media in guide and lightbox with source-aware cover', async ({
   page,
 }) => {
   await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
@@ -428,6 +566,7 @@ test('Issue 1186 keeps wide technique media square without cropping in guide and
         .poll(() => cardImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
         .toBeGreaterThan(0);
       await expectSquareMediaSurface(cardSurface, `${colorScheme} ${width}px guide`);
+      await expect(cardImage).toHaveCSS('object-position', '46% 50%');
       await cardSurface.hover();
       await expect(cardImage).toHaveCSS('transform', 'none');
       await expect(dialog.locator('.exercise-guide-image')).toHaveCSS('border-top-width', '0px');
@@ -486,6 +625,8 @@ test('Issue 1186 keeps a wide poster square in Active Workout', async ({ page })
     .poll(() => image.evaluate((node) => (node as HTMLImageElement).naturalWidth))
     .toBeGreaterThan(0);
   await expectSquareMediaSurface(media, 'dark 390px Active Workout wide poster');
+  await expect(image).toHaveCSS('object-position', '46% 50%');
+  await expectMediaClearOfFixedLayers(page, media, 'dark 390px Active Workout wide poster');
   await expect(
     page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
   ).resolves.toBe(true);
@@ -497,6 +638,151 @@ test('Issue 1186 keeps a wide poster square in Active Workout', async ({ page })
       fullPage: true,
       path: resolve(afterDir, 'dark-390-active-workout.png'),
     });
+  }
+});
+
+test('Issue 1186 fills the real wide MP4 in Guide, lightbox and Active Workout', async ({
+  page,
+}) => {
+  await installTelegramHarness(page, { platform: 'android', colorScheme: 'dark' });
+  const telegramHarness = new TelegramHarness(page);
+  await installPlatformApi(page, { browserSession: true });
+  await installWideMediaRoutes(page);
+  await installWideCatalogRoutes(page);
+  await installWideActiveWorkoutRoutes(page);
+  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+  if (afterDir) {
+    await mkdir(afterDir, { recursive: true });
+  }
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
+      const dialog = await openWideCatalogDetail(page, colorScheme);
+      const cardSurface = dialog.locator('.exercise-guide-image__frame').first();
+      const cardVideo = cardSurface.locator('video');
+      await expect(cardVideo).toHaveAttribute('src', wideVideoUrl);
+      await expect
+        .poll(() => cardVideo.evaluate((video) => (video as HTMLVideoElement).videoWidth))
+        .toBeGreaterThan(0);
+      await expectSquareMediaSurface(cardSurface, `${colorScheme} ${width}px guide MP4`);
+      await expect(cardVideo).toHaveCSS('object-position', '46% 50%');
+      if (afterDir) {
+        await dialog.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-guide-mp4.png`),
+        });
+      }
+
+      await cardSurface.click();
+      const lightbox = page.getByRole('dialog', { name: /Увеличенное изображение/ });
+      const lightboxVideo = lightbox.locator('video');
+      await expect(lightboxVideo).toHaveAttribute('src', wideVideoUrl);
+      await expect
+        .poll(() => lightboxVideo.evaluate((video) => (video as HTMLVideoElement).videoWidth))
+        .toBeGreaterThan(0);
+      await expectSquareMediaSurface(
+        lightbox.locator('.exercise-lightbox__media'),
+        `${colorScheme} ${width}px lightbox MP4`,
+      );
+      if (afterDir) {
+        await lightbox.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-lightbox-mp4.png`),
+        });
+      }
+      await lightbox.locator('.exercise-lightbox__close').click();
+      await page.getByRole('button', { name: 'Закрыть карточку упражнения' }).click();
+
+      await telegramHarness.setTheme(colorScheme);
+      await enterActiveWorkout(page);
+      const activeMedia = page.locator('.active-workout-exercise__media').first();
+      const activeVideo = activeMedia.locator('video');
+      await expect(activeVideo).toHaveAttribute('src', wideVideoUrl);
+      await expect
+        .poll(() => activeVideo.evaluate((video) => (video as HTMLVideoElement).videoWidth))
+        .toBeGreaterThan(0);
+      await expectSquareMediaSurface(activeMedia, `${colorScheme} ${width}px Active Workout MP4`);
+      await expectMediaClearOfFixedLayers(
+        page,
+        activeMedia,
+        `${colorScheme} ${width}px Active Workout MP4`,
+      );
+      if (afterDir) {
+        await page.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-active-workout-mp4.png`),
+        });
+      }
+    }
+  }
+});
+
+test('Issue 1186 keeps the native square GIF in Guide, lightbox and Active Workout', async ({
+  page,
+}) => {
+  await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
+  const telegramHarness = new TelegramHarness(page);
+  await installPlatformApi(page, { browserSession: true });
+  await installMediaRoutes(page);
+  await installCatalogRoutes(page);
+  await installWideActiveWorkoutRoutes(page, 'gif');
+  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+  if (afterDir) await mkdir(afterDir, { recursive: true });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'no-preference' });
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
+      await page.goto('/app?section=catalog');
+      await page.evaluate((theme) => localStorage.setItem('app-theme', theme), colorScheme);
+      const { dialog } = await openCatalogDetail(page);
+      const cardSurface = dialog.locator('.exercise-guide-image__frame').first();
+      const cardImage = cardSurface.locator('img');
+      await expect(cardImage).toHaveAttribute('data-media-mode', 'animation');
+      await expectNativeSquareMediaSurface(cardSurface, `${colorScheme} ${width}px GIF guide`);
+      if (afterDir) {
+        await dialog.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-guide-gif.png`),
+        });
+      }
+      await cardSurface.click();
+      const lightbox = page.getByRole('dialog', { name: /Увеличенное изображение/ });
+      await expectNativeSquareMediaSurface(
+        lightbox.locator('.exercise-lightbox__media'),
+        `${colorScheme} ${width}px GIF lightbox`,
+      );
+      if (afterDir) {
+        await lightbox.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-lightbox-gif.png`),
+        });
+      }
+      await lightbox.locator('.exercise-lightbox__close').click();
+      await page.getByRole('button', { name: 'Закрыть карточку упражнения' }).click();
+
+      await telegramHarness.setTheme(colorScheme);
+      await enterActiveWorkout(page);
+      const activeMedia = page.locator('.active-workout-exercise__media').first();
+      await expect(activeMedia.locator('img')).toHaveAttribute('src', animationUrl);
+      await expectNativeSquareMediaSurface(
+        activeMedia,
+        `${colorScheme} ${width}px GIF Active Workout`,
+      );
+      await expectMediaClearOfFixedLayers(
+        page,
+        activeMedia,
+        `${colorScheme} ${width}px GIF Active Workout`,
+      );
+      if (afterDir) {
+        await page.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-active-workout-gif.png`),
+        });
+      }
+    }
   }
 });
 

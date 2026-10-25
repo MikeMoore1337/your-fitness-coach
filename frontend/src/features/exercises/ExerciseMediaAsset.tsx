@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { resolveExerciseMediaFrame } from './exerciseMediaFraming';
 
 type MediaSource = {
   url: string;
   mime_type: string;
   width: number;
+  height?: number;
 };
 
 function responsiveSources(sources: MediaSource[], mimeType?: string) {
@@ -85,6 +87,9 @@ export function ExerciseMediaAsset({
 
   if (video) {
     const selected = [...videoSources].sort((a, b) => a.width - b.width).at(-1);
+    const frame = selected
+      ? resolveExerciseMediaFrame(selected)
+      : resolveExerciseMediaFrame({ url: thumbnailUrl ?? '', width, height });
     return (
       <video
         className={className}
@@ -99,11 +104,23 @@ export function ExerciseMediaAsset({
         aria-label={alt}
         data-media-mode="video"
         onError={() => setVideoFailed(true)}
+        data-media-frame={frame.policy}
+        data-media-source-ratio={frame.sourceRatio ?? undefined}
+        style={{ objectPosition: frame.objectPosition }}
       />
     );
   }
   const posterSources = responsiveSources(thumbnailSources, 'image/jpeg');
   const webpSources = responsiveSources(thumbnailSources, 'image/webp');
+  const posterSource = thumbnailSources
+    .slice()
+    .sort((left, right) => right.width - left.width)
+    .at(0);
+  const frame = resolveExerciseMediaFrame({
+    url: src ?? '',
+    width: posterSource?.width ?? width,
+    height: posterSource?.height ?? height,
+  });
   const image = (
     <img
       className={className}
@@ -116,6 +133,9 @@ export function ExerciseMediaAsset({
       loading={variant === 'thumbnail' ? 'lazy' : undefined}
       decoding="async"
       data-media-mode={animated && !usePosterFallback ? 'animated' : 'static-poster'}
+      data-media-frame={frame.policy}
+      data-media-source-ratio={frame.sourceRatio ?? undefined}
+      style={{ objectPosition: frame.objectPosition }}
       onError={() => {
         if (animated && thumbnailUrl) {
           setUsePosterFallback(true);

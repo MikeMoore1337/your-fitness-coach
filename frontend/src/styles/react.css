@@ -1973,6 +1973,22 @@ details:not([open]) > :not(summary) {
   object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
 }
+.exercise-guide-image__frame img[data-media-frame='filled-square'],
+.exercise-guide-image__frame .exercise-guide-video[data-media-frame='filled-square'],
+.exercise-lightbox__media img[data-media-frame='filled-square'],
+.exercise-lightbox__media .exercise-guide-video[data-media-frame='filled-square'],
+.active-workout-exercise__media img[data-media-frame='filled-square'],
+.active-workout-exercise__media video[data-media-frame='filled-square'] {
+  object-fit: cover;
+}
+.exercise-guide-image__frame img[data-media-frame='contain-exception'],
+.exercise-guide-image__frame .exercise-guide-video[data-media-frame='contain-exception'],
+.exercise-lightbox__media img[data-media-frame='contain-exception'],
+.exercise-lightbox__media .exercise-guide-video[data-media-frame='contain-exception'],
+.active-workout-exercise__media img[data-media-frame='contain-exception'],
+.active-workout-exercise__media video[data-media-frame='contain-exception'] {
+  object-fit: contain;
+}
 .exercise-guide-image__frame > .exercise-media-picture {
   width: 100%;
   height: 100%;

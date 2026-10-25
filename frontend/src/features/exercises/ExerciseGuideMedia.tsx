@@ -5,6 +5,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { usePrefersReducedMotion } from './ExerciseMediaAsset';
 import { ExerciseGuideVideo } from './ExerciseGuideVideo';
+import { resolveExerciseMediaFrame } from './exerciseMediaFraming';
 
 type GuideMediaItem = ExerciseGuide['media'][number];
 
@@ -50,6 +51,7 @@ function MediaPicture({
       (left, right) => right.width - left.width || left.mime_type.localeCompare(right.mime_type),
     )
     .at(0)?.url;
+  const frame = resolveExerciseMediaFrame({ url: src, width, height });
   const image = (
     <img
       src={largest ?? src}
@@ -61,6 +63,9 @@ function MediaPicture({
       loading={loading}
       decoding="async"
       data-media-mode={mode}
+      data-media-frame={frame.policy}
+      data-media-source-ratio={frame.sourceRatio ?? undefined}
+      style={{ objectPosition: frame.objectPosition }}
       onError={onError}
     />
   );
