@@ -1822,7 +1822,7 @@ def test_rest_preflight_rejects_unverifiable_output(monkeypatch) -> None:
 
 def test_rest_preflight_runs_before_single_slot_stop(tmp_path: Path, monkeypatch) -> None:
     config = _config(tmp_path)
-    calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
+    _patch_single_slot_runtime(tmp_path, monkeypatch)
     path = tmp_path / "deployment-migration-manifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
     manifest["changes"] = [
