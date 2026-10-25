@@ -197,6 +197,75 @@ def test_skipped_rest_has_null_measurement(client):
     assert done.json()["measured_seconds"] is None
 
 
+
+def test_offline_skip_then_manual_restart_preserves_event_timestamps(client):
+    """Queued skip/restart must not invent time while offline or overwrite the first interval."""
+    headers = _auth(client, 996031)
+    workout = _new_workout(client, headers)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    completed = client.patch(
+        f"/api/v1/workouts/sets/{sid}",
+        headers=headers,
+        json={"actual_reps": 8, "is_completed": True},
+    )
+    assert completed.status_code == 200, completed.text
+
+    now = datetime.now(UTC)
+    first_started = now - timedelta(minutes=4)
+    skip_at = now - timedelta(minutes=3)
+    next_started = now - timedelta(minutes=2)
+    first = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
+        json={
+            "source_set_id": sid,
+            "started_at": first_started.isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert first.status_code == 200, first.text
+    first_id = first.json()["id"]
+    skip_payload = {
+        "action": "skip",
+        "mutation_id": str(uuid4()),
+        "expected_version": 1,
+        "occurred_at": skip_at.isoformat(),
+    }
+    skipped = client.post(
+        f"/api/v1/workouts/rest-sessions/{first_id}/actions",
+        headers=headers,
+        json=skip_payload,
+    )
+    assert skipped.status_code == 200, skipped.text
+    assert datetime.fromisoformat(skipped.json()["ended_at"]).replace(
+        tzinfo=None
+    ) == skip_at.replace(tzinfo=None)
+    assert skipped.json()["measured_seconds"] is None
+    assert client.post(
+        f"/api/v1/workouts/rest-sessions/{first_id}/actions",
+        headers=headers,
+        json=skip_payload,
+    ).json()["version"] == skipped.json()["version"]
+
+    repeat = client.post(
+        f"/api/v1/workouts/rest-sessions/{first_id}/restart",
+        headers=headers,
+        json={"started_at": next_started.isoformat(), "mutation_id": str(uuid4())},
+    )
+    assert repeat.status_code == 200, repeat.text
+    assert repeat.json()["id"] != first_id
+    assert repeat.json()["status"] == "running"
+    assert datetime.fromisoformat(repeat.json()["started_at"]).replace(
+        tzinfo=None
+    ) == next_started.replace(tzinfo=None)
+    history = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers)
+    assert history.status_code == 200
+    assert len(history.json()) == 2
+    assert history.json()[0]["status"] == "skipped"
+    assert history.json()[0]["measured_seconds"] is None
+
+
 def test_rest_history_and_progress_exclude_unknown_intervals(client):
     headers = _auth(client, 996005)
     workout = _new_workout(client, headers)
