@@ -2724,7 +2724,7 @@ body:has(.app-shell--design-v2) {
   min-width: 0;
 }
 
-.active-workout--design-v2 .active-workout-set__more-actions > summary,
+.active-workout--design-v2 .active-workout-set__more-actions > .yfc-disclosure-summary,
 .active-workout--design-v2 .active-workout-set__helpers > summary,
 .active-workout--design-v2 .active-workout-set__advanced > summary {
   display: flex;

@@ -32,6 +32,20 @@ const ISSUE_980_AFTER_DIR = resolve(
   '980-completed-set-20261013',
   'after',
 );
+const CAPTURE_1162_VISUALS = process.env.CAPTURE_1162_VISUALS === '1';
+const ISSUE_1162_CAPTURE_PHASE = process.env.CAPTURE_1162_PHASE ?? 'after';
+const ISSUE_1162_CAPTURE_DIR = resolve(
+  process.env.CAPTURE_1162_DIR ??
+    resolve(
+      process.cwd(),
+      '..',
+      '.artifacts',
+      'tasks',
+      '1162',
+      'evidence',
+      ISSUE_1162_CAPTURE_PHASE,
+    ),
+);
 const ISSUE_996_AFTER_DIR = resolve(
   process.env.YFC_ISSUE_996_AFTER_DIR ??
     resolve(process.cwd(), '..', '.artifacts', 'tasks', '996', 'evidence', 'after'),
@@ -814,16 +828,27 @@ async function mockActiveWorkout(
 }
 
 function completedActions(row: Locator) {
-  return row.locator('details.active-workout-set__more-actions');
+  return row.locator('.active-workout-set__more-actions');
 }
 
 async function openCompletedActions(row: Locator) {
   const actions = completedActions(row);
-  await expect(actions.locator('summary')).toHaveText('Действия');
-  if ((await actions.getAttribute('open')) === null) {
-    await actions.locator('summary').click();
+  const summary = actions.locator('.yfc-disclosure-summary');
+  await expect(summary).toHaveText('Действия');
+  if ((await summary.getAttribute('aria-expanded')) !== 'true') {
+    await summary.evaluate((element) => (element as HTMLElement).click());
   }
   return actions;
+}
+
+async function captureIssue1162State(page: Page, info: TestInfo, theme: string, state: string) {
+  if (!CAPTURE_1162_VISUALS) return;
+  await mkdir(ISSUE_1162_CAPTURE_DIR, { recursive: true });
+  const width = page.viewportSize()?.width ?? 'unknown';
+  await page.screenshot({
+    path: resolve(ISSUE_1162_CAPTURE_DIR, `${info.project.name}-${width}-${theme}-${state}.png`),
+    fullPage: false,
+  });
 }
 
 async function activeWorkoutQueueLength(page: Page) {
@@ -5661,6 +5686,116 @@ test.describe('#980 completed set visual candidate', () => {
   }
 });
 
+for (const issue1162Width of [320, 360, 393, 430]) {
+  for (const theme of ['dark', 'light'] as const) {
+    test(`#1162 completed set actions stay compact and deliberate ${theme} ${issue1162Width}px`, async ({
+      page,
+    }, info) => {
+      await page.setViewportSize({ width: issue1162Width, height: 844 });
+      await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+      await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+      const server = await mockActiveWorkout(page);
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент' }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+      const first = page.locator('[data-workout-set-id="201"]');
+      const current = page.locator('[data-workout-set-id="202"]');
+      await first.getByLabel(/^Вес,/).fill('42.5');
+      await first.getByLabel(/^Повторы,/).fill('9');
+      await first.getByRole('button', { name: /^2 —/ }).click();
+      await first.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+      await expect(page.getByRole('button', { name: 'Пропустить', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Пропустить', exact: true }).click();
+
+      await expect(current).toHaveAttribute('aria-current', 'step');
+      await expect(first.getByText('Выполнен', { exact: true })).toBeVisible();
+      await expect(first.getByLabel('Вес, Жим штанги лёжа, подход 1')).toHaveValue('42.5');
+      await expect(first.getByLabel('Повторы, Жим штанги лёжа, подход 1')).toHaveValue('9');
+      await expect(first.getByRole('button', { name: 'Редактировать' })).toBeVisible();
+      await expect(first.getByRole('button', { name: 'Вернуть в работу' })).toBeHidden();
+
+      await first.scrollIntoViewIfNeeded();
+      await captureIssue1162State(page, info, theme, '01-completed-closed');
+      const closedLayout = await first.evaluate((row) => {
+        const box = (selector: string) =>
+          row.querySelector<HTMLElement>(selector)?.getBoundingClientRect();
+        const rowBox = row.getBoundingClientRect();
+        const actions = box('.active-workout-set__completed-actions');
+        const edit = box('[data-workout-action="edit-completed"]');
+        const summary = box('.active-workout-set__more-actions > .yfc-disclosure-summary');
+        return {
+          row: rowBox.toJSON(),
+          actions: actions?.toJSON() ?? null,
+          edit: edit?.toJSON() ?? null,
+          summary: summary?.toJSON() ?? null,
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+        };
+      });
+      expect(closedLayout.documentWidth).toBeLessThanOrEqual(closedLayout.viewportWidth + 1);
+      expect(closedLayout.actions?.right).toBeLessThanOrEqual((closedLayout.row?.right ?? 0) + 1);
+      expect(closedLayout.edit?.height).toBeGreaterThanOrEqual(44);
+      expect(closedLayout.summary?.height).toBeGreaterThanOrEqual(44);
+      expect(closedLayout.actions?.height).toBeLessThanOrEqual(52);
+
+      const scrollBeforeMenu = await page.evaluate(() => window.scrollY);
+      const actions = await openCompletedActions(first);
+      await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toBeVisible();
+      await expect(actions.getByRole('button', { name: 'Вернуть в работу' })).toHaveCount(1);
+      await captureIssue1162State(page, info, theme, '02-actions-open');
+      expect(await page.evaluate(() => window.scrollY)).toBe(scrollBeforeMenu);
+      const openLayout = await first.evaluate((row) => {
+        const body = row.querySelector<HTMLElement>('.active-workout-set__more-actions-body');
+        const currentRow = document.querySelector<HTMLElement>('[data-workout-set-id="202"]');
+        const dock = document.querySelector<HTMLElement>('#appBottomNav');
+        return {
+          row: row.getBoundingClientRect().toJSON(),
+          body: body?.getBoundingClientRect().toJSON() ?? null,
+          currentRow: currentRow?.getBoundingClientRect().toJSON() ?? null,
+          dock: dock?.getBoundingClientRect().toJSON() ?? null,
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+        };
+      });
+      expect(openLayout.row.height).toBe(closedLayout.row.height);
+      expect(openLayout.body?.right).toBeLessThanOrEqual((openLayout.row?.right ?? 0) + 1);
+      expect(openLayout.body?.left).toBeGreaterThanOrEqual((openLayout.row?.left ?? 0) - 1);
+      expect(openLayout.body?.bottom).toBeLessThanOrEqual(
+        (openLayout.dock?.top ?? window.innerHeight) + 1,
+      );
+      expect(openLayout.body?.bottom).toBeLessThanOrEqual((openLayout.currentRow?.top ?? 0) + 1);
+      expect(openLayout.documentWidth).toBeLessThanOrEqual(openLayout.viewportWidth + 1);
+
+      const writesBeforeConfirm = server.patches.length;
+      const restore = actions.getByRole('button', { name: 'Вернуть в работу' });
+      await restore.click();
+      await restore.dispatchEvent('click');
+      await expect(page.getByRole('dialog')).toHaveCount(1);
+      expect(server.patches.length).toBe(writesBeforeConfirm);
+      await captureIssue1162State(page, info, theme, '03-reopen-confirmation');
+      await page.getByRole('dialog').getByRole('button', { name: 'Отмена' }).click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect.poll(() => server.patches.length).toBe(writesBeforeConfirm);
+      expect(server.readSet(201).is_completed).toBe(true);
+
+      const actionsAfterCancel = await openCompletedActions(first);
+      await actionsAfterCancel.getByRole('button', { name: 'Вернуть в работу' }).click();
+      await page.getByRole('dialog').getByRole('button', { name: 'Вернуть в работу' }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(false);
+      await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
+      await expect(first).toHaveAttribute('aria-current', 'step');
+      await expect(first.getByRole('button', { name: 'Редактировать' })).toHaveCount(0);
+      await captureIssue1162State(page, info, theme, '04-returned-to-work');
+
+      expect(
+        server.patches.filter((patch) => patch.setId === 201 && patch.body.is_completed === false),
+      ).toHaveLength(1);
+    });
+  }
+}
+
 test.describe('#980 completed-set geometry regression', () => {
   for (const width of [320, 360, 390, 393, 430]) {
     for (const theme of ['dark', 'light'] as const) {
@@ -5765,7 +5900,7 @@ test.describe('#980 completed-set geometry regression', () => {
         const summaryGeometry = await page.evaluate(() =>
           Array.from(
             document.querySelectorAll<HTMLElement>(
-              '.active-workout-set__more-actions > summary, .active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
+              '.active-workout-set__more-actions > .yfc-disclosure-summary, .active-workout-set__helpers > summary, .active-workout-set__advanced > summary',
             ),
           )
             .map((summary) => {

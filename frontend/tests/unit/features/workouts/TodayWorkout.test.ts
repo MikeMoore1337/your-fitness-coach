@@ -117,3 +117,19 @@ describe('active workout prefill layout', () => {
     expect(styles).toMatch(/\.active-workout-set__prefill-actions\s*\{[^}]*order: 1;/s);
   });
 });
+
+describe('completed action layout', () => {
+  it('keeps the restore action in an overlay disclosure', () => {
+    const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
+
+    expect(styles).toMatch(
+      /\.active-workout-set__more-actions\s*\{[^}]*position: relative;[^}]*\}/s,
+    );
+    expect(styles).toMatch(
+      /\.active-workout-set__more-actions-body\s*\{[^}]*position: absolute;[^}]*\}/s,
+    );
+    expect(styles).toMatch(
+      /\.active-workout-set__more-actions > \.yfc-disclosure-summary\s*\{[^}]*min-height: 44px;/s,
+    );
+  });
+});
