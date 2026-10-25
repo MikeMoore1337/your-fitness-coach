@@ -24,7 +24,9 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
         article, digest = client.load_article()
         self.assertEqual(article["slug"], client.EXPECTED_SLUG)
         self.assertEqual(article["evidence_level"], "limited")
-        self.assertTrue(all(row["review_status"] == "pending" for row in article["claim_source_matrix"]))
+        self.assertTrue(
+            all(row["review_status"] == "pending" for row in article["claim_source_matrix"])
+        )
         self.assertEqual(len(digest), 64)
 
     def test_origin_allowlist_rejects_token_exfiltration(self) -> None:
@@ -42,9 +44,8 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
             "https://user:pass@app.your-fitness-coach.ru",
             "https://app.your-fitness-coach.ru/unexpected",
         ):
-            with self.subTest(url=value):
-                with self.assertRaises(client.PublicationError):
-                    client.require_yfc_url(value)
+            with self.subTest(url=value), self.assertRaises(client.PublicationError):
+                client.require_yfc_url(value)
 
     def test_dry_run_never_calls_live_api(self) -> None:
         with patch.object(client, "post_article") as post:
@@ -68,9 +69,7 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
             "slug": client.EXPECTED_SLUG,
             "article_status": "published",
             "content_version": 1,
-            "canonical_url": (
-                f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"
-            ),
+            "canonical_url": (f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"),
             "editorial_decision": "root_owner_publication",
             "scientific_verification": "not_attested",
         }
@@ -99,9 +98,7 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
             "slug": client.EXPECTED_SLUG,
             "article_status": "draft",
             "content_version": 1,
-            "canonical_url": (
-                f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"
-            ),
+            "canonical_url": (f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"),
             "editorial_decision": "root_owner_publication",
             "scientific_verification": "not_attested",
         }
@@ -114,9 +111,7 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
             "slug": client.EXPECTED_SLUG,
             "article_status": "published",
             "content_version": 1,
-            "canonical_url": (
-                f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"
-            ),
+            "canonical_url": (f"https://your-fitness-coach.ru/articles/{client.EXPECTED_SLUG}"),
             "editorial_decision": "root_owner_publication",
             "scientific_verification": "not_attested",
         }
