@@ -1,9 +1,14 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.api.dependencies.auth import require_root_admin
-from fitminiapp_api.db.session import get_db
+from fitminiapp_api.db.session import get_db, get_session_context
 from fitminiapp_api.models.user import User
+from fitminiapp_api.schemas.articles import (
+    OwnerWebArticlePublishRequest,
+    OwnerWebArticlePublishResponse,
+)
 from fitminiapp_api.schemas.admin import (
     AdminAuditRow,
     AdminFunnelResponse,
@@ -14,6 +19,10 @@ from fitminiapp_api.schemas.admin import (
     AdminUserDetail,
     AdminUserSearchRow,
     AdminUserStatusUpdate,
+)
+from fitminiapp_api.services.web_articles import (
+    WebArticleError,
+    publish_owner_web_article,
 )
 from fitminiapp_api.services.admin_operations import (
     end_relationship,
@@ -139,3 +148,35 @@ def admin_audit(
     _: User = Depends(require_root_admin),
 ) -> list[dict]:
     return list_audit_events(db, limit=limit)
+
+
+@router.post("/articles/publish", response_model=OwnerWebArticlePublishResponse)
+def admin_publish_web_article(
+    payload: OwnerWebArticlePublishRequest,
+    current_user: User = Depends(require_root_admin),
+) -> OwnerWebArticlePublishResponse:
+    """One explicit Root decision; Hermes intake and expert-review statuses remain untouched."""
+    try:
+        with get_session_context() as db:
+            article = publish_owner_web_article(
+                db,
+                payload.article,
+                actor_user_id=current_user.id,
+                generated_with_ai=payload.generated_with_ai,
+            )
+            response = OwnerWebArticlePublishResponse(
+                article_id=article.id,
+                slug=article.slug,
+                article_status="published",
+                content_version=article.content_version,
+                canonical_url=article.canonical_url,
+                editorial_decision="root_owner_publication",
+                scientific_verification="not_attested",
+            )
+        return response
+    except WebArticleError as exc:
+        if exc.code == "slug_conflict":
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+        raise HTTPException(status_code=422, detail=exc.code) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="article_conflict") from exc
