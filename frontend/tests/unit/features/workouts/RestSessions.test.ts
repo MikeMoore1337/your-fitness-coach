@@ -7,6 +7,7 @@ import {
   markRestBackground,
   recoverRestAfterAbsence,
   restJournalStorageKey,
+  restartMeasuredRest,
   REST_ABSENCE_REVIEW_MS,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
@@ -156,5 +157,88 @@ describe('measured rest journal #960', () => {
     beginMeasuredRest(11, 56, 1004, 60, 300_000);
     expect(updateMeasuredRest(11, 56, 1004, 'unknown')?.status).toBe('unknown');
     expect(REST_ABSENCE_REVIEW_MS).toBe(15 * 60 * 1000);
+  });
+  it('creates a distinct measured interval after stop without rewriting its predecessor', () => {
+    const at = 8_000_000;
+    const initial = beginMeasuredRest(11, 56, 987, 90, at)!;
+    const previous = updateMeasuredRest(11, 56, 987, 'complete', at + 42_000)!;
+    const restart = restartMeasuredRest(11, 56, initial.start_mutation_id, at + 60_000)!;
+
+    expect(restart).toMatchObject({
+      source_set_id: 987,
+      restart_of_start_mutation_id: initial.start_mutation_id,
+      status: 'running',
+      deadline: at + 150_000,
+    });
+    expect(restart.start_mutation_id).not.toBe(initial.start_mutation_id);
+    expect(loadRestJournal(11, 56)).toHaveLength(2);
+    expect(loadRestJournal(11, 56)[0]).toMatchObject({
+      status: 'completed',
+      ended_at: previous.ended_at,
+      source: 'USER_CONFIRMED',
+    });
+    expect(
+      restartMeasuredRest(11, 56, initial.start_mutation_id, at + 61_000)?.start_mutation_id,
+    ).toBe(restart.start_mutation_id);
+    expect(updateMeasuredRest(11, 56, 987, 'complete', at + 78_000)?.start_mutation_id).toBe(
+      restart.start_mutation_id,
+    );
+    expect(loadRestJournal(11, 56)[0]?.ended_at).toBe(previous.ended_at);
+  });
+
+  it('restores two intervals and their actions after a stale shared journal write', () => {
+    const start = 9_000_000;
+    const initial = beginMeasuredRest(11, 56, 988, 90, start)!;
+    updateMeasuredRest(11, 56, 988, 'skip', start + 20_000);
+    const oldJournal = localStorage.getItem(restJournalStorageKey(11, 56))!;
+    const repeat = restartMeasuredRest(11, 56, initial.start_mutation_id, start + 30_000)!;
+    updateMeasuredRest(11, 56, 988, 'add30', start + 31_000);
+    localStorage.setItem(restJournalStorageKey(11, 56), oldJournal);
+
+    const restored = loadRestJournal(11, 56);
+    expect(restored).toHaveLength(2);
+    expect(restored[0]).toMatchObject({ status: 'skipped' });
+    expect(restored[1]).toMatchObject({
+      start_mutation_id: repeat.start_mutation_id,
+      restart_of_start_mutation_id: initial.start_mutation_id,
+      status: 'running',
+    });
+    expect(restored[1]?.pending).toMatchObject([{ action: 'add30' }]);
+    expect(restored[0]?.pending.some((item) => item.action === 'add30')).toBe(false);
+  });
+
+  it('keeps an interrupted manual successor associated with the correct interval after stale writes', () => {
+    const start = 12_000_000;
+    const initial = beginMeasuredRest(11, 56, 990, 90, start)!;
+    updateMeasuredRest(11, 56, 990, 'complete', start + 15_000);
+    const staleJournal = localStorage.getItem(restJournalStorageKey(11, 56))!;
+    const repeat = restartMeasuredRest(11, 56, initial.start_mutation_id, start + 20_000)!;
+    beginMeasuredRest(11, 56, 991, 90, start + 45_000);
+    localStorage.setItem(restJournalStorageKey(11, 56), staleJournal);
+
+    const recovered = loadRestJournal(11, 56);
+    expect(recovered).toHaveLength(3);
+    expect(
+      recovered.find((row) => row.start_mutation_id === initial.start_mutation_id),
+    ).toMatchObject({
+      status: 'completed',
+      pending: expect.arrayContaining([expect.objectContaining({ action: 'complete' })]),
+    });
+    expect(
+      recovered.find((row) => row.start_mutation_id === repeat.start_mutation_id),
+    ).toMatchObject({
+      status: 'interrupted',
+      pending: expect.arrayContaining([expect.objectContaining({ action: 'interrupt' })]),
+    });
+    expect(recovered.find((row) => row.source_set_id === 991)).toMatchObject({ status: 'running' });
+  });
+
+  it('does not create a repeat for an active, unknown or interrupted predecessor', () => {
+    const start = 10_000_000;
+    const initial = beginMeasuredRest(11, 56, 989, 90, start)!;
+    expect(restartMeasuredRest(11, 56, initial.start_mutation_id)).toBeNull();
+    updateMeasuredRest(11, 56, 989, 'unknown', start + 10_000);
+    expect(restartMeasuredRest(11, 56, initial.start_mutation_id)).toBeNull();
+    expect(loadRestJournal(11, 56)).toHaveLength(1);
   });
 });

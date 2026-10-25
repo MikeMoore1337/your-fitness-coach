@@ -97,7 +97,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(rest).toContainText('Отдых пропущен');
       await expect(rest.getByRole('button', { name: 'Скрыть' })).toBeVisible();
       await rest.getByRole('button', { name: 'Скрыть' }).click();
-      await expect(rest).toHaveCount(0);
+      await expect(rest.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
 
       await page.goto('/app?section=progress');
       const tabs = page.getByRole('tablist').first();

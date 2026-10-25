@@ -4,6 +4,7 @@ import { RestTimer } from '../../../../src/features/workouts/TodayWorkout';
 import { activeWorkoutRestKey } from '../../../../src/features/workouts/activeWorkoutQueue';
 import {
   beginMeasuredRest,
+  loadRestJournal,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
 import { legacyWorkoutRestStorageKey } from '../../../../src/shared/userScopedStorage';
@@ -22,6 +23,7 @@ function mount() {
         nextLabel="Жим штанги лёжа, подход 2"
         nextExercise="Жим штанги лёжа"
         nextPosition="Подход 2 из 3"
+        eligibleRestSourceSetIds={[201]}
       />
       <div className="active-workout-exercises">
         <input aria-label="Вес" defaultValue="42.5" />
@@ -99,7 +101,9 @@ describe('RestTimer', () => {
       );
     });
 
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(loadRestJournal(7, 42)).toHaveLength(1);
   });
 
   it('uses an uppercase FACT label with a real, explicitly stoppable measured clock', () => {
@@ -260,5 +264,115 @@ describe('RestTimer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
     expect(localStorage.getItem(key)).toBeNull();
+  });
+  it('hides and reopens an active rest without resetting its measured interval', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    const originalId = loadRestJournal(7, 42)[0]?.start_mutation_id;
+    act(() => vi.advanceTimersByTime(12_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Свернуть таймер' }));
+
+    expect(screen.getByRole('complementary')).toHaveClass('is-compact');
+    expect(screen.getByText('Отдых сохраняется…')).toBeVisible();
+    expect(screen.getByText('ФАКТ 0:12')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Показать таймер' }));
+
+    expect(screen.getByRole('timer', { name: 'Отдых' })).toHaveTextContent('1:18');
+    expect(screen.getByText('ФАКТ')).toBeVisible();
+    expect(loadRestJournal(7, 42)).toHaveLength(1);
+    expect(loadRestJournal(7, 42)[0]?.start_mutation_id).toBe(originalId);
+  });
+
+  it('hides the terminal notice without removing the manual restart action', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
+    expect(
+      screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
+    ).toHaveTextContent('Отдых завершён по отметке');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
+    expect(
+      screen.getByRole('complementary').querySelector('.active-workout-rest__complete-copy'),
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Скрыть' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+    expect(loadRestJournal(7, 42)).toHaveLength(2);
+  });
+
+  it('starts another interval only after stopping the previous one, without completing a set', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    act(() => vi.advanceTimersByTime(20_000));
+    fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
+    const original = loadRestJournal(7, 42)[0]!;
+    expect(original.status).toBe('completed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+
+    const sessions = loadRestJournal(7, 42);
+    expect(sessions).toHaveLength(2);
+    expect(sessions[0]).toMatchObject({
+      status: 'completed',
+      start_mutation_id: original.start_mutation_id,
+    });
+    expect(sessions[1]).toMatchObject({
+      source_set_id: 201,
+      status: 'running',
+      restart_of_start_mutation_id: original.start_mutation_id,
+    });
+    expect(screen.getByRole('timer', { name: 'Отдых' })).toHaveTextContent('1:30');
+    expect(screen.getByText('ФАКТ')).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Вес' })).toHaveValue('42.5');
+  });
+
+  it('retains a skipped interval when the user explicitly starts a new one', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Пропустить' }));
+    expect(loadRestJournal(7, 42)[0]?.status).toBe('skipped');
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(loadRestJournal(7, 42)).toHaveLength(2);
+    expect(loadRestJournal(7, 42)[0]?.status).toBe('skipped');
+    expect(loadRestJournal(7, 42)[1]?.status).toBe('running');
+  });
+
+  it('restores the manual rest action rather than a phantom running timer after reload', () => {
+    const first = beginMeasuredRest(7, 42, 201, 90, initialTime)!;
+    updateMeasuredRest(7, 42, 201, 'complete', initialTime + 42_000);
+    mount();
+    expect(screen.queryByRole('timer', { name: 'Отдых' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(loadRestJournal(7, 42)[1]?.restart_of_start_mutation_id).toBe(first.start_mutation_id);
+    expect(screen.getByRole('timer')).toHaveTextContent('1:30');
   });
 });
