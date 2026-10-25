@@ -5763,8 +5763,8 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout {
 .active-workout-rest__actions {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) var(--touch-target, 44px);
-  gap: var(--v2-space-2, 8px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(88px, 1.2fr) var(--touch-target, 44px);
+  gap: 4px;
 }
 .active-workout-rest__actions .ui-button {
   min-width: var(--touch-target, 44px);
