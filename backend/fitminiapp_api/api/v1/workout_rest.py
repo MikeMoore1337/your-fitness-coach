@@ -411,7 +411,13 @@ def mutate_rest_session(
                 or payload.corrected_seconds is not None
             ):
                 raise HTTPException(status_code=422, detail="Конечное время не требуется")
-            row.ended_at = _now()
+            # A queued offline terminal action was performed at the user's tap time,
+            # not when connectivity resumes. Keep legacy clients (without occurred_at)
+            # compatible while preserving the durable event time when supplied.
+            ended = _utc_naive(payload.occurred_at) if payload.occurred_at else _now()
+            if ended < row.started_at or ended > _now() + timedelta(minutes=1):
+                raise HTTPException(status_code=422, detail="Недопустимое время окончания")
+            row.ended_at = ended
             row.status = {"skip": "skipped", "interrupt": "interrupted", "unknown": "unknown"}[
                 payload.action
             ]
