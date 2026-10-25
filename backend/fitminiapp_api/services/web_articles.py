@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.news import (
     HermesWebArticleSubmission,
     WebArticle,
@@ -803,6 +804,26 @@ def publish_existing_owner_article(
     ):
         raise WebArticleError("article_revision_conflict")
     if article.status == "published":
+        # A replay must not misattribute another publication path or Root actor
+        # to this exact interactive Control Center approval.
+        last = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_type == "web_article",
+                AuditEvent.resource_id == article_id,
+            )
+            .order_by(AuditEvent.id.desc())
+            .first()
+        )
+        if (
+            last is None
+            or last.actor_user_id != actor_user_id
+            or not isinstance(last.details, dict)
+            or last.details.get("actor_ref") != "root_owner_control_center"
+            or last.details.get("content_version") != expected_content_version
+        ):
+            raise WebArticleError("article_already_published_by_other_path")
         return article
     if article.status not in {"draft", "review", "approved"}:
         raise WebArticleError("article_transition_invalid")
