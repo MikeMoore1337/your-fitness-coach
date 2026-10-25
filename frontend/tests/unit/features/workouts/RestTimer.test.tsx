@@ -279,7 +279,7 @@ describe('RestTimer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Свернуть таймер' }));
 
     expect(screen.getByRole('complementary')).toHaveClass('is-compact');
-    expect(screen.getByText('Отдых идёт')).toBeVisible();
+    expect(screen.getByText('Отдых сохраняется…')).toBeVisible();
     expect(screen.getByText('ФАКТ 0:12')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Показать таймер' }));
 
