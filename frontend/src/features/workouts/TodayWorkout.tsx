@@ -19,7 +19,7 @@ import {
   ErrorState,
   LoadingState,
 } from '../../shared/ui/common';
-import { removeStorage, writeStorage } from '../../shared/storage';
+import { readStorage, removeStorage, writeStorage } from '../../shared/storage';
 import { ExerciseGuideDialog } from '../exercises/ExerciseGuideDialog';
 import { ExerciseMediaAsset } from '../exercises/ExerciseMediaAsset';
 import {
@@ -35,6 +35,7 @@ import {
   beginMeasuredRest,
   loadRestJournal,
   listenToRestJournal,
+  restartMeasuredRest,
   markRestBackground,
   recoverRestAfterAbsence,
   syncRestJournal,
@@ -1502,12 +1503,14 @@ export function RestTimer({
   nextLabel,
   nextExercise,
   nextPosition,
+  eligibleRestSourceSetIds = [],
 }: {
   userId: number;
   workoutId: number;
   nextLabel: string;
   nextExercise: string;
   nextPosition: string;
+  eligibleRestSourceSetIds?: readonly number[];
 }) {
   const storageKey = activeWorkoutRestKey(userId, workoutId);
   const legacyStorageKey = legacyWorkoutRestStorageKey(workoutId);
@@ -1525,6 +1528,11 @@ export function RestTimer({
   const [recoveredMinutes, setRecoveredMinutes] = useState('');
   const [recoveryValidation, setRecoveryValidation] = useState('');
   const [completedNotice, setCompletedNotice] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(() =>
+    readStorage<boolean>(`${activeWorkoutRestKey(userId, workoutId)}:panel-collapsed`, false),
+  );
+  const [restRevision, setRestRevision] = useState(0);
+  const [restSaveError, setRestSaveError] = useState<string | null>(null);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState('');
   const panel = useRef<HTMLElement>(null);
@@ -1536,6 +1544,17 @@ export function RestTimer({
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
   const hasDeadline = Boolean(deadline);
+  const restRecords = useMemo(() => loadRestJournal(userId, workoutId), [userId, workoutId, restRevision]);
+  const latestRest = restRecords.at(-1) ?? null;
+  const restartCandidate =
+    !measuredRest &&
+    latestRest &&
+    (latestRest.status === 'completed' || latestRest.status === 'skipped') &&
+    eligibleRestSourceSetIds.includes(latestRest.source_set_id) &&
+    !restRecords.some((row) => row.restart_of_start_mutation_id === latestRest.start_mutation_id)
+      ? latestRest
+      : null;
+  const restIsUnconfirmed = Boolean(measuredRest && (!measuredRest.server_id || measuredRest.pending.length));
   const measuredElapsedSeconds =
     measuredRest && !measuredRest.needs_review
       ? Math.max(0, Math.floor((now - Date.parse(measuredRest.started_at)) / 1000))
@@ -1577,6 +1596,8 @@ export function RestTimer({
       setDeadline(nextDeadline);
       setCompletedNotice(null);
       setCompact(false);
+      setCollapsed(false);
+      writeStorage(`${storageKey}:panel-collapsed`, false);
       setAnnouncement('');
       compactWhenPointersRelease.current = false;
       wasBackgrounded.current = document.visibilityState === 'hidden';
@@ -1594,8 +1615,13 @@ export function RestTimer({
       if (!hasPending() || syncInFlight) return;
       syncInFlight = true;
       void syncRestJournal(userId, workoutId)
-        .catch(() => {
-          // Keep the durable offline journal for the next retry.
+        .then(() => setRestSaveError(null))
+        .catch((error: unknown) => {
+          setRestSaveError(
+            error instanceof ApiError && error.status === 409
+              ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
+              : 'Не удалось сохранить отдых. Запись остаётся на устройстве.',
+          );
         })
         .finally(() => {
           syncInFlight = false;
@@ -1613,6 +1639,7 @@ export function RestTimer({
     };
     const refresh = () => {
       setMeasuredRest(activeRestJournalSession(userId, workoutId));
+      setRestRevision((previous) => previous + 1);
       scheduleRetry();
       sync();
     };
@@ -1623,10 +1650,12 @@ export function RestTimer({
     scheduleRetry();
     sync();
     window.addEventListener('online', reconcile);
+    window.addEventListener('offline', reconcile);
     window.addEventListener('pageshow', reconcile);
     return () => {
       unsubscribe();
       window.removeEventListener('online', reconcile);
+      window.removeEventListener('offline', reconcile);
       window.removeEventListener('pageshow', reconcile);
       if (retryTimer !== undefined) window.clearInterval(retryTimer);
     };
@@ -1793,12 +1822,33 @@ export function RestTimer({
     };
   }, [hasDeadline, compact, completedNotice]);
 
-  if (!deadline && !completedNotice) return null;
+  const startNewRest = () => {
+    if (!restartCandidate || restRecords.some((row) => row.status === 'running')) return;
+    const started = restartMeasuredRest(
+      userId,
+      workoutId,
+      restartCandidate.start_mutation_id,
+      Date.now(),
+    );
+    if (!started) return;
+    setNow(Date.now());
+    setMeasuredRest(started);
+    setDeadline(started.deadline);
+    setCompletedNotice(null);
+    setCompact(false);
+    setCollapsed(false);
+    setRestSaveError(null);
+    setAnnouncement('Новый интервал отдыха');
+    writeStorage(storageKey, started.deadline);
+    writeStorage(`${storageKey}:panel-collapsed`, false);
+  };
+
+  if (!deadline && !completedNotice && !restartCandidate) return null;
   return (
     <aside
       ref={panel}
       {...glassProps('tinted')}
-      className={`active-workout-rest${completedNotice ? ' active-workout-rest--complete' : ''}${compact ? ' is-compact' : ''}`}
+      className={`active-workout-rest${completedNotice ? ' active-workout-rest--complete' : ''}${compact || collapsed ? ' is-compact' : ''}`}
       aria-label="Отдых между подходами"
       onMouseDown={(event) => {
         if (event.target instanceof Element && event.target.closest('button'))
@@ -1806,6 +1856,27 @@ export function RestTimer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
+      {collapsed && measuredRest?.status === 'running' ? (
+        <div className="active-workout-rest__collapsed">
+          <div>
+            <strong>Отдых идёт</strong>
+            <span>ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}</span>
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            glass="clear"
+            onClick={() => {
+              captureLayoutAnchor();
+              setCollapsed(false);
+              writeStorage(`${storageKey}:panel-collapsed`, false);
+            }}
+          >
+            Показать таймер
+          </Button>
+        </div>
+      ) : (
+      <>
       <div className="active-workout-rest__time" hidden={compact}>
         <span>Отдых</span>
         <strong role={completedNotice ? undefined : 'timer'} aria-label="Отдых" aria-live="off">
@@ -1997,6 +2068,16 @@ export function RestTimer({
       {compact && (
         <>
           <span className="active-workout-rest__complete-copy">{completedNotice}</span>
+          {restartCandidate && (
+            <Button
+              type="button"
+              variant="secondary"
+              glass="clear"
+              onClick={startNewRest}
+            >
+              Начать отдых
+            </Button>
+          )}
           <Button
             type="button"
             variant="secondary"
@@ -2011,9 +2092,33 @@ export function RestTimer({
           </Button>
         </>
       )}
+      {measuredRest?.status === 'running' && !measuredRest.needs_review && !compact && (
+        <button
+          type="button"
+          className="active-workout-rest__collapse"
+          aria-label="Свернуть таймер"
+          onClick={() => {
+            captureLayoutAnchor();
+            setCollapsed(true);
+            writeStorage(`${storageKey}:panel-collapsed`, true);
+          }}
+        >
+          <Icon name="chevron-down" size={20} />
+        </button>
+      )}
+      {measuredRest && restIsUnconfirmed && (
+        <p className="active-workout-rest__sync" role="status">
+          {typeof navigator !== 'undefined' && !navigator.onLine
+            ? 'Нет сети · отдых ожидает сохранения'
+            : 'Отдых сохраняется…'}
+        </p>
+      )}
+      {restSaveError && <p className="active-workout-rest__sync" role="alert">{restSaveError}</p>}
       <span className="sr-only" role="status" aria-atomic="true">
         {completedNotice ?? announcement}
       </span>
+      </>
+      )}
     </aside>
   );
 }
@@ -2634,6 +2739,18 @@ export function TodayWorkout({
                 ? `Подход ${currentSet.set.set_number} из ${currentSet.exercise.sets.length}`
                 : 'Все подходы отмечены'
             }
+            eligibleRestSourceSetIds={data.exercises.flatMap((exercise) =>
+              exercise.metric_type === 'cardio' || exercise.rest_seconds <= 0
+                ? []
+                : exercise.sets
+                    .filter(
+                      (set) =>
+                        set.is_completed &&
+                        (set.set_kind ?? 'working') === 'working' &&
+                        !['warmup', 'activation'].includes(set.planned_role ?? ''),
+                    )
+                    .map((set) => set.id),
+            )}
           />
         )}
 
