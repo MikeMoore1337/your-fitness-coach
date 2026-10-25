@@ -1,4 +1,4 @@
-"""Bounded, atomic rest-index construction and legacy UNIQUE replacement."""
+"""Build transaction-safe rest uniqueness indexes and retire the legacy constraint."""
 
 from collections.abc import Sequence
 
@@ -12,11 +12,11 @@ depends_on: str | Sequence[str] | None = None
 
 online_rollout_phase = "rest_unique_swap"
 online_rollout_notes = (
-    "Single-slot only: drain old writers first, verify no duplicate running rests, "
-    "then build four bounded unique indexes and drop legacy source UNIQUE in one "
-    "PostgreSQL transaction. lock_timeout=3s, statement_timeout=30s. No autocommit, "
-    "so Alembic's advisory transaction lock stays held. Rollback old app after "
-    "creating successors is forbidden; use forward-fix."
+    "Single-slot only: all old backend and worker writers drained. "
+    "Four unique indexes are created in the same bounded transaction before "
+    "dropping the legacy one-rest-per-set constraint. Bounded 3s lock timeout "
+    "and 30s statement timeout; lock duration requires PG16 verification. "
+    "Never downgrade after recording multiple intervals for one source set."
 )
 
 
@@ -25,50 +25,36 @@ def upgrade() -> None:
     if bind.dialect.name == "postgresql":
         op.execute("SET LOCAL lock_timeout = '3s'")
         op.execute("SET LOCAL statement_timeout = '30s'")
+    op.create_index(
+        "uq_workout_rest_initial_source",
+        "workout_rest_sessions",
+        ["source_set_id"],
+        unique=True,
+        postgresql_where=sa.text("predecessor_id IS NULL"),
+        sqlite_where=sa.text("predecessor_id IS NULL"),
+    )
+    op.create_index(
+        "uq_workout_rest_predecessor", "workout_rest_sessions", ["predecessor_id"], unique=True
+    )
+    op.create_index(
+        "uq_workout_rest_start_mutation",
+        "workout_rest_sessions",
+        ["workout_id", "start_mutation_id"],
+        unique=True,
+    )
+    op.create_index(
+        "uq_workout_rest_running_workout",
+        "workout_rest_sessions",
+        ["workout_id"],
+        unique=True,
+        postgresql_where=sa.text("status = 'running'"),
+        sqlite_where=sa.text("status = 'running'"),
+    )
+    if bind.dialect.name == "postgresql":
         op.execute(
-            "CREATE UNIQUE INDEX uq_workout_rest_initial_source "
-            "ON workout_rest_sessions (source_set_id) WHERE predecessor_id IS NULL"
+            "ALTER TABLE workout_rest_sessions DROP CONSTRAINT uq_workout_rest_source_set"
         )
-        op.execute(
-            "CREATE UNIQUE INDEX uq_workout_rest_predecessor "
-            "ON workout_rest_sessions (predecessor_id)"
-        )
-        op.execute(
-            "CREATE UNIQUE INDEX uq_workout_rest_start_mutation "
-            "ON workout_rest_sessions (workout_id, start_mutation_id)"
-        )
-        op.execute(
-            "CREATE UNIQUE INDEX uq_workout_rest_running_workout "
-            "ON workout_rest_sessions (workout_id) WHERE status = 'running'"
-        )
-        op.execute("ALTER TABLE workout_rest_sessions DROP CONSTRAINT uq_workout_rest_source_set")
     else:
-        op.create_index(
-            "uq_workout_rest_initial_source",
-            "workout_rest_sessions",
-            ["source_set_id"],
-            unique=True,
-            sqlite_where=sa.text("predecessor_id IS NULL"),
-        )
-        op.create_index(
-            "uq_workout_rest_predecessor",
-            "workout_rest_sessions",
-            ["predecessor_id"],
-            unique=True,
-        )
-        op.create_index(
-            "uq_workout_rest_start_mutation",
-            "workout_rest_sessions",
-            ["workout_id", "start_mutation_id"],
-            unique=True,
-        )
-        op.create_index(
-            "uq_workout_rest_running_workout",
-            "workout_rest_sessions",
-            ["workout_id"],
-            unique=True,
-            sqlite_where=sa.text("status = 'running'"),
-        )
         with op.batch_alter_table("workout_rest_sessions") as batch:
             batch.drop_constraint("uq_workout_rest_source_set", type_="unique")
 
