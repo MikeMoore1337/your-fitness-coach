@@ -793,10 +793,7 @@ def publish_existing_owner_article(
     if actor_user_id <= 0:
         raise WebArticleError("owner_identity_required")
     article = (
-        db.query(WebArticle)
-        .filter(WebArticle.id == article_id)
-        .with_for_update()
-        .one_or_none()
+        db.query(WebArticle).filter(WebArticle.id == article_id).with_for_update().one_or_none()
     )
     if article is None:
         raise WebArticleError("article_not_found")
