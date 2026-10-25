@@ -263,3 +263,29 @@ def test_control_center_cannot_publish_blocked_or_archived_draft(client, monkeyp
     archived = client.post(path, json=body, headers=root)
     assert archived.status_code == 422
     assert archived.json()["detail"] == "article_transition_invalid"
+
+
+def test_control_center_replay_cannot_impersonate_other_owner_release(client, monkeypatch) -> None:
+    article_id = _draft()
+    body = _publish_request(article_id)
+    root = _auth(client, monkeypatch)
+    source = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    via_existing_route = client.post(
+        "/api/v1/admin/articles/publish",
+        json={
+            "article": source,
+            "acknowledge_unverified_evidence": True,
+            "generated_with_ai": True,
+        },
+        headers=root,
+    )
+    assert via_existing_route.status_code == 200, via_existing_route.text
+    assert via_existing_route.json()["article_id"] == article_id
+
+    false_replay = client.post(
+        "/api/v1/admin/articles/drafts/publish",
+        json=body,
+        headers=root,
+    )
+    assert false_replay.status_code == 422
+    assert false_replay.json()["detail"] == "article_already_published_by_other_path"
