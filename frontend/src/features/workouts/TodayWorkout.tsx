@@ -2064,6 +2064,20 @@ export function RestTimer({
         >
           Пропустить
         </Button>
+        {measuredRest?.status === 'running' && !measuredRest.needs_review && (
+          <button
+            type="button"
+            className="active-workout-rest__collapse"
+            aria-label="Свернуть таймер"
+            onClick={() => {
+              captureLayoutAnchor();
+              setCollapsed(true);
+              writeStorage(`${storageKey}:panel-collapsed`, true);
+            }}
+          >
+            <Icon name="chevron-down" size={20} />
+          </button>
+        )}
       </div>
       {compact && (
         <>
@@ -2091,20 +2105,6 @@ export function RestTimer({
             Скрыть
           </Button>
         </>
-      )}
-      {measuredRest?.status === 'running' && !measuredRest.needs_review && !compact && (
-        <button
-          type="button"
-          className="active-workout-rest__collapse"
-          aria-label="Свернуть таймер"
-          onClick={() => {
-            captureLayoutAnchor();
-            setCollapsed(true);
-            writeStorage(`${storageKey}:panel-collapsed`, true);
-          }}
-        >
-          <Icon name="chevron-down" size={20} />
-        </button>
       )}
       {measuredRest && restIsUnconfirmed && (
         <p className="active-workout-rest__sync" role="status">
