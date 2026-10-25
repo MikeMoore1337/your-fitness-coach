@@ -147,7 +147,6 @@ class HermesWebArticleIntakeRequest(BaseModel):
     provenance: HermesGenerationProvenance
 
 
-
 class OwnerWebArticlePublishRequest(BaseModel):
     """Explicit root-owner editorial release; does not attest scientific verification."""
 
