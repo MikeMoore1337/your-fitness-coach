@@ -745,6 +745,7 @@ jobs:
           ACCESS_TOKEN_EXPIRE_MINUTES: "60"
           REFRESH_TOKEN_EXPIRE_DAYS: "30"
           DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
+          TEST_DATABASE_URL: postgresql+psycopg://fitminiapp:test-password@127.0.0.1:5432/fitminiapp_test
           ENABLE_DEV_AUTH: "true"
           TELEGRAM_BOT_TOKEN: test-token
           BOT_INTERNAL_TOKEN: test-bot-internal-token

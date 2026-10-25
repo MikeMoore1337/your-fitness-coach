@@ -340,6 +340,88 @@ def _online_migration_command(active_revision: str, target_revision: str) -> lis
     return command
 
 
+def _production_rest_interval_read_only_preflight() -> None:
+    """Inspect the old live PostgreSQL schema before stopping production writers.
+
+    Executed inside the existing backend container. Uses one read-only SQL
+    transaction and reports only aggregate counts; it never mutates user facts.
+    """
+    code = """
+from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
+from fitminiapp_api.core.config import settings
+engine = create_engine(settings.database_url, poolclass=NullPool)
+with engine.connect() as connection:
+    connection.exec_driver_sql("SET TRANSACTION READ ONLY")
+    version = int(connection.execute(text("SHOW server_version_num")).scalar_one())
+    revision = connection.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
+    duplicates = connection.execute(text(
+        "SELECT count(*) FROM (SELECT workout_id FROM workout_rest_sessions "
+        "WHERE status = 'running' GROUP BY workout_id HAVING count(*) > 1) c"
+    )).scalar_one()
+    legacy_constraint = connection.execute(text(
+        "SELECT count(*) FROM pg_constraint WHERE "
+        "conrelid = 'workout_rest_sessions'::regclass "
+        "AND conname = 'uq_workout_rest_source_set' AND contype = 'u'"
+    )).scalar_one()
+    intervals = connection.execute(text(
+        "SELECT count(*) FROM workout_rest_sessions"
+    )).scalar_one()
+    if not 160000 <= version < 170000:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: PostgreSQL 16 required")
+    if revision != "0130_workout_rest_sessions":
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: unexpected Alembic revision")
+    if duplicates != 0:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: multiple running intervals")
+    if legacy_constraint != 1:
+        raise RuntimeError("REST_INTERVAL_PREFLIGHT_BLOCKED: source unique constraint missing")
+    print(f"REST_INTERVAL_PREFLIGHT=PASS pg=16 duplicate_workouts=0 rows={intervals}")
+engine.dispose()
+"""
+    output = _compose("exec", "-T", "backend", "python", "-c", code, capture=True)
+    verdict = output.stdout.strip()
+    if not verdict.startswith("REST_INTERVAL_PREFLIGHT=PASS pg=16 "):
+        raise DeploymentError("production rest-interval preflight returned invalid evidence")
+    print(verdict)
+
+
+def _rest_interval_schema_is_forward_only(config: DeployConfig, active_revision: str) -> bool:
+    """Detect the one database transition that forbids rollback to an old app.
+
+    The trusted, immutable deployment manifest is revision-bound. If its
+    contents cannot be verified, abort BEFORE stopping any production service.
+    """
+    manifest_name = os.environ.get("DEPLOY_MIGRATION_MANIFEST", "").strip()
+    if not manifest_name:
+        raise DeploymentError("single-slot requires immutable migration manifest")
+    manifest = config.root / manifest_name
+    try:
+        payload = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise DeploymentError("single-slot migration manifest unavailable") from exc
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != 1
+        or payload.get("active_revision") != active_revision
+        or payload.get("target_revision") != config.target_revision
+        or not isinstance(payload.get("changes"), list)
+    ):
+        raise DeploymentError("single-slot migration manifest revision mismatch")
+    changes = payload["changes"]
+    if any(
+        not isinstance(change, dict)
+        or not isinstance(change.get("path"), str)
+        or not isinstance(change.get("status"), str)
+        for change in changes
+    ):
+        raise DeploymentError("single-slot migration manifest contains invalid change")
+    return any(
+        change["path"] == "backend/alembic/versions/0132_rest_interval_unique_swap.py"
+        and change["status"] in {"A", "M"}
+        for change in changes
+    )
+
+
 def _migration_environment(env: dict[str, str]) -> dict[str, str]:
     migration_env = dict(env)
     migration_env["YFC_MIGRATION_PGOPTIONS"] = MIGRATION_PGOPTIONS
@@ -1545,6 +1627,11 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     active_revision = active_revision_path.read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9a-f]{40}", active_revision):
         raise DeploymentError("last-successful-revision is not a full Git SHA")
+    forward_only_schema = (
+        _rest_interval_schema_is_forward_only(config, active_revision)
+        if active_revision != config.target_revision
+        else False
+    )
     repair_mode = os.environ.get("DEPLOY_REPAIR_MODE", "").strip().lower() == "true"
     if repair_mode and os.environ.get("DEPLOY_REPAIR_BASELINE_SHA", "") != active_revision:
         raise DeploymentError(
@@ -1677,6 +1764,12 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
             evidence.capacity = _single_slot_capacity()
             safety.check(frozenset({"backend", "worker", "bot"}))
 
+        if forward_only_schema:
+            with _stage(evidence, "rest_interval_production_read_only_preflight"):
+                safety.check(frozenset({"backend", "worker", "bot"}))
+                _production_rest_interval_read_only_preflight()
+                safety.check(frozenset({"backend", "worker", "bot"}))
+
         with _stage(evidence, "maintenance_stop"):
             services_stopped = True
             _stop_legacy_services(config)
@@ -1752,6 +1845,7 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
             and old_backend
             and old_bot
             and safety is not None
+            and not forward_only_schema
         ):
             rollback_stage = StageRecord(name="single_slot_rollback", started_at=time.time())
             evidence.stages.append(rollback_stage)
@@ -1784,6 +1878,12 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
             finally:
                 rollback_stage.ended_at = time.time()
         elif services_stopped:
+            if forward_only_schema and migration_completed:
+                print(
+                    "REST_INTERVAL_FORWARD_FIX_ONLY: refusing automatic rollback to "
+                    "an incompatible previous backend after the rest-interval schema switch",
+                    file=sys.stderr,
+                )
             evidence.verdict = "manual intervention required"
         else:
             evidence.verdict = "not stopped"

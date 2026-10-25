@@ -3326,6 +3326,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workouts/rest-sessions/{predecessor_id}/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restart Rest Session */
+        post: operations["restart_rest_session_api_v1_workouts_rest_sessions__predecessor_id__restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workouts/rest-sessions/{session_id}/actions": {
         parameters: {
             query?: never;
@@ -15988,6 +16005,16 @@ export interface components {
             /** Corrected Seconds */
             corrected_seconds?: number | null;
         };
+        /** RestRestartRequest */
+        RestRestartRequest: {
+            /**
+             * Started At
+             * Format: date-time
+             */
+            started_at: string;
+            /** Mutation Id */
+            mutation_id: string;
+        };
         /** RestSessionResponse */
         RestSessionResponse: {
             /** Id */
@@ -16020,6 +16047,8 @@ export interface components {
             quality: string;
             /** Version */
             version: number;
+            /** Start Mutation Id */
+            start_mutation_id?: string | null;
         };
         /** RestStartRequest */
         RestStartRequest: {
@@ -25188,6 +25217,41 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["RestStartRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_rest_session_api_v1_workouts_rest_sessions__predecessor_id__restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                predecessor_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestRestartRequest"];
             };
         };
         responses: {
