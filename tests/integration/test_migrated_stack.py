@@ -646,10 +646,11 @@ def test_rest_0130_history_survives_pg16_unique_swap_and_blocks_unsafe_downgrade
     database_url = os.environ.get("DATABASE_URL", "")
     assert database_url.startswith("postgresql+psycopg://")
 
-    from alembic import command
     from alembic.config import Config
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import make_url
+
+    from alembic import command
 
     root = Path(__file__).resolve().parents[2]
     database = make_url(database_url)
@@ -761,7 +762,7 @@ def test_rest_0130_history_survives_pg16_unique_swap_and_blocks_unsafe_downgrade
                 )
             )
             connection.commit()
-            with pytest.raises(RuntimeError, match="Unsafe downgrade.*forward-fix"):
+            with pytest.raises(RuntimeError, match=r"Unsafe downgrade.*forward-fix"):
                 command.downgrade(config, "0131_rest_interval_expand")
             connection.rollback()
 
