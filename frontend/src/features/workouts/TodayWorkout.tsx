@@ -1909,7 +1909,7 @@ export function RestTimer({
                   aria-live="polite"
                   title={restPendingLabel}
                 >
-                  <Icon name={isOfflineRest ? 'cloud-off' : 'cloud-upload'} size={14} />
+                  <Icon name={isOfflineRest ? 'warning' : 'sync'} size={16} />
                   <span className="sr-only">{restPendingLabel}</span>
                 </span>
               )}
