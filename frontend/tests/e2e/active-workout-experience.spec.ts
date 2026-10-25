@@ -6606,12 +6606,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     const journal = await page.evaluate(() =>
       Object.keys(localStorage)
         .filter((key) => key.endsWith(':measured:v1'))
-        .flatMap((key) =>
-          JSON.parse(localStorage.getItem(key) || '[]') as Array<{
-            status: string;
-            start_mutation_id: string;
-          }>,
-        ),
+        .flatMap((key) => JSON.parse(localStorage.getItem(key) || '[]')),
     );
     expect(journal).toHaveLength(1);
     expect(journal[0]?.status).toBe('skipped');
