@@ -1560,6 +1560,14 @@ export function RestTimer({
   const isCompletedLatestRest = latestRest?.status === 'completed';
   const isSkippedLatestRest = latestRest?.status === 'skipped';
   const isOfflineRest = typeof navigator !== 'undefined' && !navigator.onLine;
+  let collapsedRestStatus = 'Отдых идёт';
+  if (restSaveError) {
+    collapsedRestStatus = restSaveError.startsWith('Конфликт')
+      ? 'Конфликт сохранения'
+      : 'Ошибка сохранения';
+  } else if (restIsUnconfirmed) {
+    collapsedRestStatus = isOfflineRest ? 'Нет сети' : 'Отдых сохраняется…';
+  }
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const measuredElapsedSeconds =
@@ -1853,17 +1861,7 @@ export function RestTimer({
       {collapsed && isRunningRest ? (
         <div className="active-workout-rest__collapsed">
           <div>
-            <strong aria-live="polite">
-              {restSaveError
-                ? restSaveError.startsWith('Конфликт')
-                  ? 'Конфликт сохранения'
-                  : 'Ошибка сохранения'
-                : restIsUnconfirmed
-                  ? isOfflineRest
-                    ? 'Нет сети'
-                    : 'Отдых сохраняется…'
-                  : 'Отдых идёт'}
-            </strong>
+            <strong aria-live="polite">{collapsedRestStatus}</strong>
             <span>
               ФАКТ {measuredRest.needs_review ? '—' : formatWorkoutDuration(measuredElapsedSeconds)}
             </span>
