@@ -13,9 +13,7 @@ from fitminiapp_api.schemas.articles import OwnerArticleReviewDetail, OwnerArtic
 INBOX_STATUSES = ("draft", "review", "update_required")
 
 
-def _latest_revision(
-    db: Session, article: WebArticle
-) -> WebArticleRevision | None:
+def _latest_revision(db: Session, article: WebArticle) -> WebArticleRevision | None:
     return (
         db.query(WebArticleRevision)
         .filter(
@@ -81,9 +79,7 @@ def list_root_article_drafts(
     )
     if not articles:
         return []
-    revision_keys = {
-        (article.id, article.content_version) for article in articles
-    }
+    revision_keys = {(article.id, article.content_version) for article in articles}
     revisions = (
         db.query(WebArticleRevision)
         .filter(WebArticleRevision.article_id.in_([article.id for article in articles]))
@@ -94,12 +90,12 @@ def list_root_article_drafts(
         for revision in revisions
         if (revision.article_id, revision.content_version) in revision_keys
     }
-    return [_row(article, selected.get((article.id, article.content_version))) for article in articles]
+    return [
+        _row(article, selected.get((article.id, article.content_version))) for article in articles
+    ]
 
 
-def get_root_article_draft(
-    db: Session, article_id: str
-) -> OwnerArticleReviewDetail | None:
+def get_root_article_draft(db: Session, article_id: str) -> OwnerArticleReviewDetail | None:
     """Show exact persisted source evidence, never fabricated verification."""
     article = db.get(WebArticle, article_id)
     if article is None or article.status not in INBOX_STATUSES:
