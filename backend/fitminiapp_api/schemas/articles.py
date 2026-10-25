@@ -163,9 +163,7 @@ class OwnerExistingDraftPublishRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     article_id: str = Field(..., min_length=32, max_length=32, pattern=r"^[0-9a-f]{32}$")
-    expected_content_hash: str = Field(
-        ..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$"
-    )
+    expected_content_hash: str = Field(..., min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
     expected_content_version: int = Field(..., ge=1)
     acknowledge_unverified_evidence: Literal[True]
     confirm_exact_revision: Literal[True]
