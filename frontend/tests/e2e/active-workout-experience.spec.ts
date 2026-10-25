@@ -902,7 +902,7 @@ test.describe('#1097 rest clock typography and responsive layout', () => {
         expect(result.stopRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.actualRight).toBeLessThanOrEqual(result.panelRight + 1);
         expect(result.documentOverflow).toBeLessThanOrEqual(1);
-        expect(result.actions).toHaveLength(3);
+        expect(result.actions).toHaveLength(4);
         expect(result.actions.every((buttonWidth) => buttonWidth >= 44)).toBe(true);
         await panel.screenshot({
           path: test.info().outputPath(`rest-clock-${theme}-${width}.png`),
@@ -1360,7 +1360,7 @@ async function verifyIssue1099RestSwipe(page: Page, info: TestInfo, surface: 'br
         },
       ),
     ),
-  ).toEqual([true, true, true, true]);
+  ).toEqual([true, true, true, true, true]);
   expect(await reps.inputValue()).toBe('12');
   expect(server.readSet(202).is_completed).toBe(false);
   expect(server.patches).toHaveLength(patchCountBeforeGesture);
@@ -6092,7 +6092,7 @@ test('rest timer reaches its final state from the deadline without user events',
   await expect(panel).toHaveClass(/is-compact/);
   await expect(panel).toContainText('Отдых завершён по отметке');
   await panel.getByRole('button', { name: 'Скрыть' }).click();
-  await expect(panel).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
 });
 
 test('policy C offers manual rest recovery after fifteen minutes away past the deadline', async ({
@@ -6593,7 +6593,7 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     await expect(context.panel).toHaveClass(/is-compact/);
     await unchanged(page, context);
     await context.panel.getByRole('button', { name: 'Скрыть' }).click();
-    await expect(context.panel).toHaveCount(0);
+    await expect(context.panel.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
     await unchanged(page, context);
   });
 
