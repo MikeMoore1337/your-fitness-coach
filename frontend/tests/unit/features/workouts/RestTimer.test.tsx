@@ -101,7 +101,9 @@ describe('RestTimer', () => {
       );
     });
 
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    expect(loadRestJournal(7, 42)).toHaveLength(1);
   });
 
   it('uses an uppercase FACT label with a real, explicitly stoppable measured clock', () => {
