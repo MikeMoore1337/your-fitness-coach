@@ -1,4 +1,5 @@
 """I3 educational draft contract: offline only, no YFC POST or publication."""
+
 from __future__ import annotations
 
 import copy
@@ -28,7 +29,7 @@ def test_draft_matches_actual_yfc_proposal_schema() -> None:
     assert proposal.risk_level == "moderate"
     assert len(proposal.body_sections) >= 2
     assert len(proposal.sources) == 3
-    assert set(claim.claim_id for claim in proposal.claims) == {
+    assert {claim.claim_id for claim in proposal.claims} == {
         item.claim_id for item in proposal.claim_source_matrix
     }
     assert all(str(source.url).startswith("https://") for source in proposal.sources)
@@ -48,16 +49,24 @@ def test_every_claim_requires_real_editorial_review() -> None:
 def test_not_an_intake_request_and_not_a_publication_authorization() -> None:
     draft = load_draft()
     for prohibited_field in (
-        "candidate_id", "request_nonce", "idempotency_key",
-        "provenance", "schema_version", "publish", "publication_allowed",
-        "editorial_approval", "expert_approval",
+        "candidate_id",
+        "request_nonce",
+        "idempotency_key",
+        "provenance",
+        "schema_version",
+        "publish",
+        "publication_allowed",
+        "editorial_approval",
+        "expert_approval",
     ):
         assert prohibited_field not in draft
     assert draft["cta"] == {}
     assert "sports_nutrition" in draft["topics"]
 
 
-@pytest.mark.parametrize("change", ["missing_source", "missing_matrix", "http_source", "high_risk_no_reviewer"])
+@pytest.mark.parametrize(
+    "change", ["missing_source", "missing_matrix", "http_source", "high_risk_no_reviewer"]
+)
 def test_schema_refuses_invalid_or_bypassed_draft(change: str) -> None:
     draft = copy.deepcopy(load_draft())
     if change == "missing_source":
