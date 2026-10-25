@@ -289,6 +289,28 @@ describe('RestTimer', () => {
     expect(loadRestJournal(7, 42)[0]?.start_mutation_id).toBe(originalId);
   });
 
+  it('hides the terminal notice without removing the manual restart action', () => {
+    mount();
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent('fit:rest', {
+          detail: { workoutId: 42, setId: 201, seconds: 90 },
+        }),
+      );
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Завершить отдых' }));
+    expect(screen.getByText('Отдых завершён по отметке')).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Скрыть' }));
+    expect(screen.queryByText('Отдых завершён по отметке')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Скрыть' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Начать отдых' }));
+    expect(screen.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+    expect(loadRestJournal(7, 42)).toHaveLength(2);
+  });
+
   it('starts another interval only after stopping the previous one, without completing a set', () => {
     mount();
     act(() => {
