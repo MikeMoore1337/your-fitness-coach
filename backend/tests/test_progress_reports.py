@@ -496,6 +496,13 @@ def test_progress_report_validates_bounds_and_trainer_access_revocation(client) 
     )
     assert allowed.status_code == 200, allowed.text
     assert allowed.json()["subject"]["role"] == "client"
+    # Coach OS uses the same authoritative rest aggregate as the owner report.
+    own = client.get(
+        "/api/v1/workouts/progress/report?period=days_7", headers=own_headers
+    )
+    assert own.status_code == 200, own.text
+    assert "rest" in own.json()["training"]
+    assert allowed.json()["training"]["rest"] == own.json()["training"]["rest"]
     denied = client.get(
         f"/api/v1/coach/clients/{user_id}/progress-report?period=days_7",
         headers=other_coach_headers,
