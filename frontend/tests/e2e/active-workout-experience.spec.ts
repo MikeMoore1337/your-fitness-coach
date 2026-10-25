@@ -6801,9 +6801,9 @@ for (const theme of ['light', 'dark'] as const) {
 }
 
 for (const theme1166 of ['dark', 'light'] as const) {
-  for (const width1166 of [320, 393]) {
+  for (const width1166 of [320, 360, 393, 430, 1440]) {
     test(`issue1166 real AFTER ${theme1166} ${width1166}`, async ({ page }) => {
-      await page.setViewportSize({ width: width1166, height: 844 });
+      await page.setViewportSize({ width: width1166, height: width1166 === 1440 ? 1000 : 844 });
       await page.emulateMedia({ colorScheme: theme1166, reducedMotion: 'reduce' });
       await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), theme1166);
       const server = await mockActiveWorkout(page);
