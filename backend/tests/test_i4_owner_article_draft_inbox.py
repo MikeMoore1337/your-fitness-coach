@@ -156,3 +156,102 @@ def test_root_inbox_bounded_and_excludes_published(client, monkeypatch) -> None:
 
     assert client.get(path, headers=root).json() == []
     assert client.get(f"{path}/{draft_id}", headers=root).status_code == 404
+
+
+def _publish_request(draft_id: str) -> dict:
+    with SessionLocal() as db:
+        article = db.get(WebArticle, draft_id)
+        assert article is not None
+        return {
+            "article_id": draft_id,
+            "expected_content_hash": article.content_hash,
+            "expected_content_version": article.content_version,
+            "acknowledge_unverified_evidence": True,
+            "confirm_exact_revision": True,
+        }
+
+
+def test_control_center_root_must_explicitly_publish_exact_draft(client, monkeypatch) -> None:
+    article_id = _draft()
+    path = "/api/v1/admin/articles/drafts/publish"
+    body = _publish_request(article_id)
+    slug = json.loads(FIXTURE.read_text(encoding="utf-8"))["slug"]
+
+    assert client.post(path, json=body).status_code in {401, 403}
+    user = client.post(
+        "/api/v1/auth/dev-login",
+        json={"telegram_user_id": 939_405, "is_admin": True},
+    )
+    assert user.status_code == 200
+    user_headers = {"Authorization": f"Bearer {user.json()['access_token']}"}
+    assert client.post(path, json=body, headers=user_headers).status_code == 403
+    assert client.get(f"/api/v1/public/articles/{slug}").status_code == 404
+
+    root = _auth(client, monkeypatch)
+    missing_consent = dict(body, confirm_exact_revision=False)
+    assert client.post(path, json=missing_consent, headers=root).status_code == 422
+    missing_ack = dict(body, acknowledge_unverified_evidence=False)
+    assert client.post(path, json=missing_ack, headers=root).status_code == 422
+    mismatch = dict(body, expected_content_hash="0" * 64)
+    conflict = client.post(path, json=mismatch, headers=root)
+    assert conflict.status_code == 409
+    assert conflict.json()["detail"] == "article_revision_conflict"
+    stale = dict(body, expected_content_version=2)
+    assert client.post(path, json=stale, headers=root).status_code == 409
+    assert client.get(f"/api/v1/public/articles/{slug}").status_code == 404
+
+    result = client.post(path, json=body, headers=root)
+    assert result.status_code == 200, result.text
+    published = result.json()
+    assert published["article_id"] == article_id
+    assert published["content_version"] == 1
+    assert published["article_status"] == "published"
+    assert published["editorial_decision"] == "root_owner_publication"
+    assert published["scientific_verification"] == "not_attested"
+    same = client.post(path, json=body, headers=root)
+    assert same.status_code == 200
+    assert same.json() == published
+
+    with SessionLocal() as db:
+        article = db.get(WebArticle, article_id)
+        assert article is not None
+        assert article.status == "published"
+        assert all(row["review_status"] == "pending" for row in article.claim_source_matrix)
+        revision = db.query(WebArticleRevision).filter(
+            WebArticleRevision.article_id == article_id,
+        ).one()
+        assert revision.status == "published"
+        audits = db.query(AuditEvent).filter(
+            AuditEvent.action == "web_article.published",
+            AuditEvent.resource_id == article_id,
+        ).all()
+        assert len(audits) == 1
+        assert audits[0].actor_user_id is not None
+        assert audits[0].details["editorial_decision"] == "root_owner_publication"
+    public = client.get(f"/api/v1/public/articles/{slug}")
+    assert public.status_code == 200
+    assert all(r["review_status"] == "pending" for r in public.json()["claim_source_matrix"])
+
+
+def test_control_center_cannot_publish_blocked_or_archived_draft(client, monkeypatch) -> None:
+    article_id = _draft()
+    body = _publish_request(article_id)
+    root = _auth(client, monkeypatch)
+    path = "/api/v1/admin/articles/drafts/publish"
+    with get_session_context() as db:
+        article = db.get(WebArticle, article_id)
+        assert article is not None
+        matrix = [dict(item) for item in article.claim_source_matrix]
+        matrix[0]["review_status"] = "blocked"
+        article.claim_source_matrix = matrix
+    blocked = client.post(path, json=body, headers=root)
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"] == "claim_source_explicitly_blocked"
+    with get_session_context() as db:
+        article = db.get(WebArticle, article_id)
+        assert article is not None
+        assert article.status == "draft"
+        article.status = "archived"
+    archived = client.post(path, json=body, headers=root)
+    assert archived.status_code == 422
+    assert archived.json()["detail"] == "article_transition_invalid"
