@@ -4612,26 +4612,32 @@ async function runIssue1164SpacingScenario(
       const previous = row?.querySelector<HTMLElement>('.active-workout-set__previous');
       const prefill = row?.querySelector<HTMLElement>('.active-workout-set__prefill-actions');
       const context = row?.querySelector<HTMLElement>('.active-workout-set__context');
-      if (!row || !previous || !prefill || !context) return null;
+      const controls = row?.querySelector<HTMLElement>('.active-workout-set__controls');
+      if (!row || !previous || !prefill || !context || !controls) return null;
       const prefillStyle = getComputedStyle(prefill);
       return {
         rowHeight: row.getBoundingClientRect().height,
         prefillHeight: prefill.getBoundingClientRect().height,
         prefillVisibility: prefillStyle.visibility,
         contextGap: context.getBoundingClientRect().top - previous.getBoundingClientRect().bottom,
+        prefillAfterControlsGap:
+          prefill.getBoundingClientRect().top - controls.getBoundingClientRect().bottom,
       };
     });
 
   const beforePrefill = await measure();
   expect(beforePrefill).not.toBeNull();
   expect(beforePrefill!.prefillHeight).toBeGreaterThanOrEqual(44);
-  expect(beforePrefill!.contextGap).toBeGreaterThan(48);
+  expect(beforePrefill!.prefillVisibility).toBe('visible');
+  expect(beforePrefill!.contextGap).toBeLessThanOrEqual(24);
+  expect(beforePrefill!.prefillAfterControlsGap).toBeGreaterThanOrEqual(-1);
 
   await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
   await expect(secondSet.locator('.active-workout-set__prefill-actions')).toHaveClass(/is-hidden/);
   const afterPrefill = await measure();
   expect(afterPrefill).not.toBeNull();
   expect(afterPrefill!.prefillHeight).toBe(0);
+  expect(afterPrefill!.prefillVisibility).toBe('hidden');
   expect(afterPrefill!.contextGap).toBeLessThanOrEqual(24);
   await captureState('03-rest-prefill-dismissed', secondSet, true);
 
@@ -4652,6 +4658,7 @@ async function runIssue1164SpacingScenario(
   );
   const focusedPrefill = await measure();
   expect(focusedPrefill?.prefillHeight).toBe(0);
+  expect(focusedPrefill?.prefillVisibility).toBe('hidden');
   await weight.blur();
   await expect(weight).not.toBeFocused();
   const afterBlur = await measure();

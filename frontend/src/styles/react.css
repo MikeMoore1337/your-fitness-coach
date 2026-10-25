@@ -5050,17 +5050,12 @@ button.today-text-link {
   flex-wrap: wrap;
   gap: 8px;
   margin: -3px 0 0 48px;
+  order: 1;
 }
 .active-workout-set__prefill-actions.is-hidden {
   display: none;
   visibility: hidden;
   pointer-events: none;
-}
-html[data-yfc-layout-surface='telegram'] .active-workout-set__prefill-actions.is-hidden,
-html[data-yfc-pwa-focus-placement='true'] .active-workout-set__prefill-actions.is-hidden {
-  /* Keep the iOS keyboard anchor stable while moving the hidden reserve after the controls. */
-  display: flex;
-  order: 1;
 }
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;
@@ -5158,6 +5153,7 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout-set__prefill-actions.i
   background: var(--secondary-hover);
 }
 .active-workout-set__advanced {
+  order: 2;
   border-top: 1px solid var(--border);
 }
 .active-workout-set__advanced > summary,

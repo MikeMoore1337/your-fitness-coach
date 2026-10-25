@@ -114,5 +114,6 @@ describe('active workout prefill layout', () => {
     )?.[1];
 
     expect(rule).toContain('display: none;');
+    expect(styles).toMatch(/\.active-workout-set__prefill-actions\s*\{[^}]*order: 1;/s);
   });
 });
