@@ -1,4 +1,4 @@
-"""Add nullable rest interval identity without rewriting historical facts."""
+"""Add nullable workout rest lineage columns (transaction-safe expand)."""
 
 from collections.abc import Sequence
 
@@ -12,9 +12,8 @@ depends_on: str | Sequence[str] | None = None
 
 online_rollout_phase = "expand"
 online_rollout_notes = (
-    "Only nullable columns. Existing rest rows retain their IDs, times and statuses. "
-    "Indexes and uniqueness replacement are applied transactionally in 0132 during "
-    "the authorized single-slot release, avoiding loss of Alembic's transaction lock."
+    "Add three nullable metadata-only columns; preserve all historical rest records. "
+    "Indexes and legacy uniqueness swap are a separately guarded single-slot step 0132."
 )
 
 
