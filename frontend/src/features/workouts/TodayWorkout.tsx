@@ -1906,7 +1906,7 @@ export function RestTimer({
               {restIsUnconfirmed && (
                 <span
                   className="active-workout-rest__next-status"
-                  role="status"
+                  aria-live="polite"
                   title={restPendingLabel}
                 >
                   <Icon name={isOfflineRest ? 'cloud-off' : 'cloud-upload'} size={14} />
