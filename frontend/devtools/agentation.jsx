@@ -1,3 +1,4 @@
+/* global window, document */
 // Operator-installed optional dependency: npm install --no-save --package-lock=false agentation@3.1.2
 // Served only by the Vite development server after explicit YFC_AGENTATION=1.
 import { Agentation } from 'agentation';
