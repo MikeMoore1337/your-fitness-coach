@@ -1825,27 +1825,6 @@ export function RestTimer({
     };
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
-  const startNewRest = () => {
-    if (!restartCandidate || restRecords.some((row) => row.status === 'running')) return;
-    const started = restartMeasuredRest(
-      userId,
-      workoutId,
-      restartCandidate.start_mutation_id,
-      Date.now(),
-    );
-    if (!started) return;
-    setNow(Date.now());
-    setMeasuredRest(started);
-    setDeadline(started.deadline);
-    setCompletedNotice(null);
-    setCompact(false);
-    setCollapsed(false);
-    setRestSaveError(null);
-    setAnnouncement('Новый интервал отдыха');
-    writeStorage(storageKey, started.deadline);
-    writeStorage(`${storageKey}:panel-collapsed`, false);
-  };
-
   if (!deadline && !completedNotice && !restartCandidate) return null;
   return (
     <aside
@@ -2096,7 +2075,26 @@ export function RestTimer({
                 </span>
               )}
               {restartCandidate && (
-                <Button type="button" variant="secondary" glass="clear" onClick={startNewRest}>
+                <Button type="button" variant="secondary" glass="clear" onClick={() => {
+    if (!restartCandidate || restRecords.some((row) => row.status === 'running')) return;
+    const started = restartMeasuredRest(
+      userId,
+      workoutId,
+      restartCandidate.start_mutation_id,
+      Date.now(),
+    );
+    if (!started) return;
+    setNow(Date.now());
+    setMeasuredRest(started);
+    setDeadline(started.deadline);
+    setCompletedNotice(null);
+    setCompact(false);
+    setCollapsed(false);
+    setRestSaveError(null);
+    setAnnouncement('Новый интервал отдыха');
+    writeStorage(storageKey, started.deadline);
+    writeStorage(`${storageKey}:panel-collapsed`, false);
+                }}>
                   Начать отдых
                 </Button>
               )}
