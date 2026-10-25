@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>#1162 — Active Workout: действия завершённого подхода</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: Inter, system-ui, sans-serif;
+        background: #111;
+        color: #f3f5f5;
+      }
+      body {
+        max-width: 1440px;
+        margin: 0 auto;
+        padding: 28px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Oswald, Impact, sans-serif;
+        letter-spacing: 0.02em;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .note {
+        max-width: 80ch;
+        padding: 14px 16px;
+        border: 1px solid #68736e;
+        border-radius: 12px;
+        background: #1b211f;
+      }
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      figure {
+        margin: 0;
+        padding: 10px;
+        border: 1px solid #4b5651;
+        border-radius: 12px;
+        background: #1a1e1d;
+      }
+      figure img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 8px;
+        background: #000;
+      }
+      figcaption {
+        margin-top: 9px;
+        font-size: 0.85rem;
+        line-height: 1.35;
+      }
+      code {
+        overflow-wrap: anywhere;
+      }
+      summary {
+        cursor: pointer;
+        margin: 18px 0 12px;
+        font-weight: 800;
+      }
+      @media (prefers-color-scheme: light) {
+        :root {
+          background: #f5f7f6;
+          color: #171b1a;
+        }
+        .note,
+        figure {
+          border-color: #9ba49f;
+          background: #fff;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>#1162 — Active Workout</h1>
+      <p>
+        Компоновка действий завершённого подхода: «Вернуть в работу» находится в
+        раскрытии «Действия».
+      </p>
+      <div class="note">
+        <strong>Границы доказательства.</strong>
+        Кадры сняты на синтетическом fixture в Playwright. BEFORE — актуальный
+        на момент диагностики <code>origin/master</code>
+        <code>94a9b5f3875bae858d0ea816cc47fc9d22ae9dd0</code>; AFTER — ветка
+        исправления. Это browser evidence, не подтверждение физического
+        устройства, Telegram production или owner visual approval.
+      </div>
+
+      <section>
+        <h2>BEFORE — базовая компоновка</h2>
+        <p>Chromium, 393 px и 320 px; Dark/Light; четыре состояния сценария.</p>
+        <div id="before-gallery" class="gallery"></div>
+      </section>
+
+      <section>
+        <h2>AFTER — финальный кандидат</h2>
+        <p>
+          Chromium/WebKit, 320/360/393/430 px, Dark/Light; четыре состояния
+          сценария.
+        </p>
+        <div id="after-gallery" class="gallery"></div>
+      </section>
+    </main>
+    <script>
+      const stateLabels = {
+        "01-completed-closed": "1. Завершённый подход, меню закрыто",
+        "02-actions-open": "2. «Действия» раскрыто",
+        "03-reopen-confirmation": "3. Подтверждение возврата",
+        "04-returned-to-work": "4. Результат после возврата",
+      };
+      const themes = ["dark", "light"];
+      const widths = [320, 360, 393, 430];
+      const states = Object.keys(stateLabels);
+
+      function addCard(container, src, label) {
+        const figure = document.createElement("figure");
+        const image = document.createElement("img");
+        image.src = src;
+        image.loading = "lazy";
+        image.alt = label;
+        const caption = document.createElement("figcaption");
+        caption.textContent = label;
+        figure.append(image, caption);
+        container.append(figure);
+      }
+
+      const before = document.querySelector("#before-gallery");
+      for (const width of [393, 320]) {
+        for (const theme of themes) {
+          for (const state of states) {
+            addCard(
+              before,
+              `before/chromium-${width}/chromium-${width}-${theme}-${state}.png`,
+              `BEFORE · Chromium · ${width}px · ${theme} · ${stateLabels[state]}`,
+            );
+          }
+        }
+      }
+
+      const after = document.querySelector("#after-gallery");
+      for (const browser of ["chromium", "webkit"]) {
+        for (const width of widths) {
+          for (const theme of themes) {
+            for (const state of states) {
+              addCard(
+                after,
+                `after/${browser}-${width}-${theme}-${state}.png`,
+                `AFTER · ${browser} · ${width}px · ${theme} · ${stateLabels[state]}`,
+              );
+            }
+          }
+        }
+      }
+    </script>
+  </body>
+</html>
