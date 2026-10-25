@@ -24,6 +24,7 @@ import {
   beginMeasuredRest,
   loadRestJournal,
   restJournalStorageKey,
+  restartMeasuredRest,
   syncRestJournal,
   updateMeasuredRest,
 } from '../../../../src/features/workouts/restSessions';
@@ -266,4 +267,118 @@ describe('rest journal concurrent mutation preservation #960', () => {
     expect(row?.pending).toHaveLength(1);
     expect(row?.pending[0]?.action).toBe('complete');
   });
+  it('persists the predecessor action before an explicit restart on the same set', async () => {
+    const start = new Date('2026-10-18T08:00:00Z').getTime();
+    const initial = beginMeasuredRest(31, 44, 72, 90, start)!;
+    updateMeasuredRest(31, 44, 72, 'complete', start + 25_000);
+    const repeat = restartMeasuredRest(31, 44, initial.start_mutation_id, start + 30_000)!;
+    expect(loadRestJournal(31, 44)).toHaveLength(2);
+
+    mockApi.mockImplementation((url: string) => {
+      if (url === '/api/v1/workouts/44/rest-sessions') {
+        return Promise.resolve({
+          id: 110,
+          workout_id: 44,
+          source_set_id: 72,
+          started_at: initial.started_at,
+          adjusted_seconds: 90,
+          version: 1,
+          status: 'running',
+        });
+      }
+      if (url === '/api/v1/workouts/rest-sessions/110/actions') {
+        return Promise.resolve({
+          id: 110,
+          workout_id: 44,
+          source_set_id: 72,
+          started_at: initial.started_at,
+          adjusted_seconds: 90,
+          version: 2,
+          status: 'completed',
+        });
+      }
+      if (url === '/api/v1/workouts/rest-sessions/110/restart') {
+        return Promise.resolve({
+          id: 111,
+          workout_id: 44,
+          source_set_id: 72,
+          started_at: repeat.started_at,
+          start_mutation_id: repeat.start_mutation_id,
+          adjusted_seconds: 90,
+          version: 1,
+          status: 'running',
+        });
+      }
+      throw new Error('Unexpected rest API request: ' + url);
+    });
+
+    await syncRestJournal(31, 44);
+    expect(mockApi.mock.calls.map((call) => call[0])).toEqual([
+      '/api/v1/workouts/44/rest-sessions',
+      '/api/v1/workouts/rest-sessions/110/actions',
+      '/api/v1/workouts/rest-sessions/110/restart',
+    ]);
+    expect(mockApi.mock.calls[2]?.[1]?.body).toMatchObject({
+      started_at: repeat.started_at,
+      mutation_id: repeat.start_mutation_id,
+    });
+    const saved = loadRestJournal(31, 44);
+    expect(saved[0]).toMatchObject({ server_id: 110, status: 'completed', pending: [] });
+    expect(saved[1]).toMatchObject({
+      server_id: 111,
+      status: 'running',
+      start_mutation_id: repeat.start_mutation_id,
+    });
+
+    updateMeasuredRest(31, 44, 72, 'skip', start + 35_000);
+    mockApi.mockImplementationOnce(() => Promise.resolve({
+      id: 111,
+      workout_id: 44,
+      source_set_id: 72,
+      started_at: repeat.started_at,
+      version: 2,
+      status: 'skipped',
+    }));
+    await syncRestJournal(31, 44);
+    expect(loadRestJournal(31, 44)[0]).toMatchObject({ server_id: 110, status: 'completed' });
+    expect(loadRestJournal(31, 44)[1]).toMatchObject({ server_id: 111, status: 'skipped' });
+  });
+
+  it('does not accept a stale restart ACK for the predecessor interval', async () => {
+    const start = new Date('2026-10-18T08:00:00Z').getTime();
+    const first = beginMeasuredRest(31, 44, 73, 90, start)!;
+    updateMeasuredRest(31, 44, 73, 'skip', start + 15_000);
+    const repeat = restartMeasuredRest(31, 44, first.start_mutation_id, start + 20_000)!;
+
+    mockApi.mockResolvedValueOnce({
+      id: 200,
+      workout_id: 44,
+      source_set_id: 73,
+      started_at: first.started_at,
+      adjusted_seconds: 90,
+      version: 1,
+    });
+    mockApi.mockResolvedValueOnce({
+      id: 200,
+      workout_id: 44,
+      source_set_id: 73,
+      started_at: first.started_at,
+      adjusted_seconds: 90,
+      version: 2,
+    });
+    mockApi.mockResolvedValueOnce({
+      id: 200,
+      workout_id: 44,
+      source_set_id: 73,
+      started_at: repeat.started_at,
+      adjusted_seconds: 90,
+      version: 1,
+    });
+    await expect(syncRestJournal(31, 44)).rejects.toThrow('rest_restart_reused_predecessor');
+    expect(loadRestJournal(31, 44)[1]).toMatchObject({
+      start_mutation_id: repeat.start_mutation_id,
+      server_id: undefined,
+    });
+  });
+
 });
