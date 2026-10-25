@@ -627,3 +627,51 @@ def test_pg16_concurrent_restart_same_mutation_is_one_interval(client):
     rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=owner).json()
     assert len(rows) == 2
     assert len([r for r in rows if r["status"] == "running"]) == 1
+
+
+def test_pg16_simultaneous_same_set_click_replays_one_initial_interval(client):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    import pytest
+
+    from fitminiapp_api.db.session import engine
+
+    if engine.dialect.name != "postgresql":
+        pytest.skip("Concurrent double click requires PostgreSQL")
+    owner = _auth(client, 996026)
+    workout = _new_workout(client, owner)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=owner,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
+    payload = {
+        "source_set_id": sid,
+        "started_at": datetime.now(UTC).isoformat(),
+        "mutation_id": str(uuid4()),
+    }
+    barrier = Barrier(2)
+
+    def start(_):
+        barrier.wait(timeout=10)
+        return client.post(
+            f"/api/v1/workouts/{wid}/rest-sessions",
+            headers=owner,
+            json=payload,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(start, range(2)))
+    assert [response.status_code for response in results] == [200, 200], [
+        response.text for response in results
+    ]
+    assert results[0].json()["id"] == results[1].json()["id"]
+    rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=owner).json()
+    assert len(rows) == 1
+    assert rows[0]["status"] == "running"
