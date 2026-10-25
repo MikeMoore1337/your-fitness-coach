@@ -113,6 +113,56 @@ describe('program preview factual mapping', () => {
     expect(facts.find((fact) => fact.label === 'Недель в источнике')?.value).toBe('12 недель');
   });
 
+  it('localizes the controlled equipment identifiers from the program source', () => {
+    const facts = programPreviewFacts(
+      template({
+        program_metadata: {
+          equipment: [
+            'bodyweight',
+            'dumbbell',
+            'barbell',
+            'bench',
+            'rack',
+            'cable',
+            'machine',
+            'kettlebell',
+            'cardio',
+            'other',
+          ],
+        },
+      }),
+    );
+    expect(facts.find((fact) => fact.label === 'Оборудование')?.value).toBe(
+      'Собственный вес · Гантели · Штанга · Скамья · Стойка/силовая рама · Тросовый блок · Тренажёр · Гиря · Кардиооборудование · Другое',
+    );
+  });
+
+  it('deduplicates mixed identifiers and keeps user-provided names', () => {
+    const facts = programPreviewFacts(
+      template({
+        program_metadata: {
+          equipment: ['barbell', 'Штанга', 'rack', 'rack', 'Домашний турник'],
+        },
+      }),
+    );
+    expect(facts.find((fact) => fact.label === 'Оборудование')?.value).toBe(
+      'Штанга · Стойка/силовая рама · Домашний турник',
+    );
+  });
+
+  it('does not expose unknown technical identifiers and reports incomplete values honestly', () => {
+    expect(
+      programPreviewFacts(template({ program_metadata: { equipment: ['sandbag'] } })).find(
+        (fact) => fact.label === 'Оборудование',
+      )?.value,
+    ).toBe('Неизвестное оборудование');
+    expect(
+      programPreviewFacts(template({ program_metadata: { equipment: ['barbell', ''] } })).find(
+        (fact) => fact.label === 'Оборудование',
+      )?.value,
+    ).toBe('Нет данных');
+  });
+
   it('uses explicit assignment schedule and duration, with metadata as a level fallback', () => {
     const facts = programPreviewFacts(
       template({

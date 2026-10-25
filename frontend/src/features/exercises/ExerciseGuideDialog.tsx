@@ -7,6 +7,7 @@ import { Badge, CloseIcon, ErrorState, LoadingState } from '../../shared/ui/comm
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideMedia } from './ExerciseGuideMedia';
 import { ExerciseProgressPanel } from './ExerciseProgressPanel';
+import { knownEquipmentLabel, localizedEquipmentDisplayLabel } from '../../shared/equipmentLabels';
 
 const difficultyLabels: Record<Exercise['difficulty_level'], string> = {
   beginner: 'Начальный уровень',
@@ -53,6 +54,10 @@ export function ExerciseGuideDialog({
     [guide?.muscles],
   );
   const alternatives = guide?.alternatives ?? details.data?.alternatives ?? [];
+  const equipmentLabel = localizedEquipmentDisplayLabel(
+    details.data?.equipment_ids,
+    details.data?.equipment,
+  );
 
   const openAlternative = (alternative: (typeof alternatives)[number]) => {
     setMediaExpanded(false);
@@ -198,16 +203,18 @@ export function ExerciseGuideDialog({
                   </section>
                 )}
 
-                {(guide?.equipment.length || details.data.equipment) && (
+                {(guide?.equipment.length || equipmentLabel) && (
                   <section className="exercise-guide-section" aria-labelledby="guide-equipment">
                     <h3 id="guide-equipment">Оборудование</h3>
                     <div className="toolbar wrap">
                       {guide?.equipment.length ? (
                         guide.equipment.map((item) => (
-                          <Badge key={item.identifier}>{item.name}</Badge>
+                          <Badge key={item.identifier}>
+                            {knownEquipmentLabel(item.identifier) ?? item.name}
+                          </Badge>
                         ))
                       ) : (
-                        <Badge>{details.data.equipment}</Badge>
+                        <Badge>{equipmentLabel}</Badge>
                       )}
                     </div>
                   </section>

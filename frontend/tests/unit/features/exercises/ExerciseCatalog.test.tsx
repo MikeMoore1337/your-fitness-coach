@@ -11,7 +11,7 @@ const exercises = [
     metric_type: 'strength',
     slug: 'lat-pulldown',
     primary_muscle: 'Спина',
-    equipment: 'Тросовый блок',
+    equipment: 'cable',
     primary_muscle_ids: ['back'],
     secondary_muscle_ids: ['biceps'],
     equipment_ids: ['cable'],
@@ -73,6 +73,8 @@ describe('ExerciseCatalog', () => {
     renderCatalog();
 
     expect(await screen.findByText('Подтягивания')).toBeInTheDocument();
+    expect(screen.getAllByText('Тросовый блок').length).toBeGreaterThan(0);
+    expect(screen.queryByText('cable')).not.toBeInTheDocument();
     const compactRow = screen.getByRole('button', {
       name: /Техника и детали: Тяга верхнего блока с очень длинным названием/,
     });
