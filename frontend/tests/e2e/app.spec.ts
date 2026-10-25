@@ -68,6 +68,13 @@ test.describe('универсальная геометрия предпросм�
             const content = dialog.locator('.program-example-modal__content');
             const summaries = dialog.locator('.program-example-day > summary');
             await expect(dialog).toBeVisible();
+            if (template.key === 'nsuns') {
+              const equipmentFact = dialog
+                .locator('.program-preview-fact')
+                .filter({ hasText: 'Оборудование' });
+              await expect(equipmentFact).toContainText('Штанга · Скамья · Стойка/силовая рама');
+              await expect(equipmentFact).not.toContainText(/barbell|bench|rack/);
+            }
             await dialog.evaluate((node) =>
               Promise.all(
                 node

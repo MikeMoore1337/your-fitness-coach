@@ -29,7 +29,10 @@ export function previewTemplates() {
     default_duration_weeks: 12,
     program_metadata: {
       days_per_week: dayCount,
-      equipment: ['barbell', 'dumbbell', 'bench', 'cable', 'machine'],
+      equipment:
+        key === 'nsuns'
+          ? ['barbell', 'bench', 'rack']
+          : ['barbell', 'dumbbell', 'bench', 'cable', 'machine'],
     },
     days: Array.from({ length: Number(dayCount) }, (_, day) => ({
       id: 118500 + day,

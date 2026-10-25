@@ -9,6 +9,7 @@ import { trainingPreferencesDraftStorageKey } from '../../shared/userScopedStora
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { Card, DisclosureIcon } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
+import { localizedEquipmentDisplayLabel } from '../../shared/equipmentLabels';
 
 export type TrainingPreferencesDraft = ApiSchemas['TrainingPreferencesUpdate'];
 type Exercise = ApiSchemas['ExerciseCatalogItem'];
@@ -186,7 +187,8 @@ function ExercisePicker({
                 <small>
                   {exercise.is_custom
                     ? 'Личное упражнение'
-                    : exercise.equipment || 'Без оборудования'}
+                    : (localizedEquipmentDisplayLabel(exercise.equipment_ids, exercise.equipment) ??
+                      'Без оборудования')}
                 </small>
               </span>
             </label>

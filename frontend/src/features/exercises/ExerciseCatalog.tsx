@@ -17,23 +17,16 @@ import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { ExerciseGuideDialog } from './ExerciseGuideDialog';
 import { ExerciseMediaAsset } from './ExerciseMediaAsset';
 import { rankExercisesForSearch } from './exerciseSearch';
+import {
+  equipmentLabels,
+  localizedEquipmentDisplayLabel,
+  localizedEquipmentLabel,
+} from '../../shared/equipmentLabels';
 
 const difficultyLabels: Record<Exercise['difficulty_level'], string> = {
   beginner: 'Начальный',
   intermediate: 'Средний',
   advanced: 'Продвинутый',
-};
-
-const equipmentLabels: Record<string, string> = {
-  bodyweight: 'Собственный вес',
-  dumbbell: 'Гантели',
-  barbell: 'Штанга',
-  bench: 'Скамья',
-  cable: 'Тросовый блок',
-  machine: 'Тренажёр',
-  kettlebell: 'Гиря',
-  cardio: 'Кардиооборудование',
-  other: 'Другое',
 };
 
 const weekdayLabels = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -148,9 +141,17 @@ export function ExerciseCatalog({
     for (const exercise of rows.data ?? []) {
       const ids = exercise.equipment_ids ?? [];
       if (ids.length) {
-        for (const id of ids) values.set(id, equipmentLabels[id] ?? exercise.equipment ?? id);
+        for (const id of ids) {
+          values.set(
+            id,
+            equipmentLabels[id] ??
+              localizedEquipmentLabel(exercise.equipment) ??
+              'Неизвестное оборудование',
+          );
+        }
       } else if (exercise.equipment) {
-        values.set(`legacy:${exercise.equipment}`, exercise.equipment);
+        const label = localizedEquipmentLabel(exercise.equipment);
+        if (label) values.set(`legacy:${exercise.equipment}`, label);
       }
     }
     return [...values].sort((left, right) => left[1].localeCompare(right[1], 'ru'));
@@ -504,7 +505,8 @@ export function ExerciseCatalog({
                 <strong>{exercise.title}</strong>
                 <span>
                   {exercise.primary_muscle || 'Всё тело'} ·{' '}
-                  {exercise.equipment || 'Без оборудования'}
+                  {localizedEquipmentDisplayLabel(exercise.equipment_ids, exercise.equipment) ??
+                    'Без оборудования'}
                 </span>
                 <span className="exercise-catalog-item__badges">
                   <Badge>{difficultyLabels[exercise.difficulty_level]}</Badge>
