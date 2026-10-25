@@ -1629,7 +1629,11 @@ def single_slot_deploy(config: DeployConfig) -> Evidence:
     active_revision = active_revision_path.read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9a-f]{40}", active_revision):
         raise DeploymentError("last-successful-revision is not a full Git SHA")
-    forward_only_schema = _rest_interval_schema_is_forward_only(config, active_revision)
+    forward_only_schema = (
+        _rest_interval_schema_is_forward_only(config, active_revision)
+        if active_revision != config.target_revision
+        else False
+    )
     repair_mode = os.environ.get("DEPLOY_REPAIR_MODE", "").strip().lower() == "true"
     if repair_mode and os.environ.get("DEPLOY_REPAIR_BASELINE_SHA", "") != active_revision:
         raise DeploymentError(
