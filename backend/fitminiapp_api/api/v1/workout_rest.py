@@ -20,9 +20,9 @@ from fitminiapp_api.models.user import User
 from fitminiapp_api.models.workout_rest import WorkoutRestAction, WorkoutRestSession
 from fitminiapp_api.schemas.workout_rest import (
     RestActionRequest,
+    RestRestartRequest,
     RestSessionResponse,
     RestStartRequest,
-    RestRestartRequest,
 )
 from fitminiapp_api.services.workout_recovery import recovery_user_local_naive_to_utc_naive
 
@@ -175,9 +175,7 @@ def start_rest_session(
         raise HTTPException(status_code=404, detail="Подход не найден")
     set_row, exercise = candidate
     started_at = _utc_naive(payload.started_at)
-    fingerprint = _fingerprint(
-        started_at=started_at, source_set_id=set_row.id, predecessor_id=None
-    )
+    fingerprint = _fingerprint(started_at=started_at, source_set_id=set_row.id, predecessor_id=None)
     replay = _replayed_start(
         db, workout_id=workout_id, mutation_id=payload.mutation_id, fingerprint=fingerprint
     )
@@ -198,9 +196,7 @@ def start_rest_session(
     if not set_row.is_completed or workout.status not in ("in_progress", "completed"):
         raise HTTPException(status_code=409, detail="Сначала завершите подход")
     if workout.status == "completed" and workout.completed_at is not None:
-        completed_utc = recovery_user_local_naive_to_utc_naive(
-            workout.completed_at, current_user
-        )
+        completed_utc = recovery_user_local_naive_to_utc_naive(workout.completed_at, current_user)
         if started_at > completed_utc + timedelta(minutes=1):
             raise HTTPException(status_code=409, detail="Отдых начался после окончания тренировки")
     _validate_source_set(set_row, exercise)
