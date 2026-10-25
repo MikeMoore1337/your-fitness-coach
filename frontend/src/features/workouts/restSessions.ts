@@ -267,7 +267,7 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
           row.source = lastTerminal.corrected ? 'USER_CORRECTED' : 'USER_CONFIRMED';
           row.measured_seconds = lastTerminal.corrected
             ? (lastTerminal.corrected_seconds ?? null)
-            : Math.max(0, Math.floor((Date.parse(row.ended_at) - Date.parse(row.started_at)) / 1000));
+            : Math.max(0, Math.floor((Date.parse(row.ended_at ?? row.started_at) - Date.parse(row.started_at)) / 1000));
         }
       }
     }
