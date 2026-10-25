@@ -1857,6 +1857,28 @@ export function RestTimer({
     };
   }, [hasDeadline, collapsed, showCompact, completedNotice]);
 
+  useEffect(() => {
+    const element = panel.current;
+    const root = element?.parentElement;
+    if (!element || !root) return;
+    // Telegram owns keyboard resizing but not the sticky timer's occlusion area.
+    // Recheck when an input takes focus and when the WebView keyboard changes size.
+    const keepFocusedInputClear = () => {
+      if (document.documentElement.dataset.yfcLayoutSurface !== 'telegram') return;
+      const focused = document.activeElement;
+      if (!(focused instanceof HTMLInputElement) || !root.contains(focused)) return;
+      const top = focused.getBoundingClientRect().top;
+      const clearance = element.getBoundingClientRect().bottom + 12;
+      if (top < clearance) window.scrollBy({ top: top - clearance, behavior: 'instant' });
+    };
+    root.addEventListener('focusin', keepFocusedInputClear);
+    window.visualViewport?.addEventListener('resize', keepFocusedInputClear);
+    return () => {
+      root.removeEventListener('focusin', keepFocusedInputClear);
+      window.visualViewport?.removeEventListener('resize', keepFocusedInputClear);
+    };
+  }, [hasDeadline, collapsed, showCompact, completedNotice]);
+
   if (!deadline && !completedNotice && !restartCandidate) return null;
   return (
     <aside
