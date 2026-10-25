@@ -7,7 +7,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from scripts.geo_readonly_audit import (
     CANONICAL_ORIGIN,
     MAX_OUTPUT_CHARS,
