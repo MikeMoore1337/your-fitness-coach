@@ -1556,6 +1556,9 @@ export function RestTimer({
   const restIsUnconfirmed = Boolean(
     measuredRest && (!measuredRest.server_id || measuredRest.pending.length),
   );
+  const isRunningRest = measuredRest?.status === 'running';
+  const isCompletedLatestRest = latestRest?.status === 'completed';
+  const nextRestStatusRole = restIsUnconfirmed ? ('status' as const) : undefined;
   const restoredTerminal = !deadline && !completedNotice && Boolean(restartCandidate);
   const showCompact = compact || restoredTerminal;
   const measuredElapsedSeconds =
@@ -1846,7 +1849,7 @@ export function RestTimer({
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      {collapsed && measuredRest?.status === 'running' ? (
+      {collapsed && isRunningRest ? (
         <div className="active-workout-rest__collapsed">
           <div>
             <strong>Отдых идёт</strong>
@@ -1877,7 +1880,7 @@ export function RestTimer({
           </div>
           <div className="active-workout-rest__next" hidden={showCompact}>
             <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span role={restIsUnconfirmed ? 'status' : undefined}>
+            <span role={nextRestStatusRole}>
               {restIsUnconfirmed
                 ? typeof navigator !== 'undefined' && !navigator.onLine
                   ? 'Нет сети · отдых ожидает сохранения'
@@ -2062,7 +2065,7 @@ export function RestTimer({
             >
               Пропустить
             </Button>
-            {measuredRest?.status === 'running' && !measuredRest.needs_review && (
+            {isRunningRest && !measuredRest?.needs_review && (
               <button
                 type="button"
                 className="active-workout-rest__collapse"
@@ -2083,7 +2086,7 @@ export function RestTimer({
                 {completedNotice ??
                   (latestRest?.status === 'skipped' ? 'Отдых пропущен' : 'Отдых завершён')}
               </span>
-              {latestRest?.status === 'completed' && latestRest.measured_seconds != null && (
+              {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                 <span className="active-workout-rest__complete-copy">
                   ФАКТ {formatWorkoutDuration(latestRest.measured_seconds)}
                 </span>
