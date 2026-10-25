@@ -378,7 +378,9 @@ describe('rest journal concurrent mutation preservation #960', () => {
       adjusted_seconds: 90,
       version: 1,
     });
-    await expect(syncRestJournal(31, 44)).rejects.toThrow('Сервер повторно использовал предыдущий интервал отдыха');
+    await expect(syncRestJournal(31, 44)).rejects.toThrow(
+      'Сервер повторно использовал предыдущий интервал отдыха',
+    );
     expect(loadRestJournal(31, 44)[1]?.start_mutation_id).toBe(repeat.start_mutation_id);
     expect(loadRestJournal(31, 44)[1]).not.toHaveProperty('server_id');
   });
