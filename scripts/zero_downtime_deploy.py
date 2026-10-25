@@ -385,9 +385,7 @@ engine.dispose()
     print(verdict)
 
 
-def _rest_interval_schema_is_forward_only(
-    config: DeployConfig, active_revision: str
-) -> bool:
+def _rest_interval_schema_is_forward_only(config: DeployConfig, active_revision: str) -> bool:
     """Detect the one database transition that forbids rollback to an old app.
 
     The trusted, immutable deployment manifest is revision-bound. If its
