@@ -47,7 +47,7 @@ class StaticPilotTests(unittest.TestCase):
         raw = 'Already up to date\nDone in 275ms using pnpm v11.5.0\n{"testsDiscovered": 238, "selected": []}'
         self.assertEqual(report.parse_upstream_output(raw)["testsDiscovered"], 238)
         with self.assertRaises(ValueError):
-            report.parse_upstream_output('WARNING: unknown\\n{"testsDiscovered":238}')
+            report.parse_upstream_output('WARNING: unknown\n{"testsDiscovered":238}')
 
     def test_playwright_in_vitest_selection_is_no_go(self):
         cases = {
