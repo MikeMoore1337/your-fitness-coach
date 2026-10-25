@@ -1,6 +1,8 @@
 # Issue #1186: квадратная поверхность медиа
 
-Материалы этого каталога относятся к обязательным этапам инвентаризации и визуального прототипа. Они не изменяют production UI и не являются визуальным одобрением.
+Материалы этого каталога фиксируют инвентаризацию, визуальный прототип и проверку approved A для
+Issue #1186. Production implementation находится в PR #1221; эти материалы не заменяют
+отдельные owner visual acceptance и release approval.
 
 Матрица пересобирается на текущем checkout командой:
 
@@ -16,4 +18,11 @@ node scripts/build_issue_1186_media_inventory.mjs
 
 `media-inventory.json` содержит матрицу упражнений, `media-file-checks.json` — проверку каждого уникального source-файла, а `media-inventory.csv` — плоскую таблицу для фильтрации. Визуальные варианты находятся в `visual-prototype.html`; PNG-материалы генерируются отдельным воспроизводимым renderer-скриптом.
 
-Текущий этап: `WAITING_FOR_OWNER_VISUAL_APPROVAL`. До явного `APPROVE` или `REQUEST CHANGES` изменения в `TodayWorkout.tsx`, `ExerciseMediaAsset.tsx` и `ExerciseGuideMedia.tsx` не вносятся.
+После owner-направления по приложенному референсу реализован вариант A: квадратная surface,
+полный кадр через `object-fit: contain`, нейтральная matte-поверхность без видимой рамки.
+Priority/provenance/license/fallback источников сохранены; thumbnails не менялись.
+
+Реальные AFTER для guide card, lightbox и Active Workout: [evidence/after](./evidence/after/). Они сняты в
+Chromium на 320/360/393/430 px в Light/Dark; geometry-проверка также проходит в Firefox и WebKit.
+Текущий этап: `IMPLEMENTED_AWAITING_AFTER_ACCEPTANCE`. Merge, deploy и закрытие Issue остаются
+отдельными owner gates.

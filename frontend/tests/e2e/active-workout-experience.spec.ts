@@ -3285,9 +3285,12 @@ async function expectRealMediaFullWidth(page: Page, label: string) {
       mediaLeft: mediaRect.left,
       mediaRight: mediaRect.right,
       mediaWidth: mediaRect.width,
+      mediaHeight: mediaRect.height,
       techniqueLeft: techniqueRect.left,
       techniqueRight: techniqueRect.right,
       techniqueWidth: techniqueRect.width,
+      imageHeight: imageRect.height,
+      mediaBorderTop: getComputedStyle(media).borderTopWidth,
       techniqueCssWidth: techniqueStyle.width,
       techniqueFlex: techniqueStyle.flex,
       actionsWidth: actionsRect?.width ?? null,
@@ -3315,6 +3318,15 @@ async function expectRealMediaFullWidth(page: Page, label: string) {
     geometry?.imageWidth ?? 0,
     `${label}: rendered image must fill the media wrapper`,
   ).toBeGreaterThanOrEqual((geometry?.mediaWidth ?? 0) - tolerance);
+  expect(
+    Math.abs((geometry?.mediaWidth ?? 0) - (geometry?.mediaHeight ?? 0)),
+    `${label}: main media surface must remain square`,
+  ).toBeLessThanOrEqual(1);
+  expect(
+    geometry?.imageHeight ?? 0,
+    `${label}: rendered image must fill the square media wrapper`,
+  ).toBeGreaterThanOrEqual((geometry?.mediaHeight ?? 0) - tolerance);
+  expect(geometry?.mediaBorderTop, `${label}: main media has no visible frame`).toBe('0px');
 }
 
 async function resetPageScroll(page: Page) {

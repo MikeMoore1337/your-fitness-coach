@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { resolve } from 'node:path';
 import { installPlatformApi } from './fixtures/platform-api';
 import { TelegramHarness, installTelegramHarness } from './fixtures/mobile-tma';
@@ -7,6 +8,7 @@ test.use({ serviceWorkers: 'block' });
 
 const thumbnailUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.jpg';
 const animationUrl = '/static/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif';
+const widePosterUrl = '/static/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg';
 const screenshotRoot =
   process.env.YFC_TASK_513_SCREENSHOT_DIR ??
   resolve(process.cwd(), '..', '.artifacts', 'tasks', '513', 'evidence', 'screenshots');
@@ -100,6 +102,46 @@ const guide = {
   source_license_url: 'https://gymvisual.com/',
 };
 
+const wideExercise = {
+  ...exercise,
+  id: 12003,
+  edit_target_id: 12003,
+  title: 'Жим штанги на наклонной скамье',
+  slug: 'incline-bench-press',
+  media_state: 'approved_static',
+  media_thumbnail_url: widePosterUrl,
+  media_animation_url: null,
+};
+
+const wideGuide = {
+  ...guide,
+  media: [
+    {
+      ...guide.media[0]!,
+      type: 'image',
+      url: widePosterUrl,
+      poster: widePosterUrl,
+      phase: 'Движение',
+      alt: 'Жим штанги на наклонной скамье: движение',
+      width: 1280,
+      height: 720,
+      byte_size: 53_251,
+      sources: [
+        {
+          url: widePosterUrl,
+          mime_type: 'image/jpeg',
+          width: 1280,
+          height: 720,
+          byte_size: 53_251,
+        },
+      ],
+    },
+  ],
+  images: [
+    { phase: 'Движение', url: widePosterUrl, alt: 'Жим штанги на наклонной скамье: движение' },
+  ],
+};
+
 async function installMediaRoutes(page: Page) {
   let animationAvailable = true;
   await page.route(
@@ -136,6 +178,84 @@ async function installCatalogRoutes(page: Page) {
   );
 }
 
+async function installWideMediaRoutes(page: Page) {
+  await page.route(
+    /\/static\/exercise-guides\/exercises-media\/incline-bench-press\/poster-1280\.jpg(?:\?.*)?$/,
+    (route) =>
+      route.fulfill({
+        path: '../backend/assets/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg',
+        contentType: 'image/jpeg',
+      }),
+  );
+}
+
+async function installWideCatalogRoutes(page: Page) {
+  await page.route(/\/api\/v1\/programs\/exercises(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: [wideExercise] }),
+  );
+  await page.route(/\/api\/v1\/programs\/exercises\/12003(?:\?.*)?$/, (route) =>
+    route.fulfill({ json: { ...wideExercise, guide: wideGuide } }),
+  );
+}
+
+async function installWideActiveWorkoutRoutes(page: Page) {
+  await page.route(/\/api\/v1\/workouts\/today(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      json: {
+        id: 1186,
+        scheduled_date: '2026-10-01',
+        title: 'Силовая база',
+        status: 'in_progress',
+        day_number: 1,
+        week_number: 1,
+        started_at: '2026-10-01T08:00:00Z',
+        completed_at: null,
+        exercises: [
+          {
+            id: 11861,
+            exercise_id: 1186,
+            exercise_title: 'Жим штанги на наклонной скамье',
+            metric_type: 'strength',
+            sort_order: 1,
+            prescribed_sets: 1,
+            prescribed_reps: '8–10',
+            rest_seconds: 90,
+            notes: null,
+            has_guide: false,
+            media_state: 'approved_static',
+            media_thumbnail_url: widePosterUrl,
+            media_thumbnail_sources: [
+              {
+                url: widePosterUrl,
+                mime_type: 'image/jpeg',
+                width: 1280,
+                height: 720,
+                byte_size: 53_251,
+              },
+            ],
+            media_animation_url: null,
+            media_video_sources: [],
+            media_preferred_mode: 'static',
+            sets: [
+              {
+                id: 11861,
+                set_number: 1,
+                actual_reps: null,
+                actual_weight: null,
+                rir: null,
+                set_kind: 'working',
+                reached_failure: false,
+                is_completed: false,
+                version: 1,
+              },
+            ],
+          },
+        ],
+      },
+    }),
+  );
+}
+
 async function openCatalogDetail(page: Page) {
   await page.goto('/app?section=catalog');
   await page.getByRole('searchbox', { name: 'Поиск' }).fill('жим штанги лежа');
@@ -145,6 +265,48 @@ async function openCatalogDetail(page: Page) {
   const dialog = page.getByRole('dialog', { name: 'Жим лежа' });
   await expect(dialog).toBeVisible();
   return { dialog, media: dialog.locator('.exercise-guide-image img') };
+}
+
+async function openWideCatalogDetail(page: Page, colorScheme: 'light' | 'dark') {
+  await page.goto('/app?section=catalog');
+  await page.evaluate((theme) => localStorage.setItem('app-theme', theme), colorScheme);
+  await page.reload();
+  await page.getByRole('searchbox', { name: 'Поиск' }).fill('наклонной скамье');
+  const row = page.locator('.exercise-catalog-item');
+  await expect(row).toHaveCount(1);
+  await row.getByRole('button', { name: /Техника и детали/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Жим штанги на наклонной скамье' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+async function expectSquareMediaSurface(locator: Locator, label: string) {
+  const geometry = await locator.evaluate((element) => {
+    const surface = element.getBoundingClientRect();
+    const media = element.querySelector<HTMLElement>('img, video');
+    const mediaRect = media?.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      surfaceWidth: surface.width,
+      surfaceHeight: surface.height,
+      mediaWidth: mediaRect?.width ?? 0,
+      mediaHeight: mediaRect?.height ?? 0,
+      objectFit: media ? getComputedStyle(media).objectFit : null,
+      border: style.border,
+    };
+  });
+  expect(
+    Math.abs(geometry.surfaceWidth - geometry.surfaceHeight),
+    `${label}: square surface delta`,
+  ).toBeLessThanOrEqual(1);
+  expect(geometry.mediaWidth, `${label}: media must stay inside surface`).toBeLessThanOrEqual(
+    geometry.surfaceWidth + 1,
+  );
+  expect(geometry.mediaHeight, `${label}: media must stay inside surface`).toBeLessThanOrEqual(
+    geometry.surfaceHeight + 1,
+  );
+  expect(geometry.objectFit, `${label}: preserve full source frame`).toBe('contain');
+  expect(geometry.border, `${label}: no visible frame`).toMatch(/^0px/);
 }
 
 test('Task 513 owner visual package covers catalog and exercise media states', async ({ page }) => {
@@ -237,6 +399,105 @@ test('Task 513 owner visual package covers catalog and exercise media states', a
     animations: 'disabled',
     path: screenshotPath('exercise-detail-desktop-1440x900.png'),
   });
+});
+
+test('Issue 1186 keeps wide technique media square without cropping in guide and lightbox', async ({
+  page,
+}) => {
+  await installTelegramHarness(page, { platform: 'android', colorScheme: 'light' });
+  const telegramHarness = new TelegramHarness(page);
+  await installPlatformApi(page, { browserSession: true });
+  await installWideMediaRoutes(page);
+  await installWideCatalogRoutes(page);
+
+  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+  if (afterDir) await mkdir(afterDir, { recursive: true });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+
+    for (const width of [320, 360, 393, 430]) {
+      await page.setViewportSize({ width, height: width < 500 ? 844 : 932 });
+      const dialog = await openWideCatalogDetail(page, colorScheme);
+      await telegramHarness.setTheme(colorScheme);
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', colorScheme);
+      const cardSurface = dialog.locator('.exercise-guide-image__frame').first();
+      const cardImage = cardSurface.locator('img');
+      await expect(cardImage).toHaveAttribute('src', widePosterUrl);
+      await expect
+        .poll(() => cardImage.evaluate((image) => (image as HTMLImageElement).naturalWidth))
+        .toBeGreaterThan(0);
+      await expectSquareMediaSurface(cardSurface, `${colorScheme} ${width}px guide`);
+      await cardSurface.hover();
+      await expect(cardImage).toHaveCSS('transform', 'none');
+      await expect(dialog.locator('.exercise-guide-image')).toHaveCSS('border-top-width', '0px');
+      await expect(
+        page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).resolves.toBe(true);
+
+      if (afterDir) {
+        await dialog.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-guide.png`),
+        });
+      }
+
+      await cardSurface.click();
+      const lightbox = page.getByRole('dialog', { name: /Увеличенное изображение/ });
+      const lightboxSurface = lightbox.locator('.exercise-lightbox__media');
+      await expect(lightboxSurface).toBeVisible();
+      await expectSquareMediaSurface(lightboxSurface, `${colorScheme} ${width}px lightbox`);
+      if (afterDir) {
+        await lightbox.screenshot({
+          animations: 'disabled',
+          path: resolve(afterDir, `${colorScheme}-${width}-lightbox.png`),
+        });
+      }
+      await lightbox.locator('.exercise-lightbox__close').click();
+      await expect(lightbox).not.toBeVisible();
+    }
+  }
+});
+
+test('Issue 1186 keeps a wide poster square in Active Workout', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await installTelegramHarness(page, { platform: 'android', colorScheme: 'dark' });
+  await installPlatformApi(page, { browserSession: true });
+  await installWideMediaRoutes(page);
+  await installWideActiveWorkoutRoutes(page);
+
+  await page.goto('/app');
+  const continueButton = page.getByRole('button', { name: 'Продолжить тренировку' });
+  const clientEntry = page.getByRole('button', { name: 'Клиент' });
+  await Promise.race([
+    continueButton.waitFor({ state: 'visible', timeout: 10000 }),
+    clientEntry.waitFor({ state: 'visible', timeout: 10000 }),
+  ]);
+  if (!(await continueButton.isVisible())) await clientEntry.click();
+  await expect(continueButton).toBeVisible();
+  await continueButton.click();
+
+  const media = page.locator('.active-workout-exercise__media').first();
+  const image = media.locator('img');
+  await expect(image).toHaveAttribute('src', widePosterUrl);
+  await expect(image).toHaveAttribute('data-media-mode', 'static-poster');
+  await expect
+    .poll(() => image.evaluate((node) => (node as HTMLImageElement).naturalWidth))
+    .toBeGreaterThan(0);
+  await expectSquareMediaSurface(media, 'dark 390px Active Workout wide poster');
+  await expect(
+    page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+  ).resolves.toBe(true);
+  const afterDir = process.env.YFC_ISSUE_1186_AFTER_DIR;
+  if (afterDir) {
+    await mkdir(afterDir, { recursive: true });
+    await page.screenshot({
+      animations: 'disabled',
+      fullPage: true,
+      path: resolve(afterDir, 'dark-390-active-workout.png'),
+    });
+  }
 });
 
 test('Task 513 Active Workout keeps technique access beside set logging', async ({ page }) => {
