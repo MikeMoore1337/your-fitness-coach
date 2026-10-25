@@ -232,6 +232,14 @@ def test_offline_skip_then_manual_restart_preserves_event_timestamps(client):
         "expected_version": 1,
         "occurred_at": skip_at.isoformat(),
     }
+    for invalid_at in (first_started - timedelta(seconds=1), now + timedelta(minutes=5)):
+        rejected = client.post(
+            f"/api/v1/workouts/rest-sessions/{first_id}/actions",
+            headers=headers,
+            json={**skip_payload, "occurred_at": invalid_at.isoformat(), "mutation_id": str(uuid4())},
+        )
+        assert rejected.status_code == 422, rejected.text
+
     skipped = client.post(
         f"/api/v1/workouts/rest-sessions/{first_id}/actions",
         headers=headers,
