@@ -6799,3 +6799,130 @@ for (const theme of ['light', 'dark'] as const) {
     });
   }
 }
+
+for (const theme1166 of ['dark', 'light'] as const) {
+  for (const width1166 of [320, 393]) {
+    test(`issue1166 real AFTER ${theme1166} ${width1166}`, async ({ page }) => {
+      await page.setViewportSize({ width: width1166, height: 844 });
+      await page.emulateMedia({ colorScheme: theme1166, reducedMotion: 'reduce' });
+      await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), theme);
+      const server = await mockActiveWorkout(page);
+      const intervals: Record<number, Record<string, unknown>> = {};
+      let nextId = 900;
+      await page.route('**/api/v1/workouts/42/rest-sessions', async (route) => {
+        const request = route.request();
+        if (request.method() === 'GET') {
+          await route.fulfill({ json: Object.values(intervals) });
+          return;
+        }
+        const payload = request.postDataJSON();
+        const id = nextId++;
+        intervals[id] = {
+          id,
+          workout_id: 42,
+          source_set_id: payload.source_set_id,
+          started_at: payload.started_at,
+          ended_at: null,
+          planned_seconds: 90,
+          adjusted_seconds: 90,
+          measured_seconds: null,
+          status: 'running',
+          source: null,
+          quality: 'normal',
+          version: 1,
+          start_mutation_id: payload.mutation_id,
+        };
+        await route.fulfill({ json: intervals[id] });
+      });
+      await page.route('**/api/v1/workouts/rest-sessions/*/actions', async (route) => {
+        const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+        const interval = intervals[id];
+        const payload = route.request().postDataJSON();
+        if (!interval) {
+          await route.fulfill({ status: 404, json: { detail: 'Not found' } });
+          return;
+        }
+        interval.version = Number(interval.version) + 1;
+        if (payload.action === 'complete') {
+          interval.status = 'completed';
+          interval.ended_at = payload.ended_at;
+          interval.measured_seconds = Math.max(
+            0,
+            Math.floor(
+              (Date.parse(payload.ended_at) - Date.parse(String(interval.started_at))) / 1000,
+            ),
+          );
+          interval.source = 'USER_CONFIRMED';
+        } else if (payload.action === 'skip') {
+          interval.status = 'skipped';
+          interval.ended_at = payload.occurred_at;
+        } else {
+          interval.adjusted_seconds =
+            Number(interval.adjusted_seconds) + (payload.action === 'add30' ? 30 : 60);
+        }
+        await route.fulfill({ json: interval });
+      });
+      await page.route('**/api/v1/workouts/rest-sessions/*/restart', async (route) => {
+        const oldId = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+        const previous = intervals[oldId];
+        if (!previous) {
+          await route.fulfill({ status: 404, json: { detail: 'Not found' } });
+          return;
+        }
+        const payload = route.request().postDataJSON();
+        const id = nextId++;
+        intervals[id] = {
+          ...previous,
+          id,
+          started_at: payload.started_at,
+          ended_at: null,
+          adjusted_seconds: previous.planned_seconds,
+          measured_seconds: null,
+          status: 'running',
+          source: null,
+          version: 1,
+          start_mutation_id: payload.mutation_id,
+        };
+        await route.fulfill({ json: intervals[id] });
+      });
+      await page.goto('/app');
+      await page.getByRole('button', { name: 'Клиент', exact: true }).click();
+      await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+      const current = page.locator('[data-workout-set-id="201"]');
+      await current.getByLabel(/^Вес,/).fill('40');
+      await current.getByLabel(/^Повторы,/).fill('8');
+      await current.getByRole('button', { name: /^Завершить:/ }).click();
+      await expect.poll(() => server.readSet(201).is_completed).toBe(true);
+      const out = resolve(
+        process.cwd(),
+        '..',
+        '.artifacts',
+        'runtime',
+        'tests',
+        'playwright',
+        'redesign-visual-1166',
+      );
+      await mkdir(out, { recursive: true });
+      const shot = async (name: string) => {
+        await page.screenshot({
+          path: resolve(out, `${theme1166}-${width1166}-${name}.png`),
+          animations: 'disabled',
+        });
+      };
+      await expect(page.getByRole('button', { name: 'Свернуть таймер' })).toBeVisible();
+      await shot('01-running');
+      await page.getByRole('button', { name: 'Свернуть таймер' }).click();
+      await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+      await shot('02-hidden');
+      await page.getByRole('button', { name: 'Показать таймер' }).click();
+      await shot('03-reopened');
+      await page.getByRole('button', { name: 'Завершить отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+      await shot('04-stopped');
+      await page.getByRole('button', { name: 'Начать отдых' }).click();
+      await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+      await shot('05-restarted');
+      expect(server.readSet(201).is_completed).toBe(true);
+    });
+  }
+}
