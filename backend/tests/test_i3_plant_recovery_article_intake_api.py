@@ -24,9 +24,7 @@ from fitminiapp_api.services.web_articles import (
     publish_web_article,
 )
 
-ARTICLE_FIXTURE = (
-    Path(__file__).parent / "fixtures" / "i3_plant_recovery_editorial_draft.json"
-)
+ARTICLE_FIXTURE = Path(__file__).parent / "fixtures" / "i3_plant_recovery_editorial_draft.json"
 TEST_KEY_ID = "hermes-i3-tests"
 TEST_SECRET = "synthetic-hermes-intake-secret-for-local-tests-only"
 
