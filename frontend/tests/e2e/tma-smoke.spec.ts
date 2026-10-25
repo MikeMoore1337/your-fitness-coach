@@ -1270,7 +1270,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   for (const currentPage of [tmaPage, mobilePage]) {
     const body = currentPage.locator('#progress-body');
     await expect(
-      body.locator('.measurement-diary').getByText(/Вес: 74\.2 кг · Окружность плеча: 31\.6 см/),
+      body.locator('.measurement-diary').getByText(/Вес: 74,2 кг · Окружность плеча: 31,6 см/),
     ).toBeVisible();
     const singlePointHints = body.getByText(
       'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
@@ -1280,11 +1280,11 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
     const noTrendStates = body.getByText('Пока без динамики', { exact: true });
     await expect(noTrendStates).toHaveCount(2);
     for (const state of await noTrendStates.all()) await expect(state).toBeVisible();
-    const row = body.locator('.measurement-history__row').filter({ hasText: '74.2 кг' });
+    const row = body.locator('.measurement-history__row').filter({ hasText: '74,2 кг' });
     await row.getByRole('button', { name: 'Изменить' }).click();
     await body.getByLabel('Вес, кг').fill('74.6');
     await body.getByRole('button', { name: 'Сохранить изменения' }).click();
-    await expect(body.getByText(/Вес: 74\.6 кг · Окружность плеча: 31\.6 см/)).toBeVisible();
+    await expect(body.getByText(/Вес: 74,6 кг · Окружность плеча: 31,6 см/)).toBeVisible();
     await expectNoHorizontalOverflow(currentPage);
     await expectTouchTargets(body.locator('.measurement-history__actions .ui-button'));
   }
@@ -1302,7 +1302,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tma.setViewport(844, 844);
   const toastClose = tmaPage.getByRole('button', { name: 'Закрыть сообщение' });
   if (await toastClose.isVisible()) await toastClose.click();
-  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74.6 кг' });
+  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74,6 кг' });
   await editedRow.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await tmaPage.screenshot({
     path: '../.artifacts/screenshots/task-60/tma-390x844-dark.png',
