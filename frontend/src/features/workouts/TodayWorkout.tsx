@@ -1531,7 +1531,7 @@ export function RestTimer({
   const [collapsed, setCollapsed] = useState(() =>
     readStorage<boolean>(`${activeWorkoutRestKey(userId, workoutId)}:panel-collapsed`, false),
   );
-  const [restRevision, setRestRevision] = useState(0);
+  const [restRecords, setRestRecords] = useState(() => loadRestJournal(userId, workoutId));
   const [restSaveError, setRestSaveError] = useState<string | null>(null);
   const [compact, setCompact] = useState(false);
   const [announcement, setAnnouncement] = useState('');
@@ -1544,7 +1544,6 @@ export function RestTimer({
   );
   const seconds = Math.max(0, Math.ceil((deadline - now) / 1000));
   const hasDeadline = Boolean(deadline);
-  const restRecords = useMemo(() => loadRestJournal(userId, workoutId), [userId, workoutId, restRevision]);
   const latestRest = restRecords.at(-1) ?? null;
   const restartCandidate =
     !measuredRest &&
@@ -1639,7 +1638,7 @@ export function RestTimer({
     };
     const refresh = () => {
       setMeasuredRest(activeRestJournalSession(userId, workoutId));
-      setRestRevision((previous) => previous + 1);
+      setRestRecords(loadRestJournal(userId, workoutId));
       scheduleRetry();
       sync();
     };
