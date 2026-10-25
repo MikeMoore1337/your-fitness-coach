@@ -41,7 +41,7 @@ jobs:
       - name: Build only pinned upstream development dependencies (no postinstall)
         run: |
           corepack enable
-          corepack pnpm --dir .pilot/jev-upstream install --frozen-lockfile --ignore-scripts
+          (cd .pilot/jev-upstream && corepack pnpm install --frozen-lockfile --ignore-scripts)
       - name: Static-only source evaluations, zero remote inference
         shell: bash
         env:
@@ -63,7 +63,7 @@ jobs:
             file="${item#*|}"
             test -f "$file"
             printf '\n// synthetic JTI experiment only\n' >> "$file"
-            corepack pnpm --dir .pilot/jev-upstream exec tsx src/cli/index.ts \
+            (cd .pilot/jev-upstream && corepack pnpm exec tsx src/cli/index.ts \
               select --static --json --root "$GITHUB_WORKSPACE/frontend" --base HEAD \
               > ".artifacts/jev-static-pilot/${name}.json"
             git restore -- "$file"
