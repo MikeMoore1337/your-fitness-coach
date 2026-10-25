@@ -639,3 +639,145 @@ def test_migrated_postgres_shared_package_scan_confirmation(monkeypatch) -> None
             assert stored is not None
             assert stored.status == "active"
             assert stored.catalog_quality == "community_unverified"
+
+
+def test_rest_0130_history_survives_pg16_unique_swap_and_blocks_unsafe_downgrade() -> None:
+    """Exercise the actual Alembic path on isolated PG16, never on production records."""
+    database_url = os.environ.get("DATABASE_URL", "")
+    assert database_url.startswith("postgresql+psycopg://")
+
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.engine import make_url
+
+    root = Path(__file__).resolve().parents[2]
+    database = make_url(database_url)
+    assert database.database == "fitminiapp_test", "history drill requires the isolated CI database"
+
+    schema_name = f"rest_history_{os.getpid()}_{os.urandom(4).hex()}"
+    maintenance_engine = create_engine(database_url)
+    with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as admin:
+        major = admin.execute(text("SHOW server_version_num")).scalar_one()
+        assert str(major).startswith("16"), "history drill requires PostgreSQL 16"
+        admin.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+    schema_url = database.update_query_dict({"options": f"-csearch_path={schema_name},public"})
+    schema_engine = create_engine(schema_url.render_as_string(hide_password=False))
+    config = Config(str(root / "backend" / "alembic.ini"))
+    config.set_main_option("script_location", str(root / "backend" / "alembic"))
+    try:
+        with schema_engine.connect() as connection:
+            # Small, isolated parent stubs satisfy actual 0130 foreign keys. All rest
+            # tables, constraints and indexes still come from real Alembic scripts.
+            for parent in ("users", "user_workouts", "user_workout_sets"):
+                connection.execute(text(f"CREATE TABLE {parent} (id INTEGER PRIMARY KEY)"))
+                connection.execute(text(f"INSERT INTO {parent} (id) VALUES (1)"))
+            connection.commit()
+
+            config.attributes["connection"] = connection
+            config.attributes["version_table_schema"] = schema_name
+            command.stamp(config, "0129_coach_workflow_templates")
+            command.upgrade(config, "0130_workout_rest_sessions")
+
+            connection.execute(
+                text(
+                    "INSERT INTO workout_rest_sessions "
+                    "(id, user_id, workout_id, source_set_id, started_at, ended_at, "
+                    "planned_seconds, adjusted_seconds, measured_seconds, status, "
+                    "source, quality, version, created_at) "
+                    "VALUES (10, 1, 1, 1, TIMESTAMP '2026-10-23 08:00:00', "
+                    "TIMESTAMP '2026-10-23 08:01:00', 90, 90, 60, 'completed', "
+                    "'USER_CONFIRMED', 'normal', 1, TIMESTAMP '2026-10-23 08:00:00')"
+                )
+            )
+            before = connection.execute(
+                text(
+                    "SELECT id, user_id, workout_id, source_set_id, started_at, "
+                    "ended_at, planned_seconds, adjusted_seconds, measured_seconds, "
+                    "status, source, quality, version, created_at "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            connection.commit()
+
+            command.upgrade(config, "0131_rest_interval_expand")
+            expanded = connection.execute(
+                text(
+                    "SELECT predecessor_id, start_mutation_id, start_fingerprint "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            assert expanded == (None, None, None)
+            connection.commit()
+
+            command.upgrade(config, "0132_rest_interval_unique_swap")
+            after = connection.execute(
+                text(
+                    "SELECT id, user_id, workout_id, source_set_id, started_at, "
+                    "ended_at, planned_seconds, adjusted_seconds, measured_seconds, "
+                    "status, source, quality, version, created_at "
+                    "FROM workout_rest_sessions WHERE id = 10"
+                )
+            ).one()
+            assert after == before, "migration must preserve every old rest fact"
+            indexes = set(
+                connection.execute(
+                    text(
+                        "SELECT indexname FROM pg_indexes "
+                        "WHERE schemaname = :schema AND tablename = 'workout_rest_sessions'"
+                    ),
+                    {"schema": schema_name},
+                ).scalars()
+            )
+            assert {
+                "uq_workout_rest_initial_source",
+                "uq_workout_rest_predecessor",
+                "uq_workout_rest_start_mutation",
+                "uq_workout_rest_running_workout",
+            } <= indexes
+            legacy_unique = connection.execute(
+                text(
+                    "SELECT COUNT(*) FROM pg_constraint "
+                    "WHERE conrelid = 'workout_rest_sessions'::regclass "
+                    "AND conname = 'uq_workout_rest_source_set'"
+                )
+            ).scalar_one()
+            assert legacy_unique == 0
+            connection.commit()
+
+            # A second historical interval is now legal only with a predecessor.
+            connection.execute(
+                text(
+                    "INSERT INTO workout_rest_sessions "
+                    "(id, user_id, workout_id, source_set_id, predecessor_id, "
+                    "start_mutation_id, start_fingerprint, started_at, ended_at, "
+                    "planned_seconds, adjusted_seconds, measured_seconds, status, "
+                    "source, quality, version, created_at) "
+                    "VALUES (11, 1, 1, 1, 10, 'test-repeat-mutation', "
+                    "'test-fingerprint', TIMESTAMP '2026-10-23 08:02:00', "
+                    "TIMESTAMP '2026-10-23 08:03:00', 90, 90, 60, 'completed', "
+                    "'USER_CONFIRMED', 'normal', 1, TIMESTAMP '2026-10-23 08:02:00')"
+                )
+            )
+            connection.commit()
+            with pytest.raises(RuntimeError, match="Unsafe downgrade.*forward-fix"):
+                command.downgrade(config, "0131_rest_interval_expand")
+            connection.rollback()
+
+            revision = connection.execute(
+                text("SELECT version_num FROM alembic_version")
+            ).scalar_one()
+            rows = connection.execute(
+                text(
+                    "SELECT id, source_set_id, predecessor_id, measured_seconds "
+                    "FROM workout_rest_sessions ORDER BY id"
+                )
+            ).all()
+            assert revision == "0132_rest_interval_unique_swap"
+            assert rows == [(10, 1, None, 60), (11, 1, 10, 60)]
+    finally:
+        schema_engine.dispose()
+        with maintenance_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as admin:
+            admin.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
+        maintenance_engine.dispose()
