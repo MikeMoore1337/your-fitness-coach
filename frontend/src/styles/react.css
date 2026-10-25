@@ -5050,8 +5050,10 @@ button.today-text-link {
   flex-wrap: wrap;
   gap: 8px;
   margin: -3px 0 0 48px;
+  order: 1;
 }
 .active-workout-set__prefill-actions.is-hidden {
+  display: none;
   visibility: hidden;
   pointer-events: none;
 }
@@ -5151,6 +5153,7 @@ button.today-text-link {
   background: var(--secondary-hover);
 }
 .active-workout-set__advanced {
+  order: 2;
   border-top: 1px solid var(--border);
 }
 .active-workout-set__advanced > summary,
