@@ -52,10 +52,13 @@ class PublishI3OwnerArticleTests(unittest.TestCase):
             post.assert_not_called()
 
     def test_publish_without_token_fails_closed(self) -> None:
-        with patch.dict(os.environ, {client.TOKEN_ENV: ""}):
-            with patch.object(client, "post_article") as post:
-                self.assertEqual(client.main(["--publish"]), 2)
-                post.assert_not_called()
+        with (
+            patch.dict(os.environ, {client.TOKEN_ENV: ""}),
+            patch.object(sys.stdin, "isatty", return_value=False),
+            patch.object(client, "post_article") as post,
+        ):
+            self.assertEqual(client.main(["--publish"]), 2)
+            post.assert_not_called()
 
     def test_publish_saves_secret_free_receipt(self) -> None:
         article, digest = client.load_article()
