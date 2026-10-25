@@ -5753,6 +5753,13 @@ html[data-yfc-pwa-focus-placement='true'] .active-workout {
   font-size: 0.75rem;
   line-height: 1.25;
 }
+.active-workout-rest__next:has(.active-workout-rest__next-status) {
+  gap: 1px;
+}
+.active-workout-rest__next-status {
+  font-size: 0.75rem;
+  line-height: 1;
+}
 .active-workout-rest__next strong {
   overflow: hidden;
   color: var(--v2-text-primary);
