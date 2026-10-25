@@ -1721,10 +1721,12 @@ def test_rest_interval_release_disallows_previous_backend_rollback(
     calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
     manifest = tmp_path / "deployment-migration-manifest.json"
     payload = json.loads(manifest.read_text(encoding="utf-8"))
-    payload["changes"] = [{
-        "status": "A",
-        "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
-    }]
+    payload["changes"] = [
+        {
+            "status": "A",
+            "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
+        }
+    ]
     manifest.write_text(json.dumps(payload), encoding="utf-8")
     assert deploy._rest_interval_schema_is_forward_only(config, OLD_SHA)
 
@@ -1746,10 +1748,13 @@ def test_rest_interval_release_disallows_previous_backend_rollback(
     assert not any(stage["name"] == "single_slot_rollback" for stage in summary["stages"])
 
 
-@pytest.mark.parametrize("change", [
-    {"status": "M", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
-    {"status": "A", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"status": "M", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
+        {"status": "A", "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py"},
+    ],
+)
 def test_rest_interval_immutable_manifest_identifies_forward_fix_only(
     tmp_path: Path, monkeypatch, change: dict[str, str]
 ) -> None:
@@ -1807,7 +1812,8 @@ def test_rest_preflight_is_read_only_and_requires_verified_result(monkeypatch) -
 
 def test_rest_preflight_rejects_unverifiable_output(monkeypatch) -> None:
     monkeypatch.setattr(
-        deploy, "_compose",
+        deploy,
+        "_compose",
         lambda *args, **kwargs: subprocess.CompletedProcess(args, 0, stdout="unknown"),
     )
     with pytest.raises(deploy.DeploymentError, match="invalid evidence"):
@@ -1819,18 +1825,22 @@ def test_rest_preflight_runs_before_single_slot_stop(tmp_path: Path, monkeypatch
     calls = _patch_single_slot_runtime(tmp_path, monkeypatch)
     path = tmp_path / "deployment-migration-manifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
-    manifest["changes"] = [{
-        "status": "A",
-        "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
-    }]
+    manifest["changes"] = [
+        {
+            "status": "A",
+            "path": "backend/alembic/versions/0132_rest_interval_unique_swap.py",
+        }
+    ]
     path.write_text(json.dumps(manifest), encoding="utf-8")
     order = []
     monkeypatch.setattr(
-        deploy, "_production_rest_interval_read_only_preflight",
+        deploy,
+        "_production_rest_interval_read_only_preflight",
         lambda: order.append("read-only"),
     )
     monkeypatch.setattr(
-        deploy, "_stop_legacy_services",
+        deploy,
+        "_stop_legacy_services",
         lambda value, **kwargs: order.append("stop"),
     )
     evidence = deploy.single_slot_deploy(config)
