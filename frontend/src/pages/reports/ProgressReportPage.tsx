@@ -403,8 +403,8 @@ function factualSummaryLines(report: ProgressReport): Array<{ label: string; val
     const change =
       trend.change == null
         ? ''
-        : ` (${trend.change > 0 ? '+' : ''}${formatNumber(trend.change)} ${bodyMetricUnit(trend)})`;
-    return `${bodyMetricLabel(trend)}: ${formatNumber(trend.latest_value)} ${bodyMetricUnit(trend)}${change}`;
+        : ` (${trend.change > 0 ? '+' : ''}${formatNumber(trend.change, 2)} ${bodyMetricUnit(trend)})`;
+    return `${bodyMetricLabel(trend)}: ${formatNumber(trend.latest_value, 2)} ${bodyMetricUnit(trend)}${change}`;
   });
   if (bodyValues.length > 0) {
     lines.push({ label: 'Замеры тела', value: bodyValues.join(' · ') });
@@ -712,13 +712,13 @@ function ReportContent({
                       {formatDate(trend.first_measured_on)}
                     </td>
                     <td>
-                      {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)} ·{' '}
+                      {formatNumber(trend.latest_value, 2)} {bodyMetricUnit(trend)} ·{' '}
                       {formatDate(trend.latest_measured_on)}
                     </td>
                     <td>
                       {trend.change == null
                         ? 'Недостаточно точек'
-                        : `${formatNumber(trend.change)} ${bodyMetricUnit(trend)}`}
+                        : `${formatNumber(trend.change, 2)} ${bodyMetricUnit(trend)}`}
                     </td>
                   </tr>
                 ))}

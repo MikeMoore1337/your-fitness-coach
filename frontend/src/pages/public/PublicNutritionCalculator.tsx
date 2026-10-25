@@ -211,7 +211,7 @@ export default function PublicNutritionCalculator() {
               type="number"
               min="20"
               max="350"
-              step="0.1"
+              step="0.01"
               inputMode="decimal"
               autoComplete="off"
               value={fieldValue(form.weight_kg)}
@@ -225,7 +225,7 @@ export default function PublicNutritionCalculator() {
               type="number"
               min="100"
               max="250"
-              step="0.1"
+              step="0.01"
               inputMode="decimal"
               autoComplete="off"
               value={fieldValue(form.height_cm)}

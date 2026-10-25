@@ -499,7 +499,7 @@ export function ProfileForm() {
                   inputMode="decimal"
                   min="20"
                   max="350"
-                  step="0.1"
+                  step="0.01"
                   value={form.weight_kg ?? ''}
                   aria-invalid={Boolean(validationErrors.weight_kg)}
                   aria-describedby={

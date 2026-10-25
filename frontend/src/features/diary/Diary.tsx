@@ -332,7 +332,7 @@ export function Diary({
                   type="number"
                   inputMode="decimal"
                   enterKeyHint={key === 'thigh_cm' ? 'done' : 'next'}
-                  step="0.1"
+                  step="0.01"
                   min={numericLimits[key].min}
                   max={numericLimits[key].max}
                   value={form[key] ?? ''}
@@ -356,7 +356,7 @@ export function Diary({
                     aria-label={`${definition.label}, см`}
                     type="number"
                     inputMode="decimal"
-                    step="0.1"
+                    step="0.01"
                     min={0.1}
                     max={300}
                     value={currentValue ?? ''}

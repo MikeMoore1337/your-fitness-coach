@@ -260,7 +260,7 @@ export function NutritionForm({
                     type="number"
                     min="20"
                     max="350"
-                    step="0.1"
+                    step="0.01"
                     required
                     value={form.weight_kg || ''}
                     onChange={(event) => {
@@ -275,7 +275,7 @@ export function NutritionForm({
                     type="number"
                     min="100"
                     max="250"
-                    step="0.1"
+                    step="0.01"
                     required
                     value={form.height_cm || ''}
                     onChange={(event) => setNumber('height_cm', event.target.value)}

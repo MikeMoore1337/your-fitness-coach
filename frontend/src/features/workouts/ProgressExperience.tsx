@@ -102,7 +102,7 @@ function formatDate(value: string, withYear = false): string {
 function formatChange(change: number | null | undefined, unit: string): string {
   if (change == null) return 'Пока без динамики';
   const sign = change > 0 ? '+' : '';
-  return `${sign}${formatNumber(change)} ${unit}`;
+  return `${sign}${formatNumber(change, 2)} ${unit}`;
 }
 
 function trendInterpretationText(
@@ -204,7 +204,7 @@ function ProgressTrendRows({
         <li key={trend.metric}>
           <span>{bodyMetricLabel(trend)}</span>
           <strong>
-            {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)}
+            {formatNumber(trend.latest_value, 2)} {bodyMetricUnit(trend)}
           </strong>
           <small>{formatChange(trend.change, bodyMetricUnit(trend))}</small>
         </li>
@@ -243,7 +243,7 @@ function ProgressTrendPanel({
         </div>
         {selectedTrend && (
           <strong className="progress-trend-panel__value">
-            {formatNumber(selectedTrend.latest_value)} {bodyMetricUnit(selectedTrend)}
+            {formatNumber(selectedTrend.latest_value, 2)} {bodyMetricUnit(selectedTrend)}
             <small>{formatChange(selectedTrend.change, bodyMetricUnit(selectedTrend))}</small>
           </strong>
         )}
@@ -602,7 +602,7 @@ function SummaryOverview({
 }) {
   const weight = summary.body.trends.find((trend) => trend.metric === 'weight_kg');
   const confirmedNutritionDays = summary.nutrition.complete_days + summary.nutrition.fasted_days;
-  const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Мало данных';
+  const latestWeight = weight ? `${formatNumber(weight.latest_value, 2)} кг` : 'Мало данных';
   const bodyState = weight ? 'populated' : 'sparse';
   const trainingState =
     summary.training.planned_workouts > 0 || summary.training.completed_workouts > 0
@@ -780,7 +780,7 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
                 ? exercise.uses_bodyweight_equipment
                   ? 'Собственный вес'
                   : 'Вес не записан'
-                : `до ${formatNumber(exercise.max_external_load_kg)} кг`}
+                : `до ${formatNumber(exercise.max_external_load_kg, 2)} кг`}
             </span>
             <DisclosureIcon />
           </summary>
@@ -817,7 +817,7 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
                         value={
                           set.external_load_kg == null
                             ? '—'
-                            : `${formatNumber(set.external_load_kg)} кг`
+                            : `${formatNumber(set.external_load_kg, 2)} кг`
                         }
                       />
                       <SetValue label="Повторы" value={set.reps} />
@@ -946,7 +946,7 @@ function BodyChart({ trend }: { trend: BodyTrend }) {
   return (
     <TimeSeriesChart
       ariaLabel={`${bodyMetricLabel(trend)}: ${trend.points
-        .map((point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value)} ${unit}`)
+        .map((point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value, 2)} ${unit}`)
         .join(', ')}`}
       metric={bodyMetricLabel(trend)}
       period={`${formatDate(trend.first_measured_on)} — ${formatDate(trend.latest_measured_on)}`}

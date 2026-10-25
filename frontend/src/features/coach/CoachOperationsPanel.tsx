@@ -885,6 +885,7 @@ export function CoachOperationsPanel({
                   id="crm-payment-expected"
                   inputMode="decimal"
                   min="0"
+                  step="0.01"
                   onChange={(event) => setPaymentExpected(event.target.value)}
                   type="number"
                   value={paymentExpected}
@@ -895,6 +896,7 @@ export function CoachOperationsPanel({
                   id="crm-payment-paid"
                   inputMode="decimal"
                   min="0"
+                  step="0.01"
                   onChange={(event) => setPaymentPaid(event.target.value)}
                   type="number"
                   value={paymentPaid}

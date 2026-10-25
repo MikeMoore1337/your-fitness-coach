@@ -335,7 +335,7 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
               type="number"
               min="20"
               max="350"
-              step="0.1"
+              step="0.01"
               value={form.weight_kg ?? ''}
               onChange={(e) => setForm({ ...form, weight_kg: numberValue(e.target.value) })}
             />
