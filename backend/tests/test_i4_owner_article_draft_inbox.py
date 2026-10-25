@@ -217,14 +217,22 @@ def test_control_center_root_must_explicitly_publish_exact_draft(client, monkeyp
         assert article is not None
         assert article.status == "published"
         assert all(row["review_status"] == "pending" for row in article.claim_source_matrix)
-        revision = db.query(WebArticleRevision).filter(
-            WebArticleRevision.article_id == article_id,
-        ).one()
+        revision = (
+            db.query(WebArticleRevision)
+            .filter(
+                WebArticleRevision.article_id == article_id,
+            )
+            .one()
+        )
         assert revision.status == "published"
-        audits = db.query(AuditEvent).filter(
-            AuditEvent.action == "web_article.published",
-            AuditEvent.resource_id == article_id,
-        ).all()
+        audits = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_id == article_id,
+            )
+            .all()
+        )
         assert len(audits) == 1
         assert audits[0].actor_user_id is not None
         assert audits[0].details["editorial_decision"] == "root_owner_publication"
