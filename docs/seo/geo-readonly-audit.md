@@ -17,7 +17,7 @@ python scripts/geo_readonly_audit.py --execute --route /nutrition
 Тесты адаптера без внешнего пакета и сети:
 
 ```sh
-python -m pytest tests/test_geo_readonly_audit.py -q
+python -m pytest -o filterwarnings=error tests/test_geo_readonly_audit.py -q
 ```
 
 Установка, выбор версии и проверка исходного кода GEO Optimizer остаются добровольным отдельным действием оператора вне production и этого скрипта. Перед выполнением нужно убедиться, что локальная команда `geo` соответствует проверенному релизу разработчика и не имеет неожиданных побочных эффектов. Для этого пилота не нужны API-ключи, платные услуги и соединение с учётными записями Google/Яндекс.
