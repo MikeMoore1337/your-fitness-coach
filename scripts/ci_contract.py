@@ -255,6 +255,13 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "-q",
             ),
             _cmd("migrated-browser-smoke", "npm", "run", "e2e:migrated-stack", cwd="frontend"),
+            _cmd(
+                "rest-pg16-replay-and-races",
+                "python",
+                "scripts/run_pytest.py",
+                "backend/tests/test_workout_rest.py",
+                "-q",
+            ),
         ),
         prerequisites=("python", "alembic", "npm", "frontend/node_modules", "DATABASE_URL"),
     ),

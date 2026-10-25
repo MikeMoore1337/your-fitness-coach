@@ -675,3 +675,192 @@ def test_pg16_simultaneous_same_set_click_replays_one_initial_interval(client):
     rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=owner).json()
     assert len(rows) == 1
     assert rows[0]["status"] == "running"
+
+
+def test_offline_skip_then_restart_preserves_tap_order_and_interval_facts(client):
+    """Delayed delivery must not turn a legitimate offline successor into 422."""
+    headers = _auth(client, 996031)
+    workout = _new_workout(client, headers)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "actual_weight": 40, "is_completed": True},
+        ).status_code
+        == 200
+    )
+
+    now = datetime.now(UTC)
+    started_at = now - timedelta(seconds=80)
+    skipped_at = now - timedelta(seconds=50)
+    restarted_at = now - timedelta(seconds=48)
+    initial = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
+        json={
+            "source_set_id": sid,
+            "started_at": started_at.isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert initial.status_code == 200, initial.text
+    parent = initial.json()
+    skip_url = f"/api/v1/workouts/rest-sessions/{parent['id']}/actions"
+    skip_action = {
+        "action": "skip",
+        "occurred_at": skipped_at.isoformat(),
+        "expected_version": 1,
+        "mutation_id": str(uuid4()),
+    }
+    # Simulate an offline journal flushing all three operations after reconnection.
+    terminal = client.post(skip_url, headers=headers, json=skip_action)
+    assert terminal.status_code == 200, terminal.text
+    assert datetime.fromisoformat(terminal.json()["ended_at"]) == skipped_at
+    assert terminal.json()["measured_seconds"] is None
+    assert client.post(skip_url, headers=headers, json=skip_action).status_code == 200
+
+    restart_url = f"/api/v1/workouts/rest-sessions/{parent['id']}/restart"
+    restart_payload = {"started_at": restarted_at.isoformat(), "mutation_id": str(uuid4())}
+    successor = client.post(restart_url, headers=headers, json=restart_payload)
+    assert successor.status_code == 200, successor.text
+    child = successor.json()
+    assert child["id"] != parent["id"]
+    assert child["status"] == "running"
+    assert datetime.fromisoformat(child["started_at"]) == restarted_at
+    assert (
+        client.post(restart_url, headers=headers, json=restart_payload).json()["id"] == child["id"]
+    )
+
+    rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers)
+    assert rows.status_code == 200
+    assert [row["id"] for row in rows.json()] == [parent["id"], child["id"]]
+    assert rows.json()[0]["status"] == "skipped"
+    assert rows.json()[0]["measured_seconds"] is None
+    current = client.get("/api/v1/workouts/today", headers=headers).json()
+    assert current["exercises"][0]["sets"][0]["actual_weight"] == 40
+    assert not current["exercises"][0]["sets"][1]["is_completed"]
+
+
+def test_terminal_offline_event_time_rejects_impossible_dates_without_mutation(client):
+    headers = _auth(client, 996032)
+    workout = _new_workout(client, headers)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
+    now = datetime.now(UTC)
+    started_at = now - timedelta(seconds=60)
+    started = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
+        json={
+            "source_set_id": sid,
+            "started_at": started_at.isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert started.status_code == 200
+    sid_rest = started.json()["id"]
+    action_url = f"/api/v1/workouts/rest-sessions/{sid_rest}/actions"
+    for action in ("skip", "interrupt", "unknown"):
+        for invalid in (
+            started_at - timedelta(seconds=1),
+            now + timedelta(days=1),
+        ):
+            result = client.post(
+                action_url,
+                headers=headers,
+                json={
+                    "action": action,
+                    "mutation_id": str(uuid4()),
+                    "expected_version": 1,
+                    "occurred_at": invalid.isoformat(),
+                },
+            )
+            assert result.status_code == 422, result.text
+    assert (
+        client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers).json()[0]["status"]
+        == "running"
+    )
+    # Legacy clients do not send occurred_at; they keep working.
+    legacy = client.post(
+        action_url,
+        headers=headers,
+        json={"action": "skip", "mutation_id": str(uuid4()), "expected_version": 1},
+    )
+    assert legacy.status_code == 200, legacy.text
+    assert legacy.json()["ended_at"] is not None
+
+
+def test_pg16_concurrent_two_tab_conflicts_do_not_duplicate_terminal_actions(client):
+    """One winner and one explicit 409, proven using real PostgreSQL row locks."""
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    import pytest
+
+    from fitminiapp_api.db.session import engine
+    from fitminiapp_api.models.workout_rest import WorkoutRestAction
+
+    if engine.dialect.name != "postgresql":
+        pytest.skip("Two-tab row-lock oracle requires PostgreSQL 16")
+    headers = _auth(client, 996033)
+    workout = _new_workout(client, headers)
+    wid = workout["id"]
+    sid = workout["exercises"][0]["sets"][0]["id"]
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
+    now = datetime.now(UTC)
+    started = client.post(
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
+        json={
+            "source_set_id": sid,
+            "started_at": (now - timedelta(seconds=25)).isoformat(),
+            "mutation_id": str(uuid4()),
+        },
+    )
+    assert started.status_code == 200
+    rest_id = started.json()["id"]
+    barrier = Barrier(2)
+
+    def mutate(action):
+        barrier.wait(timeout=10)
+        body = {"action": action, "mutation_id": str(uuid4()), "expected_version": 1}
+        if action == "complete":
+            body["ended_at"] = now.isoformat()
+        else:
+            body["occurred_at"] = now.isoformat()
+        return client.post(
+            f"/api/v1/workouts/rest-sessions/{rest_id}/actions",
+            headers=headers,
+            json=body,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        replies = list(pool.map(mutate, ["complete", "skip"]))
+    assert sorted(reply.status_code for reply in replies) == [200, 409], [
+        reply.text for reply in replies
+    ]
+    rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers).json()
+    assert len(rows) == 1
+    assert rows[0]["status"] in ("completed", "skipped")
+    assert rows[0]["version"] == 2
+    from fitminiapp_api.db.session import get_session_context
+
+    with get_session_context() as session:
+        assert session.query(WorkoutRestAction).filter_by(session_id=rest_id).count() == 1
