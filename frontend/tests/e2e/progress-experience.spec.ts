@@ -2152,7 +2152,7 @@ test('#1190 saves body measurements with hundredths without HTML step mismatch',
   await diary.getByRole('button', { name: 'Сохранить замер' }).click();
   const request = await sent;
   expect(request.postDataJSON()).toMatchObject({ weight_kg: 72.34, waist_cm: 71.23 });
-  await expect(diary.getByText(/Вес: 72\\.34 кг · Талия: 71\\.23 см/)).toBeVisible();
+  await expect(diary.getByText(/Вес: 72\.34 кг · Талия: 71\.23 см/)).toBeVisible();
 });
 
 test('quick measurement can return without losing an unsaved draft', async ({ page }) => {
