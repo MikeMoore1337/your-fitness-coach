@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { agentationDevelopmentHtml, agentationDevelopmentPlugin } from '../../devtools/agentation-dev-plugin';
+import {
+  agentationDevelopmentHtml,
+  agentationDevelopmentPlugin,
+} from '../../devtools/agentation-dev-plugin';
 
 describe('Agentation local-only Vite integration', () => {
   it('leaves HTML unchanged unless explicitly enabled', () => {
