@@ -6595,8 +6595,26 @@ test.describe('#914 rest timer pointer lifecycle', () => {
     });
     await expect(context.panel).toHaveClass(/is-compact/);
     await unchanged(page, context);
-    await context.panel.getByRole('button', { name: 'Скрыть' }).click();
-    await expect(context.panel.getByRole('button', { name: 'Начать отдых' })).toBeVisible();
+    // After rapid repeated taps, the terminal "Скрыть" action may already have
+    // been hit at the former Skip coordinates. Both terminal states must retain
+    // the explicit restart action without starting another interval.
+    const restart = context.panel.getByRole('button', { name: 'Начать отдых' });
+    await expect(restart).toBeVisible();
+    const dismiss = context.panel.getByRole('button', { name: 'Скрыть' });
+    if (await dismiss.isVisible()) await dismiss.click();
+    await expect(restart).toBeVisible();
+    const journal = await page.evaluate(() =>
+      Object.keys(localStorage)
+        .filter((key) => key.endsWith(':measured:v1'))
+        .flatMap((key) =>
+          JSON.parse(localStorage.getItem(key) || '[]') as Array<{
+            status: string;
+            start_mutation_id: string;
+          }>,
+        ),
+    );
+    expect(journal).toHaveLength(1);
+    expect(journal[0]?.status).toBe('skipped');
     await unchanged(page, context);
   });
 
