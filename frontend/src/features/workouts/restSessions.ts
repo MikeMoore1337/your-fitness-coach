@@ -58,6 +58,7 @@ export interface LocalRestSession {
   deadline: number;
   status: RestStatus;
   ended_at?: string;
+  measured_seconds?: number | null;
   source?: string;
   notified?: boolean;
   /** Timestamp of entering the background; survives WebView suspend/reload. */
@@ -264,6 +265,9 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
         row.ended_at = lastTerminal.ended_at ?? lastTerminal.occurred_at;
         if (lastTerminal.action === 'complete') {
           row.source = lastTerminal.corrected ? 'USER_CORRECTED' : 'USER_CONFIRMED';
+          row.measured_seconds = lastTerminal.corrected
+            ? (lastTerminal.corrected_seconds ?? null)
+            : Math.max(0, Math.floor((Date.parse(row.ended_at) - Date.parse(row.started_at)) / 1000));
         }
       }
     }
@@ -449,7 +453,10 @@ export function updateMeasuredRest(
     row.background_since = undefined;
     if (effectiveAction === 'complete') {
       entry.ended_at = occurredAt;
+      row.measured_seconds = correctedSeconds ?? Math.max(0, Math.floor((at - Date.parse(row.started_at)) / 1000));
       row.source = correctedSeconds === undefined ? 'USER_CONFIRMED' : 'USER_CORRECTED';
+    } else {
+      row.measured_seconds = null;
     }
   }
   row.pending.push(entry);
@@ -532,6 +539,7 @@ function acknowledgeRemote(
     : undefined;
   row.server_id = remote.id;
   row.server_version = Math.max(row.server_version ?? 0, remote.version);
+  if (remote.measured_seconds !== undefined) row.measured_seconds = remote.measured_seconds;
   if (Number.isInteger(remote.adjusted_seconds) && remote.adjusted_seconds > 0) {
     row.adjusted_seconds = Math.max(row.adjusted_seconds, remote.adjusted_seconds);
     const startedAt = Date.parse(row.started_at);
