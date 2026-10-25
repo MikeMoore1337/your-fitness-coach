@@ -147,6 +147,27 @@ class HermesWebArticleIntakeRequest(BaseModel):
     provenance: HermesGenerationProvenance
 
 
+
+class OwnerWebArticlePublishRequest(BaseModel):
+    """Explicit root-owner editorial release; does not attest scientific verification."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    article: HermesWebArticleProposal
+    acknowledge_unverified_evidence: Literal[True]
+    generated_with_ai: bool = True
+
+
+class OwnerWebArticlePublishResponse(BaseModel):
+    article_id: str
+    slug: str
+    article_status: Literal["published"]
+    content_version: int
+    canonical_url: str
+    editorial_decision: Literal["root_owner_publication"]
+    scientific_verification: Literal["not_attested"]
+
+
 class WebArticleCard(BaseModel):
     slug: str
     title: str
