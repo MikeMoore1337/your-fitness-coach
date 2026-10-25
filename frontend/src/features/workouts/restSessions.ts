@@ -19,6 +19,7 @@ interface RemoteRestSession {
   source: string | null;
   quality: string;
   version: number;
+  start_mutation_id?: string | null;
 }
 
 interface QueuedRestAction {
@@ -37,12 +38,14 @@ interface RestStartRecovery {
   adjusted_seconds: number;
   deadline: number;
   start_mutation_id: string;
+  restart_of_start_mutation_id?: string;
   server_id?: number;
   server_version?: number;
 }
 
 interface StoredRestRecovery {
   source_set_id: number;
+  session_start_mutation_id?: string;
   start?: RestStartRecovery;
   operation?: QueuedRestAction;
 }
@@ -64,6 +67,7 @@ export interface LocalRestSession {
   server_id?: number;
   server_version?: number;
   start_mutation_id: string;
+  restart_of_start_mutation_id?: string;
   pending: QueuedRestAction[];
 }
 
@@ -116,7 +120,10 @@ function validStartRecovery(value: unknown): value is RestStartRecovery {
     start.start_mutation_id.length > 0 &&
     (start.server_id === undefined || (Number.isInteger(start.server_id) && start.server_id > 0)) &&
     (start.server_version === undefined ||
-      (Number.isInteger(start.server_version) && start.server_version >= 0)),
+      (Number.isInteger(start.server_version) && start.server_version >= 0)) &&
+    (start.restart_of_start_mutation_id === undefined ||
+      (typeof start.restart_of_start_mutation_id === 'string' &&
+        start.restart_of_start_mutation_id.length > 0)),
   );
 }
 
@@ -199,7 +206,7 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
     for (const value of recoveries) {
       const start = value?.start;
       if (!validStartRecovery(start)) continue;
-      const existing = valid.find((session) => session.source_set_id === start.source_set_id);
+      const existing = valid.find((session) => session.start_mutation_id === start.start_mutation_id);
       if (existing) {
         if (existing.server_id === undefined && start.server_id !== undefined) {
           existing.server_id = start.server_id;
@@ -219,7 +226,11 @@ export function loadRestJournal(userId: number, workoutId: number): LocalRestSes
     }
     for (const value of recoveries) {
       const operation = value?.operation;
-      const row = valid.find((session) => session.source_set_id === value?.source_set_id);
+      const row = valid.find((session) =>
+        value?.session_start_mutation_id
+          ? session.start_mutation_id === value.session_start_mutation_id
+          : session.source_set_id === value?.source_set_id && !session.restart_of_start_mutation_id,
+      );
       if (!row || !operation?.mutation_id) continue;
       if (!row.pending.some((item) => item.mutation_id === operation.mutation_id)) {
         row.pending.push(operation);
@@ -292,7 +303,9 @@ export function beginMeasuredRest(
 ): LocalRestSession | null {
   if (sourceSetId <= 0 || plannedSeconds <= 0) return null;
   const records = loadRestJournal(userId, workoutId);
-  const found = records.find((row) => row.source_set_id === sourceSetId);
+  const found = records.find(
+    (row) => row.source_set_id === sourceSetId && !row.restart_of_start_mutation_id,
+  );
   if (found) return found.status === 'running' ? found : null;
   for (const row of records.filter((item) => item.status === 'running')) {
     row.status = 'interrupted';
@@ -334,6 +347,51 @@ export function beginMeasuredRest(
   return created;
 }
 
+/** New explicit interval after a finalised measured/omitted rest. Never re-open history. */
+export function restartMeasuredRest(
+  userId: number,
+  workoutId: number,
+  predecessorStartMutationId: string,
+  at = Date.now(),
+): LocalRestSession | null {
+  const records = loadRestJournal(userId, workoutId);
+  const predecessor = records.find((row) => row.start_mutation_id === predecessorStartMutationId);
+  if (!predecessor || !['completed', 'skipped'].includes(predecessor.status)) return null;
+  if (records.some((row) => row.status === 'running')) return null;
+  const existing = records.find(
+    (row) => row.restart_of_start_mutation_id === predecessorStartMutationId,
+  );
+  if (existing) return existing.status === 'running' ? existing : null;
+  const startedAt = new Date(at).toISOString();
+  const created: LocalRestSession = {
+    source_set_id: predecessor.source_set_id,
+    started_at: startedAt,
+    planned_seconds: predecessor.planned_seconds,
+    adjusted_seconds: predecessor.planned_seconds,
+    deadline: at + predecessor.planned_seconds * 1000,
+    status: 'running',
+    start_mutation_id: makeId(),
+    restart_of_start_mutation_id: predecessorStartMutationId,
+    pending: [],
+  };
+  records.push(created);
+  writeStorage(actionStorageKey(userId, workoutId, created.start_mutation_id), {
+    source_set_id: created.source_set_id,
+    session_start_mutation_id: created.start_mutation_id,
+    start: {
+      source_set_id: created.source_set_id,
+      started_at: created.started_at,
+      planned_seconds: created.planned_seconds,
+      adjusted_seconds: created.adjusted_seconds,
+      deadline: created.deadline,
+      start_mutation_id: created.start_mutation_id,
+      restart_of_start_mutation_id: predecessorStartMutationId,
+    },
+  });
+  saveRestJournal(userId, workoutId, records);
+  return created;
+}
+
 export function updateMeasuredRest(
   userId: number,
   workoutId: number,
@@ -343,8 +401,8 @@ export function updateMeasuredRest(
   correctedSeconds?: number,
 ): LocalRestSession | null {
   const records = loadRestJournal(userId, workoutId);
-  const row = records.find((item) => item.source_set_id === sourceSetId);
-  if (!row || row.status !== 'running') return null;
+  const row = records.find((item) => item.source_set_id === sourceSetId && item.status === 'running');
+  if (!row) return null;
   // Variant C: unresolved background returns must be explicitly corrected or skipped.
   if (
     row.needs_review &&
@@ -397,6 +455,7 @@ export function updateMeasuredRest(
   row.pending.push(entry);
   writeStorage(actionStorageKey(userId, workoutId, entry.mutation_id), {
     source_set_id: sourceSetId,
+    session_start_mutation_id: row.start_mutation_id,
     operation: entry,
   });
   saveRestJournal(userId, workoutId, records);
@@ -405,8 +464,8 @@ export function updateMeasuredRest(
 
 export function acknowledgeRestPlan(userId: number, workoutId: number, sourceSetId: number): void {
   const records = loadRestJournal(userId, workoutId);
-  const row = records.find((item) => item.source_set_id === sourceSetId);
-  if (!row || row.notified || row.status !== 'running') return;
+  const row = records.find((item) => item.source_set_id === sourceSetId && item.status === 'running');
+  if (!row || row.notified) return;
   row.notified = true;
   saveRestJournal(userId, workoutId, records);
 }
@@ -449,15 +508,24 @@ export function recoverRestAfterAbsence(
 function acknowledgeRemote(
   userId: number,
   workoutId: number,
-  sourceSetId: number,
+  startMutationId: string,
   remote: RemoteRestSession,
   mutationId?: string,
 ): void {
   const records = loadRestJournal(userId, workoutId);
-  const row = records.find((item) => item.source_set_id === sourceSetId);
+  const row = records.find((item) => item.start_mutation_id === startMutationId);
   if (!row) {
     if (mutationId) updateStartRecovery(userId, workoutId, mutationId, remote, false);
     return;
+  }
+  // Reject stale/cross-interval ACKs, even when multiple intervals share a set.
+  if (
+    remote.workout_id !== workoutId ||
+    remote.source_set_id !== row.source_set_id ||
+    Math.abs(Date.parse(remote.started_at) - Date.parse(row.started_at)) > 1000 ||
+    (remote.start_mutation_id && remote.start_mutation_id !== row.start_mutation_id)
+  ) {
+    throw new Error('rest_interval_identity_mismatch');
   }
   const acknowledgedOperation = mutationId
     ? row.pending.find((operation) => operation.mutation_id === mutationId)
@@ -490,35 +558,50 @@ function acknowledgeRemote(
   saveRestJournal(userId, workoutId, records);
 }
 
-/** Sync accepted set journal before any rest actions; retain 409s for recovery. */
+/** Sync starts/actions in lineage order, preserving all local intervals and durable replay keys. */
 export async function syncRestJournal(userId: number, workoutId: number): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const key = restJournalStorageKey(userId, workoutId);
   await crossContextCoordinator.run(`rest-sync:${key}`, async () => {
-    const sourceSetIds = loadRestJournal(userId, workoutId)
+    const intervalIds = loadRestJournal(userId, workoutId)
       .filter((row) => !row.server_id || row.pending.length)
-      .map((row) => row.source_set_id);
-    for (const sourceSetId of sourceSetIds) {
+      .map((row) => row.start_mutation_id);
+    for (const intervalId of intervalIds) {
       const latest = () =>
-        loadRestJournal(userId, workoutId).find((row) => row.source_set_id === sourceSetId);
+        loadRestJournal(userId, workoutId).find((row) => row.start_mutation_id === intervalId);
       let row = latest();
       if (!row) continue;
       if (!row.server_id) {
+        const predecessor = row.restart_of_start_mutation_id
+          ? loadRestJournal(userId, workoutId).find(
+              (item) => item.start_mutation_id === row?.restart_of_start_mutation_id,
+            )
+          : null;
+        // The predecessor's start AND stop/skip must be persisted before restart.
+        if (row.restart_of_start_mutation_id && (!predecessor?.server_id || predecessor.pending.length)) {
+          continue;
+        }
         try {
           const remote = await api<RemoteRestSession>(
-            `/api/v1/workouts/${workoutId}/rest-sessions`,
+            predecessor
+              ? `/api/v1/workouts/rest-sessions/${predecessor.server_id}/restart`
+              : `/api/v1/workouts/${workoutId}/rest-sessions`,
             {
               method: 'POST',
-              body: {
-                source_set_id: row.source_set_id,
-                started_at: row.started_at,
-                mutation_id: row.start_mutation_id,
-              },
+              body: predecessor
+                ? { started_at: row.started_at, mutation_id: row.start_mutation_id }
+                : {
+                    source_set_id: row.source_set_id,
+                    started_at: row.started_at,
+                    mutation_id: row.start_mutation_id,
+                  },
             },
           );
-          acknowledgeRemote(userId, workoutId, sourceSetId, remote, row.start_mutation_id);
+          if (predecessor && remote.id === predecessor.server_id) {
+            throw new Error('rest_restart_reused_predecessor');
+          }
+          acknowledgeRemote(userId, workoutId, intervalId, remote, row.start_mutation_id);
         } catch (error) {
-          // Completion of the source set can still be in its separate offline queue.
           if (error instanceof ApiError && [409, 503].includes(error.status)) continue;
           throw error;
         }
@@ -526,7 +609,6 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
       row = latest();
       if (!row?.server_id) continue;
       for (const pendingId of row.pending.map((operation) => operation.mutation_id)) {
-        // Refresh on every iteration: a foreground click can append while a POST awaits.
         row = latest();
         const operation = row?.pending.find((entry) => entry.mutation_id === pendingId);
         if (!row?.server_id || !operation) continue;
@@ -538,9 +620,8 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
               body: { ...operation, expected_version: row.server_version },
             },
           );
-          acknowledgeRemote(userId, workoutId, sourceSetId, remote, operation.mutation_id);
+          acknowledgeRemote(userId, workoutId, intervalId, remote, operation.mutation_id);
         } catch (error) {
-          // Conflicts require explicit reconciliation, not data loss or silent retries.
           if (error instanceof ApiError && [409, 503].includes(error.status)) break;
           throw error;
         }
