@@ -512,6 +512,8 @@ def test_rest_restart_rejects_foreign_predecessor_and_active_another_rest(client
         ).status_code
         == 200
     )
+    # Restart begins after the skip action has persisted its terminal timestamp.
+    request["started_at"] = datetime.now(UTC).isoformat()
     assert client.post(url, headers=owner, json=request).status_code == 200
 
 
