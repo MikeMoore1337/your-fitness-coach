@@ -267,7 +267,7 @@ test('@ui-audit-pr workout active and completion states keep critical controls c
         } else {
           await page.getByRole('button', { name: 'Начать тренировку' }).click();
           await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-          await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+          await page.getByLabel('Вес, Приседания, подход 1').fill('40');
           await page.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
           await expect(page.getByText('Синхронизировано')).toBeVisible();
           await page.getByRole('button', { name: 'Завершить тренировку' }).click();

@@ -59,7 +59,7 @@ for (const theme of ['dark', 'light'] as const) {
       const currentSet = await enterWorkout(page);
       await expectNoHorizontalOverflow(page);
 
-      const weight = currentSet.getByRole('spinbutton', { name: /^Вес,/ });
+      const weight = currentSet.getByLabel(/^Вес,/);
       const reps = currentSet.getByRole('spinbutton', { name: /^Повторы,/ });
       const complete = currentSet.getByRole('button', { name: /^Завершить:/ });
       await expect(weight).toBeVisible();
@@ -120,7 +120,7 @@ test('@critical Issue #998 preserves input order and keyboard disclosure control
 }) => {
   await preparePage(page, 'dark', VIEWPORTS[2]);
   const currentSet = await enterWorkout(page);
-  const weight = currentSet.getByRole('spinbutton', { name: /^Вес,/ });
+  const weight = currentSet.getByLabel(/^Вес,/);
   const reps = currentSet.getByRole('spinbutton', { name: /^Повторы,/ });
   const complete = currentSet.getByRole('button', { name: /^Завершить:/ });
   const rirDetails = currentSet.locator('.active-workout-set__contextual-help .contextual-help');

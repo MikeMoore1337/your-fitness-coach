@@ -2034,7 +2034,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
   const reps = tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' });
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await reps.fill('8');
   await weight.fill('40');
   await tma.setTheme('dark');
@@ -2061,9 +2061,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   await expect(
     tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }),
   ).toHaveValue('8');
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '40',
-  );
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('40');
   await expectNoHorizontalOverflow(tmaPage);
 });
 
@@ -2131,7 +2129,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
   await tmaGuidance.getByRole('button', { name: 'Применить 42,5 кг' }).dblclick();
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await expect(weight).toHaveValue('42.5');
   await expect(
     tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
@@ -2152,9 +2150,7 @@ test('progression guidance applies a configured step once, stays optional and ma
     .getByRole('region', { name: 'Что делать сейчас?' })
     .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '42.5',
-  );
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('42.5');
   await expect(tmaPage.getByRole('button', { name: 'Вес подставлен' })).toBeDisabled();
   expect(api.setPatchCalls()).toBe(1);
 
@@ -2314,7 +2310,7 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await tmaPage.goto('/app');
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   await tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await tmaPage.getByLabel('Вес, Приседания, подход 1').fill('40');
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
   await expect(tmaPage.getByText('Синхронизировано')).toBeVisible();
   await tmaPage.getByRole('button', { name: 'Завершить тренировку' }).click();

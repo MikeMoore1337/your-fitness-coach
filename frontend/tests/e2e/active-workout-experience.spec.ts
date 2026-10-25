@@ -2620,7 +2620,7 @@ test('P1 completion waits for acceptance behind an in-flight autosave', async ({
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const first = page.locator('[data-workout-set-id="201"]');
   const release = server.holdNextPatch();
-  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByLabel(/^Вес,/).fill('42.5');
   await expect.poll(() => server.patches.length).toBe(1);
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await first.getByRole('button', { name: /^2 —/ }).click();
@@ -2742,8 +2742,7 @@ for (const edit of ['weight', 'reps', 'rir', 'multiple'] as const) {
     await page.getByRole('button', { name: 'Клиент' }).click();
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const first = page.locator('[data-workout-set-id="201"]');
-    if (edit === 'weight' || edit === 'multiple')
-      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    if (edit === 'weight' || edit === 'multiple') await first.getByLabel(/^Вес,/).fill('42.5');
     if (edit === 'reps' || edit === 'multiple')
       await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
     if (edit === 'rir' || edit === 'multiple') {
@@ -2804,7 +2803,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'Клиент' }).click();
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const first = page.locator('[data-workout-set-id="201"]');
-    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByLabel(/^Вес,/).fill('42.5');
     await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
     await first.getByRole('button', { name: /^2 —/ }).click();
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
@@ -2850,7 +2849,7 @@ for (const role of ['working', 'warmup', 'activation'] as const) {
       Object.defineProperty(navigator, 'onLine', { configurable: true, value: false }),
     );
     const first = page.locator('[data-workout-set-id="201"]');
-    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByLabel(/^Вес,/).fill('42.5');
     await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
     await first.getByRole('button', { name: /^2 —/ }).click();
     await first.getByRole('button', { name: /^Завершить:/ }).click();
@@ -2905,7 +2904,7 @@ for (const width of [320, 360, 393, 430]) {
       await page.getByRole('button', { name: 'Клиент' }).click();
       await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
       const first = page.locator('[data-workout-set-id="201"]');
-      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+      await first.getByLabel(/^Вес,/).fill('42.5');
       await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
       await first.getByRole('button', { name: /^2 —/ }).click();
       await page.screenshot({ path: info.outputPath(`completion-before-${width}-${theme}.png`) });
@@ -2998,7 +2997,7 @@ test('P1 sequential completions reach the final workout set without duplicate ti
   for (const id of [201, 202, 203]) {
     const row = page.locator(`[data-workout-set-id="${id}"]`);
     await expect(row).toHaveAttribute('aria-current', 'step');
-    await row.getByRole('spinbutton', { name: /^Вес,/ }).fill('40');
+    await row.getByLabel(/^Вес,/).fill('40');
     await row.getByRole('spinbutton', { name: /^Повторы,/ }).fill('8');
     await row.getByRole('button', { name: /^Завершить:/ }).click();
     await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
@@ -3024,7 +3023,7 @@ test('P1 completion preserves rest when navigation unmounts the pending workout'
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const first = page.locator('[data-workout-set-id="201"]');
-  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByLabel(/^Вес,/).fill('42.5');
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
   const release = server.holdNextPatch();
@@ -3085,7 +3084,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'Клиент' }).click();
     await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
     const first = page.locator('[data-workout-set-id="201"]');
-    await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+    await first.getByLabel(/^Вес,/).fill('42.5');
     await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
     await first.getByRole('button', { name: /^2 —/ }).click();
     await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
@@ -3102,7 +3101,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.locator('.active-workout-sync')).toContainText('Требуется действие');
     await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
     await expect(first).toHaveAttribute('aria-current', 'step');
-    await expect(first.getByRole('spinbutton', { name: /^Вес,/ })).toHaveValue('42.5');
+    await expect(first.getByLabel(/^Вес,/)).toHaveValue('42.5');
     await expect(first.getByRole('spinbutton', { name: /^Повторы,/ })).toHaveValue('9');
     expect(server.readSet(201).is_completed).toBe(false);
     await page.locator('.active-workout-sync').scrollIntoViewIfNeeded();
@@ -3116,7 +3115,7 @@ test('P1 late workout read cannot revert a confirmed completion', async ({ page 
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const first = page.locator('[data-workout-set-id="201"]');
-  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByLabel(/^Вес,/).fill('42.5');
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
   const stale = await page.evaluate(async () => (await fetch('/api/v1/workouts/today')).json());
@@ -3173,7 +3172,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const first = page.locator('[data-workout-set-id="201"]');
-  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByLabel(/^Вес,/).fill('42.5');
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
   server.failSetPatch(true);
@@ -3190,7 +3189,7 @@ test('P1 combined API and storage failure never claims durable completion', asyn
   await expect(first.locator('.active-workout-set__complete-label')).toHaveText(/Не сохранено/);
   await expect(page.locator('.active-workout-sync')).toContainText('Не закрывайте приложение');
   await expect(page.getByRole('timer', { name: 'Отдых' })).toHaveCount(0);
-  await expect(first.getByRole('spinbutton', { name: /^Вес,/ })).toHaveValue('42.5');
+  await expect(first.getByLabel(/^Вес,/)).toHaveValue('42.5');
   await expect(first.getByRole('spinbutton', { name: /^Повторы,/ })).toHaveValue('9');
   expect(server.readSet(201).is_completed).toBe(false);
 });
@@ -4088,7 +4087,7 @@ test('V9-02 keeps warm-up editable until confirmation and survives reload', asyn
   const currentSet = page.locator('[data-workout-set-id="201"]');
   await Promise.all([
     waitForSetPatch(page, 201),
-    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+    currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('80'),
   ]);
   await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   const warmupEntry = currentSet.getByTestId('warmup-proposal-entry');
@@ -4130,7 +4129,7 @@ test('V9-02 is available in mocked TMA without mobile overflow', async ({ page }
   const currentSet = page.locator('[data-workout-set-id="201"]');
   await Promise.all([
     waitForSetPatch(page, 201),
-    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+    currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('80'),
   ]);
   await clickDetailsSummary(currentSet.getByText('Разминка и блины', { exact: true }));
   await expect(currentSet.getByRole('button', { name: 'Подготовить разминку' })).toBeVisible();
@@ -4155,7 +4154,7 @@ test('V9-02 does not persist an unsaved proposal offline', async ({ page }) => {
   const currentSet = page.locator('[data-workout-set-id="201"]');
   await Promise.all([
     waitForSetPatch(page, 201),
-    currentSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('80'),
+    currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('80'),
   ]);
   await page.context().setOffline(true);
   await page.evaluate(() => {
@@ -4468,7 +4467,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await clickDetailsSummary(firstSet.getByText('Разминка и блины', { exact: true }));
   await firstSet.getByLabel('Целевой вес, кг').fill('80');
   await expect(firstSet.locator('.active-workout-plate-result')).toContainText('На сторону:');
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   const firstDone = firstSet.getByRole('button', {
     name: 'Завершить: Жим штанги лёжа, подход 1',
@@ -4480,14 +4479,12 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await expect(secondSet).toHaveAttribute('aria-current', 'step');
   await expect(secondSet.getByText('Облегчённый подход', { exact: true })).toBeVisible();
   await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
-  await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
+  await secondSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('35');
   await expect.poll(() => secondSetPatchBodies.length).toBeGreaterThan(0);
   const patchesBeforePrefill = secondSetPatchBodies.length;
   await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
   await expect.poll(() => secondSetPatchBodies.length).toBe(patchesBeforePrefill);
-  await expect(
-    secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }),
-  ).toHaveValue('35');
+  await expect(secondSet.getByLabel('Вес, Жим штанги лёжа, подход 2')).toHaveValue('35');
   await expect(
     secondSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 2' }),
   ).toHaveValue('8');
@@ -4505,7 +4502,7 @@ test('active workout keeps one obvious next action through logging, timer and fi
   await secondSet.getByText('Дополнительно').click();
   await secondSet.getByLabel('Вид подхода').selectOption('drop');
   await secondSet.getByRole('button', { name: '2 — ещё примерно 2 повтора' }).click();
-  await secondSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 2' }).fill('35');
+  await secondSet.getByLabel('Вес, Жим штанги лёжа, подход 2').fill('35');
   await secondSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 2' }).fill('9');
   await Promise.all([
     waitForCompletedSetPatch(page, 202),
@@ -4591,7 +4588,7 @@ async function runIssue1164SpacingScenario(
   const firstSet = page.locator('[data-workout-set-id="201"]');
   await expect(firstSet).toHaveAttribute('aria-current', 'step');
   await captureState('01-first-set-initial', firstSet);
-  await firstSet.getByRole('spinbutton', { name: /Вес,/ }).fill('40');
+  await firstSet.getByLabel(/Вес,/).fill('40');
   await firstSet.getByRole('spinbutton', { name: /Повторы,/ }).fill('8');
   await Promise.all([
     waitForCompletedSetPatch(page, 201),
@@ -4648,7 +4645,7 @@ async function runIssue1164SpacingScenario(
   await secondSet.getByText('Дополнительно', { exact: true }).click();
   await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
 
-  const weight = secondSet.getByRole('spinbutton', { name: /Вес,/ });
+  const weight = secondSet.getByLabel(/Вес,/);
   await weight.focus();
   await expect(weight).toBeFocused();
   await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
@@ -4710,9 +4707,7 @@ test('active workout keeps the current exercise primary and exposes keyboard han
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const currentSet = page.locator('[data-workout-set-id="201"]');
-  const weight = currentSet.getByRole('spinbutton', {
-    name: 'Вес, Жим штанги лёжа, подход 1',
-  });
+  const weight = currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1');
   const reps = currentSet.getByRole('spinbutton', {
     name: 'Повторы, Жим штанги лёжа, подход 1',
   });
@@ -4900,9 +4895,7 @@ test('active workout actionable controls clear the mobile bottom dock', async ({
 
       await expect(page.locator('#appBottomNav')).toBeVisible();
       const currentSet = page.locator('[data-workout-set-id="201"]');
-      const weight = currentSet.getByRole('spinbutton', {
-        name: 'Вес, Жим штанги лёжа, подход 1',
-      });
+      const weight = currentSet.getByLabel('Вес, Жим штанги лёжа, подход 1');
       const reps = currentSet.getByRole('spinbutton', {
         name: 'Повторы, Жим штанги лёжа, подход 1',
       });
@@ -5227,7 +5220,7 @@ test('mixed workout keeps cardio type-aware, compact and stable during input', a
   await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
   await expect(cardio.getByRole('alert')).toHaveText('Укажите длительность кардио.');
   await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
-  await cardio.getByRole('spinbutton', { name: 'Дистанция, Велотренажёр' }).fill('6.4');
+  await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
   const pulse = cardio.getByText('Пульс (необязательно)');
   await pulse.click();
   await cardio.getByRole('spinbutton', { name: 'Средний пульс, уд/мин' }).fill('138');
@@ -5305,7 +5298,7 @@ test('#980 completed strength sets require an explicit edit or reopen action', a
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const first = page.locator('[data-workout-set-id="201"]');
-  await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+  await first.getByLabel(/^Вес,/).fill('42.5');
   await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
   await first.getByRole('button', { name: /^2 —/ }).click();
   await first.getByRole('button', { name: /^Завершить:/ }).click();
@@ -5385,7 +5378,7 @@ test('#980 completed cardio results keep their values through edit and reopen', 
   const cardio = page.locator('.active-workout-exercise').filter({ hasText: 'Велотренажёр' });
   await cardio.getByRole('button', { name: 'Открыть упражнение' }).click();
   await cardio.getByRole('spinbutton', { name: 'Длительность, Велотренажёр' }).fill('27');
-  await cardio.getByRole('spinbutton', { name: 'Дистанция, Велотренажёр' }).fill('6.4');
+  await cardio.getByLabel('Дистанция, Велотренажёр').fill('6.4');
   await cardio.getByRole('button', { name: 'Завершить кардио: Велотренажёр' }).click();
   await expect.poll(() => server.readSet(204).is_completed).toBe(true);
 
@@ -5529,7 +5522,7 @@ test.describe('#980 completed set visual candidate', () => {
       await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
       const first = page.locator('[data-workout-set-id="201"]');
-      await first.getByRole('spinbutton', { name: /^Вес,/ }).fill('42.5');
+      await first.getByLabel(/^Вес,/).fill('42.5');
       await first.getByRole('spinbutton', { name: /^Повторы,/ }).fill('9');
       await first.getByRole('button', { name: /^Завершить:/ }).click();
       await expect.poll(() => server.readSet(201).is_completed).toBe(true);
@@ -6120,7 +6113,7 @@ test('TMA active workout keeps in-page back while native back stays hidden and k
 
   const navigation = page.locator('#appBottomNav');
   await expect(navigation).toBeVisible();
-  const weight = page.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' });
+  const weight = page.getByLabel('Вес, Жим штанги лёжа, подход 1');
   await weight.focus();
   await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(navigation).toBeHidden();
@@ -6150,7 +6143,7 @@ test('save failure stays compact, keeps controls open and retries explicitly', a
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const firstSet = page.locator('[data-workout-set-id="201"]');
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await expect(page.getByText('Требуется действие')).toBeVisible();
   await expect(
     firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }),
@@ -6185,7 +6178,7 @@ test('rest timer reconciles its deadline after a simulated hidden-tab return', a
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const firstSet = page.locator('[data-workout-set-id="201"]');
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
   const timer = page.getByRole('timer', { name: 'Отдых' });
@@ -6231,7 +6224,7 @@ test('rest timer reaches its final state from the deadline without user events',
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
 
   const firstSet = page.locator('[data-workout-set-id="201"]');
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
 
@@ -6261,7 +6254,7 @@ test('policy C offers manual rest recovery after fifteen minutes away past the d
   await page.getByRole('button', { name: 'Клиент' }).click();
   await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
   const firstSet = page.locator('[data-workout-set-id="201"]');
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
   await expect(
@@ -6831,7 +6824,7 @@ test('Task 520 owner visual package covers friction-reduction states', async ({ 
     fullPage: true,
   });
 
-  await firstSet.getByRole('spinbutton', { name: 'Вес, Жим штанги лёжа, подход 1' }).fill('40');
+  await firstSet.getByLabel('Вес, Жим штанги лёжа, подход 1').fill('40');
   await firstSet.getByRole('spinbutton', { name: 'Повторы, Жим штанги лёжа, подход 1' }).fill('8');
   await firstSet.getByRole('button', { name: 'Завершить: Жим штанги лёжа, подход 1' }).click();
   await expect(page.getByRole('timer', { name: 'Отдых' })).toBeVisible();
