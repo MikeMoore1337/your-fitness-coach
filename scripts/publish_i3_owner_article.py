@@ -8,6 +8,7 @@ are both required. A sanitized local receipt is saved for reconciliation.
 from __future__ import annotations
 
 import argparse
+import getpass
 import hashlib
 import json
 import os
@@ -195,9 +196,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
         token = os.environ.get(TOKEN_ENV, "").strip()
+        if not token and sys.stdin.isatty():
+            token = getpass.getpass("YFC Root token (input hidden): ").strip()
         if not token:
             raise PublicationError(
-                f"Authenticated Root token missing: set {TOKEN_ENV} transiently"
+                f"Authenticated Root token missing: enter it on TTY or set {TOKEN_ENV}"
             )
         published = validate_receipt(post_article(origin, token, article), EXPECTED_SLUG)
         public_verified = verify_public_api(origin, EXPECTED_SLUG)
@@ -216,7 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         save_receipt(args.receipt, record)
         print(json.dumps(record, ensure_ascii=False))
         return 0 if public_verified else 4
-    except (PublicationError, OSError, ValueError, json.JSONDecodeError) as exc:
+    except (PublicationError, OSError, ValueError) as exc:
         print(f"Publication not confirmed: {exc}", file=sys.stderr)
         return 2
 
