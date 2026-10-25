@@ -801,9 +801,32 @@ def publish_owner_web_article(
     content_hash = _content_hash(_article_content_payload(proposal))
     existing = db.query(WebArticle).filter(WebArticle.slug == proposal.slug).one_or_none()
     if existing is not None:
-        if existing.status == "published" and existing.content_hash == content_hash:
+        if existing.content_hash != content_hash:
+            raise WebArticleError("slug_conflict")
+        if existing.status == "published":
             return existing
-        raise WebArticleError("slug_conflict")
+        if existing.status not in {"draft", "review", "approved"}:
+            raise WebArticleError("article_transition_invalid")
+        revision = (
+            db.query(WebArticleRevision)
+            .filter(
+                WebArticleRevision.article_id == existing.id,
+                WebArticleRevision.content_version == existing.content_version,
+            )
+            .one_or_none()
+        )
+        if revision is None:
+            raise WebArticleError("article_revision_missing")
+        existing.status = "approved"
+        revision.status = "approved"
+        publish_web_article(
+            db,
+            existing,
+            actor_ref="root_owner",
+            owner_editorial_decision=True,
+            owner_user_id=actor_user_id,
+        )
+        return existing
 
     warnings = validate_article_proposal(proposal)
     blockers = _review_blockers(proposal, warnings)
