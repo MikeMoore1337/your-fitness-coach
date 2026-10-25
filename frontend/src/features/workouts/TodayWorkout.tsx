@@ -1877,7 +1877,13 @@ export function RestTimer({
           </div>
           <div className="active-workout-rest__next" hidden={showCompact}>
             <strong>{completedNotice?.split(' · ')[0] ?? `Далее: ${nextExercise}`}</strong>
-            <span>{nextPosition}</span>
+            <span role={restIsUnconfirmed ? 'status' : undefined}>
+              {restIsUnconfirmed
+                ? typeof navigator !== 'undefined' && !navigator.onLine
+                  ? 'Нет сети · отдых ожидает сохранения'
+                  : 'Отдых сохраняется…'
+                : nextPosition}
+            </span>
           </div>
           {measuredRest && !showCompact && (
             <div className="active-workout-rest__actual">
@@ -2126,7 +2132,7 @@ export function RestTimer({
               </Button>
             </>
           )}
-          {((measuredRest && restIsUnconfirmed) ||
+          {((measuredRest && restIsUnconfirmed && (showCompact || collapsed)) ||
             (!measuredRest &&
               latestRest &&
               (!latestRest.server_id || latestRest.pending.length > 0))) && (
