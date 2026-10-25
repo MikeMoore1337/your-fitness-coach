@@ -5056,10 +5056,8 @@ button.today-text-link {
   visibility: hidden;
   pointer-events: none;
 }
-html[data-yfc-layout-surface='telegram']
-  .active-workout-set__prefill-actions.is-hidden,
-html[data-yfc-pwa-focus-placement='true']
-  .active-workout-set__prefill-actions.is-hidden {
+html[data-yfc-layout-surface='telegram'] .active-workout-set__prefill-actions.is-hidden,
+html[data-yfc-pwa-focus-placement='true'] .active-workout-set__prefill-actions.is-hidden {
   /* Keep the iOS keyboard anchor stable while moving the hidden reserve after the controls. */
   display: flex;
   order: 1;
