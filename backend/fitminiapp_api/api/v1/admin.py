@@ -5,10 +5,6 @@ from sqlalchemy.orm import Session
 from fitminiapp_api.api.dependencies.auth import require_root_admin
 from fitminiapp_api.db.session import get_db, get_session_context
 from fitminiapp_api.models.user import User
-from fitminiapp_api.schemas.articles import (
-    OwnerWebArticlePublishRequest,
-    OwnerWebArticlePublishResponse,
-)
 from fitminiapp_api.schemas.admin import (
     AdminAuditRow,
     AdminFunnelResponse,
@@ -20,9 +16,9 @@ from fitminiapp_api.schemas.admin import (
     AdminUserSearchRow,
     AdminUserStatusUpdate,
 )
-from fitminiapp_api.services.web_articles import (
-    WebArticleError,
-    publish_owner_web_article,
+from fitminiapp_api.schemas.articles import (
+    OwnerWebArticlePublishRequest,
+    OwnerWebArticlePublishResponse,
 )
 from fitminiapp_api.services.admin_operations import (
     end_relationship,
@@ -35,6 +31,10 @@ from fitminiapp_api.services.admin_operations import (
     update_trainer_capability,
     update_user_status,
     user_detail,
+)
+from fitminiapp_api.services.web_articles import (
+    WebArticleError,
+    publish_owner_web_article,
 )
 
 router = APIRouter()
