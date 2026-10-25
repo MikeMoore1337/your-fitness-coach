@@ -119,17 +119,14 @@ describe('active workout prefill layout', () => {
 });
 
 describe('completed action layout', () => {
-  it('keeps the restore action in an overlay disclosure', () => {
+  it('keeps completed actions on one compact touch-target row', () => {
     const styles = readFileSync('src/styles/react.css', 'utf8').replace(/\r\n/g, '\n');
 
     expect(styles).toMatch(
-      /\.active-workout-set__more-actions\s*\{[^}]*position: relative;[^}]*\}/s,
+      /\.active-workout-set__completed-actions\s*\{[^}]*display: grid;[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
     );
     expect(styles).toMatch(
-      /\.active-workout-set__more-actions-body\s*\{[^}]*position: absolute;[^}]*\}/s,
-    );
-    expect(styles).toMatch(
-      /\.active-workout-set__more-actions > \.yfc-disclosure-summary\s*\{[^}]*min-height: 44px;/s,
+      /\.active-workout-set__completed-actions > \.ui-button\s*\{[^}]*min-height: 44px;[^}]*white-space: nowrap;/s,
     );
   });
 });

@@ -1,13 +1,4 @@
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../app/AuthProvider';
 import { api, ApiError } from '../../shared/api/client';
@@ -118,29 +109,6 @@ const rirOptions: readonly { value: RirValue; label: string }[] = [
   { value: '3', label: '3 — ещё примерно 3 повтора' },
   { value: '4+', label: '4+ — осталось много сил' },
 ];
-
-function CompletedActionsDisclosure({ children }: { children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const bodyId = useId();
-
-  return (
-    <div className="active-workout-set__more-actions">
-      <button
-        type="button"
-        className="yfc-disclosure-summary"
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => setOpen((current) => !current)}
-      >
-        Действия
-        <DisclosureIcon />
-      </button>
-      <div id={bodyId} className="active-workout-set__more-actions-body" hidden={!open}>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 export function formatWorkoutDuration(totalSeconds: number): string {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
@@ -724,7 +692,7 @@ function WorkoutSetRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным подходом"
+          aria-label="Управление выполненным подходом"
         >
           {editingCompleted ? (
             <>
@@ -759,17 +727,15 @@ function WorkoutSetRow({
             </Button>
           )}
           {!editingCompleted && (
-            <CompletedActionsDisclosure>
-              <Button
-                type="button"
-                disabled={disabled || completing}
-                data-workout-action="reopen-completed"
-                variant="secondary"
-                onClick={() => void requestReopen()}
-              >
-                Вернуть в работу
-              </Button>
-            </CompletedActionsDisclosure>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}
@@ -1270,7 +1236,7 @@ function CardioWorkoutRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным кардио"
+          aria-label="Управление выполненным интервалом"
         >
           {editingCompleted ? (
             <>
@@ -1305,17 +1271,15 @@ function CardioWorkoutRow({
             </Button>
           )}
           {!editingCompleted && (
-            <CompletedActionsDisclosure>
-              <Button
-                type="button"
-                disabled={disabled || completing}
-                data-workout-action="reopen-completed"
-                variant="secondary"
-                onClick={() => void requestReopen()}
-              >
-                Вернуть в работу
-              </Button>
-            </CompletedActionsDisclosure>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}
