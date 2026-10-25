@@ -542,7 +542,15 @@ function acknowledgeRemote(
   if (
     remote.workout_id !== workoutId ||
     remote.source_set_id !== row.source_set_id ||
-    Math.abs(Date.parse(remote.started_at) - Date.parse(row.started_at)) > 1000 ||
+    // API stores UTC timestamps as naive datetimes. Without the UTC suffix,
+    // Date.parse treats them as device-local time and rejects a valid ACK.
+    Math.abs(
+      Date.parse(
+        /(?:Z|[+-]\d{2}:\d{2})$/i.test(remote.started_at)
+          ? remote.started_at
+          : `${remote.started_at}Z`,
+      ) - Date.parse(row.started_at),
+    ) > 1000 ||
     (remote.start_mutation_id && remote.start_mutation_id !== row.start_mutation_id)
   ) {
     throw new Error('Ответ сервера относится к другому интервалу отдыха');
