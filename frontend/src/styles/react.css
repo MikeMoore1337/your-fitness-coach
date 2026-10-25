@@ -5052,8 +5052,13 @@ button.today-text-link {
   margin: -3px 0 0 48px;
 }
 .active-workout-set__prefill-actions.is-hidden {
+  display: none;
   visibility: hidden;
   pointer-events: none;
+}
+.active-workout-set.is-current:has(.active-workout-input input:focus)
+  .active-workout-set__prefill-actions.is-hidden {
+  display: flex;
 }
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;

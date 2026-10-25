@@ -4547,6 +4547,152 @@ test('active workout keeps one obvious next action through logging, timer and fi
   expect(JSON.stringify(analyticsEvents)).not.toContain('actual_reps');
 });
 
+type Issue1164Theme = 'light' | 'dark';
+
+const issue1164Viewports = [
+  { width: 320, height: 800 },
+  { width: 360, height: 800 },
+  { width: 393, height: 844 },
+  { width: 430, height: 932 },
+] as const;
+
+async function runIssue1164SpacingScenario(
+  page: Page,
+  theme: Issue1164Theme,
+  viewport: (typeof issue1164Viewports)[number],
+) {
+  await page.setViewportSize(viewport);
+  await page.emulateMedia({ colorScheme: theme, reducedMotion: 'reduce' });
+  await page.addInitScript((value) => localStorage.setItem('app-theme', value), theme);
+  await mockActiveWorkout(page);
+  await page.goto('/app');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+  await page.getByRole('button', { name: 'Продолжить тренировку' }).click();
+
+  const capture = process.env.YFC_ISSUE_1164_CAPTURE === '1';
+  const directory = resolve(
+    process.cwd(),
+    '..',
+    '.artifacts',
+    'tasks',
+    '1164',
+    'evidence',
+    process.env.YFC_ISSUE_1164_CAPTURE_PHASE ?? 'after',
+    `${theme}-${viewport.width}`,
+  );
+  const captureState = async (name: string, locator: Locator, fullPage = false) => {
+    if (!capture) return;
+    await mkdir(directory, { recursive: true });
+    await locator.screenshot({ path: resolve(directory, `${name}-card.png`) });
+    if (fullPage)
+      await page.screenshot({ path: resolve(directory, `${name}-page.png`), fullPage: true });
+  };
+
+  const firstSet = page.locator('[data-workout-set-id="201"]');
+  await expect(firstSet).toHaveAttribute('aria-current', 'step');
+  await captureState('01-first-set-initial', firstSet);
+  await firstSet.getByRole('spinbutton', { name: /Вес,/ }).fill('40');
+  await firstSet.getByRole('spinbutton', { name: /Повторы,/ }).fill('8');
+  await Promise.all([
+    waitForCompletedSetPatch(page, 201),
+    firstSet.getByRole('button', { name: /^Завершить:/ }).click(),
+  ]);
+
+  const secondSet = page.locator('[data-workout-set-id="202"]');
+  await expect(secondSet).toHaveAttribute('aria-current', 'step');
+  await expect(secondSet.getByText('Предыдущий подход: 40 кг × 8')).toBeVisible();
+  await expect(secondSet.locator('.active-workout-set__context')).toContainText('8–10 повторений');
+  await expect(secondSet.locator('.active-workout-set__context')).toContainText('Отдых 90 с');
+  await expect(page.getByRole('button', { name: 'Завершить отдых' })).toBeVisible();
+  await captureState('02-rest-prefill-visible', secondSet, true);
+
+  const measure = async () =>
+    page.evaluate(() => {
+      const row = document.querySelector<HTMLElement>('[data-workout-set-id="202"]');
+      const previous = row?.querySelector<HTMLElement>('.active-workout-set__previous');
+      const prefill = row?.querySelector<HTMLElement>('.active-workout-set__prefill-actions');
+      const context = row?.querySelector<HTMLElement>('.active-workout-set__context');
+      if (!row || !previous || !prefill || !context) return null;
+      const prefillStyle = getComputedStyle(prefill);
+      return {
+        rowHeight: row.getBoundingClientRect().height,
+        prefillHeight: prefill.getBoundingClientRect().height,
+        prefillVisibility: prefillStyle.visibility,
+        contextGap: context.getBoundingClientRect().top - previous.getBoundingClientRect().bottom,
+      };
+    });
+
+  const beforePrefill = await measure();
+  expect(beforePrefill).not.toBeNull();
+  expect(beforePrefill!.prefillHeight).toBeGreaterThanOrEqual(44);
+  expect(beforePrefill!.contextGap).toBeGreaterThan(48);
+
+  await secondSet.getByRole('button', { name: 'Подставить предыдущий результат' }).click();
+  await expect(secondSet.locator('.active-workout-set__prefill-actions')).toHaveClass(/is-hidden/);
+  const afterPrefill = await measure();
+  expect(afterPrefill).not.toBeNull();
+  expect(afterPrefill!.prefillHeight).toBe(0);
+  expect(afterPrefill!.contextGap).toBeLessThanOrEqual(24);
+  await captureState('03-rest-prefill-dismissed', secondSet, true);
+
+  await secondSet.getByText('Дополнительно', { exact: true }).click();
+  await expect(secondSet.getByLabel('Вид подхода')).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('04-advanced-open', secondSet, true);
+  await secondSet.getByText('Дополнительно', { exact: true }).click();
+  await expect(secondSet.getByLabel('Вид подхода')).not.toBeVisible();
+
+  const weight = secondSet.getByRole('spinbutton', { name: /Вес,/ });
+  await weight.focus();
+  await expect(weight).toBeFocused();
+  await expectClearOfBottomDock(weight, `${theme} ${viewport.width}px weight`);
+  await expectClearOfBottomDock(
+    secondSet.getByRole('button', { name: /^Завершить:/ }),
+    `${theme} ${viewport.width}px completion`,
+  );
+  const focusedPrefill = await measure();
+  expect(focusedPrefill?.prefillHeight).toBeGreaterThanOrEqual(44);
+  await weight.blur();
+  await expect(weight).not.toBeFocused();
+  const afterBlur = await measure();
+  expect(afterBlur?.prefillHeight).toBe(0);
+  if (capture) {
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      resolve(directory, 'geometry.json'),
+      JSON.stringify({ beforePrefill, afterPrefill, focusedPrefill, afterBlur }, null, 2),
+    );
+  }
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    )
+    .toBe(true);
+
+  await page.getByRole('button', { name: 'Свернуть таймер' }).click();
+  await expect(page.getByRole('button', { name: 'Показать таймер' })).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('05-rest-collapsed', secondSet, true);
+
+  await page.getByRole('button', { name: 'Показать таймер' }).click();
+  await page.getByRole('button', { name: 'Завершить отдых' }).click();
+  await expect(page.getByRole('button', { name: 'Скрыть' })).toBeVisible();
+  expect((await measure())?.contextGap).toBeLessThanOrEqual(24);
+  await captureState('06-rest-completed', secondSet, true);
+}
+
+for (const issue1164Theme of ['light', 'dark'] as const) {
+  for (const issue1164Viewport of issue1164Viewports) {
+    test(`#1164 active set spacing ${issue1164Theme} ${issue1164Viewport.width}px`, async ({
+      page,
+    }) => {
+      await runIssue1164SpacingScenario(page, issue1164Theme, issue1164Viewport);
+    });
+  }
+}
+
 test('active workout keeps the current exercise primary and exposes keyboard handoff', async ({
   page,
 }) => {
