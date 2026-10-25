@@ -545,7 +545,7 @@ function acknowledgeRemote(
     Math.abs(Date.parse(remote.started_at) - Date.parse(row.started_at)) > 1000 ||
     (remote.start_mutation_id && remote.start_mutation_id !== row.start_mutation_id)
   ) {
-    throw new Error('rest_interval_identity_mismatch');
+    throw new Error('Ответ сервера относится к другому интервалу отдыха');
   }
   const acknowledgedOperation = mutationId
     ? row.pending.find((operation) => operation.mutation_id === mutationId)
@@ -626,7 +626,7 @@ export async function syncRestJournal(
             },
           );
           if (predecessor && remote.id === predecessor.server_id) {
-            throw new Error('rest_restart_reused_predecessor');
+            throw new Error('Сервер повторно использовал предыдущий интервал отдыха');
           }
           acknowledgeRemote(userId, workoutId, intervalId, remote, row.start_mutation_id);
         } catch (error) {
