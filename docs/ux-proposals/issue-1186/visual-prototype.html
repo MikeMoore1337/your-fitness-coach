@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ru" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Issue #1186 — квадратная поверхность медиа</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --page: #f4f5f0;
+        --panel: #ffffff;
+        --surface: #e4e7df;
+        --ink: #151812;
+        --muted: #5f675c;
+        --line: #cbd2c3;
+        --accent: #a4e637;
+        --danger: #c84d43;
+      }
+      html[data-theme='dark'] {
+        color-scheme: dark;
+        --page: #111411;
+        --panel: #1a1f1a;
+        --surface: #282e27;
+        --ink: #f2f5ed;
+        --muted: #aab4a6;
+        --line: #3b4638;
+        --accent: #b5f044;
+        --danger: #ff897d;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-width: 320px;
+        background: var(--page);
+        color: var(--ink);
+        font: 15px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main { width: min(100% - 32px, 1120px); margin: 0 auto; padding: 24px 0 48px; }
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: clamp(1.35rem, 4vw, 2rem); }
+      h2 { font-size: 1.05rem; }
+      h3 { font-size: .95rem; }
+      .intro { display: grid; gap: 8px; margin-bottom: 20px; }
+      .intro p, .fixture-note, figcaption { color: var(--muted); }
+      .badge {
+        display: inline-flex;
+        width: fit-content;
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #162000;
+        font-size: .72rem;
+        font-weight: 800;
+      }
+      .fixture {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+        padding: 16px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background: var(--panel);
+      }
+      .fixture-head { display: grid; gap: 4px; }
+      .fixture-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        align-items: start;
+      }
+      .fixture-grid--current { grid-template-columns: minmax(0, 1fr); }
+      .fixture-grid--variants { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .candidate {
+        display: grid;
+        gap: 8px;
+        min-width: 0;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+      .candidate--current { border-color: color-mix(in srgb, var(--danger) 65%, var(--line)); }
+      .candidate h3 { min-height: 2.8em; }
+      .media-surface {
+        width: min(100%, 280px);
+        margin: 0 auto;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface);
+      }
+      .media-surface img,
+      .media-surface video {
+        display: block;
+        width: 100%;
+        object-fit: contain;
+      }
+      /* The old shape: the picture wrapper has no definite square height. */
+      .candidate--current .media-surface picture { display: block; min-width: 0; }
+      /* Diagnostic stand-in for the measured intrinsic-height result, not production CSS. */
+      .candidate--current .media-surface { height: clamp(600px, 200vw, 830px); }
+      .candidate--current .media-surface img { height: 100%; aspect-ratio: 1; }
+      .media-surface--square { aspect-ratio: 1; }
+      .media-surface--square picture { display: block; width: 100%; height: 100%; }
+      .media-surface--square img,
+      .media-surface--square video { height: 100%; }
+      .candidate--adaptive .media-surface--square img,
+      .candidate--adaptive .media-surface--square video { object-position: 50% 38%; }
+      .source-chip {
+        display: inline-flex;
+        width: fit-content;
+        padding: 3px 6px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        font-size: .72rem;
+      }
+      .fixture-note { font-size: .82rem; }
+      .frame-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+      .frame-card { display: grid; gap: 6px; min-width: 0; }
+      .frame-card video { width: 100%; aspect-ratio: 16 / 9; object-fit: contain; background: var(--surface); border-radius: 10px; }
+      .frame-card figcaption { font-size: .8rem; }
+      .legend { display: flex; flex-wrap: wrap; gap: 6px; }
+      .legend span { font-size: .75rem; color: var(--muted); }
+      @media (max-width: 760px) {
+        main { width: min(100% - 20px, 560px); padding-top: 16px; }
+        .fixture-grid { grid-template-columns: 1fr; }
+        .candidate h3 { min-height: 0; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        * { scroll-behavior: auto !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <span class="badge">Только прототип · Issue #1186</span>
+        <h1 id="page-title">Квадратная поверхность без обрезки техники</h1>
+        <p>Сравнение текущего fallback и двух безопасных вариантов для 16:9. Исходные GIF, MP4 и poster не изменяются.</p>
+        <p>Варианты A и B используют полный кадр через <code>object-fit: contain</code>; различается только вертикальная привязка широкого кадра.</p>
+      </section>
+
+      <section class="fixture" aria-labelledby="wide-title">
+        <div class="fixture-head">
+          <h2 id="wide-title">Широкий источник: жим штанги на наклонной скамье</h2>
+          <p class="fixture-note">Poster: 1280×720 · MP4: 1280×720 · исходная анимация GymVisual: 180×180</p>
+        </div>
+        <div class="fixture-grid fixture-grid--current">
+          <article class="candidate candidate--current">
+            <h3>Текущее поведение: fallback picture</h3>
+            <div class="media-surface">
+              <picture>
+                <img src="/backend/assets/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg" width="1280" height="720" alt="Жим штанги на наклонной скамье — текущий fallback" />
+              </picture>
+            </div>
+            <span class="source-chip">Измеренное следствие: высокий wrapper</span>
+          </article>
+        </div>
+        <div class="fixture-grid fixture-grid--variants">
+          <article class="candidate candidate--contain">
+            <h3>Вариант A: квадрат + полный кадр</h3>
+            <div class="media-surface media-surface--square">
+              <picture>
+                <img src="/backend/assets/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg" width="1280" height="720" alt="Жим штанги на наклонной скамье — вариант A" />
+              </picture>
+            </div>
+            <span class="source-chip">Contain · центр</span>
+          </article>
+          <article class="candidate candidate--adaptive">
+            <h3>Вариант B: квадрат + безопасная привязка</h3>
+            <div class="media-surface media-surface--square">
+              <picture>
+                <img src="/backend/assets/exercise-guides/exercises-media/incline-bench-press/poster-1280.jpg" width="1280" height="720" alt="Жим штанги на наклонной скамье — вариант B" />
+              </picture>
+            </div>
+            <span class="source-chip">Contain · position 50% 38%</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="fixture" aria-labelledby="square-title">
+        <div class="fixture-head">
+          <h2 id="square-title">Квадратный источник: жим штанги лёжа</h2>
+          <p class="fixture-note">GIF: 180×180 · poster: 1280×720 · MP4: 1280×720</p>
+        </div>
+        <div class="fixture-grid fixture-grid--variants">
+          <article class="candidate candidate--contain">
+            <h3>Вариант A: GIF в квадрате</h3>
+            <div class="media-surface media-surface--square">
+              <img src="/backend/assets/exercise-guides/gymvisual/bench-press-0025-EIeI8Vf.gif" alt="Жим штанги лёжа — GIF" />
+            </div>
+            <span class="source-chip">Оригинальная анимация · 1:1</span>
+          </article>
+          <article class="candidate candidate--adaptive">
+            <h3>Вариант B: poster в квадрате</h3>
+            <div class="media-surface media-surface--square">
+              <img src="/backend/assets/exercise-guides/exercises-media/bench-press/poster-1280.jpg" width="1280" height="720" alt="Жим штанги лёжа — poster" />
+            </div>
+            <span class="source-chip">Contain · без crop</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="fixture" aria-labelledby="frames-title">
+        <div class="fixture-head">
+          <h2 id="frames-title">Проверка движения: первый, средний и конечный кадр</h2>
+          <p class="fixture-note">Используется лицензированный 720p MP4 из manifest; браузер перемещает воспроизведение на 0%, 50% и последний доступный кадр.</p>
+        </div>
+        <div class="frame-grid">
+          <figure class="frame-card">
+            <video data-frame-time="0" src="/backend/assets/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4" muted playsinline preload="auto" aria-label="Первый кадр"></video>
+            <figcaption>Первый кадр</figcaption>
+          </figure>
+          <figure class="frame-card">
+            <video data-frame-time="0.5" src="/backend/assets/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4" muted playsinline preload="auto" aria-label="Средний кадр"></video>
+            <figcaption>Средний кадр</figcaption>
+          </figure>
+          <figure class="frame-card">
+            <video data-frame-time="0.95" src="/backend/assets/exercise-guides/exercises-media/videos/incline-bench-press-720p-h264.mp4" muted playsinline preload="auto" aria-label="Конечный кадр"></video>
+            <figcaption>Конечный кадр</figcaption>
+          </figure>
+        </div>
+        <div class="legend" aria-label="Ограничения прототипа">
+          <span>• не production CSS</span>
+          <span>• не меняет media priority</span>
+          <span>• не кадрирует и не транскодирует источник</span>
+        </div>
+      </section>
+    </main>
+    <script>
+      const theme = new URLSearchParams(location.search).get('theme');
+      if (theme === 'dark' || theme === 'light') document.documentElement.dataset.theme = theme;
+      for (const video of document.querySelectorAll('video[data-frame-time]')) {
+        const seekToFrame = () => {
+          const requested = Number(video.dataset.frameTime ?? 0);
+          const target = Math.max(0, Math.min(video.duration - 0.05, video.duration * requested));
+          if (target === 0) {
+            video.dataset.frameReady = 'true';
+            return;
+          }
+          video.addEventListener('seeked', () => {
+            video.dataset.frameReady = 'true';
+          }, { once: true });
+          video.currentTime = target;
+        };
+        if (video.readyState >= 1) seekToFrame();
+        else video.addEventListener('loadedmetadata', seekToFrame, { once: true });
+        video.addEventListener('error', () => {
+          video.dataset.frameReady = 'error';
+        }, { once: true });
+        if (video.dataset.frameTime === '0') {
+          video.currentTime = 0;
+          video.pause();
+        }
+      }
+    </script>
+  </body>
+</html>
