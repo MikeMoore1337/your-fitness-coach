@@ -5056,9 +5056,13 @@ button.today-text-link {
   visibility: hidden;
   pointer-events: none;
 }
-.active-workout-set.is-current:has(.active-workout-input input:focus)
+html[data-yfc-layout-surface='telegram']
+  .active-workout-set__prefill-actions.is-hidden,
+html[data-yfc-pwa-focus-placement='true']
   .active-workout-set__prefill-actions.is-hidden {
+  /* Keep the iOS keyboard anchor stable while moving the hidden reserve after the controls. */
   display: flex;
+  order: 1;
 }
 .active-workout-set__prefill-actions .active-workout-set__prefill {
   margin: 0;

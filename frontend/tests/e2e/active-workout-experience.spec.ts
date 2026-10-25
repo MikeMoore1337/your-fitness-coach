@@ -4651,7 +4651,7 @@ async function runIssue1164SpacingScenario(
     `${theme} ${viewport.width}px completion`,
   );
   const focusedPrefill = await measure();
-  expect(focusedPrefill?.prefillHeight).toBeGreaterThanOrEqual(44);
+  expect(focusedPrefill?.prefillHeight).toBe(0);
   await weight.blur();
   await expect(weight).not.toBeFocused();
   const afterBlur = await measure();
