@@ -121,12 +121,18 @@ def test_hermes_draft_inbox_only_root_reads(client, monkeypatch) -> None:
     with SessionLocal() as db:
         article = db.get(WebArticle, draft_id)
         assert article is not None and article.status == "draft"
-        revisions = db.query(WebArticleRevision).filter(WebArticleRevision.article_id == draft_id).all()
+        revisions = (
+            db.query(WebArticleRevision).filter(WebArticleRevision.article_id == draft_id).all()
+        )
         assert len(revisions) == 1 and revisions[0].status == "draft"
-        published = db.query(AuditEvent).filter(
-            AuditEvent.action == "web_article.published",
-            AuditEvent.resource_id == draft_id,
-        ).count()
+        published = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_id == draft_id,
+            )
+            .count()
+        )
         assert published == 0
     assert client.get(f"/api/v1/public/articles/{obj['slug']}").status_code == 404
 
