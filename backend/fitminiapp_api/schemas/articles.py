@@ -167,7 +167,6 @@ class OwnerWebArticlePublishResponse(BaseModel):
     scientific_verification: Literal["not_attested"]
 
 
-
 class OwnerArticleReviewRow(BaseModel):
     """Authenticated Root-only read model; cannot authorize publication."""
 
