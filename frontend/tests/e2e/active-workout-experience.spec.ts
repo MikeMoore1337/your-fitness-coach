@@ -6805,7 +6805,7 @@ for (const theme1166 of ['dark', 'light'] as const) {
     test(`issue1166 real AFTER ${theme1166} ${width1166}`, async ({ page }) => {
       await page.setViewportSize({ width: width1166, height: 844 });
       await page.emulateMedia({ colorScheme: theme1166, reducedMotion: 'reduce' });
-      await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), theme);
+      await page.addInitScript((theme) => localStorage.setItem('app-theme', theme), theme1166);
       const server = await mockActiveWorkout(page);
       const intervals: Record<number, Record<string, unknown>> = {};
       let nextId = 900;
