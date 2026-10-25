@@ -68,7 +68,11 @@ def load_article(path: Path = ARTICLE_PATH) -> tuple[dict[str, Any], str]:
     matrix = article.get("claim_source_matrix")
     claims = article.get("claims")
     sources = article.get("sources")
-    if not isinstance(matrix, list) or not isinstance(claims, list) or not isinstance(sources, list):
+    if (
+        not isinstance(matrix, list)
+        or not isinstance(claims, list)
+        or not isinstance(sources, list)
+    ):
         raise PublicationError("I3 claim/source matrix is missing")
     if len(matrix) != 3 or len(claims) != 3 or len(sources) != 3:
         raise PublicationError("I3 expected three claims and three sources")
@@ -159,7 +163,7 @@ def verify_public_api(origin: str, slug: str) -> bool:
                 for item in published.get("claim_source_matrix", [])
             )
         )
-    except (error.HTTPError, error.URLError, OSError, ValueError, TypeError):
+    except error.HTTPError, error.URLError, OSError, ValueError, TypeError:
         return False
 
 
@@ -173,7 +177,9 @@ def save_receipt(path: Path, record: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--publish", action="store_true", help="POST with authenticated Root access")
+    parser.add_argument(
+        "--publish", action="store_true", help="POST with authenticated Root access"
+    )
     parser.add_argument("--origin", default=API_ORIGIN, help="Approved YFC HTTPS origin")
     parser.add_argument("--receipt", type=Path, default=RECEIPT_PATH)
     args = parser.parse_args(argv)
