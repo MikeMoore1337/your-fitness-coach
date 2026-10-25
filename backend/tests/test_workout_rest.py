@@ -677,24 +677,28 @@ def test_pg16_simultaneous_same_set_click_replays_one_initial_interval(client):
     assert rows[0]["status"] == "running"
 
 
-
 def test_offline_skip_then_restart_preserves_tap_order_and_interval_facts(client):
     """Delayed delivery must not turn a legitimate offline successor into 422."""
     headers = _auth(client, 996031)
     workout = _new_workout(client, headers)
     wid = workout["id"]
     sid = workout["exercises"][0]["sets"][0]["id"]
-    assert client.patch(
-        f"/api/v1/workouts/sets/{sid}", headers=headers,
-        json={"actual_reps": 8, "actual_weight": 40, "is_completed": True},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "actual_weight": 40, "is_completed": True},
+        ).status_code
+        == 200
+    )
 
     now = datetime.now(UTC)
     started_at = now - timedelta(seconds=80)
     skipped_at = now - timedelta(seconds=50)
     restarted_at = now - timedelta(seconds=48)
     initial = client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions", headers=headers,
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
         json={
             "source_set_id": sid,
             "started_at": started_at.isoformat(),
@@ -725,7 +729,9 @@ def test_offline_skip_then_restart_preserves_tap_order_and_interval_facts(client
     assert child["id"] != parent["id"]
     assert child["status"] == "running"
     assert datetime.fromisoformat(child["started_at"]) == restarted_at
-    assert client.post(restart_url, headers=headers, json=restart_payload).json()["id"] == child["id"]
+    assert (
+        client.post(restart_url, headers=headers, json=restart_payload).json()["id"] == child["id"]
+    )
 
     rows = client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers)
     assert rows.status_code == 200
@@ -742,16 +748,22 @@ def test_terminal_offline_event_time_rejects_impossible_dates_without_mutation(c
     workout = _new_workout(client, headers)
     wid = workout["id"]
     sid = workout["exercises"][0]["sets"][0]["id"]
-    assert client.patch(
-        f"/api/v1/workouts/sets/{sid}", headers=headers,
-        json={"actual_reps": 8, "is_completed": True},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
     now = datetime.now(UTC)
     started_at = now - timedelta(seconds=60)
     started = client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions", headers=headers,
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
         json={
-            "source_set_id": sid, "started_at": started_at.isoformat(),
+            "source_set_id": sid,
+            "started_at": started_at.isoformat(),
             "mutation_id": str(uuid4()),
         },
     )
@@ -764,19 +776,24 @@ def test_terminal_offline_event_time_rejects_impossible_dates_without_mutation(c
             now + timedelta(days=1),
         ):
             result = client.post(
-                action_url, headers=headers,
+                action_url,
+                headers=headers,
                 json={
-                    "action": action, "mutation_id": str(uuid4()),
-                    "expected_version": 1, "occurred_at": invalid.isoformat(),
+                    "action": action,
+                    "mutation_id": str(uuid4()),
+                    "expected_version": 1,
+                    "occurred_at": invalid.isoformat(),
                 },
             )
             assert result.status_code == 422, result.text
-    assert client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers).json()[0][
-        "status"
-    ] == "running"
+    assert (
+        client.get(f"/api/v1/workouts/{wid}/rest-sessions", headers=headers).json()[0]["status"]
+        == "running"
+    )
     # Legacy clients do not send occurred_at; they keep working.
     legacy = client.post(
-        action_url, headers=headers,
+        action_url,
+        headers=headers,
         json={"action": "skip", "mutation_id": str(uuid4()), "expected_version": 1},
     )
     assert legacy.status_code == 200, legacy.text
@@ -799,15 +816,21 @@ def test_pg16_concurrent_two_tab_conflicts_do_not_duplicate_terminal_actions(cli
     workout = _new_workout(client, headers)
     wid = workout["id"]
     sid = workout["exercises"][0]["sets"][0]["id"]
-    assert client.patch(
-        f"/api/v1/workouts/sets/{sid}", headers=headers,
-        json={"actual_reps": 8, "is_completed": True},
-    ).status_code == 200
+    assert (
+        client.patch(
+            f"/api/v1/workouts/sets/{sid}",
+            headers=headers,
+            json={"actual_reps": 8, "is_completed": True},
+        ).status_code
+        == 200
+    )
     now = datetime.now(UTC)
     started = client.post(
-        f"/api/v1/workouts/{wid}/rest-sessions", headers=headers,
+        f"/api/v1/workouts/{wid}/rest-sessions",
+        headers=headers,
         json={
-            "source_set_id": sid, "started_at": (now - timedelta(seconds=25)).isoformat(),
+            "source_set_id": sid,
+            "started_at": (now - timedelta(seconds=25)).isoformat(),
             "mutation_id": str(uuid4()),
         },
     )
@@ -824,7 +847,8 @@ def test_pg16_concurrent_two_tab_conflicts_do_not_duplicate_terminal_actions(cli
             body["occurred_at"] = now.isoformat()
         return client.post(
             f"/api/v1/workouts/rest-sessions/{rest_id}/actions",
-            headers=headers, json=body,
+            headers=headers,
+            json=body,
         )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
