@@ -1617,8 +1617,16 @@ export function RestTimer({
     const sync = () => {
       if (!hasPending() || syncInFlight) return;
       syncInFlight = true;
-      void syncRestJournal(userId, workoutId)
-        .then(() => setRestSaveError(null))
+      void syncRestJournal(userId, workoutId, (status) => {
+        setRestSaveError(
+          status === 409
+            ? 'Конфликт сохранения отдыха. Данные сохранены на устройстве.'
+            : 'Сервер временно недоступен. Отдых ожидает сохранения.',
+        );
+      })
+        .then(() => {
+          if (!hasPending()) setRestSaveError(null);
+        })
         .catch((error: unknown) => {
           setRestSaveError(
             error instanceof ApiError && error.status === 409

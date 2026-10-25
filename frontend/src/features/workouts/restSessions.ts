@@ -579,7 +579,11 @@ function acknowledgeRemote(
 }
 
 /** Sync starts/actions in lineage order, preserving all local intervals and durable replay keys. */
-export async function syncRestJournal(userId: number, workoutId: number): Promise<void> {
+export async function syncRestJournal(
+  userId: number,
+  workoutId: number,
+  onBlocked?: (status: number) => void,
+): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return;
   const key = restJournalStorageKey(userId, workoutId);
   await crossContextCoordinator.run(`rest-sync:${key}`, async () => {
@@ -625,7 +629,10 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
           }
           acknowledgeRemote(userId, workoutId, intervalId, remote, row.start_mutation_id);
         } catch (error) {
-          if (error instanceof ApiError && [409, 503].includes(error.status)) continue;
+          if (error instanceof ApiError && [409, 503].includes(error.status)) {
+            onBlocked?.(error.status);
+            continue;
+          }
           throw error;
         }
       }
@@ -645,7 +652,10 @@ export async function syncRestJournal(userId: number, workoutId: number): Promis
           );
           acknowledgeRemote(userId, workoutId, intervalId, remote, operation.mutation_id);
         } catch (error) {
-          if (error instanceof ApiError && [409, 503].includes(error.status)) break;
+          if (error instanceof ApiError && [409, 503].includes(error.status)) {
+            onBlocked?.(error.status);
+            break;
+          }
           throw error;
         }
       }

@@ -260,9 +260,11 @@ describe('rest journal concurrent mutation preservation #960', () => {
     });
     mockApi.mockRejectedValueOnce(new MockApiError(409));
 
-    await syncRestJournal(31, 44);
+    const blocked: number[] = [];
+    await syncRestJournal(31, 44, (status) => blocked.push(status));
 
     const row = loadRestJournal(31, 44)[0];
+    expect(blocked).toEqual([409]);
     expect(row).toMatchObject({ server_id: 67, status: 'completed' });
     expect(row?.pending).toHaveLength(1);
     expect(row?.pending[0]?.action).toBe('complete');
