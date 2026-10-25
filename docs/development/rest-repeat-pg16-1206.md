@@ -14,12 +14,12 @@
 1. Run an **authorized read-only production preflight** against actual PG16 and record time, revision, counts, invalid indexes and blockers. Queries below do not invoke user-defined functions.
 2. Back up and verify recovery using existing approved #849 pipeline. The backup itself is not permission to restore production.
 3. The existing single-slot procedure (approved in #848) drains **all old backend/worker writers**, with observed DB clients and connection budget M=10. Do not allow old backend after new repeat intervals exist.
-4. Run Alembic 0131: three nullable columns plus PG16 `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` for all replacement protections. Measure index build and inspect `pg_index.indisvalid`/`indisready`. PostgreSQL concurrent unique index failures can leave invalid indexes: **STOP**, inspect and manually remediate under a separate authorized step; `IF NOT EXISTS` does not validate an existing invalid index.
-5. Run 0132 only in the drained single-slot window. Verified indexed protection must exist before the short `ALTER TABLE ... DROP CONSTRAINT` with `lock_timeout='3s'` and `statement_timeout='30s'`. The online migration validator has one precisely scoped `rest_unique_swap` exception; it is not disabled.
+4. Run Alembic 0131: three nullable columns, with no data rewrite and without an autocommit block. This preserves compatibility with the existing Alembic supplied-connection transaction path.
+5. Run 0132 only in the drained single-slot window. In a single transaction, create four bounded **non-CONCURRENTLY** unique indexes and then drop the old source-set UNIQUE, with `lock_timeout='3s'` and `statement_timeout='30s'`. Concurrent index building was rejected by the existing Alembic supplied-connection path during PG16 migration tests; nonconcurrent building here is deliberate and requires the proven single-slot/drained writer gate. The online migration validator has one precisely scoped `rest_unique_swap` exception; it is not disabled.
 6. Start the exact tested new backend/worker release; verify Alembic head, contract tests, smoke and provenance before reopening traffic. No overlapping old replicas and no speculative second slot.
 7. Coordinate #1166 frontend integration against the new restart path. Old clients may continue calling initial start. If multiple sessions per source set have been created, **old backend image rollback is forbidden**; forward-fix the new code and retain the schema/history.
 
-A failed index build, duplicate running record, missing schema revision, migration timeout, preflight failure or loss of DB ownership is **BLOCKED**, not auto-repaired. Do not delete or silently update historical rest rows to pass the migration.
+A failed index build, duplicate running record, missing schema revision, migration timeout, preflight failure or loss of DB ownership is **BLOCKED**, not auto-repaired. Transactional index creation allows the failed migration to roll back rather than leaving partially-created unique indexes. Do not delete or silently update historical rest rows to pass the migration.
 
 ## Production read-only preflight SQL
 
