@@ -2098,8 +2098,7 @@ export function RestTimer({
           {showCompact && (
             <>
               <span className="active-workout-rest__complete-copy">
-                {completedNotice ??
-                  (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
+                {completedNotice ?? (isSkippedLatestRest ? 'Отдых пропущен' : 'Отдых завершён')}
               </span>
               {isCompletedLatestRest && latestRest?.measured_seconds != null && (
                 <span className="active-workout-rest__complete-copy">
@@ -2155,9 +2154,7 @@ export function RestTimer({
               latestRest &&
               (!latestRest.server_id || latestRest.pending.length > 0))) && (
             <p className="active-workout-rest__sync" aria-live="polite">
-              {isOfflineRest
-                ? 'Нет сети · отдых ожидает сохранения'
-                : 'Отдых сохраняется…'}
+              {isOfflineRest ? 'Нет сети · отдых ожидает сохранения' : 'Отдых сохраняется…'}
             </p>
           )}
           {restSaveError && (
