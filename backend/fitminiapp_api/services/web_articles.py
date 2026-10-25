@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.news import (
     HermesWebArticleSubmission,
     WebArticle,
@@ -775,6 +776,79 @@ def publish_web_article(
             ),
         },
     )
+
+
+def publish_existing_owner_article(
+    db: Session,
+    *,
+    article_id: str,
+    expected_content_hash: str,
+    expected_content_version: int,
+    actor_user_id: int,
+) -> WebArticle:
+    """One Root owner's exact-revision release of a previously ingested draft.
+
+    Hermes HMAC, scheduler and GitHub OAuth alone cannot call this operation.
+    A row lock keeps concurrent owner approvals and draft changes consistent.
+    """
+    if actor_user_id <= 0:
+        raise WebArticleError("owner_identity_required")
+    article = (
+        db.query(WebArticle).filter(WebArticle.id == article_id).with_for_update().one_or_none()
+    )
+    if article is None:
+        raise WebArticleError("article_not_found")
+    if (
+        article.content_hash != expected_content_hash
+        or article.content_version != expected_content_version
+    ):
+        raise WebArticleError("article_revision_conflict")
+    if article.status == "published":
+        # A replay must not misattribute another publication path or Root actor
+        # to this exact interactive Control Center approval.
+        last = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_type == "web_article",
+                AuditEvent.resource_id == article_id,
+            )
+            .order_by(AuditEvent.id.desc())
+            .first()
+        )
+        if (
+            last is None
+            or last.actor_user_id != actor_user_id
+            or not isinstance(last.details, dict)
+            or last.details.get("actor_ref") != "root_owner_control_center"
+            or last.details.get("content_version") != expected_content_version
+        ):
+            raise WebArticleError("article_already_published_by_other_path")
+        return article
+    if article.status not in {"draft", "review", "approved"}:
+        raise WebArticleError("article_transition_invalid")
+    revision = (
+        db.query(WebArticleRevision)
+        .filter(
+            WebArticleRevision.article_id == article_id,
+            WebArticleRevision.content_version == expected_content_version,
+        )
+        .one_or_none()
+    )
+    if revision is None:
+        raise WebArticleError("article_revision_missing")
+    if revision.status not in {"draft", "review", "approved"}:
+        raise WebArticleError("article_revision_status_invalid")
+    article.status = "approved"
+    revision.status = "approved"
+    publish_web_article(
+        db,
+        article,
+        actor_ref="root_owner_control_center",
+        owner_editorial_decision=True,
+        owner_user_id=actor_user_id,
+    )
+    return article
 
 
 def publish_owner_web_article(

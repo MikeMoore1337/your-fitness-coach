@@ -5122,6 +5122,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/articles/drafts/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Publish Existing Article
+         * @description Root-only explicit confirmation of an exact existing draft revision.
+         */
+        post: operations["admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/articles/publish": {
         parameters: {
             query?: never;
@@ -13679,6 +13699,28 @@ export interface components {
             research_version: string;
             /** Updated At */
             updated_at: string | null;
+        };
+        /**
+         * OwnerExistingDraftPublishRequest
+         * @description One owner-confirmed exact revision; never a Hermes or scheduled command.
+         */
+        OwnerExistingDraftPublishRequest: {
+            /** Article Id */
+            article_id: string;
+            /** Expected Content Hash */
+            expected_content_hash: string;
+            /** Expected Content Version */
+            expected_content_version: number;
+            /**
+             * Acknowledge Unverified Evidence
+             * @constant
+             */
+            acknowledge_unverified_evidence: true;
+            /**
+             * Confirm Exact Revision
+             * @constant
+             */
+            confirm_exact_revision: true;
         };
         /**
          * OwnerWebArticlePublishRequest
@@ -29463,6 +29505,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OwnerArticleReviewDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerExistingDraftPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerWebArticlePublishResponse"];
                 };
             };
             /** @description Validation Error */
