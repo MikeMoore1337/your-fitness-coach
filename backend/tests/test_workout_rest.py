@@ -197,7 +197,6 @@ def test_skipped_rest_has_null_measurement(client):
     assert done.json()["measured_seconds"] is None
 
 
-
 def test_offline_skip_then_manual_restart_preserves_event_timestamps(client):
     """Queued skip/restart must not invent time while offline or overwrite the first interval."""
     headers = _auth(client, 996031)
@@ -236,7 +235,11 @@ def test_offline_skip_then_manual_restart_preserves_event_timestamps(client):
         rejected = client.post(
             f"/api/v1/workouts/rest-sessions/{first_id}/actions",
             headers=headers,
-            json={**skip_payload, "occurred_at": invalid_at.isoformat(), "mutation_id": str(uuid4())},
+            json={
+                **skip_payload,
+                "occurred_at": invalid_at.isoformat(),
+                "mutation_id": str(uuid4()),
+            },
         )
         assert rejected.status_code == 422, rejected.text
 
@@ -250,11 +253,14 @@ def test_offline_skip_then_manual_restart_preserves_event_timestamps(client):
         tzinfo=None
     ) == skip_at.replace(tzinfo=None)
     assert skipped.json()["measured_seconds"] is None
-    assert client.post(
-        f"/api/v1/workouts/rest-sessions/{first_id}/actions",
-        headers=headers,
-        json=skip_payload,
-    ).json()["version"] == skipped.json()["version"]
+    assert (
+        client.post(
+            f"/api/v1/workouts/rest-sessions/{first_id}/actions",
+            headers=headers,
+            json=skip_payload,
+        ).json()["version"]
+        == skipped.json()["version"]
+    )
 
     repeat = client.post(
         f"/api/v1/workouts/rest-sessions/{first_id}/restart",
