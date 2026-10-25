@@ -419,3 +419,45 @@ def test_online_constraint_swap_rejects_unbounded_validating_replacement(
 
     with pytest.raises(OnlineMigrationError, match="NOT VALID"):
         validate_added_migration(path)
+
+
+def test_rest_interval_migrations_use_strict_online_contract() -> None:
+    root = Path(__file__).resolve().parents[1] / "backend" / "alembic" / "versions"
+    validate_added_migration(root / "0131_rest_interval_expand.py")
+    validate_added_migration(root / "0132_rest_interval_unique_swap.py")
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("SET LOCAL lock_timeout = '3s'", "SET LOCAL lock_timeout = '30s'"),
+        (
+            "DROP CONSTRAINT uq_workout_rest_source_set",
+            "DROP CONSTRAINT uq_workout_rest_running_workout",
+        ),
+        ('type_="unique"', 'type_="foreignkey"'),
+        (
+            'op.batch_alter_table("workout_rest_sessions")',
+            'op.batch_alter_table("users")',
+        ),
+    ],
+)
+def test_rest_unique_swap_rejects_modified_scope(tmp_path: Path, old: str, new: str) -> None:
+    path = (
+        Path(__file__).resolve().parents[1]
+        / "backend" / "alembic" / "versions" / "0132_rest_interval_unique_swap.py"
+    )
+    source = path.read_text(encoding="utf-8")
+    assert old in source
+    candidate = _migration(tmp_path / path.name, source.replace(old, new, 1))
+    with pytest.raises(OnlineMigrationError, match="rest unique"):
+        validate_added_migration(candidate)
+
+
+def test_rest_unique_swap_rejects_undeclared_migration_name(tmp_path: Path) -> None:
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "backend" / "alembic" / "versions" / "0132_rest_interval_unique_swap.py"
+    ).read_text(encoding="utf-8")
+    with pytest.raises(OnlineMigrationError, match="unapproved"):
+        validate_added_migration(_migration(tmp_path / "9999_unrelated_unique_swap.py", source))
