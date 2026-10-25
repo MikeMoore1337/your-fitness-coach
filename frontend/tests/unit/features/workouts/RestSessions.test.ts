@@ -218,11 +218,15 @@ describe('measured rest journal #960', () => {
 
     const recovered = loadRestJournal(11, 56);
     expect(recovered).toHaveLength(3);
-    expect(recovered.find((row) => row.start_mutation_id === initial.start_mutation_id)).toMatchObject({
+    expect(
+      recovered.find((row) => row.start_mutation_id === initial.start_mutation_id),
+    ).toMatchObject({
       status: 'completed',
       pending: expect.arrayContaining([expect.objectContaining({ action: 'complete' })]),
     });
-    expect(recovered.find((row) => row.start_mutation_id === repeat.start_mutation_id)).toMatchObject({
+    expect(
+      recovered.find((row) => row.start_mutation_id === repeat.start_mutation_id),
+    ).toMatchObject({
       status: 'interrupted',
       pending: expect.arrayContaining([expect.objectContaining({ action: 'interrupt' })]),
     });
