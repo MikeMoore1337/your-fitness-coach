@@ -18,6 +18,7 @@ SKILLSPECTOR_VERSION = "2.11.2-postrelease"
 SKILLSPECTOR_COMMIT = "d162d9b343e559be13df8ebba093df3bc9d58c90"
 SKILLSPECTOR_SOURCE = f"git+https://github.com/NVIDIA/SkillSpector.git@{SKILLSPECTOR_COMMIT}"
 EXTERNAL_SOURCE_NAME = "SOURCE.json"
+SKILLSPECTOR_TIMEOUT_SECONDS = 180
 SECRET_ENV_RE = re.compile(
     r"(TOKEN|KEY|SECRET|PASSWORD|CREDENTIAL|AUTH|PRIVATE|SESSION)", re.IGNORECASE
 )
@@ -191,14 +192,23 @@ def scan_skill(
     output_root.mkdir(parents=True, exist_ok=True)
     report_path = output_root / f"{skill_dir.resolve().name}.json"
     command = build_command(skill_dir, report_path, uvx=resolved_uvx)
-    completed = runner(
-        command,
-        check=False,
-        text=True,
-        encoding="utf-8",
-        capture_output=True,
-        env=_safe_env(env),
-    )
+    # A previous SAFE result must not be accepted if the current scanner exits
+    # without producing a report (including after a crash or an upstream CLI change).
+    try:
+        report_path.unlink(missing_ok=True)
+        completed = runner(
+            command,
+            check=False,
+            text=True,
+            encoding="utf-8",
+            capture_output=True,
+            timeout=SKILLSPECTOR_TIMEOUT_SECONDS,
+            env=_safe_env(env),
+        )
+    except subprocess.TimeoutExpired as error:
+        raise SkillSpectorGuardError("SkillSpector exceeded its bounded runtime") from error
+    except OSError as error:
+        raise SkillSpectorGuardError("SkillSpector report cleanup or execution failed") from error
     if completed.returncode not in {0, 1}:
         detail = (completed.stderr or completed.stdout or "").strip()
         raise SkillSpectorGuardError(
