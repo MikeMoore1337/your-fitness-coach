@@ -100,7 +100,9 @@ services:
       timeout: 6s
       retries: 3
       start_period: 60s
-    networks: [dev_internal]
+    # Docker Desktop forwards the loopback-published port through this normal
+    # bridge. PostgreSQL and the one-shot setup remain on dev_internal only.
+    networks: [dev_internal, dev_access]
 
 volumes:
   dev_postgres_data:
@@ -108,3 +110,5 @@ volumes:
 networks:
   dev_internal:
     internal: true
+  dev_access:
+    driver: bridge
