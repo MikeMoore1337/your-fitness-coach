@@ -38,6 +38,10 @@ export default function HermesRootConsentPage() {
     window.opener !== null,
     window.location.origin,
   );
+  const isComplete = phase === 'complete';
+  const isError = phase === 'error';
+  const isSending = phase === 'sending';
+  const isReady = phase === 'ready';
   const confirm = async () => {
     if (!valid || phase !== 'ready') return;
     setPhase('sending');
@@ -45,7 +49,7 @@ export default function HermesRootConsentPage() {
       // This is not an ownership hint: YFC verifies Telegram Root server-side.
       await api<unknown>('/api/v1/admin/articles/drafts?limit=1&offset=0');
       const accessToken = getAccessToken();
-      if (!accessToken || accessToken.length < 20) throw new Error('missing YFC access token');
+      if (!accessToken || accessToken.length < 20) throw new Error('Токен доступа YFC отсутствует');
       // Omit all publication rights: Hermes needs an independently verified
       // ephemeral bearer and a *separate* explicit release click per revision.
       window.opener.postMessage(
@@ -77,11 +81,11 @@ export default function HermesRootConsentPage() {
               Соединение недоступно: требуется действующий YFC Root-доступ и
               окно, открытое из Hermes Control Center. Передача запрещена.
             </p>
-          ) : phase === 'complete' ? (
+          ) : isComplete ? (
             <p role="status">Подтверждение передано. Вернитесь в Hermes Control Center.</p>
           ) : (
             <>
-              {phase === 'error' && (
+              {isError && (
                 <p role="alert">
                   Не удалось подтвердить Root-доступ. Обновите авторизацию YFC,
                   затем откройте подключение из Hermes заново.
@@ -89,10 +93,10 @@ export default function HermesRootConsentPage() {
               )}
               <Button
                 type="button"
-                disabled={phase !== 'ready'}
+                disabled={!isReady}
                 onClick={() => void confirm()}
               >
-                {phase === 'sending' ? 'Проверяем Root-доступ…' : 'Разрешить подключение Hermes'}
+                {isSending ? 'Проверяем Root-доступ…' : 'Разрешить подключение Hermes'}
               </Button>
             </>
           )}
