@@ -16,6 +16,8 @@ def test_dev_push_runs_ci_but_cannot_start_production_deploy() -> None:
     deploy = (ROOT / ".github/workflows/deploy.yml").read_text(encoding="utf-8")
 
     assert "branches: [master, dev]" in ci
+    # Retargeting must rerun the target-branch promotion guard and exact diff.
+    assert "types: [opened, reopened, ready_for_review, synchronize, edited]" in ci
     assert "Require accepted dev promotion for master PR" in ci
     assert "PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}" in ci
     assert "PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}" in ci

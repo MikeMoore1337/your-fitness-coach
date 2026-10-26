@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, ready_for_review, synchronize, edited]
   push:
     # Run post-merge quality on staging without invoking production deploy.
     branches: [master, dev]
