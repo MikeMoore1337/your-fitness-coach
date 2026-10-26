@@ -57,11 +57,18 @@ test.describe('Issue #1230: ready-template separators', () => {
       await expect(card.getByRole('button', { name: 'Настроить копию' })).toBeVisible();
       await expect(card.getByRole('button', { name: 'Запустить' })).toBeVisible();
       await expect(card.getByRole('button', { name: /^Посмотреть шаблон «/ })).toBeVisible();
-      const otherActions = card.getByText('Другие действия', { exact: true });
+      await expect
+        .poll(async () => card.evaluate((element) => getComputedStyle(element).borderTopWidth))
+        .toBe('1px');
+      const dangerMenu = card.locator('details.program-danger-menu');
+      const otherActions = dangerMenu.locator(':scope > summary');
       await expect(otherActions).toBeVisible();
-      await otherActions.click();
+      await otherActions.focus();
+      await otherActions.press('Space');
+      await expect(dangerMenu).toHaveAttribute('open', '');
       await expect(card.getByRole('button', { name: 'Скрыть шаблон' })).toBeVisible();
-      await otherActions.click();
+      await otherActions.press('Space');
+      await expect(dangerMenu).not.toHaveAttribute('open', '');
 
       await library.locator(':scope > summary').click();
       await expect(grid).toBeHidden();
