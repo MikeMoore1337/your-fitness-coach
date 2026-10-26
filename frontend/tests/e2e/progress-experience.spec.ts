@@ -2233,7 +2233,7 @@ test('#1189 iOS PWA delegates measurement keyboard focus and typing to the nativ
   const waist = diary.getByLabel('Талия, см');
   await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute(
-    'data-yfc-measurement-pwa-focus-placement',
+    'data-yfc-measurement-pwa',
     'true',
   );
 
