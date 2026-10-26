@@ -34,6 +34,9 @@ const allowedLatinWords = new Map([
   ['YFC', 'official product abbreviation'],
   ['XLSX', 'file format abbreviation'],
   ['Telegram', 'official external platform name'],
+  ['Hermes', 'explicitly named integrated first-party editorial product'],
+  ['Root', 'YFC owner authorization role'],
+  ['ROOT', 'YFC owner authorization role in overlines'],
 ]);
 
 const allowedLatinPhrases = new Map([
@@ -42,6 +45,8 @@ const allowedLatinPhrases = new Map([
   ['COACH OS', 'official product name'],
   ['Coach Today', 'official product surface'],
   ['Client 360', 'official product surface'],
+  ['HERMES CONTROL CENTER', 'approved integrated editorial product name'],
+  ['hermes.mikemoore.top', 'fixed verified editorial destination hostname'],
 ]);
 
 const userFacingAttributes = new Set([
