@@ -394,6 +394,12 @@ for public_path in public_page_paths():
     )
 
 
+@app.get("/admin/hermes-bridge", include_in_schema=False)
+def hermes_editorial_bridge_page() -> HTMLResponse:
+    """Serve the private YFC Root consent SPA shell, never a server-side Root grant."""
+    return _frontend_index("/admin/hermes-bridge")
+
+
 @app.get("/admin")
 def admin_page() -> HTMLResponse:
     return _frontend_index("/admin")

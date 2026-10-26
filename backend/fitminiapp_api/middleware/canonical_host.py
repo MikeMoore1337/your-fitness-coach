@@ -18,6 +18,7 @@ APPLICATION_PATHS = frozenset(
     {
         "/app",
         "/admin",
+        "/admin/hermes-bridge",
         "/coach",
         "/login",
         "/verify-email",
