@@ -2241,7 +2241,7 @@ test('#1189 iOS PWA delegates measurement keyboard focus and typing to the nativ
     const root = window as Window & { __yfc1189ScrollCalls?: number };
     const original = window.scrollBy.bind(window);
     root.__yfc1189ScrollCalls = 0;
-    window.scrollBy = (x: number | ScrollToOptions, y?: number) => {
+    window.scrollBy = (x: number | ScrollToOptions = {}, y?: number) => {
       root.__yfc1189ScrollCalls = (root.__yfc1189ScrollCalls ?? 0) + 1;
       if (typeof x === 'number') return original(x, y ?? 0);
       return original(x);
