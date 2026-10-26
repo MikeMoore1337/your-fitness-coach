@@ -43,6 +43,24 @@ function draftString(value: string | number | null | undefined): string {
   return typeof value === 'string' ? value : decimalDraftFromValue(value);
 }
 
+function keepFocusedMeasurementVisible(input: HTMLInputElement): void {
+  requestAnimationFrame(() => {
+    if (document.activeElement !== input) return;
+    const viewport = window.visualViewport;
+    const offset = viewport?.offsetTop ?? 0;
+    const top = offset + 12;
+    const bottom = offset + (viewport?.height ?? window.innerHeight) - 12;
+    const bounds = input.getBoundingClientRect();
+
+    // Only correct actual clipping; leave natural keyboard focus and manual scrolling alone.
+    if (bounds.top < top) {
+      window.scrollBy(0, bounds.top - top);
+    } else if (bounds.bottom > bottom) {
+      window.scrollBy(0, bounds.bottom - bottom);
+    }
+  });
+}
+
 function formatMeasurementValue(value: number): string {
   return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
 }
@@ -297,10 +315,8 @@ export function Diary({
         value: decimalDraftFromValue(value.value),
       })),
     });
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView?.({ block: 'center' });
-      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
-    });
+    // Do not force-scroll a long measurement form while iOS is positioning its keyboard.
+    // Let the user focus the intended input; the browser keeps it in the visual viewport.
   };
   const activeDefinitions = (definitions.data ?? []).filter((definition) => !definition.archived);
   const setCustomValue = (definitionId: number, value: string) => {
@@ -414,12 +430,14 @@ export function Diary({
                   min={numericLimits[key].min}
                   max={numericLimits[key].max}
                   value={draftString(form[key])}
-                  onChange={(e) =>
+                  onFocus={(e) => keepFocusedMeasurementVisible(e.currentTarget)}
+                  onChange={(e) => {
                     setForm({
                       ...form,
                       [key]: e.target.value,
-                    })
-                  }
+                    });
+                    keepFocusedMeasurementVisible(e.currentTarget);
+                  }}
                 />
               </label>
             ))}
@@ -438,7 +456,11 @@ export function Diary({
                     min={0.1}
                     max={300}
                     value={draftString(currentValue)}
-                    onChange={(e) => setCustomValue(definition.id, e.target.value)}
+                    onFocus={(e) => keepFocusedMeasurementVisible(e.currentTarget)}
+                    onChange={(e) => {
+                      setCustomValue(definition.id, e.target.value);
+                      keepFocusedMeasurementVisible(e.currentTarget);
+                    }}
                   />
                 </label>
               );

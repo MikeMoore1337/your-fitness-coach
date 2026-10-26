@@ -8530,13 +8530,10 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     min-width: 0;
   }
 
+  /* A sticky save action competes with native iOS keyboard scrolling and can hide
+     the active measurement input. Keep the form's normal flow while typing. */
   html[data-yfc-keyboard='visible'] .measurement-diary__save-dock {
-    position: sticky;
-    z-index: 2;
-    bottom: max(6px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)));
-    padding-top: 12px;
-    background: var(--card-bg);
-    box-shadow: 0 -12px 20px var(--card-bg);
+    position: static;
   }
 
   .progress-fact-strip > div {
