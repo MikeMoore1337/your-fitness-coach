@@ -87,7 +87,9 @@ def quote_plain_assignment_for_preview(line: str, required_key: str) -> str | No
     if not match or match.group(1) != required_key:
         return None
     value = match.group(2)
-    if not value or any(char in value for char in (chr(92), "$", "`", '"', "'", ";", "&", "|", "<", ">", "#")):
+    if not value or any(
+        char in value for char in (chr(92), "$", "`", '"', "'", ";", "&", "|", "<", ">", "#")
+    ):
         return None
     return f"{required_key}={shlex.quote(value)}{suffix}"
 
