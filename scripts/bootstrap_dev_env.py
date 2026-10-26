@@ -7,7 +7,6 @@ import os
 import secrets
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 TOKENS = {
     "__GENERATE_DB_PASSWORD__": 24,
