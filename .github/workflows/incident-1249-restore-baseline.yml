@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/incident-1249-restore-baseline.yml
       - scripts/incident_1249_restore_baseline.py
+      - tests/test_incident_1249_restore_baseline.py
   push:
     branches: [master]
     paths:
@@ -25,7 +26,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - run: python3 -m py_compile scripts/incident_1249_restore_baseline.py
+      - run: |
+          python3 -m py_compile scripts/incident_1249_restore_baseline.py
+          python3 -m unittest discover -s tests -p 'test_incident_1249_restore_baseline.py' -v
 
   restore:
     if: github.event_name == 'push'
