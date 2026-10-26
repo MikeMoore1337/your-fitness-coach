@@ -395,9 +395,18 @@ jobs:
         # system package install; failure remains a required CI failure.
         run: |
           if ! ldconfig -p | grep -Fq 'libevent-2.1.so.7'; then
-            sudo timeout -s KILL 120 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends libevent-2.1-7t64
+            sudo timeout -s KILL 150 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends libevent-2.1-7t64 libopus0 libvpx9 libwoff1 libharfbuzz-icu0 libhyphen0 libflite1 libenchant-2-2 libmanette-0.2-0 libgles2 libjpeg-turbo8 libwebp7 libwebpdemux2 libgstreamer-gl1.0-0
           fi
           ldconfig -p | grep -F 'libevent-2.1.so.7'
+          ldconfig -p | grep -F 'libopus.so.0'
+          # Detect any remaining native WebKit prerequisites before running
+          # actual mobile tests. Never skip tests based on this diagnostic.
+          test -x "$HOME/.cache/ms-playwright/webkit-2336/minibrowser-wpe/bin/MiniBrowser"
+          missing="$(ldd "$HOME/.cache/ms-playwright/webkit-2336/minibrowser-wpe/bin/MiniBrowser" | grep 'not found' || true)"
+          if [ -n "$missing" ]; then
+            printf 'WEBKIT_SYSTEM_DEPENDENCY_MISSING=YES\n'
+            exit 1
+          fi
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
