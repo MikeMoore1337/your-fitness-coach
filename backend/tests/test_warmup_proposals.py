@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from fitminiapp_api.db.session import get_session_context
 from fitminiapp_api.models.program import UserWorkoutSet, WorkoutSetMutation
 from fitminiapp_api.services.warmup_proposals import _warmup_weights
@@ -111,7 +113,7 @@ def test_warmup_apply_is_editable_ordered_and_idempotent(client) -> None:
         "working_weight_kg": 80,
         "rows": [
             {"weight_kg": 30, "reps": 10},
-            {"weight_kg": 45.5, "reps": 6},
+            {"weight_kg": 42.25, "reps": 6},
             {"weight_kg": 60, "reps": 3},
         ],
         "state_token": preview["state_token"],
@@ -133,7 +135,7 @@ def test_warmup_apply_is_editable_ordered_and_idempotent(client) -> None:
     assert [item["planned_role"] for item in returned_sets[:3]] == ["warmup"] * 3
     assert [(item["actual_weight"], item["actual_reps"]) for item in returned_sets[:3]] == [
         (30, 10),
-        (45.5, 6),
+        (42.25, 6),
         (60, 3),
     ]
     assert returned_sets[-1]["set_number"] == 1
@@ -170,6 +172,7 @@ def test_warmup_apply_is_editable_ordered_and_idempotent(client) -> None:
             not counts_toward_working_volume(row) for row in rows if row.set_kind == "warmup"
         )
         assert all(not is_pr_record_set(row) for row in rows if row.set_kind == "warmup")
+        assert next(row.actual_weight for row in rows if row.actual_reps == 6) == Decimal("42.25")
 
 
 def test_warmup_apply_fails_closed_when_target_changes_after_preview(client) -> None:

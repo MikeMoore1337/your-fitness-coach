@@ -106,6 +106,11 @@ class NutritionLabelError(ValueError):
         self.status_code = status_code
 
 
+def _fits_decimal_scale(value: Decimal, scale: int) -> bool:
+    quantum = Decimal(1).scaleb(-scale)
+    return value == value.quantize(quantum)
+
+
 class NutritionLabelNotFoundError(NutritionLabelError):
     def __init__(self) -> None:
         super().__init__("draft_not_found", status_code=404)
@@ -655,9 +660,18 @@ def _legacy_projection(canonical: CanonicalDraft) -> dict[str, Decimal | None]:
         "carbohydrate_g": "carbs_g_per_100g",
         "fiber_g": "fiber_g_per_100g",
     }
+    scales = {
+        "energy_kcal_per_100g": 2,
+        "protein_g_per_100g": 3,
+        "fat_g_per_100g": 3,
+        "carbs_g_per_100g": 3,
+        "fiber_g_per_100g": 3,
+    }
     for field_name, column_name in mapping.items():
         fact = getattr(canonical.normalized_facts, field_name)
         if fact is not None and fact.basis_ref == "per_100_g":
+            if not _fits_decimal_scale(fact.value, scales[column_name]):
+                raise NutritionLabelError("nutrition_scale_exceeded")
             projection[column_name] = fact.value
     return projection
 
@@ -676,6 +690,8 @@ def _food_serving_projection(canonical: CanonicalDraft) -> dict[str, Decimal | s
             "standard_serving_unit": None,
             "standard_serving_weight_g": None,
         }
+    if not _fits_decimal_scale(serving.amount, 3):
+        raise NutritionLabelError("nutrition_scale_exceeded")
     return {
         "standard_serving_amount": serving.amount,
         "standard_serving_unit": serving.unit,

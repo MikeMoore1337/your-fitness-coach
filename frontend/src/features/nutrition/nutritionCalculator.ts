@@ -17,7 +17,11 @@ export type NutritionCalculatorInput = Omit<
   | 'steps_range'
   | 'strength_training_type'
   | 'cardio_trainings'
+  | 'weight_kg'
+  | 'height_cm'
 > & {
+  weight_kg: number;
+  height_cm: number;
   daily_routine: DailyRoutine;
   steps_range: StepsRange;
   strength_training_type: StrengthTrainingType;
@@ -162,8 +166,8 @@ const normalizeInput = (
   return {
     target_telegram_user_id: form.target_telegram_user_id,
     sex: form.sex,
-    weight_kg: form.weight_kg,
-    height_cm: form.height_cm,
+    weight_kg: Number(form.weight_kg),
+    height_cm: Number(form.height_cm),
     age: form.age,
     daily_routine:
       form.daily_routine ?? legacyDailyRoutines[legacy.daily_activity_level ?? 'sedentary'],

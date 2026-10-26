@@ -155,7 +155,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
     window.dispatchEvent(new Event('offline'));
   });
   await page.getByRole('spinbutton', { name: 'Повторы, Жим штанги лежа, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Жим штанги лежа, подход 1' }).fill('40');
+  await page.getByLabel('Вес, Жим штанги лежа, подход 1').fill('40');
   await expect(page.getByText('Сохранено на устройстве')).toBeVisible();
   await expect
     .poll(() =>
@@ -194,9 +194,7 @@ test('active workout переживает offline edit, refresh и reconnect б�
   await expect(
     page.getByRole('spinbutton', { name: 'Повторы, Жим штанги лежа, подход 1' }),
   ).toHaveValue('8');
-  await expect(
-    page.getByRole('spinbutton', { name: 'Вес, Жим штанги лежа, подход 1' }),
-  ).toHaveValue('40');
+  await expect(page.getByLabel('Вес, Жим штанги лежа, подход 1')).toHaveValue('40');
 
   workoutOffline = false;
   workoutMissing = false;

@@ -43,7 +43,7 @@ export function formatCompletionDuration(seconds: number | null | undefined): st
 }
 
 function formatLoad(value: number): string {
-  return `${Number.isInteger(value) ? value : value.toFixed(1)} кг`;
+  return `${Number(value.toFixed(2))} кг`;
 }
 
 function formatDistance(value: number): string {

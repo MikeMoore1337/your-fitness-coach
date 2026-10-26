@@ -321,6 +321,7 @@ def _raise_nutrition_label_http_error(exc: NutritionLabelError) -> None:
         "contribution_conflict": "Найден конфликт фактов продукта; данные не перезаписаны",
         "duplicate_barcode": "Продукт с этим штрихкодом уже существует",
         "sharing_requires_valid_gtin": "Для общего каталога нужен корректный GTIN",
+        "nutrition_scale_exceeded": "Проверьте точность питательных значений: энергия допускает 2, остальные значения — до 3 знаков",
     }
     raise HTTPException(
         status_code=exc.status_code,

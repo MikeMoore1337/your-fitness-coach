@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -147,7 +148,7 @@ def update_profile(
             from fitminiapp_api.services.measurements import latest_current_weight_measurement
 
             latest = latest_current_weight_measurement(db, user)
-            if latest is not None and latest.weight_kg == value:
+            if latest is not None and latest.weight_kg == Decimal(str(value)):
                 # The profile form submits its full state. An unchanged weight
                 # projected from yesterday's diary is not a new weigh-in today.
                 continue
@@ -158,7 +159,7 @@ def update_profile(
     # The user's explicitly saved profile weight is a current measurement too.
     # Mirror it into today's dated ledger without triggering another target version.
     changed_weight = nutrition_updates.get("weight_kg")
-    if isinstance(changed_weight, (float, int)):
+    if isinstance(changed_weight, (Decimal, float, int)):
         from fitminiapp_api.services.measurements import sync_current_weight_to_diary
 
         sync_current_weight_to_diary(db, user, float(changed_weight))

@@ -354,6 +354,7 @@ function WeightChart({ report }: { report: ProgressReport }) {
       print
       tableCaption="Таблица замеров массы"
       unit="кг"
+      valueFractionDigits={2}
       valueLabel="Замер"
     />
   );
@@ -403,8 +404,8 @@ function factualSummaryLines(report: ProgressReport): Array<{ label: string; val
     const change =
       trend.change == null
         ? ''
-        : ` (${trend.change > 0 ? '+' : ''}${formatNumber(trend.change)} ${bodyMetricUnit(trend)})`;
-    return `${bodyMetricLabel(trend)}: ${formatNumber(trend.latest_value)} ${bodyMetricUnit(trend)}${change}`;
+        : ` (${trend.change > 0 ? '+' : ''}${formatNumber(trend.change, 2)} ${bodyMetricUnit(trend)})`;
+    return `${bodyMetricLabel(trend)}: ${formatNumber(trend.latest_value, 2)} ${bodyMetricUnit(trend)}${change}`;
   });
   if (bodyValues.length > 0) {
     lines.push({ label: 'Замеры тела', value: bodyValues.join(' · ') });
@@ -632,7 +633,7 @@ function ReportContent({
                     <dl>
                       <div>
                         <dt>Макс. внешний вес</dt>
-                        <dd>{formatNumber(exercise.max_external_load_kg)} кг</dd>
+                        <dd>{formatNumber(exercise.max_external_load_kg, 2)} кг</dd>
                       </div>
                       <div>
                         <dt>Объём за период</dt>
@@ -675,7 +676,7 @@ function ReportContent({
               {formatNumber(report.cardio.frequency_per_week, 2)} / нед.
               {report.cardio.distance_km == null
                 ? ''
-                : ` · ${formatNumber(report.cardio.distance_km)} км`}
+                : ` · ${formatNumber(report.cardio.distance_km, 2)} км`}
             </p>
           </div>
         </div>
@@ -708,17 +709,17 @@ function ReportContent({
                   <tr key={trend.metric}>
                     <th scope="row">{bodyMetricLabel(trend)}</th>
                     <td>
-                      {formatNumber(trend.first_value)} {bodyMetricUnit(trend)} ·{' '}
+                      {formatNumber(trend.first_value, 2)} {bodyMetricUnit(trend)} ·{' '}
                       {formatDate(trend.first_measured_on)}
                     </td>
                     <td>
-                      {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)} ·{' '}
+                      {formatNumber(trend.latest_value, 2)} {bodyMetricUnit(trend)} ·{' '}
                       {formatDate(trend.latest_measured_on)}
                     </td>
                     <td>
                       {trend.change == null
                         ? 'Недостаточно точек'
-                        : `${formatNumber(trend.change)} ${bodyMetricUnit(trend)}`}
+                        : `${formatNumber(trend.change, 2)} ${bodyMetricUnit(trend)}`}
                     </td>
                   </tr>
                 ))}
@@ -755,19 +756,19 @@ function ReportContent({
             </div>
             <div>
               <dt>Средние калории</dt>
-              <dd>{formatNumber(nutrition.calories.average, 0)} ккал</dd>
+              <dd>{formatNumber(nutrition.calories.average, 2)} ккал</dd>
             </div>
             <div>
               <dt>Белок</dt>
-              <dd>{formatNumber(nutrition.protein_g.average)} г</dd>
+              <dd>{formatNumber(nutrition.protein_g.average, 2)} г</dd>
             </div>
             <div>
               <dt>Жиры</dt>
-              <dd>{formatNumber(nutrition.fat_g.average)} г</dd>
+              <dd>{formatNumber(nutrition.fat_g.average, 2)} г</dd>
             </div>
             <div>
               <dt>Углеводы</dt>
-              <dd>{formatNumber(nutrition.carbs_g.average)} г</dd>
+              <dd>{formatNumber(nutrition.carbs_g.average, 2)} г</dd>
             </div>
             <div>
               <dt>Калории по плану</dt>

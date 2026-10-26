@@ -1182,9 +1182,7 @@ test('demo uses production today composition and persists one workout set throug
   await expect(
     page.getByRole('heading', { name: 'Верх тела · уверенный старт', level: 2 }),
   ).toBeVisible();
-  await page
-    .getByRole('spinbutton', { name: 'Вес, Жим гантелей лёжа с контролируемой паузой, подход 3' })
-    .fill('19');
+  await page.getByLabel('Вес, Жим гантелей лёжа с контролируемой паузой, подход 3').fill('19');
   await page
     .getByRole('spinbutton', {
       name: 'Повторы, Жим гантелей лёжа с контролируемой паузой, подход 3',

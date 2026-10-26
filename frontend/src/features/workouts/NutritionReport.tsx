@@ -209,18 +209,18 @@ function MetricRow({
       <dt>{label}</dt>
       <dd>
         <strong>
-          {formatNumber(metric.average, 0)} <span>{unit}</span>
+          {formatNumber(metric.average, 2)} <span>{unit}</span>
         </strong>
         <small>
           {metric.sample_days
-            ? `минимум ${formatNumber(metric.minimum, 0)} · максимум ${formatNumber(metric.maximum, 0)} · по ${metric.sample_days} дн.`
+            ? `минимум ${formatNumber(metric.minimum, 2)} · максимум ${formatNumber(metric.maximum, 2)} · по ${metric.sample_days} дн.`
             : 'Нет данных по показателю'}
         </small>
       </dd>
       <dd>
         <span>Ориентир в среднем</span>
         <strong>
-          {formatNumber(comparison.average_target, 0)}{' '}
+          {formatNumber(comparison.average_target, 2)}{' '}
           {comparison.average_target == null ? '' : <span>{unit}</span>}
         </strong>
         <small>
@@ -233,7 +233,7 @@ function MetricRow({
         <span>Отклонение</span>
         <strong>
           {deviation != null && deviation > 0 ? '+' : ''}
-          {formatNumber(deviation, 0)} {deviation == null ? '' : <span>{unit}</span>}
+          {formatNumber(deviation, 2)} {deviation == null ? '' : <span>{unit}</span>}
         </strong>
       </dd>
     </div>
@@ -268,7 +268,7 @@ function ReportMetrics({ report }: { report: NutritionReport }) {
           <dt>Клетчатка</dt>
           <dd>
             <strong>
-              {formatNumber(summary.fiber_g.average, 1)} <span>г</span>
+              {formatNumber(summary.fiber_g.average, 2)} <span>г</span>
             </strong>
             <small>
               {summary.fiber_g.sample_days
@@ -486,14 +486,14 @@ function DailyTable({
                 </td>
                 <td data-label="Статус">{statusLabels[point.status]}</td>
                 <td data-label="Калории">
-                  {point.calories == null ? '—' : `${formatNumber(point.calories, 0)} ккал`}
+                  {point.calories == null ? '—' : `${formatNumber(point.calories, 2)} ккал`}
                 </td>
                 <td data-label="Б / Ж / У">
                   {point.protein_g == null
                     ? '—'
-                    : `${formatNumber(point.protein_g, 0)} / ${formatNumber(point.fat_g, 0)} / ${formatNumber(point.carbs_g, 0)} г`}
+                    : `${formatNumber(point.protein_g, 2)} / ${formatNumber(point.fat_g, 2)} / ${formatNumber(point.carbs_g, 2)} г`}
                   {point.fiber_g != null && (
-                    <small>Клетчатка: {formatNumber(point.fiber_g, 1)} г</small>
+                    <small>Клетчатка: {formatNumber(point.fiber_g, 2)} г</small>
                   )}
                 </td>
                 <td data-label="Цель">

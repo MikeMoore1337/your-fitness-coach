@@ -186,7 +186,7 @@ describe('ProfileForm heart rate preview', () => {
 
     expect(await screen.findByText('Укажите рост от 100 до 250 см.')).toBeInTheDocument();
     expect(screen.getByLabelText('Рост, см')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByLabelText('Рост, см')).toHaveValue(99);
+    expect(screen.getByLabelText('Рост, см')).toHaveValue('99');
     expect(apiMock.mock.calls.filter(([path]) => path === '/api/v1/me/profile')).toHaveLength(0);
 
     fireEvent.change(screen.getByLabelText('Рост, см'), { target: { value: '170' } });

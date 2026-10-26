@@ -10,9 +10,15 @@ from fitminiapp_api.models.nutrition import NutritionTarget
 from fitminiapp_api.models.user import CoachClient, User
 from fitminiapp_api.schemas.progress import NutritionReportPeriod
 from fitminiapp_api.services.nutrition_reports import (
+    _metric_summary,
     _safe_csv_value,
     resolve_report_bounds,
 )
+
+
+def test_nutrition_metric_summary_preserves_decimal_scale() -> None:
+    assert _metric_summary([{"calories": Decimal("72.34")}], "calories")["average"] == 72.34
+    assert _metric_summary([{"protein_g": Decimal("42.344")}], "protein_g")["average"] == 42.344
 
 
 def _auth(client, telegram_user_id: int, *, is_coach: bool = False) -> dict[str, str]:

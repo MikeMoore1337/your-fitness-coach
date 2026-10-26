@@ -69,7 +69,7 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(add).toBeFocused();
 
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
-      await page.getByRole('spinbutton', { name: /^Вес,/ }).first().fill('18');
+      await page.getByLabel(/^Вес,/).first().fill('18');
       await page
         .getByRole('spinbutton', { name: /^Повторы,/ })
         .first()

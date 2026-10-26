@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from fitminiapp_api.schemas.nutrition import NutritionTargetResponse
 from fitminiapp_api.schemas.user import BodyPriorityPreference, TrainingPreferencesResponse
@@ -163,7 +164,15 @@ class PrescriptionLoadTarget(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     kind: PrescriptionLoadKind = "user_selected"
-    value: float | None = Field(default=None, ge=0, le=100_000)
+    value: float | None = Field(default=None, ge=0, le=100_000, allow_inf_nan=False)
+
+    @field_validator("value")
+    @classmethod
+    def validate_value_scale(cls, value: float | None) -> float | None:
+        exponent = Decimal(str(value)).as_tuple().exponent if value is not None else 0
+        if isinstance(exponent, int) and exponent < -2:
+            raise ValueError("load value must use no more than two decimal places")
+        return value
 
     @model_validator(mode="after")
     def validate_value(self):
@@ -362,13 +371,21 @@ class ProgramCoachingRule(BaseModel):
     rep_target: PrescriptionRepTarget | None = None
     load_target: PrescriptionLoadTarget | None = None
     effort_target: PrescriptionEffortTarget | None = None
-    increment_value: float | None = Field(default=None, gt=0, le=100_000)
+    increment_value: float | None = Field(default=None, gt=0, le=100_000, allow_inf_nan=False)
     increment_unit: Literal["kg", "lb", "percent"] | None = None
     reset_on_failure: bool | None = None
     amrap_min_reps: int | None = Field(default=None, ge=1, le=1_000)
     amrap_failure_action: Literal["repeat", "reduce_load", "deload", "manual_review"] | None = None
     deload_volume_percent: int | None = Field(default=None, ge=0, le=100)
     deload_intensity_percent: int | None = Field(default=None, ge=0, le=100)
+
+    @field_validator("increment_value")
+    @classmethod
+    def validate_increment_scale(cls, value: float | None) -> float | None:
+        exponent = Decimal(str(value)).as_tuple().exponent if value is not None else 0
+        if isinstance(exponent, int) and exponent < -2:
+            raise ValueError("increment value must use no more than two decimal places")
+        return value
 
     @model_validator(mode="after")
     def validate_rule(self):
@@ -1094,7 +1111,7 @@ class ClientResponse(BaseModel):
     birth_date: date | None = None
     goal: str | None = None
     level: str | None = None
-    height_cm: int | None = None
+    height_cm: float | None = Field(default=None, ge=100, le=250, allow_inf_nan=False)
     weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
     workouts_per_week: int | None = None
     cardio_trainings_per_week: int | None = None

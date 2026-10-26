@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -44,8 +45,8 @@ class NutritionTargetSave(BaseModel):
     # Avoid turning an unchanged calculator default into a fabricated weigh-in.
     record_weight_measurement: bool = False
     sex: Literal["male", "female"]
-    weight_kg: float = Field(ge=20, le=350, allow_inf_nan=False)
-    height_cm: float = Field(ge=100, le=250, allow_inf_nan=False)
+    weight_kg: Decimal = Field(ge=20, le=350, max_digits=5, decimal_places=2, allow_inf_nan=False)
+    height_cm: Decimal = Field(ge=100, le=250, max_digits=5, decimal_places=2, allow_inf_nan=False)
     age: float = Field(ge=18, le=100, allow_inf_nan=False)
     daily_routine: DailyRoutine | None = None
     steps_range: StepsRange | None = None

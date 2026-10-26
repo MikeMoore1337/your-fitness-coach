@@ -12,8 +12,14 @@ import { Button, CloseIcon, IconButton, Input } from '../../shared/ui/common';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { createWorkoutMutationId } from './activeWorkoutQueue';
+import {
+  hasDecimalScale,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 type DraftRow = { weight: string; reps: string };
+type ParsedRow = { weight_kg: number; reps: number };
 
 function readableError(reason: unknown): string {
   return getUserFacingErrorMessage(reason, 'Не удалось выполнить действие.');
@@ -23,15 +29,17 @@ function toDraftRows(rows: WarmupProposalRow[]): DraftRow[] {
   return rows.map((row) => ({ weight: String(row.weight_kg), reps: String(row.reps) }));
 }
 
-function parseRows(rows: DraftRow[]): WarmupProposalRow[] | null {
+function parseRows(rows: DraftRow[]): ParsedRow[] | null {
   const parsed = rows.map((row) => ({
-    weight_kg: Number(row.weight),
+    weight_kg: parseDecimalDraft(row.weight),
     reps: Number(row.reps),
   }));
   if (
     parsed.some(
-      (row) =>
-        !Number.isFinite(row.weight_kg) ||
+      (row, index) =>
+        row.weight_kg == null ||
+        !isCompleteDecimalDraft(rows[index]?.weight ?? '') ||
+        !hasDecimalScale(rows[index]?.weight ?? '', 2) ||
         row.weight_kg <= 0 ||
         row.weight_kg > 1000 ||
         !Number.isInteger(row.reps) ||
@@ -41,7 +49,7 @@ function parseRows(rows: DraftRow[]): WarmupProposalRow[] | null {
   ) {
     return null;
   }
-  return parsed;
+  return parsed.map((row) => ({ weight_kg: row.weight_kg!, reps: row.reps }));
 }
 
 export function WarmupProposal({
@@ -76,8 +84,11 @@ export function WarmupProposal({
     () => setOpen(false),
     '.warmup-proposal-dialog__close',
   );
-  const numericWorkingWeight = Number(workingWeight);
-  const canPreview = Number.isFinite(numericWorkingWeight) && numericWorkingWeight > 0;
+  const numericWorkingWeight = parseDecimalDraft(workingWeight) ?? Number.NaN;
+  const canPreview =
+    Number.isFinite(numericWorkingWeight) &&
+    numericWorkingWeight > 0 &&
+    hasDecimalScale(workingWeight, 2);
 
   const previewMutation = useMutation({
     mutationFn: () =>
@@ -98,11 +109,7 @@ export function WarmupProposal({
   });
 
   const applyMutation = useMutation({
-    mutationFn: (request: {
-      rows: WarmupProposalRow[];
-      state_token: string;
-      proposal_token: string;
-    }) =>
+    mutationFn: (request: { rows: ParsedRow[]; state_token: string; proposal_token: string }) =>
       api<WarmupProposalApply>(
         `/api/v1/workouts/${workoutId}/exercises/${workoutExerciseId}/warmup-proposals/apply`,
         {
@@ -290,8 +297,8 @@ export function WarmupProposal({
                               inputMode="decimal"
                               min="0.5"
                               max={numericWorkingWeight}
-                              step="0.5"
-                              type="number"
+                              step="0.01"
+                              type="text"
                               value={row.weight}
                               onChange={(event) =>
                                 setRows((current) =>

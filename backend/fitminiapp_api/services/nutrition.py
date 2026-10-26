@@ -202,6 +202,7 @@ def _target_calories(maintenance_calories: float, goal: str) -> int:
 
 
 def calculate_macros(weight_kg: float, target_calories: int, goal: str) -> NutritionMacros:
+    weight_kg = float(weight_kg)
     protein_per_kg = {
         "fat_loss": 2.2,
         "muscle_gain": 1.8,
@@ -268,8 +269,10 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
         raise NutritionError("Invalid sex")
     if goal not in VALID_GOALS:
         raise NutritionError("Invalid goal")
+    weight_kg = float(payload.weight_kg)
+    height_cm = float(payload.height_cm)
     sex_constant = -161 if sex == "female" else 5
-    bmr = 10 * payload.weight_kg + 6.25 * payload.height_cm - 5 * payload.age + sex_constant
+    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * payload.age + sex_constant
     _, _, activity_coefficient = _daily_activity(payload)
     base_tdee = bmr * activity_coefficient
     strength_met = STRENGTH_MET_VALUES[payload.strength_training_type or "regular"]
@@ -277,7 +280,7 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
     strength_weekly_calories = (
         _net_exercise_kcal(
             strength_met,
-            payload.weight_kg,
+            weight_kg,
             payload.strength_training_duration_minutes,
         )
         * payload.strength_trainings_per_week
@@ -286,7 +289,7 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
         _net_exercise_kcal(
             CARDIO_BASE_MET_VALUES[training.kind]
             * CARDIO_INTENSITY_MULTIPLIERS[training.intensity],
-            payload.weight_kg,
+            weight_kg,
             training.duration_minutes,
         )
         * training.trainings_per_week
@@ -296,7 +299,7 @@ def calculate_nutrition(payload: NutritionTargetSave) -> NutritionCalculation:
     cardio_daily_calories = cardio_weekly_calories / 7
     maintenance_calories = base_tdee + strength_daily_calories + cardio_daily_calories
     calories = _target_calories(maintenance_calories, goal)
-    macros = calculate_macros(payload.weight_kg, calories, goal)
+    macros = calculate_macros(weight_kg, calories, goal)
     if macros["macro_warning"]:
         # Fail closed: increasing calories to fit weight-based macros can
         # silently reverse a deficit or create an unapproved surplus.
@@ -780,7 +783,7 @@ def save_nutrition_target(
         if profile is not None:
             profile.sex = payload.sex
             profile.weight_kg = payload.weight_kg
-            profile.height_cm = round(payload.height_cm)
+            profile.height_cm = payload.height_cm
             profile.goal = payload.goal
             profile.workouts_per_week = payload.strength_trainings_per_week
             profile.cardio_trainings_per_week = sum(
@@ -789,7 +792,7 @@ def save_nutrition_target(
             if payload.record_weight_measurement:
                 from fitminiapp_api.services.measurements import sync_current_weight_to_diary
 
-                sync_current_weight_to_diary(db, target_user, payload.weight_kg)
+                sync_current_weight_to_diary(db, target_user, float(payload.weight_kg))
 
     db.commit()
     db.refresh(target)
