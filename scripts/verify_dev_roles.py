@@ -13,7 +13,9 @@ from urllib.request import Request, urlopen
 BASE = "http://127.0.0.1:18080"
 
 
-def _request(path: str, *, token: str | None = None, payload: dict | None = None) -> tuple[int, object]:
+def _request(
+    path: str, *, token: str | None = None, payload: dict | None = None
+) -> tuple[int, object]:
     if not path.startswith("/") or "//" in path:
         raise ValueError("only same-origin relative paths are supported")
     data = json.dumps(payload).encode() if payload is not None else None
