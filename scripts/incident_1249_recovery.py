@@ -50,6 +50,35 @@ def bash_valid(data: bytes) -> bool:
     return result.returncode == 0
 
 
+def bash_parse_error_line(data: bytes) -> int | None:
+    # Never expose shell stderr or the values of environment variables.
+    result = subprocess.run(
+        ["bash", "-n"],
+        input=data,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        timeout=15,
+        check=False,
+    )
+    if result.returncode == 0:
+        return None
+    matched = re.search(rb"line (\d+):", result.stderr)
+    return int(matched.group(1)) if matched else None
+
+
+def safe_key_at_line(data: bytes, line_number: int | None) -> str | None:
+    if line_number is None or line_number < 1:
+        return None
+    try:
+        lines = data.decode("utf-8").splitlines()
+    except UnicodeError:
+        return None
+    if line_number > len(lines):
+        return None
+    match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)=", lines[line_number - 1])
+    return match.group(1) if match else None
+
+
 def env_data() -> tuple[bytes, os.stat_result]:
     try:
         info = ENV_FILE.lstat()
@@ -107,6 +136,21 @@ def container_summary() -> dict[str, object]:
 
 def inspect() -> dict[str, object]:
     data, info = env_data()
+    initial_error_line = bash_parse_error_line(data)
+    line_30_error_line: int | None = None
+    bounded_error_line: int | None = None
+    bounded_preview_valid: bool | None = None
+    key = safe_line_key(data)
+    if key and not bash_valid(data):
+        with suppress(RecoveryError, UnicodeError, IndexError):
+            lines = data.decode("utf-8").splitlines(keepends=True)
+            simple = _quote_simple_assignment(lines[29], key)
+            if simple is not None:
+                lines[29] = simple[0]
+                line_30_error_line = bash_parse_error_line("".join(lines).encode("utf-8"))
+            preview = candidate_fix(data, key, require_valid_bash=False)
+            bounded_preview_valid = bash_valid(preview)
+            bounded_error_line = bash_parse_error_line(preview)
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
     except ENV_READ_ERRORS:
@@ -131,7 +175,14 @@ def inspect() -> dict[str, object]:
         "env_private": not bool(info.st_mode & 0o077),
         "env_sha256": checksum(data),
         "env_bash_syntax_valid": bash_valid(data),
+        "bash_parse_error_line": initial_error_line,
+        "bash_parse_error_key": safe_key_at_line(data, initial_error_line),
         "line_30_key": safe_line_key(data),
+        "line_30_preview_error_line": line_30_error_line,
+        "line_30_preview_error_key": safe_key_at_line(data, line_30_error_line),
+        "bounded_preview_bash_valid": bounded_preview_valid,
+        "bounded_preview_error_line": bounded_error_line,
+        "bounded_preview_error_key": safe_key_at_line(data, bounded_error_line),
         "baseline_revision": baseline if GIT_SHA_RE.fullmatch(baseline) else "INVALID",
         "current_release_relative": link_target,
         "baseline_release_exists": release_path.is_dir()
@@ -160,7 +211,7 @@ def _quote_simple_assignment(line: str, required_key: str | None = None) -> tupl
     return f"{key}={shlex.quote(value)}{suffix}", key
 
 
-def candidate_fix(data: bytes, expected_key: str) -> bytes:
+def candidate_fix(data: bytes, expected_key: str, *, require_valid_bash: bool = True) -> bytes:
     if bash_valid(data):
         raise RecoveryError("environment already parses; refusing unnecessary mutation")
     try:
@@ -189,7 +240,7 @@ def candidate_fix(data: bytes, expected_key: str) -> bytes:
                     raise RecoveryError("too many additional env fixes; manual review required")
                 lines[idx] = result[0]
     proposed = "".join(lines).encode("utf-8")
-    if not bash_valid(proposed):
+    if require_valid_bash and not bash_valid(proposed):
         raise RecoveryError("bounded parenthesis correction did not produce valid Bash syntax")
     return proposed
 
