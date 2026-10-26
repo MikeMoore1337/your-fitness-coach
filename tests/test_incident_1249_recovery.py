@@ -103,3 +103,28 @@ def test_readonly_diagnostic_reports_sanitized_next_parse_line(
     assert "hello(first)" not in str(report)
     assert "hello(second)" not in str(report)
     assert recovery.ENV_FILE.read_bytes() == original
+
+
+def test_line_98_diagnostic_previews_only_literal_without_exposing_token(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(recovery, "APP_ROOT", tmp_path)
+    monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
+    monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
+    monkeypatch.setattr(recovery, "container_summary", lambda: {})
+    original = (
+        "SAFE=value\n" * 29
+        + "OPEN_FOOD_FACTS_USER_AGENT=fitness(client)\n"
+        + "SAFE=value\n" * 67
+        + "CLOUDFLARED_TOKEN=token(other)\n"
+    ).encode()
+    recovery.ENV_FILE.write_bytes(original)
+    recovery.ENV_FILE.chmod(0o600)
+
+    report = recovery.inspect()
+    assert report["line_98_key"] == "CLOUDFLARED_TOKEN"
+    assert report["line_30_and_98_literal_preview_safe"] is True
+    assert report["line_30_and_98_literal_preview_bash_valid"] is True
+    assert report["line_30_and_98_literal_preview_error_line"] is None
+    assert "token(other)" not in str(report)
+    assert recovery.ENV_FILE.read_bytes() == original

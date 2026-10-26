@@ -79,6 +79,21 @@ def safe_key_at_line(data: bytes, line_number: int | None) -> str | None:
     return match.group(1) if match else None
 
 
+def quote_plain_assignment_for_preview(line: str, required_key: str) -> str | None:
+    # Preview only. Never evaluate, print, or change the original assignment.
+    suffix = "\r\n" if line.endswith("\r\n") else ("\n" if line.endswith("\n") else "")
+    raw = line[: -len(suffix)] if suffix else line
+    match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
+    if not match or match.group(1) != required_key:
+        return None
+    value = match.group(2)
+    if not value or any(
+        char in value for char in (chr(92), "$", "`", '"', "'", ";", "&", "|", "<", ">", "#")
+    ):
+        return None
+    return f"{required_key}={shlex.quote(value)}{suffix}"
+
+
 def env_data() -> tuple[bytes, os.stat_result]:
     try:
         info = ENV_FILE.lstat()
@@ -140,6 +155,10 @@ def inspect() -> dict[str, object]:
     line_30_error_line: int | None = None
     bounded_error_line: int | None = None
     bounded_preview_valid: bool | None = None
+    key_98 = safe_key_at_line(data, 98)
+    line_98_preview_valid: bool | None = None
+    line_98_preview_error_line: int | None = None
+    line_98_preview_safe = False
     key = safe_line_key(data)
     if key and not bash_valid(data):
         with suppress(RecoveryError, UnicodeError, IndexError):
@@ -151,6 +170,18 @@ def inspect() -> dict[str, object]:
             preview = candidate_fix(data, key, require_valid_bash=False)
             bounded_preview_valid = bash_valid(preview)
             bounded_error_line = bash_parse_error_line(preview)
+    if key == "OPEN_FOOD_FACTS_USER_AGENT" and key_98 == "CLOUDFLARED_TOKEN":
+        with suppress(RecoveryError, UnicodeError, IndexError):
+            lines = data.decode("utf-8").splitlines(keepends=True)
+            proposed_30 = quote_plain_assignment_for_preview(lines[29], key)
+            proposed_98 = quote_plain_assignment_for_preview(lines[97], key_98)
+            line_98_preview_safe = proposed_30 is not None and proposed_98 is not None
+            if line_98_preview_safe:
+                lines[29] = proposed_30
+                lines[97] = proposed_98
+                combined = "".join(lines).encode("utf-8")
+                line_98_preview_valid = bash_valid(combined)
+                line_98_preview_error_line = bash_parse_error_line(combined)
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
     except ENV_READ_ERRORS:
@@ -183,6 +214,13 @@ def inspect() -> dict[str, object]:
         "bounded_preview_bash_valid": bounded_preview_valid,
         "bounded_preview_error_line": bounded_error_line,
         "bounded_preview_error_key": safe_key_at_line(data, bounded_error_line),
+        "line_98_key": key_98,
+        "line_30_and_98_literal_preview_safe": line_98_preview_safe,
+        "line_30_and_98_literal_preview_bash_valid": line_98_preview_valid,
+        "line_30_and_98_literal_preview_error_line": line_98_preview_error_line,
+        "line_30_and_98_literal_preview_error_key": safe_key_at_line(
+            data, line_98_preview_error_line
+        ),
         "baseline_revision": baseline if GIT_SHA_RE.fullmatch(baseline) else "INVALID",
         "current_release_relative": link_target,
         "baseline_release_exists": release_path.is_dir()
