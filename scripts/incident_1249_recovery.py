@@ -97,7 +97,7 @@ def container_summary() -> dict[str, object]:
                 "running": sum(s == "running" for s in states),
                 "exited": sum(s == "exited" for s in states),
             }
-        except OSError, subprocess.SubprocessError:
+        except (OSError, subprocess.SubprocessError):  # fmt: skip (Python 3.12 and 3.14 compatible)
             output[name] = {"available": False}
     return output
 
@@ -106,14 +106,14 @@ def inspect() -> dict[str, object]:
     data, info = env_data()
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
-    except OSError, UnicodeError:
+    except (OSError, UnicodeError):  # fmt: skip (Python 3.12 and 3.14 compatible)
         baseline = ""
     current = APP_ROOT / "current"
     link_target = ""
     if current.is_symlink():
         try:
             link_target = str(current.resolve(strict=True).relative_to(APP_ROOT / "releases"))
-        except OSError, ValueError:
+        except (OSError, ValueError):  # fmt: skip (Python 3.12 and 3.14 compatible)
             link_target = "untrusted"
     release_path = APP_ROOT / "releases" / baseline
     deployment_sha = ""
