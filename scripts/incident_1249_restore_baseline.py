@@ -92,7 +92,9 @@ def check_image(kind: str) -> bool:
         and isinstance(tags, list)
         and ref in tags
         and isinstance(digests, list)
-        and any(isinstance(item, str) and re.search(r"@sha256:[0-9a-f]{64}$", item) for item in digests)
+        and any(
+            isinstance(item, str) and re.search(r"@sha256:[0-9a-f]{64}$", item) for item in digests
+        )
     )
 
 
