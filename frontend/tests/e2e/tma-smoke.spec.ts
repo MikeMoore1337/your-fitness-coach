@@ -1244,7 +1244,8 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tmaBody.getByLabel('Вес, кг').focus();
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
-  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'sticky');
+  // #1189: avoid a sticky save bar overlapping focused input on the iOS keyboard.
+  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'static');
   await tma.setTheme('dark');
   await tma.setActive(false);
   await tma.setActive(true);
