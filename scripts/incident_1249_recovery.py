@@ -156,6 +156,8 @@ def _quote_simple_assignment(
         return None
     unsafe = (chr(92), chr(36), chr(96), chr(34), chr(39), ";", "&", "|", "<", ">", "#")
     if any(char in value for char in unsafe):
+        if required_key is None:
+            return None
         raise RecoveryError(f"complex shell syntax at assignment for {key}; manual review required")
     return f"{key}={shlex.quote(value)}{suffix}", key
 
