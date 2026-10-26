@@ -27,3 +27,9 @@ def test_dev_secret_config_is_not_committed() -> None:
     assert "__GENERATE_INTERNAL_TOKEN__" in template
     ignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert ".env.*" in ignore
+
+
+def test_windows_powershell_script_is_utf8_with_bom() -> None:
+    # Windows PowerShell 5.1 otherwise decodes UTF-8 Cyrillic text as ANSI.
+    content = (ROOT / "scripts" / "dev.ps1").read_bytes()
+    assert content.startswith(bytes((0xEF, 0xBB, 0xBF)))
