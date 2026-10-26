@@ -4,6 +4,7 @@
 Runs only via the manually dispatched production GitHub Actions workflow.
 Never sources environment values, prints credentials, or starts containers.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -15,6 +16,7 @@ import stat
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from pathlib import Path
 
 APP_ROOT = Path("/srv/yfc/fit-mini-app")
@@ -34,8 +36,14 @@ def checksum(data: bytes) -> str:
 
 
 def bash_valid(data: bytes) -> bool:
-    result = subprocess.run(["bash", "-n"], input=data, stdout=subprocess.DEVNULL,
-                            stderr=subprocess.DEVNULL, timeout=15, check=False)
+    result = subprocess.run(
+        ["bash", "-n"],
+        input=data,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=15,
+        check=False,
+    )
     return result.returncode == 0
 
 
@@ -65,9 +73,19 @@ def container_summary() -> dict[str, object]:
     for name in ("backend", "worker", "bot"):
         try:
             p = subprocess.run(
-                ["docker", "ps", "-a", "--filter", f"label=com.docker.compose.service={name}",
-                 "--format", "{{.State}}"],
-                capture_output=True, text=True, timeout=12, check=False,
+                [
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    f"label=com.docker.compose.service={name}",
+                    "--format",
+                    "{{.State}}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=False,
             )
             if p.returncode:
                 output[name] = {"available": False}
@@ -79,7 +97,7 @@ def container_summary() -> dict[str, object]:
                 "running": sum(s == "running" for s in states),
                 "exited": sum(s == "exited" for s in states),
             }
-        except (OSError, subprocess.SubprocessError):
+        except OSError, subprocess.SubprocessError:
             output[name] = {"available": False}
     return output
 
@@ -88,24 +106,20 @@ def inspect() -> dict[str, object]:
     data, info = env_data()
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
-    except (OSError, UnicodeError):
+    except OSError, UnicodeError:
         baseline = ""
     current = APP_ROOT / "current"
     link_target = ""
     if current.is_symlink():
         try:
             link_target = str(current.resolve(strict=True).relative_to(APP_ROOT / "releases"))
-        except (OSError, ValueError):
+        except OSError, ValueError:
             link_target = "untrusted"
     release_path = APP_ROOT / "releases" / baseline
     deployment_sha = ""
     if GIT_SHA_RE.fullmatch(baseline):
-        try:
-            deployment_sha = (release_path / ".deployment-sha").read_text(
-                encoding="ascii"
-            ).strip()
-        except (OSError, UnicodeError):
-            pass
+        with suppress(OSError, UnicodeError):
+            deployment_sha = (release_path / ".deployment-sha").read_text(encoding="ascii").strip()
     return {
         "incident": 1249,
         "operation": "inspect",
@@ -117,7 +131,9 @@ def inspect() -> dict[str, object]:
         "line_30_key": safe_line_key(data),
         "baseline_revision": baseline if GIT_SHA_RE.fullmatch(baseline) else "INVALID",
         "current_release_relative": link_target,
-        "baseline_release_exists": release_path.is_dir() if GIT_SHA_RE.fullmatch(baseline) else False,
+        "baseline_release_exists": release_path.is_dir()
+        if GIT_SHA_RE.fullmatch(baseline)
+        else False,
         "baseline_deployment_marker_matches": bool(baseline and deployment_sha == baseline),
         "compose_service_states": container_summary(),
         "application_mutation": False,
@@ -136,7 +152,7 @@ def candidate_fix(data: bytes, expected_key: str) -> bytes:
         raise RecoveryError("environment has fewer than 30 lines")
     original = lines[29]
     suffix = "\r\n" if original.endswith("\r\n") else ("\n" if original.endswith("\n") else "")
-    raw = original[:-len(suffix)] if suffix else original
+    raw = original[: -len(suffix)] if suffix else original
     found = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
     if not found or found.group(1) != expected_key:
         raise RecoveryError("line 30 key does not match requested key")
@@ -224,8 +240,9 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, sort_keys=True))
         return 0
     except (RecoveryError, subprocess.TimeoutExpired) as exc:
-        print(json.dumps({"incident": 1249, "status": "BLOCKED", "reason": str(exc)}),
-              file=sys.stderr)
+        print(
+            json.dumps({"incident": 1249, "status": "BLOCKED", "reason": str(exc)}), file=sys.stderr
+        )
         return 2
 
 
