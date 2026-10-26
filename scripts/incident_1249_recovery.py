@@ -149,6 +149,103 @@ def container_summary() -> dict[str, object]:
     return output
 
 
+def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, object]:
+    # This reports only service state, OCI revision labels and configuration validity.
+    # Never inspect or print environment variables, container logs or secret values.
+    report: dict[str, object] = {
+        "service_states": {},
+        "baseline_revision_verified": False,
+        "backend_worker_same_image": False,
+        "compose_config_valid": False,
+    }
+    services: dict[str, dict[str, object]] = {}
+    image_ids: dict[str, str] = {}
+    for service in ("backend", "worker", "bot", "db", "edge"):
+        try:
+            ids = subprocess.run(
+                [
+                    "docker",
+                    "ps",
+                    "-a",
+                    "--filter",
+                    f"label=com.docker.compose.service={service}",
+                    "--format",
+                    "{{.ID}}",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=False,
+            )
+            if ids.returncode != 0:
+                services[service] = {"available": False}
+                continue
+            container_ids = [line.strip() for line in ids.stdout.splitlines() if line.strip()]
+            if len(container_ids) != 1:
+                services[service] = {
+                    "available": True,
+                    "container_count": len(container_ids),
+                }
+                continue
+            inspected = subprocess.run(
+                [
+                    "docker",
+                    "inspect",
+                    "--format",
+                    '{{.State.Status}}|{{.Image}}|{{index .Config.Labels "org.opencontainers.image.revision"}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}',
+                    container_ids[0],
+                ],
+                capture_output=True,
+                text=True,
+                timeout=12,
+                check=False,
+            )
+            parts = inspected.stdout.strip().split("|") if inspected.returncode == 0 else []
+            if len(parts) != 4:
+                services[service] = {"available": False}
+                continue
+            status, image_id, revision, health = parts
+            image_ids[service] = image_id
+            services[service] = {
+                "available": True,
+                "container_count": 1,
+                "status": status,
+                "health": health,
+                "oci_revision": revision if GIT_SHA_RE.fullmatch(revision) else "UNVERIFIED",
+            }
+        except (OSError, subprocess.SubprocessError):
+            services[service] = {"available": False}
+    report["service_states"] = services
+    report["backend_worker_same_image"] = bool(
+        image_ids.get("backend")
+        and image_ids.get("backend") == image_ids.get("worker")
+    )
+    report["baseline_revision_verified"] = bool(
+        GIT_SHA_RE.fullmatch(baseline_revision)
+        and all(
+            services.get(service, {}).get("status") == "exited"
+            and services.get(service, {}).get("oci_revision") == baseline_revision
+            for service in ("backend", "worker", "bot")
+        )
+        and report["backend_worker_same_image"]
+    )
+    try:
+        if GIT_SHA_RE.fullmatch(baseline_revision):
+            release = APP_ROOT / "releases" / baseline_revision
+            parsed = subprocess.run(
+                ["docker", "compose", "config", "--quiet"],
+                cwd=release,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                check=False,
+            )
+            report["compose_config_valid"] = parsed.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return report
+
+
 def inspect() -> dict[str, object]:
     data, info = env_data()
     initial_error_line = bash_parse_error_line(data)
@@ -228,6 +325,7 @@ def inspect() -> dict[str, object]:
         else False,
         "baseline_deployment_marker_matches": bool(baseline and deployment_sha == baseline),
         "compose_service_states": container_summary(),
+        "stopped_runtime_candidate": stopped_runtime_candidate_summary(baseline),
         "application_mutation": False,
     }
 
