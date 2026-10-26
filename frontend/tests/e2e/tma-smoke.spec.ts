@@ -298,7 +298,8 @@ test('cardio date and time stays inside its card on narrow Mobile Web and TMA sc
             fieldRight: fieldBox.right,
             cardRight: cardBox.right,
             cardOverflow: card.scrollWidth - card.clientWidth,
-            pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            pageOverflow:
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
           };
         });
 
