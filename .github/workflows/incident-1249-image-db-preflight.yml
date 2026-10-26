@@ -1,0 +1,63 @@
+name: Incident 1249 baseline image and database preflight
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/incident-1249-image-db-preflight.yml
+      - scripts/incident_1249_image_db_preflight.py
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/incident-1249-image-db-preflight.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  check-code:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m py_compile scripts/incident_1249_image_db_preflight.py
+
+  inspect:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Gate to protected master and owner
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+      - name: Configure existing production SSH access
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Check immutable baseline OCI and schema without application mutation
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -p 1337 yfc-deploy@77.91.90.171 \
+            "python3 -" < scripts/incident_1249_image_db_preflight.py | tee audit.json
+          jq -e '.incident == 1249 and .application_mutation == false' audit.json >/dev/null
