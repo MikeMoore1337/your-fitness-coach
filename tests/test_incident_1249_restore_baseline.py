@@ -45,9 +45,11 @@ class RestoreBaselineTests(unittest.TestCase):
 
     def test_preflight_rejects_env_drift_without_docker_mutation(self) -> None:
         (self.root / ".env").write_bytes(b"DRIFT=true\n")
-        with mock.patch.object(recovery, "call") as runner:
-            with self.assertRaises(recovery.RecoveryBlocked):
-                recovery.preflight()
+        with (
+            mock.patch.object(recovery, "call") as runner,
+            self.assertRaises(recovery.RecoveryBlocked),
+        ):
+            recovery.preflight()
         runner.assert_not_called()
 
     def test_preflight_accepts_exact_synthetic_metadata(self) -> None:
@@ -92,9 +94,9 @@ class RestoreBaselineTests(unittest.TestCase):
         with (
             mock.patch.object(recovery, "preflight", side_effect=recovery.RecoveryBlocked("NO")),
             mock.patch.object(recovery, "call") as runner,
+            self.assertRaises(recovery.RecoveryBlocked),
         ):
-            with self.assertRaises(recovery.RecoveryBlocked):
-                recovery.restore()
+            recovery.restore()
         runner.assert_not_called()
 
 
