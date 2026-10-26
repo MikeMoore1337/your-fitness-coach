@@ -143,6 +143,23 @@ def inspect() -> dict[str, object]:
     }
 
 
+def _quote_simple_assignment(line: str, required_key: str | None = None) -> tuple[str, str] | None:
+    suffix = "\r\n" if line.endswith("\r\n") else ("\n" if line.endswith("\n") else "")
+    raw = line[: -len(suffix)] if suffix else line
+    match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
+    if not match or (required_key is not None and match.group(1) != required_key):
+        return None
+    key, value = match.groups()
+    if not value or not any(char in value for char in "()"):
+        return None
+    unsafe = (chr(92), chr(36), chr(96), chr(34), chr(39), ";", "&", "|", "<", ">", "#")
+    if any(char in value for char in unsafe):
+        if required_key is None:
+            return None
+        raise RecoveryError(f"complex shell syntax at assignment for {key}; manual review required")
+    return f"{key}={shlex.quote(value)}{suffix}", key
+
+
 def candidate_fix(data: bytes, expected_key: str) -> bytes:
     if bash_valid(data):
         raise RecoveryError("environment already parses; refusing unnecessary mutation")
@@ -153,21 +170,27 @@ def candidate_fix(data: bytes, expected_key: str) -> bytes:
     lines = source.splitlines(keepends=True)
     if len(lines) < 30:
         raise RecoveryError("environment has fewer than 30 lines")
-    original = lines[29]
-    suffix = "\r\n" if original.endswith("\r\n") else ("\n" if original.endswith("\n") else "")
-    raw = original[: -len(suffix)] if suffix else original
-    found = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
-    if not found or found.group(1) != expected_key:
-        raise RecoveryError("line 30 key does not match requested key")
-    value = found.group(2)
-    if not value or not any(char in value for char in "()"):
-        raise RecoveryError("line 30 has no supported unquoted-parenthesis problem")
-    if any(char in value for char in "\\$\x60\x22\x27;&|<>"):
-        raise RecoveryError("line 30 contains complex shell syntax; manual review required")
-    lines[29] = f"{expected_key}={shlex.quote(value)}{suffix}"
+    primary = _quote_simple_assignment(lines[29], expected_key)
+    if primary is None:
+        raise RecoveryError("line 30 key or simple parenthesis value does not match")
+    lines[29] = primary[0]
+
+    if not bash_valid("".join(lines).encode("utf-8")):
+        # Only additional simple parenthesis assignments may be corrected.
+        # Fail closed if more than three other lines require repair.
+        changed = 0
+        for idx, line in enumerate(lines):
+            if idx == 29:
+                continue
+            result = _quote_simple_assignment(line)
+            if result is not None:
+                changed += 1
+                if changed > 3:
+                    raise RecoveryError("too many additional env fixes; manual review required")
+                lines[idx] = result[0]
     proposed = "".join(lines).encode("utf-8")
     if not bash_valid(proposed):
-        raise RecoveryError("narrow line-30 correction did not produce valid Bash syntax")
+        raise RecoveryError("bounded parenthesis correction did not produce valid Bash syntax")
     return proposed
 
 
@@ -219,6 +242,15 @@ def self_test() -> None:
     candidate = candidate_fix(prefix + b"TEST_KEY=thing(hello)\n", "TEST_KEY")
     assert candidate.splitlines()[29] == b"TEST_KEY='thing(hello)'"
     assert bash_valid(candidate)
+    extra = candidate_fix(prefix + b"TEST_KEY=thing(hello)\nNEXT_KEY=other(value)\n", "TEST_KEY")
+    assert bash_valid(extra)
+    assert extra.splitlines()[30] == b"NEXT_KEY='other(value)'"
+    try:
+        candidate_fix(prefix + b"TEST_KEY=thing(hello)\n" + b"EXTRA=other(value)\n" * 4, "TEST_KEY")
+    except RecoveryError:
+        pass
+    else:
+        raise AssertionError("more than three additional corrections must be rejected")
     try:
         candidate_fix(prefix + b"TEST_KEY=$(echo hello)\n", "TEST_KEY")
     except RecoveryError:

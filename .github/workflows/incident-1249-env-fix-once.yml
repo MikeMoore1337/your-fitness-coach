@@ -1,4 +1,4 @@
-name: Incident 1249 one-time production env syntax repair
+name: Incident 1249 bounded production env syntax repair
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   one-time-fix:
-    name: Compare-and-swap repair of exact line 30 (no container mutation)
+    name: Bounded parenthesis repair with exact line-30 anchor (no container mutation)
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15
@@ -81,7 +81,7 @@ jobs:
           ' preflight.json >/dev/null
           echo 'INCIDENT_1249_PRE_REPAIR=PASS'
 
-      - name: Apply only the validated line 30 syntax correction
+      - name: Apply bounded correction anchored on validated line 30 (up to 3 other simple lines)
         shell: bash
         run: |
           set -Eeuo pipefail
