@@ -28,6 +28,7 @@ GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ENV_READ_ERRORS = (OSError, UnicodeError)
 DOCKER_COMMAND_ERRORS = (OSError, subprocess.SubprocessError)
 SYMLINK_ERRORS = (OSError, ValueError)
+IMAGE_READ_ERRORS = (OSError, subprocess.SubprocessError, ValueError, TypeError)
 
 
 class RecoveryError(RuntimeError):
@@ -247,6 +248,54 @@ def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, objec
     return report
 
 
+def local_baseline_image_summary(revision: str) -> dict[str, object]:
+    # Deterministic image references from deployment_contract.py; no .env access.
+    result: dict[str, object] = {"available_for_restore": False, "images": {}}
+    if not GIT_SHA_RE.fullmatch(revision):
+        return result
+    images: dict[str, dict[str, bool]] = {}
+    for kind in ("backend", "bot"):
+        ref = f"ghcr.io/mikemoore1337/your-fitness-coach-{kind}:{revision}"
+        try:
+            command = subprocess.run(
+                ["docker", "image", "inspect", ref],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=15,
+            )
+            if command.returncode != 0:
+                images[kind] = {"present": False}
+                continue
+            payload = json.loads(command.stdout)
+            if not isinstance(payload, list) or len(payload) != 1:
+                images[kind] = {"present": False}
+                continue
+            image = payload[0]
+            labels = (image.get("Config") or {}).get("Labels") or {}
+            digests = image.get("RepoDigests") or []
+            tags = image.get("RepoTags") or []
+            images[kind] = {
+                "present": True,
+                "revision_verified": labels.get("org.opencontainers.image.revision") == revision,
+                "immutable_digest_present": any(
+                    isinstance(item, str) and "@sha256:" in item for item in digests
+                ),
+                "exact_tag_present": ref in tags,
+            }
+        except IMAGE_READ_ERRORS:
+            images[kind] = {"present": False}
+    result["images"] = images
+    result["available_for_restore"] = all(
+        images.get(kind, {}).get("present")
+        and images[kind].get("revision_verified")
+        and images[kind].get("immutable_digest_present")
+        and images[kind].get("exact_tag_present")
+        for kind in ("backend", "bot")
+    )
+    return result
+
+
 def inspect() -> dict[str, object]:
     data, info = env_data()
     initial_error_line = bash_parse_error_line(data)
@@ -327,6 +376,7 @@ def inspect() -> dict[str, object]:
         "baseline_deployment_marker_matches": bool(baseline and deployment_sha == baseline),
         "compose_service_states": container_summary(),
         "stopped_runtime_candidate": stopped_runtime_candidate_summary(baseline),
+        "baseline_images": local_baseline_image_summary(baseline),
         "application_mutation": False,
     }
 
