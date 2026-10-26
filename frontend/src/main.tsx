@@ -79,6 +79,7 @@ function isPublicLandingRoute(path: string): boolean {
 const ProgressReportPage = lazy(() => import('./pages/reports/ProgressReportPage'));
 const CoachPage = lazy(() => import('./pages/coach/CoachPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
+const HermesRootConsentPage = lazy(() => import('./pages/admin/HermesRootConsentPage'));
 const LandingV10AthletePage = lazy(() => import('./pages/landing/LandingV10AthletePage'));
 const LandingV10CoachPage = lazy(() => import('./pages/landing/LandingV10CoachPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
@@ -224,6 +225,14 @@ function AppRoutes() {
         <CoachPage />
       </AuthenticatedRoute>
     );
+  if (path === '/admin/hermes-connect') {
+    if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
+    return (
+      <AuthenticatedRoute>
+        <HermesRootConsentPage />
+      </AuthenticatedRoute>
+    );
+  }
   if (path === '/admin') {
     if (isTelegramLaunch(window.location)) return <Redirect to="/app" />;
     return (
