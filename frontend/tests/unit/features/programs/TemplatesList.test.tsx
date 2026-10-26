@@ -81,11 +81,13 @@ function renderList(mode: 'full' | 'summary' = 'full') {
 
 describe('TemplatesList editing', () => {
   let activeProgram = true;
+  let activeProgramSource: 'own' | 'trainer' | 'foreign' = 'own';
   let deleteResponse: (() => Promise<Response>) | null = null;
   let previewDetailChanged = false;
 
   beforeEach(() => {
     activeProgram = true;
+    activeProgramSource = 'own';
     deleteResponse = null;
     previewDetailChanged = false;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -119,8 +121,12 @@ describe('TemplatesList editing', () => {
               is_example: false,
               can_edit: true,
               is_public: false,
-              owner_user_id: 1,
+              owner_user_id:
+                activeProgramSource === 'own' ? 1 : activeProgramSource === 'foreign' ? 99 : null,
               is_active_for_current_user: activeProgram,
+              is_assigned_to_current_user: activeProgram,
+              assigned_by_user_id: activeProgramSource === 'trainer' ? 99 : null,
+              assigned_by_full_name: activeProgramSource === 'trainer' ? 'Тренер Анна' : null,
               assigned_program_id: 42,
             },
           ]),
@@ -261,12 +267,15 @@ describe('TemplatesList editing', () => {
       await screen.findByRole('heading', { name: 'Активная программа' })
     ).closest('section');
     expect(activeSection).not.toBeNull();
-    expect(within(activeSection!).getByText('Другие действия')).toBeInTheDocument();
-
-    fireEvent.click(within(activeSection!).getByText('Другие действия'));
-    expect(
-      within(activeSection!).getByRole('button', { name: 'Удалить программу' }),
-    ).toBeInTheDocument();
+    expect(within(activeSection!).queryByText('Другие действия')).not.toBeInTheDocument();
+    const sharePanel = within(activeSection!).getByRole('region', {
+      name: 'Поделиться программой',
+    });
+    const deleteButton = within(activeSection!).getByRole('button', {
+      name: 'Удалить программу',
+    });
+    expect(deleteButton).toHaveClass('btn-danger', 'program-active__delete-action');
+    expect(sharePanel.nextElementSibling).toBe(deleteButton);
 
     cleanup();
     renderList('summary');
@@ -280,12 +289,43 @@ describe('TemplatesList editing', () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(['trainer', 'foreign'] as const)(
+    'keeps deletion available without a share panel for a %s active program',
+    async (source) => {
+      activeProgramSource = source;
+      renderList();
+
+      const activeSection = (
+        await screen.findByRole('heading', { name: 'Активная программа' })
+      ).closest('section');
+      expect(activeSection).not.toBeNull();
+      expect(
+        within(activeSection!).queryByRole('region', { name: 'Поделиться программой' }),
+      ).not.toBeInTheDocument();
+      expect(
+        within(activeSection!).getByRole('button', { name: 'Удалить программу' }),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it('does not show active-program deletion when no program is assigned', async () => {
+    activeProgram = false;
+    renderList();
+
+    const activeSection = (
+      await screen.findByRole('heading', { name: 'План ещё не выбран' })
+    ).closest('section');
+    expect(activeSection).not.toBeNull();
+    expect(
+      within(activeSection!).queryByRole('button', { name: 'Удалить программу' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('confirms assigned-program deletion and sends the assigned program id', async () => {
     renderList();
     const activeSection = (
       await screen.findByRole('heading', { name: 'Активная программа' })
     ).closest('section');
-    fireEvent.click(within(activeSection!).getByText('Другие действия'));
     fireEvent.click(within(activeSection!).getByRole('button', { name: 'Удалить программу' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Удалить текущую программу?' });
@@ -318,7 +358,6 @@ describe('TemplatesList editing', () => {
     const activeSection = (
       await screen.findByRole('heading', { name: 'Активная программа' })
     ).closest('section');
-    fireEvent.click(within(activeSection!).getByText('Другие действия'));
     fireEvent.click(within(activeSection!).getByRole('button', { name: 'Удалить программу' }));
     const dialog = await screen.findByRole('dialog', { name: 'Удалить текущую программу?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
@@ -341,7 +380,6 @@ describe('TemplatesList editing', () => {
     const activeSection = (
       await screen.findByRole('heading', { name: 'Активная программа' })
     ).closest('section');
-    fireEvent.click(within(activeSection!).getByText('Другие действия'));
     fireEvent.click(within(activeSection!).getByRole('button', { name: 'Удалить программу' }));
     const dialog = await screen.findByRole('dialog', { name: 'Удалить текущую программу?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить программу' }));
@@ -360,7 +398,6 @@ describe('TemplatesList editing', () => {
     const activeSection = (
       await screen.findByRole('heading', { name: 'Активная программа' })
     ).closest('section');
-    fireEvent.click(within(activeSection!).getByText('Другие действия'));
     fireEvent.click(within(activeSection!).getByRole('button', { name: 'Удалить программу' }));
     const dialog = await screen.findByRole('dialog', { name: 'Удалить текущую программу?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Удалить программу' }));
