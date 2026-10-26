@@ -297,10 +297,8 @@ export function Diary({
         value: decimalDraftFromValue(value.value),
       })),
     });
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView?.({ block: 'center' });
-      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
-    });
+    // Do not force-scroll a long measurement form while iOS is positioning its keyboard.
+    // Let the user focus the intended input; the browser keeps it in the visual viewport.
   };
   const activeDefinitions = (definitions.data ?? []).filter((definition) => !definition.archived);
   const setCustomValue = (definitionId: number, value: string) => {
