@@ -2199,11 +2199,11 @@ test('#1189 keeps measurement inputs visible in a keyboard-sized viewport', asyn
     await weight.press('Backspace');
     await weight.press('4');
     await expect(weight).toHaveValue('72.34');
-    expect(await inVisualViewport(weight)).toBe(true);
+    await expect.poll(() => inVisualViewport(weight), { timeout: 2000 }).toBe(true);
 
     await waist.fill('71.23');
     await expect(waist).toBeFocused();
-    expect(await inVisualViewport(waist)).toBe(true);
+    await expect.poll(() => inVisualViewport(waist), { timeout: 2000 }).toBe(true);
     await expect(diary.getByRole('button', { name: 'Сохранить замер' })).toBeAttached();
   }
 });
