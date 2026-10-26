@@ -228,6 +228,16 @@ jobs:
         run: |
           uv sync --locked --no-default-groups --extra backend
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Validate one-time dev bootstrap lime baseline
+        if: matrix.lane == 'checks' && github.event_name == 'pull_request' && github.event.pull_request.number == 1267
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/ci_contract.py bootstrap-lime-base >> "$GITHUB_ENV"
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
         run: python scripts/ci_contract.py run-group frontend-checks

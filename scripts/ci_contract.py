@@ -42,6 +42,8 @@ CONTRACT_VERSION = "ci-contract-v2"
 ROUTER_VERSION = "ci-router-v2"
 SHARDABLE_GROUPS = frozenset({"frontend-e2e", "python-tests"})
 SHARD_RE = re.compile(r"(?P<number>[1-9][0-9]*)/(?P<count>[1-9][0-9]*)\Z")
+DEV_BOOTSTRAP_BASE_SHA = "d358e388caa58fc27abc7f28aa2c7984a05adcc1"
+DEV_BOOTSTRAP_MASTER_SHA = "8fab0f899ba06a13c6773fcdf5c3e04d34f0daaf"
 
 
 class CIContractError(RuntimeError):
@@ -341,6 +343,7 @@ COMMAND_GROUPS: dict[str, GroupSpec] = {
                 "pytest",
                 "tests/test_release_safeguards.py",
                 "tests/test_ci_contract.py",
+                "tests/test_dev_release_flow.py",
                 "tests/test_pytest_shard.py",
                 "tests/test_ci_timing.py",
                 "tests/test_agent_flow.py",
@@ -952,6 +955,49 @@ def _git_changed_paths(root: Path, base_sha: str, head_sha: str) -> list[str]:
     return _normalized_paths(completed.stdout.split("\0"))
 
 
+def bootstrap_lime_edge_base(root: Path, env: Mapping[str, str]) -> str:
+    """One-time PR #1267 baseline; expire when the original dev ref moves."""
+    repository = "MikeMoore1337/your-fitness-coach"
+    expected = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": repository,
+        "PR_NUMBER": "1267",
+        "PR_BASE_REF": "dev",
+        "PR_BASE_SHA": DEV_BOOTSTRAP_BASE_SHA,
+        "PR_HEAD_REF": "feat/1266-dev-promotion-gate",
+        "PR_HEAD_REPO": repository,
+    }
+    if any(env.get(key) != value for key, value in expected.items()):
+        raise CIContractError("Dev bootstrap identity/base mismatch; no lime baseline override")
+    head = env.get("PR_HEAD_SHA", "")
+    if not re.fullmatch(r"[0-9a-f]{40}", head):
+        raise CIContractError("Dev bootstrap requires an exact head SHA")
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=False
+        )
+        if result.returncode:
+            raise CIContractError(f"Dev bootstrap Git validation failed: {' '.join(args)}")
+        return result.stdout.strip()
+
+    for ref, sha in (
+        ("refs/remotes/origin/dev", DEV_BOOTSTRAP_BASE_SHA),
+        ("refs/remotes/origin/master", DEV_BOOTSTRAP_MASTER_SHA),
+        (DEV_BOOTSTRAP_MASTER_SHA, DEV_BOOTSTRAP_MASTER_SHA),
+        (head, head),
+    ):
+        if git("rev-parse", "--verify", f"{ref}^{{commit}}") != sha:
+            raise CIContractError(f"Dev bootstrap exact ref mismatch: {ref}")
+    for ancestor, descendant in (
+        (DEV_BOOTSTRAP_BASE_SHA, DEV_BOOTSTRAP_MASTER_SHA),
+        (DEV_BOOTSTRAP_MASTER_SHA, head),
+        (head, "HEAD"),
+    ):
+        git("merge-base", "--is-ancestor", ancestor, descendant)
+    return DEV_BOOTSTRAP_MASTER_SHA
+
+
 def route_repository(
     root: Path,
     *,
@@ -1558,6 +1604,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("validate")
+    subparsers.add_parser("bootstrap-lime-base")
     digest = subparsers.add_parser("digest")
     digest.add_argument("--json", action="store_true")
     groups = subparsers.add_parser("list-groups")
@@ -1587,6 +1634,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
         validate_contract()
+        if args.command == "bootstrap-lime-base":
+            baseline = bootstrap_lime_edge_base(Path.cwd(), os.environ)
+            print(f"LIME_EDGE_BASE_SHA={baseline}")
+            return 0
         if args.command == "validate":
             print(f"CI contract valid: {CONTRACT_VERSION} {contract_digest()}")
             return 0

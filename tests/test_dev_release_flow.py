@@ -1,8 +1,11 @@
 """Two-stage YFC release governance contracts."""
 
 import json
+import subprocess
 from pathlib import Path
 
+import pytest
+import yaml
 from scripts import ci_contract
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,3 +48,152 @@ def test_normal_pull_request_outputs_preserve_exact_paths(tmp_path: Path) -> Non
     path = tmp_path / "gh-output"
     ci_contract.write_router_outputs(decision, path)
     assert 'changed_paths=["frontend/package.json"]' in path.read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def bootstrap_repo(tmp_path: Path, monkeypatch):
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-c", "user.name=Contract", "-c", "user.email=contract@example.invalid", *args],
+            cwd=tmp_path,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init", "--quiet")
+    revisions = []
+    for name in ("dev", "master", "head"):
+        git("commit", "--quiet", "--allow-empty", "-m", name)
+        revisions.append(git("rev-parse", "HEAD"))
+    base, master, head = revisions
+    git("update-ref", "refs/remotes/origin/dev", base)
+    git("update-ref", "refs/remotes/origin/master", master)
+    monkeypatch.setattr(ci_contract, "DEV_BOOTSTRAP_BASE_SHA", base)
+    monkeypatch.setattr(ci_contract, "DEV_BOOTSTRAP_MASTER_SHA", master)
+    env = {
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REPOSITORY": "MikeMoore1337/your-fitness-coach",
+        "PR_NUMBER": "1267",
+        "PR_BASE_REF": "dev",
+        "PR_BASE_SHA": base,
+        "PR_HEAD_REF": "feat/1266-dev-promotion-gate",
+        "PR_HEAD_REPO": "MikeMoore1337/your-fitness-coach",
+        "PR_HEAD_SHA": head,
+    }
+    return tmp_path, env, git, master
+
+
+def test_bootstrap_accepts_only_verified_master_in_actual_pr_head(bootstrap_repo) -> None:
+    root, env, _, master = bootstrap_repo
+    assert ci_contract.bootstrap_lime_edge_base(root, env) == master
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("GITHUB_EVENT_NAME", "push"),
+        ("GITHUB_REPOSITORY", "fork/your-fitness-coach"),
+        ("PR_NUMBER", "1268"),
+        ("PR_BASE_REF", "master"),
+        ("PR_BASE_SHA", "0" * 40),
+        ("PR_HEAD_REF", "dev"),
+        ("PR_HEAD_REPO", "fork/your-fitness-coach"),
+        ("PR_HEAD_SHA", "HEAD"),
+        ("PR_HEAD_SHA", ""),
+        ("PR_HEAD_SHA", "f" * 40),
+    ],
+)
+def test_bootstrap_identity_and_missing_commit_fail_closed(bootstrap_repo, key, value) -> None:
+    root, env, _, _ = bootstrap_repo
+    env[key] = value
+    with pytest.raises(ci_contract.CIContractError):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+@pytest.mark.parametrize("ref", ["dev", "master"])
+def test_bootstrap_changed_remote_ref_fails_closed(bootstrap_repo, ref) -> None:
+    root, env, git, _ = bootstrap_repo
+    git("update-ref", f"refs/remotes/origin/{ref}", env["PR_HEAD_SHA"])
+    with pytest.raises(ci_contract.CIContractError, match="exact ref mismatch"):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+@pytest.mark.parametrize("missing", ["dev", "master"])
+def test_bootstrap_missing_remote_ref_fails_closed(bootstrap_repo, missing) -> None:
+    root, env, git, _ = bootstrap_repo
+    git("update-ref", "-d", f"refs/remotes/origin/{missing}")
+    with pytest.raises(ci_contract.CIContractError, match="Git validation failed"):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+def test_bootstrap_synthetic_merge_cannot_mask_master_missing_from_pr_head(bootstrap_repo) -> None:
+    root, env, _, _ = bootstrap_repo
+    # The checkout has master, but the advertised feature head does not.
+    env["PR_HEAD_SHA"] = env["PR_BASE_SHA"]
+    with pytest.raises(ci_contract.CIContractError, match="merge-base"):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+def test_bootstrap_rejects_checkout_without_pr_head(bootstrap_repo) -> None:
+    root, env, git, master = bootstrap_repo
+    git("checkout", "--detach", master)
+    with pytest.raises(ci_contract.CIContractError, match="merge-base"):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+def test_bootstrap_requires_original_dev_ancestor_of_master(bootstrap_repo, monkeypatch) -> None:
+    root, env, git, _ = bootstrap_repo
+    git("checkout", "--orphan", "unrelated")
+    git("commit", "--quiet", "--allow-empty", "-m", "unrelated")
+    unrelated = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/dev", unrelated)
+    monkeypatch.setattr(ci_contract, "DEV_BOOTSTRAP_BASE_SHA", unrelated)
+    env["PR_BASE_SHA"] = unrelated
+    with pytest.raises(ci_contract.CIContractError, match="merge-base"):
+        ci_contract.bootstrap_lime_edge_base(root, env)
+
+
+def test_bootstrap_cli_emits_no_environment_override_on_failure(
+    bootstrap_repo, monkeypatch, capsys
+) -> None:
+    root, env, _, _ = bootstrap_repo
+    monkeypatch.chdir(root)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("PR_HEAD_SHA", "f" * 40)
+    assert ci_contract.main(["bootstrap-lime-base"]) == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert "Git validation failed" in output.err
+
+
+def test_workflow_does_not_override_lime_base_for_other_prs_or_skip_checks() -> None:
+    workflow = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["frontend"]["steps"]
+    baseline = next(
+        step
+        for step in steps
+        if step.get("name") == "Validate one-time dev bootstrap lime baseline"
+    )
+    assert baseline["if"] == (
+        "matrix.lane == 'checks' && github.event_name == 'pull_request' "
+        "&& github.event.pull_request.number == 1267"
+    )
+    assert baseline["run"] == 'python scripts/ci_contract.py bootstrap-lime-base >> "$GITHUB_ENV"'
+    assert "continue-on-error" not in baseline
+    for key, field in {
+        "PR_NUMBER": "number",
+        "PR_BASE_REF": "base.ref",
+        "PR_BASE_SHA": "base.sha",
+        "PR_HEAD_REF": "head.ref",
+        "PR_HEAD_REPO": "head.repo.full_name",
+        "PR_HEAD_SHA": "head.sha",
+    }.items():
+        assert baseline["env"][key] == "${{ github.event.pull_request." + field + " }}"
+    checks = next(step for step in steps if step.get("name") == "Run shared frontend checks group")
+    assert checks["if"] == "matrix.lane == 'checks'"
+    assert "continue-on-error" not in checks
+    assert "tests/test_dev_release_flow.py" in ci_contract.COMMAND_GROUPS["policy"].commands[0].argv
+    assert "LIME_EDGE_BASE_SHA" not in workflow["env"]
+    assert "LIME_EDGE_BASE_SHA" not in workflow["jobs"]["frontend"]["env"]
