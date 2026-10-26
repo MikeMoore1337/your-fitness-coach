@@ -1,4 +1,5 @@
 import type { ProgramTemplate } from '../../shared/api/types';
+import { localizedEquipmentList } from '../../shared/equipmentLabels';
 
 export interface ProgramPreviewFact {
   label: string;
@@ -56,21 +57,12 @@ function formatWeeks(value: number): string {
   return `${value} ${suffix}`;
 }
 
-function equipmentLabel(value: unknown): string {
-  if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
-    return 'Нет данных';
-  }
-  const entries = value.map((entry: string) => entry.trim()).filter(Boolean);
-  if (entries.length !== value.length) return 'Нет данных';
-  return entries.length ? entries.join(' · ') : 'Не требуется (по данным шаблона)';
-}
-
 export function programPreviewFacts(template: ProgramTemplate): ProgramPreviewFact[] {
   const meta = metadata(template);
   const scheduleFrequency = knownScheduleFrequency(template.assigned_program_schedule_weekdays);
   const metadataFrequency = knownFrequency(meta.days_per_week);
   const frequency = scheduleFrequency ?? metadataFrequency ?? 'Нет данных';
-  const equipment = equipmentLabel(meta.equipment);
+  const equipment = localizedEquipmentList(meta.equipment);
   const level = knownLevel(template.level) ?? knownLevel(meta.level) ?? 'Нет данных';
   const weeks = template.days.flatMap((day) =>
     day.exercises.flatMap((exercise) =>

@@ -133,6 +133,7 @@ describe('TrainingPreferencesForm', () => {
     fireEvent.click(within(avoid).getByText('Упражнения и движения, которых хотите избегать'));
     const longExercise = await within(avoid).findByText(/Жим штанги лёжа/);
     fireEvent.click(longExercise.closest('label')!);
+    expect(within(avoid).getByText('Штанга · Скамья')).toBeInTheDocument();
     expect(screen.getByText(/Это не медицинская оценка.*При боли или травме/)).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Дополнительная заметка'), {

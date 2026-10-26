@@ -693,5 +693,126 @@
       "https://example.org/study"
     ],
     "must_avoid": []
+  },
+  {
+    "id": "ss-yfc-error-state",
+    "profile": "yfc",
+    "mode": "edit",
+    "input": "Ура, новая эра! Синхронизация не завершена. Повторите позже.",
+    "must_keep": [
+      "Синхронизация не завершена",
+      "Повторите позже"
+    ],
+    "must_avoid": [
+      "Ура, новая эра"
+    ]
+  },
+  {
+    "id": "ss-yfc-success-state",
+    "profile": "yfc",
+    "mode": "edit",
+    "input": "Программа сохранена. Вы только что совершили революционный прорыв!",
+    "must_keep": [
+      "Программа сохранена"
+    ],
+    "must_avoid": [
+      "революционный прорыв"
+    ]
+  },
+  {
+    "id": "ss-yfc-aria-stability",
+    "profile": "yfc",
+    "mode": "targeted",
+    "input": "Для кнопки оставить `aria-label=\"Завершить подход\"`, а подпись «космический прогресс» нужно проверить.",
+    "must_keep": [
+      "aria-label",
+      "Завершить подход"
+    ],
+    "must_avoid": [
+      "космический прогресс"
+    ]
+  },
+  {
+    "id": "ss-yfc-legal-unchanged",
+    "profile": "yfc",
+    "mode": "unchanged",
+    "input": "Перед публикацией нужна проверка владельца. Медицинские рекомендации не предоставляются.",
+    "must_keep": [
+      "Перед публикацией нужна проверка владельца",
+      "Медицинские рекомендации не предоставляются"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-yfc-landing-proof",
+    "profile": "yfc",
+    "mode": "edit",
+    "input": "Не просто упражнения, а новая эра! В приложении можно сохранить рабочий вес упражнения.",
+    "must_keep": [
+      "можно сохранить рабочий вес упражнения"
+    ],
+    "must_avoid": [
+      "новая эра"
+    ]
+  },
+  {
+    "id": "ss-hermes-association",
+    "profile": "hermes",
+    "mode": "edit",
+    "input": "Революционная новость! В вымышленной выборке 40 взрослых обнаружили ассоциацию, но причинная связь не установлена.",
+    "must_keep": [
+      "40 взрослых",
+      "причинная связь не установлена"
+    ],
+    "must_avoid": [
+      "Революционная новость"
+    ]
+  },
+  {
+    "id": "ss-hermes-unknown",
+    "profile": "hermes",
+    "mode": "unchanged",
+    "input": "Статус: NOT_VERIFIED. Последняя проверка научного источника не завершена.",
+    "must_keep": [
+      "NOT_VERIFIED",
+      "не завершена"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-brain-author-voice",
+    "profile": "second-brain",
+    "mode": "unchanged",
+    "input": "Иногда мне кажется, что заметка слишком длинная. Я пока не решил, что менять.",
+    "must_keep": [
+      "Иногда мне кажется",
+      "пока не решил"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-brain-structure",
+    "profile": "second-brain",
+    "mode": "targeted",
+    "input": "Редактировать только `content`. Поля `title`, `note_type`, `tags` и `links` должны сохраниться.",
+    "must_keep": [
+      "content",
+      "title",
+      "note_type",
+      "tags",
+      "links"
+    ],
+    "must_avoid": []
+  },
+  {
+    "id": "ss-general-real-contrast",
+    "profile": "general",
+    "mode": "unchanged",
+    "input": "В журнале отметка `is_active=false` означает отключение, а не удаление профиля.",
+    "must_keep": [
+      "is_active=false",
+      "а не удаление профиля"
+    ],
+    "must_avoid": []
   }
 ]

@@ -2046,7 +2046,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   await expect(body.locator('.progress-measurement-editor')).not.toHaveAttribute('open');
   await body.locator('.progress-measurement-editor > summary').click();
   await expect(
-    body.locator('.measurement-diary').getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/),
+    body.locator('.measurement-diary').getByText(/Вес: 69,1 кг · Талия: 72,5 см/),
   ).toBeVisible();
   await expect(body.getByText(/разовое изменение не считаем трендом/)).toBeVisible();
   await expect(body.locator('.progress-body-guidance')).toHaveCSS('display', 'none');
@@ -2100,9 +2100,9 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   );
   await body.getByRole('button', { name: 'Сохранить замер' }).click();
   await createRequest;
-  await expect(body.getByText(/Вес: 68\.7 кг · Талия: 71\.9 см/)).toBeVisible();
+  await expect(body.getByText(/Вес: 68,7 кг · Талия: 71,9 см/)).toBeVisible();
 
-  const todayRow = body.locator('.measurement-history__row').filter({ hasText: '68.7 кг' });
+  const todayRow = body.locator('.measurement-history__row').filter({ hasText: '68,7 кг' });
   await todayRow.getByRole('button', { name: 'Изменить' }).click();
   await expect(body.getByRole('heading', { name: 'Изменить замер' })).toBeVisible();
   await body.getByLabel('Вес, кг').fill('68.5');
@@ -2111,8 +2111,8 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   );
   await body.getByRole('button', { name: 'Сохранить изменения' }).click();
   await editRequest;
-  await expect(body.getByText(/Вес: 68\.5 кг · Талия: 71\.9 см/)).toBeVisible();
-  await expect(body.getByText(/Вес: 68\.7 кг/)).not.toBeAttached();
+  await expect(body.getByText(/Вес: 68,5 кг · Талия: 71,9 см/)).toBeVisible();
+  await expect(body.getByText(/Вес: 68,7 кг/)).not.toBeAttached();
 
   const save = body.getByRole('button', { name: 'Сохранить замер' });
   expect((await save.boundingBox())?.height).toBeGreaterThanOrEqual(48);
@@ -2123,6 +2123,47 @@ test('measurements keep priority context, units, mobile order and add/edit histo
       ),
     )
     .toBe(true);
+});
+
+test('#1190 saves body measurements with hundredths without HTML step mismatch', async ({
+  page,
+}) => {
+  await mockProgress(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
+  const weight = diary.getByLabel('Вес, кг');
+  const waist = diary.getByLabel('Талия, см');
+  await expect(weight).toHaveAttribute('step', '0.01');
+  await expect(waist).toHaveAttribute('step', '0.01');
+  await weight.fill('72.34');
+  await waist.fill('71.23');
+  expect(
+    await weight.evaluate((element) => (element as HTMLInputElement).validity.stepMismatch),
+  ).toBe(false);
+  expect(
+    await waist.evaluate((element) => (element as HTMLInputElement).validity.stepMismatch),
+  ).toBe(false);
+
+  const sent = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/workouts/diary') && response.request().method() === 'POST',
+  );
+  await diary.getByRole('button', { name: 'Сохранить замер' }).click();
+  const response = await sent;
+  expect(response.status()).toBe(200);
+  const request = response.request();
+  expect(request.postDataJSON()).toMatchObject({ weight_kg: 72.34, waist_cm: 71.23 });
+  expect(await response.json()).toMatchObject({ weight_kg: 72.34, waist_cm: 71.23 });
+  await expect(diary.getByText(/Вес: 72,34 кг · Талия: 71,23 см/)).toBeVisible();
+
+  await page.goto('/app?section=progress&focus=measurements');
+  await expect(
+    page.locator('#measurement-diary').getByText(/Вес: 72,34 кг · Талия: 71,23 см/),
+  ).toBeVisible();
 });
 
 test('quick measurement can return without losing an unsaved draft', async ({ page }) => {

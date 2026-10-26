@@ -5,4 +5,6 @@
 1. **human-writing**, Ilya (`codemistake`), 2026, MIT. Проект: https://github.com/codemistake/human-writing. Уведомление: `licenses/human-writing-LICENSE`.
 2. **humanizer**, Siqi Chen, 2025, MIT. Проект: https://github.com/blader/humanizer. Уведомление: `licenses/humanizer-LICENSE`.
 
+3. **stop-slop**, hardikpandya, 2026, MIT. Источник методических идей: https://github.com/hardikpandya/stop-slop, commit `8da1f030185bdfe8471220585162991eaeb970e9`. Использованы только общие идеи, без копирования оригинальных исходников. При дальнейшей прямой поставке upstream-файлов потребуется соответствующее лицензионное уведомление и отдельная проверка прав.
+
 Применение принципов не означает аффилированность Clear Voice с авторами или гарантированную эквивалентность оригинальным навыкам. При дальнейшем копировании значительных частей оригинальных материалов сохраняйте соответствующие уведомления MIT.

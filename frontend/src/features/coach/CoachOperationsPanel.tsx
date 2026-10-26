@@ -33,6 +33,7 @@ import {
 } from '../../shared/ui/common';
 import { Icon } from '../../shared/ui/Icon';
 import { WeekStrip } from '../../shared/ui/WeekStrip';
+import { hasDecimalScale, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 import type { CoachTool } from './CoachToolsHub';
 
 type Composer = 'session' | 'task' | 'package' | 'payment' | null;
@@ -569,15 +570,17 @@ export function CoachOperationsPanel({
 
   const submitPayment = () => {
     const clientId = Number(paymentClientId || clientsWithId[0]?.id);
-    const expected = Math.round(Number(paymentExpected.replace(',', '.')) * 100);
-    const paid = Math.round(Number(paymentPaid.replace(',', '.') || 0) * 100);
-    if (
-      !clientId ||
-      !Number.isInteger(expected) ||
-      expected <= 0 ||
-      !Number.isInteger(paid) ||
-      paid < 0
-    ) {
+    const expectedAmount = parseDecimalDraft(paymentExpected);
+    const paidAmount = paymentPaid.trim() === '' ? 0 : parseDecimalDraft(paymentPaid);
+    const expected =
+      expectedAmount != null && hasDecimalScale(paymentExpected, 2)
+        ? Math.round(expectedAmount * 100)
+        : null;
+    const paid =
+      paidAmount != null && (paymentPaid.trim() === '' || hasDecimalScale(paymentPaid, 2))
+        ? Math.round(paidAmount * 100)
+        : null;
+    if (!clientId || expected == null || expected <= 0 || paid == null || paid < 0) {
       setFormError('Укажите клиента и сумму в рублях.');
       return;
     }
@@ -885,8 +888,9 @@ export function CoachOperationsPanel({
                   id="crm-payment-expected"
                   inputMode="decimal"
                   min="0"
+                  step="0.01"
                   onChange={(event) => setPaymentExpected(event.target.value)}
-                  type="number"
+                  type="text"
                   value={paymentExpected}
                 />
               </Field>
@@ -895,8 +899,9 @@ export function CoachOperationsPanel({
                   id="crm-payment-paid"
                   inputMode="decimal"
                   min="0"
+                  step="0.01"
                   onChange={(event) => setPaymentPaid(event.target.value)}
-                  type="number"
+                  type="text"
                   value={paymentPaid}
                 />
               </Field>

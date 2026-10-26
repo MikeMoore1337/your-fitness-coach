@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     JSON,
@@ -8,10 +9,10 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     Time,
@@ -567,9 +568,9 @@ class UserWorkoutSet(Base):
     )
     set_number: Mapped[int] = mapped_column(Integer)
     actual_reps: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    actual_weight: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2), nullable=True)
     duration_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    distance_km: Mapped[Decimal | None] = mapped_column(Numeric(7, 2), nullable=True)
     average_heart_rate_bpm: Mapped[int | None] = mapped_column(Integer, nullable=True)
     heart_rate_zone: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rir: Mapped[str | None] = mapped_column(String(2), nullable=True)

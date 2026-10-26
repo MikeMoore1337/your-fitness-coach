@@ -1,4 +1,5 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
@@ -21,7 +22,9 @@ CardioStatus = Literal["planned", "completed"]
 class CardioSessionFields(BaseModel):
     activity_type: CardioActivityType
     duration_minutes: int = Field(ge=1, le=600)
-    distance_km: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    distance_km: Decimal | None = Field(
+        default=None, gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False
+    )
     average_heart_rate_bpm: int | None = Field(default=None, ge=30, le=250)
     heart_rate_zone: int | None = Field(default=None, ge=1, le=5)
     note: str | None = Field(default=None, max_length=500)
@@ -48,7 +51,9 @@ class CardioSessionCreate(CardioSessionFields):
 class CardioSessionUpdate(BaseModel):
     activity_type: CardioActivityType | None = None
     duration_minutes: int | None = Field(default=None, ge=1, le=600)
-    distance_km: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    distance_km: Decimal | None = Field(
+        default=None, gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False
+    )
     average_heart_rate_bpm: int | None = Field(default=None, ge=30, le=250)
     heart_rate_zone: int | None = Field(default=None, ge=1, le=5)
     note: str | None = Field(default=None, max_length=500)
@@ -73,7 +78,15 @@ class CardioSessionUpdate(BaseModel):
         return self
 
 
-class CardioSessionResponse(CardioSessionFields):
+class CardioSessionResponse(BaseModel):
+    activity_type: CardioActivityType
+    duration_minutes: int = Field(ge=1, le=600)
+    distance_km: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    average_heart_rate_bpm: int | None = Field(default=None, ge=30, le=250)
+    heart_rate_zone: int | None = Field(default=None, ge=1, le=5)
+    note: str | None = Field(default=None, max_length=500)
+    scheduled_at: datetime
+    status: CardioStatus = "completed"
     id: int
     source: Literal["manual"]
     completed_at: datetime | None = None

@@ -26,6 +26,15 @@ from fitminiapp_api.services.progress import is_calorie_target_met, is_protein_t
 METRICS = ("calories", "protein_g", "fat_g", "carbs_g")
 TRACKED_METRICS = (*METRICS, "fiber_g")
 
+
+def _metric_scale(metric: str) -> int:
+    return 2 if metric == "calories" else 3
+
+
+def _round_metric(value: Decimal | float | int, metric: str) -> float:
+    return round(float(value), _metric_scale(metric))
+
+
 NutritionReportError = PeriodBoundsError
 
 
@@ -140,7 +149,7 @@ def _nutrition_trend_insights(daily: list[dict]) -> list[dict]:
             continue
 
         # The deviation is against the target effective on each individual day.
-        average_deviation = round(sum(deviations) / len(deviations), 1)
+        average_deviation = _round_metric(sum(deviations) / len(deviations), metric)
         action = (
             "open_meal_suggestions"
             if sign == "below" and metric in {"calories", "protein_g"}
@@ -180,9 +189,9 @@ def _metric_summary(points: list[dict], metric: str) -> dict:
     if not values:
         return {"average": None, "minimum": None, "maximum": None, "sample_days": 0}
     return {
-        "average": round(sum(values) / len(values), 1),
-        "minimum": round(min(values), 1),
-        "maximum": round(max(values), 1),
+        "average": _round_metric(sum(values) / len(values), metric),
+        "minimum": _round_metric(min(values), metric),
+        "maximum": _round_metric(max(values), metric),
         "sample_days": len(values),
     }
 
@@ -201,9 +210,9 @@ def _target_comparison(points: list[dict], metric: str, target_metric: str) -> d
     actual = sum(point[metric] for point in comparable) / len(comparable)
     target = sum(point[target_metric] for point in comparable) / len(comparable)
     return {
-        "average_actual": round(actual, 1),
-        "average_target": round(target, 1),
-        "average_deviation": round(actual - target, 1),
+        "average_actual": _round_metric(actual, metric),
+        "average_target": _round_metric(target, metric),
+        "average_deviation": _round_metric(actual - target, metric),
         "evaluated_days": len(comparable),
     }
 
@@ -294,7 +303,7 @@ def build_nutrition_report(
         hydration_ml = hydration_by_date.get(diary_date)
         is_logged = status in {"complete", "fasted"}
         actual = {
-            metric: round(float(getattr(aggregate, metric)), 1)
+            metric: _round_metric(getattr(aggregate, metric), metric)
             if aggregate is not None and getattr(aggregate, metric) is not None
             else None
             for metric in TRACKED_METRICS
@@ -313,22 +322,22 @@ def build_nutrition_report(
             **actual,
             **target_values,
             "calorie_deviation": (
-                round(comparison_actual["calories"] - target.calories, 1)
+                _round_metric(comparison_actual["calories"] - target.calories, "calories")
                 if comparison_actual["calories"] is not None and target
                 else None
             ),
             "protein_deviation_g": (
-                round(comparison_actual["protein_g"] - target.protein_g, 1)
+                _round_metric(comparison_actual["protein_g"] - target.protein_g, "protein_g")
                 if comparison_actual["protein_g"] is not None and target
                 else None
             ),
             "fat_deviation_g": (
-                round(comparison_actual["fat_g"] - target.fat_g, 1)
+                _round_metric(comparison_actual["fat_g"] - target.fat_g, "fat_g")
                 if comparison_actual["fat_g"] is not None and target
                 else None
             ),
             "carbs_deviation_g": (
-                round(comparison_actual["carbs_g"] - target.carbs_g, 1)
+                _round_metric(comparison_actual["carbs_g"] - target.carbs_g, "carbs_g")
                 if comparison_actual["carbs_g"] is not None and target
                 else None
             ),

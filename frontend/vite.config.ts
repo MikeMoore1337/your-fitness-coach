@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { agentationDevelopmentPlugin } from './devtools/agentation-dev-plugin';
 import type { UserConfig } from 'vite';
 
 type TestReporters = NonNullable<NonNullable<UserConfig['test']>['reporters']>;
@@ -16,7 +17,7 @@ const testReporters: TestReporters | undefined = process.env.ALLURE_RESULTS_DIR
 const apiPort = process.env.PW_API_PORT ?? '8000';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), agentationDevelopmentPlugin()],
   cacheDir: '../.artifacts/runtime/cache/vite',
   build: {
     outDir: 'dist',

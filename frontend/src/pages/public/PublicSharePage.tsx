@@ -147,7 +147,7 @@ function ProgressSnapshot({ snapshot }: { snapshot: PublicShareProgressSnapshot 
                   </div>
                   <div>
                     <dt>Макс. внешний вес</dt>
-                    <dd>{formatNumber(exercise.max_external_load_kg)} кг</dd>
+                    <dd>{formatNumber(exercise.max_external_load_kg, 2)} кг</dd>
                   </div>
                 </dl>
               </article>

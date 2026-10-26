@@ -301,18 +301,13 @@ test('@critical active workout keeps the current set primary across mobile width
     );
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
-    const numberInputs = currentSet.locator('input[type="number"]:visible');
-    await expect(numberInputs).toHaveCount(2);
-    expect(
-      await numberInputs.evaluateAll((inputs) =>
-        inputs.map((input) => (input as HTMLInputElement).type),
-      ),
-    ).toEqual(['number', 'number']);
+    const weightInput = currentSet.getByRole('textbox', { name: /Вес, .*подход 1/ });
+    const repsInput = currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ });
+    await expect(currentSet.locator('input:visible')).toHaveCount(2);
+    await expect(weightInput).toHaveAttribute('inputmode', 'decimal');
+    await expect(repsInput).toHaveAttribute('inputmode', 'numeric');
 
-    for (const input of [
-      currentSet.getByRole('spinbutton', { name: /Вес, .*подход 1/ }),
-      currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ }),
-    ]) {
+    for (const input of [weightInput, repsInput]) {
       await input.focus();
       await expect(input).toBeInViewport();
       await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');

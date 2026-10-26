@@ -5,7 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchableExercisePicker } from '../../../../src/features/programs/SearchableExercisePicker';
 
 const exercises = [
-  { id: 11, title: 'Присед со штангой', primary_muscle: 'Квадрицепс', equipment: 'Штанга' },
+  {
+    id: 11,
+    title: 'Присед со штангой',
+    primary_muscle: 'Квадрицепс',
+    equipment: 'barbell',
+    equipment_ids: ['barbell'],
+  },
   { id: 12, title: 'Велотренажёр', primary_muscle: 'Кардио', equipment: 'Велотренажёр' },
 ];
 
@@ -47,6 +53,9 @@ describe('SearchableExercisePicker mobile focus and selection', () => {
     const trigger = screen.getByRole('button', { name: 'Поиск упражнения' });
     await user.click(trigger);
     const dialog = screen.getByRole('dialog', { name: 'Выбор упражнения' });
+    expect(
+      within(dialog).getByRole('button', { name: /Присед со штангой.*Штанга/ }),
+    ).toBeInTheDocument();
     const search = within(dialog).getByRole('searchbox');
     await waitFor(() => expect(search).toHaveFocus());
     await user.click(within(dialog).getByRole('button', { name: 'Очистить поиск' }));

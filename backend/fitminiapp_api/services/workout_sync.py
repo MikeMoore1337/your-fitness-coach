@@ -1,5 +1,6 @@
 import hashlib
 import json
+from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
@@ -18,9 +19,11 @@ def serialize_workout_set(set_row: UserWorkoutSet) -> dict:
         "id": set_row.id,
         "set_number": set_row.set_number,
         "actual_reps": set_row.actual_reps,
-        "actual_weight": set_row.actual_weight,
+        "actual_weight": (
+            float(set_row.actual_weight) if set_row.actual_weight is not None else None
+        ),
         "duration_minutes": set_row.duration_minutes,
-        "distance_km": set_row.distance_km,
+        "distance_km": float(set_row.distance_km) if set_row.distance_km is not None else None,
         "average_heart_rate_bpm": set_row.average_heart_rate_bpm,
         "heart_rate_zone": set_row.heart_rate_zone,
         "rir": set_row.rir,
@@ -37,7 +40,15 @@ def serialize_workout_set(set_row: UserWorkoutSet) -> dict:
 
 
 def _request_fingerprint(changes: dict) -> str:
-    canonical = json.dumps(changes, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    fingerprint_changes = {
+        key: float(value) if isinstance(value, Decimal) else value for key, value in changes.items()
+    }
+    canonical = json.dumps(
+        fingerprint_changes,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

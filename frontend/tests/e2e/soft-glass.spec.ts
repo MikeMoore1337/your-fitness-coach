@@ -108,7 +108,7 @@ for (const theme of ['light', 'dark'] as const) {
 
       await page.getByRole('button', { name: 'Начать тренировку', exact: true }).click();
       await expect(page.locator('.active-workout')).toBeVisible();
-      const weight = page.getByRole('spinbutton', { name: /^Вес,/ }).first();
+      const weight = page.getByLabel(/^Вес,/).first();
       const reps = page.getByRole('spinbutton', { name: /^Повторы,/ }).first();
       await weight.fill('18');
       await reps.fill('10');

@@ -28,6 +28,7 @@ import { useFeedback } from '../../shared/ui/FeedbackProvider';
 import { useOnlineStatus } from '../../shared/ui/OnlineStatus';
 import { DateInput } from '../../shared/ui/PickerInput';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { isCompleteDecimalDraft, parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 
 const sleepOptions = [
   { value: 1, label: 'Очень плохо' },
@@ -59,8 +60,6 @@ const emptyForm: WellbeingForm = {
   note: '',
 };
 
-const sleepHoursPattern = /^\d+(?:[.,]\d*)?$/;
-
 function normalizeSleepHours(value: string): string {
   return value.trim().replace(',', '.');
 }
@@ -68,10 +67,11 @@ function normalizeSleepHours(value: string): string {
 function sleepDurationError(value: string): string | null {
   const normalized = normalizeSleepHours(value);
   if (!normalized) return null;
-  if (!sleepHoursPattern.test(normalized)) {
+  if (!isCompleteDecimalDraft(normalized)) {
     return 'Укажите количество часов числом, например 7,5.';
   }
-  const minutes = Math.round(Number(normalized) * 60);
+  const hours = parseDecimalDraft(normalized);
+  const minutes = hours == null ? Number.NaN : Math.round(hours * 60);
   return Number.isFinite(minutes) && minutes >= 1 && minutes <= 1440
     ? null
     : 'Укажите длительность от 1 минуты до 24 часов.';
@@ -79,7 +79,8 @@ function sleepDurationError(value: string): string | null {
 
 export function minutesFromSleepHours(value: string): number | null {
   if (!value.trim() || sleepDurationError(value)) return null;
-  return Math.round(Number(normalizeSleepHours(value)) * 60);
+  const hours = parseDecimalDraft(normalizeSleepHours(value));
+  return hours == null ? null : Math.round(hours * 60);
 }
 
 export function hoursFromMinutes(minutes: number | null | undefined): string {

@@ -11,6 +11,18 @@ ROOT = Path(__file__).resolve().parent.parent
 SKILL = ROOT / "SKILL.md"
 EXPECTED_PROFILES = {"general", "yfc", "second-brain", "hermes"}
 EXPECTED_MODES = {"draft", "edit", "audit", "unchanged", "targeted"}
+STOP_SLOP_PROFILE_MODES = {
+    "ss-yfc-error-state": ("yfc", "edit"),
+    "ss-yfc-success-state": ("yfc", "edit"),
+    "ss-yfc-aria-stability": ("yfc", "targeted"),
+    "ss-yfc-legal-unchanged": ("yfc", "unchanged"),
+    "ss-yfc-landing-proof": ("yfc", "edit"),
+    "ss-hermes-association": ("hermes", "edit"),
+    "ss-hermes-unknown": ("hermes", "unchanged"),
+    "ss-brain-author-voice": ("second-brain", "unchanged"),
+    "ss-brain-structure": ("second-brain", "targeted"),
+    "ss-general-real-contrast": ("general", "unchanged"),
+}
 REQUIRED_FILES = (
     "SKILL.md",
     "README.md",
@@ -120,6 +132,22 @@ def validate_package() -> tuple[list[str], list[dict[str, object]]]:
                         errors.append(f"'{fragment}' не встречается во входе: {case_id}")
     if profiles != EXPECTED_PROFILES:
         errors.append("Сценарии не покрывают все профили")
+    case_by_id = {
+        case["id"]: case
+        for case in cases
+        if isinstance(case, dict) and isinstance(case.get("id"), str)
+    }
+    for case_id, (profile, mode) in STOP_SLOP_PROFILE_MODES.items():
+        item = case_by_id.get(case_id)
+        if item is None:
+            errors.append(f"Отсутствует stop-slop сценарий: {case_id}")
+        elif item.get("profile") != profile or item.get("mode") != mode:
+            errors.append(f"Неверная роль/режим stop-slop сценария: {case_id}")
+    for path in ("references/patterns.md", "profiles/yfc.md", "profiles/hermes.md",
+                 "profiles/second-brain.md"):
+        doc = (ROOT / path).read_text(encoding="utf-8")
+        if "#1143" not in doc:
+            errors.append(f"Не подтверждена редакторская адаптация #1143: {path}")
     return errors, cases
 
 

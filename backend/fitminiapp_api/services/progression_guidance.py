@@ -365,7 +365,7 @@ def _progression_set_selection(
                     _rep_target_text(anchor.rep_target),
                     reason_code="advanced_method_requires_review",
                 )
-            amrap_relative_backoffs.append((segment.position, target.value))
+            amrap_relative_backoffs.append((segment.position, float(target.value)))
         return ProgressionSetSelection(
             role=anchor.role,
             positions=(anchor.position,),
@@ -397,7 +397,7 @@ def _progression_set_selection(
                     _rep_target_text(top_sets[0].rep_target),
                     reason_code="advanced_method_requires_review",
                 )
-            top_relative_backoffs.append((segment.position, target.value))
+            top_relative_backoffs.append((segment.position, float(target.value)))
         return ProgressionSetSelection(
             role="top",
             positions=(top_sets[0].position,),
@@ -688,6 +688,7 @@ def _rule_guidance(
     proposed_action = "hold"
     volume_percent = rule.deload_volume_percent
     intensity_percent = rule.deload_intensity_percent
+    increment_value = float(rule.increment_value) if rule.increment_value is not None else None
 
     if selection.reason_code is not None:
         base["evidence"]["reason_keys"] = [selection.reason_code]
@@ -758,16 +759,16 @@ def _rule_guidance(
             base["outcome"] = "hold"
             base["evidence"]["reason_keys"] = ["rir_target_not_met"]
             return base, "hold", volume_percent, intensity_percent
-        if rule.increment_value is None:
+        if increment_value is None:
             base["evidence"]["reason_keys"] = ["missing_configured_increment"]
             return base, "hold", volume_percent, intensity_percent
         if rule.increment_unit not in {"kg", "percent"}:
             base["evidence"]["reason_keys"] = ["incompatible_load_unit"]
             return base, "hold", volume_percent, intensity_percent
         delta = (
-            latest.load * rule.increment_value / 100
+            latest.load * increment_value / 100
             if rule.increment_unit == "percent" and latest.load is not None
-            else rule.increment_value
+            else increment_value
         )
         if latest.load is None:
             base["evidence"]["reason_keys"] = ["missing_load_evidence"]
@@ -793,7 +794,7 @@ def _rule_guidance(
             return base, "hold", volume_percent, intensity_percent
         success = actual_reps >= (rule.amrap_min_reps or 0)
         if success:
-            if rule.increment_value is None or rule.increment_unit not in {"kg", "lb"}:
+            if increment_value is None or rule.increment_unit not in {"kg", "lb"}:
                 base["outcome"] = "hold"
                 base["evidence"]["reason_keys"] = ["amrap_success_without_increment"]
                 base["detail"] = "Порог AMRAP выполнен, но точный шаг нагрузки не задан."
@@ -805,8 +806,8 @@ def _rule_guidance(
                 outcome="consider_progressing",
                 message=_PROGRESS_MESSAGES["consider_progressing"],
                 detail="Порог AMRAP выполнен; шаг взят из сохранённого правила.",
-                suggested_increment=rule.increment_value,
-                suggested_weight=(latest.load + rule.increment_value)
+                suggested_increment=increment_value,
+                suggested_weight=(latest.load + increment_value)
                 if latest.load is not None
                 else None,
             )
@@ -829,19 +830,19 @@ def _rule_guidance(
             base["detail"] = "Порог AMRAP не выполнен; требуется ручная проверка."
             return base, "hold", volume_percent, intensity_percent
         if rule.amrap_failure_action == "reduce_load":
-            if rule.increment_value is None or rule.increment_unit != "kg" or latest.load is None:
+            if increment_value is None or rule.increment_unit != "kg" or latest.load is None:
                 base["evidence"]["reason_keys"].append("missing_configured_decrement")
                 base["detail"] = "Для точного снижения нагрузки не задан совместимый шаг."
                 return base, "hold", volume_percent, intensity_percent
-            if latest.load <= rule.increment_value:
+            if latest.load <= increment_value:
                 base["evidence"]["reason_keys"].append("invalid_reduction_target")
                 return base, "hold", volume_percent, intensity_percent
             base.update(
                 outcome="consider_reducing",
                 message=_PROGRESS_MESSAGES["consider_reducing"],
                 detail="Порог AMRAP не выполнен; используется точный шаг снижения из правила.",
-                suggested_increment=-rule.increment_value,
-                suggested_weight=latest.load - rule.increment_value,
+                suggested_increment=-increment_value,
+                suggested_weight=latest.load - increment_value,
             )
             return base, "set_load", volume_percent, intensity_percent
         if rule.amrap_failure_action == "deload":
@@ -874,7 +875,7 @@ def _rule_guidance(
             base["outcome"] = "hold"
             base["evidence"]["reason_keys"] = ["minimum_reps_not_met"]
             return base, "hold", volume_percent, intensity_percent
-        if rule.increment_value is None:
+        if increment_value is None:
             base["evidence"]["reason_keys"] = ["missing_configured_increment"]
             return base, "hold", volume_percent, intensity_percent
         if rule.increment_unit != "kg":
@@ -887,8 +888,8 @@ def _rule_guidance(
             outcome="consider_progressing",
             message=_PROGRESS_MESSAGES["consider_progressing"],
             detail="Последняя сопоставимая тренировка выполнила минимум повторений; шаг задан правилом.",
-            suggested_increment=rule.increment_value,
-            suggested_weight=latest.load + rule.increment_value,
+            suggested_increment=increment_value,
+            suggested_weight=latest.load + increment_value,
         )
         base["evidence"]["reason_keys"] = ["linear_load_success", "configured_increment"]
         return base, "set_load", volume_percent, intensity_percent
@@ -900,7 +901,7 @@ def _rule_guidance(
         if target is None or current_target != target:
             base["evidence"]["reason_keys"] = ["incompatible_prescription"]
             return base, "hold", volume_percent, intensity_percent
-        if rule.increment_value is None:
+        if increment_value is None:
             base["evidence"]["reason_keys"] = ["missing_configured_increment"]
             return base, "hold", volume_percent, intensity_percent
         if rule.increment_unit != "kg":
@@ -911,7 +912,7 @@ def _rule_guidance(
             prescribed_reps=target_text or current.prescribed_reps,
             sessions=sessions,
             load_unit="kg",
-            configured_increment=rule.increment_value,
+            configured_increment=increment_value,
         )
         if (
             result["outcome"] == "hold"

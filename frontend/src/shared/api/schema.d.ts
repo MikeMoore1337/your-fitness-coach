@@ -5082,6 +5082,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/articles/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Article Drafts
+         * @description Root-only read: no approval or publication side effects.
+         */
+        get: operations["admin_article_drafts_api_v1_admin_articles_drafts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/drafts/{article_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin Article Draft Detail
+         * @description Owner inspection of exact draft evidence, including pending claims.
+         */
+        get: operations["admin_article_draft_detail_api_v1_admin_articles_drafts__article_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/drafts/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Publish Existing Article
+         * @description Root-only explicit confirmation of an exact existing draft revision.
+         */
+        post: operations["admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/articles/publish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Admin Publish Web Article
+         * @description One explicit Root decision; Hermes intake and expert-review statuses remain untouched.
+         */
+        post: operations["admin_publish_web_article_api_v1_admin_articles_publish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bot/timezone": {
         parameters: {
             query?: never;
@@ -7014,7 +7094,7 @@ export interface components {
             /** Definition Id */
             definition_id: number;
             /** Value */
-            value?: number | null;
+            value?: number | string | null;
         };
         /** BodyMeasurementDefinitionCreate */
         BodyMeasurementDefinitionCreate: {
@@ -7101,17 +7181,17 @@ export interface components {
             /** Measured On */
             measured_on?: string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Chest Cm */
-            chest_cm?: number | null;
+            chest_cm?: number | string | null;
             /** Waist Cm */
-            waist_cm?: number | null;
+            waist_cm?: number | string | null;
             /** Hips Cm */
-            hips_cm?: number | null;
+            hips_cm?: number | string | null;
             /** Biceps Cm */
-            biceps_cm?: number | null;
+            biceps_cm?: number | string | null;
             /** Thigh Cm */
-            thigh_cm?: number | null;
+            thigh_cm?: number | string | null;
             /** Note */
             note?: string | null;
             /** Custom Values */
@@ -7605,7 +7685,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes: number;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -7684,7 +7764,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -11792,6 +11872,68 @@ export interface components {
             /** Review Blockers */
             review_blockers: string[];
         };
+        /** HermesWebArticleProposal */
+        HermesWebArticleProposal: {
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Body Sections */
+            body_sections: components["schemas"]["ArticleBodySection"][];
+            /** Topics */
+            topics: string[];
+            /**
+             * Article Kind
+             * @enum {string}
+             */
+            article_kind: "evergreen_explainer" | "practical_guide" | "evidence_review" | "myth_busting" | "research_update" | "comparison" | "product_education";
+            /**
+             * Search Intent
+             * @enum {string}
+             */
+            search_intent: "informational" | "how_to" | "comparison" | "definition" | "evidence" | "mixed";
+            /** Primary Query */
+            primary_query: string;
+            /** Secondary Queries */
+            secondary_queries?: string[];
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Claims */
+            claims: components["schemas"]["ArticleClaim"][];
+            /** Sources */
+            sources: components["schemas"]["ArticleSource"][];
+            /** Claim Source Matrix */
+            claim_source_matrix: components["schemas"]["ArticleClaimSourceMatrixItem"][];
+            author: components["schemas"]["ArticlePerson"];
+            editor: components["schemas"]["ArticlePerson"];
+            domain_reviewer?: components["schemas"]["ArticlePerson"] | null;
+            /** Related Slugs */
+            related_slugs?: string[];
+            /** Cta */
+            cta?: {
+                [key: string]: string;
+            };
+            /** Evergreen Score */
+            evergreen_score: number;
+            /** Product Relevance */
+            product_relevance: number;
+            /** Editorial Value */
+            editorial_value: number;
+            /** Web Article Potential Reasons */
+            web_article_potential_reasons?: string[];
+        };
         /**
          * HydrationBeverageType
          * @enum {string}
@@ -13298,9 +13440,9 @@ export interface components {
              */
             sex: "male" | "female";
             /** Weight Kg */
-            weight_kg: number;
+            weight_kg: number | string;
             /** Height Cm */
-            height_cm: number;
+            height_cm: number | string;
             /** Age */
             age: number;
             /** Daily Routine */
@@ -13440,6 +13582,188 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * OwnerArticleReviewDetail
+         * @description Exact content and provenance for a human Root decision, never a GO.
+         */
+        OwnerArticleReviewDetail: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Article Status
+             * @enum {string}
+             */
+            article_status: "draft" | "review" | "update_required";
+            /** Content Version */
+            content_version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Candidate Id */
+            candidate_id: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Source Count */
+            source_count: number;
+            /** Claim Count */
+            claim_count: number;
+            /** Pending Claim Count */
+            pending_claim_count: number;
+            /** Review Blockers */
+            review_blockers: string[];
+            /** Generated With Ai */
+            generated_with_ai: boolean;
+            /** Research Version */
+            research_version: string;
+            /** Updated At */
+            updated_at: string | null;
+            /** Description */
+            description: string;
+            /** Lead */
+            lead: string;
+            /** Body Sections */
+            body_sections: components["schemas"]["ArticleBodySection"][];
+            /** Topics */
+            topics: string[];
+            /** Claims */
+            claims: components["schemas"]["ArticleClaim"][];
+            /** Sources */
+            sources: components["schemas"]["ArticleSource"][];
+            /** Claim Source Matrix */
+            claim_source_matrix: components["schemas"]["ArticleClaimSourceMatrixItem"][];
+            domain_reviewer: components["schemas"]["ArticlePerson"] | null;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Skill Version */
+            skill_version: string;
+        };
+        /**
+         * OwnerArticleReviewRow
+         * @description Authenticated Root-only read model; cannot authorize publication.
+         */
+        OwnerArticleReviewRow: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /** Title */
+            title: string;
+            /**
+             * Article Status
+             * @enum {string}
+             */
+            article_status: "draft" | "review" | "update_required";
+            /** Content Version */
+            content_version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Candidate Id */
+            candidate_id: string | null;
+            /**
+             * Risk Level
+             * @enum {string}
+             */
+            risk_level: "low" | "moderate" | "high" | "critical" | "unknown";
+            /**
+             * Evidence Level
+             * @enum {string}
+             */
+            evidence_level: "high" | "moderate" | "limited" | "preliminary" | "conflicting" | "unknown";
+            /** Source Count */
+            source_count: number;
+            /** Claim Count */
+            claim_count: number;
+            /** Pending Claim Count */
+            pending_claim_count: number;
+            /** Review Blockers */
+            review_blockers: string[];
+            /** Generated With Ai */
+            generated_with_ai: boolean;
+            /** Research Version */
+            research_version: string;
+            /** Updated At */
+            updated_at: string | null;
+        };
+        /**
+         * OwnerExistingDraftPublishRequest
+         * @description One owner-confirmed exact revision; never a Hermes or scheduled command.
+         */
+        OwnerExistingDraftPublishRequest: {
+            /** Article Id */
+            article_id: string;
+            /** Expected Content Hash */
+            expected_content_hash: string;
+            /** Expected Content Version */
+            expected_content_version: number;
+            /**
+             * Acknowledge Unverified Evidence
+             * @constant
+             */
+            acknowledge_unverified_evidence: true;
+            /**
+             * Confirm Exact Revision
+             * @constant
+             */
+            confirm_exact_revision: true;
+        };
+        /**
+         * OwnerWebArticlePublishRequest
+         * @description Explicit root-owner editorial release; does not attest scientific verification.
+         */
+        OwnerWebArticlePublishRequest: {
+            article: components["schemas"]["HermesWebArticleProposal"];
+            /**
+             * Acknowledge Unverified Evidence
+             * @constant
+             */
+            acknowledge_unverified_evidence: true;
+            /**
+             * Generated With Ai
+             * @default true
+             */
+            generated_with_ai: boolean;
+        };
+        /** OwnerWebArticlePublishResponse */
+        OwnerWebArticlePublishResponse: {
+            /** Article Id */
+            article_id: string;
+            /** Slug */
+            slug: string;
+            /**
+             * Article Status
+             * @constant
+             */
+            article_status: "published";
+            /** Content Version */
+            content_version: number;
+            /** Canonical Url */
+            canonical_url: string;
+            /**
+             * Editorial Decision
+             * @constant
+             */
+            editorial_decision: "root_owner_publication";
+            /**
+             * Scientific Verification
+             * @constant
+             */
+            scientific_verification: "not_attested";
         };
         /** PackageAmount */
         "PackageAmount-Input": {
@@ -16710,9 +17034,9 @@ export interface components {
             /** Level */
             level?: ("beginner" | "intermediate" | "advanced") | null;
             /** Height Cm */
-            height_cm?: number | null;
+            height_cm?: number | string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Workouts Per Week */
             workouts_per_week?: number | null;
             /** Cardio Trainings Per Week */
@@ -16790,7 +17114,7 @@ export interface components {
             /** Target Set Id */
             target_set_id: number;
             /** Working Weight Kg */
-            working_weight_kg: number;
+            working_weight_kg: number | string;
             /** Rows */
             rows: components["schemas"]["WarmupProposalRow"][];
             /** State Token */
@@ -16819,7 +17143,7 @@ export interface components {
             /** Target Set Id */
             target_set_id: number;
             /** Working Weight Kg */
-            working_weight_kg: number;
+            working_weight_kg: number | string;
         };
         /** WarmupProposalPreviewResponse */
         WarmupProposalPreviewResponse: {
@@ -16837,7 +17161,7 @@ export interface components {
             /** Working Weight Kg */
             working_weight_kg: number;
             /** Rows */
-            rows: components["schemas"]["WarmupProposalRow"][];
+            rows: components["schemas"]["WarmupProposalRowResponse"][];
             /** Max Rows */
             max_rows: number;
             /** State Token */
@@ -16849,6 +17173,13 @@ export interface components {
         };
         /** WarmupProposalRow */
         WarmupProposalRow: {
+            /** Weight Kg */
+            weight_kg: number | string;
+            /** Reps */
+            reps: number;
+        };
+        /** WarmupProposalRowResponse */
+        WarmupProposalRowResponse: {
             /** Weight Kg */
             weight_kg: number;
             /** Reps */
@@ -18014,11 +18345,11 @@ export interface components {
             /** Actual Reps */
             actual_reps?: number | null;
             /** Actual Weight */
-            actual_weight?: number | null;
+            actual_weight?: number | string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -29118,6 +29449,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminAuditRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_article_drafts_api_v1_admin_articles_drafts_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerArticleReviewRow"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_article_draft_detail_api_v1_admin_articles_drafts__article_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                article_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerArticleReviewDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_publish_existing_article_api_v1_admin_articles_drafts_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerExistingDraftPublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerWebArticlePublishResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_publish_web_article_api_v1_admin_articles_publish_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerWebArticlePublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerWebArticlePublishResponse"];
                 };
             };
             /** @description Validation Error */

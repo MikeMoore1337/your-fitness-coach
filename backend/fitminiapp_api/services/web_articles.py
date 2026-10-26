@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.news import (
     HermesWebArticleSubmission,
     WebArticle,
@@ -705,8 +706,21 @@ def retract_web_article(db: Session, article: WebArticle, *, reason: str, actor_
     )
 
 
-def publish_web_article(db: Session, article: WebArticle, *, actor_ref: str) -> None:
-    """Owner/editor gate: publishing is an explicit internal action, never Hermes intake."""
+def publish_web_article(
+    db: Session,
+    article: WebArticle,
+    *,
+    actor_ref: str,
+    owner_editorial_decision: bool = False,
+    owner_user_id: int | None = None,
+) -> None:
+    """Publish via strict editorial checks or a separately authenticated owner decision.
+
+    An owner decision is not scientific verification: pending matrix entries stay pending.
+    The caller of the owner path must enforce verified Root authentication.
+    """
+    if owner_editorial_decision and (owner_user_id is None or owner_user_id <= 0):
+        raise WebArticleError("owner_identity_required")
 
     if article.status != "approved":
         raise WebArticleError("article_not_approved")
@@ -720,18 +734,26 @@ def publish_web_article(db: Session, article: WebArticle, *, actor_ref: str) -> 
     )
     if revision is None:
         raise WebArticleError("article_revision_missing")
+    if not isinstance(article.claim_source_matrix, list) or not article.claim_source_matrix:
+        raise WebArticleError("claim_source_matrix_missing")
     if any(
-        item.get("review_status") != "verified"
-        or item.get("support_level") in {"does_not_support", "unclear"}
+        not isinstance(item, dict)
+        or item.get("review_status") == "blocked"
+        or item.get("support_level") == "does_not_support"
         for item in article.claim_source_matrix
-        if isinstance(item, dict)
     ):
-        raise WebArticleError("claim_source_review_incomplete")
-    if not article.domain_reviewer and (
-        article.risk_level in {"high", "critical"}
-        or any(topic in SENSITIVE_ARTICLE_TOPICS for topic in article.topics)
-    ):
-        raise WebArticleError("domain_reviewer_required")
+        raise WebArticleError("claim_source_explicitly_blocked")
+    if not owner_editorial_decision:
+        if any(
+            item.get("review_status") != "verified" or item.get("support_level") == "unclear"
+            for item in article.claim_source_matrix
+        ):
+            raise WebArticleError("claim_source_review_incomplete")
+        if not article.domain_reviewer and (
+            article.risk_level in {"high", "critical"}
+            or any(topic in SENSITIVE_ARTICLE_TOPICS for topic in article.topics)
+        ):
+            raise WebArticleError("domain_reviewer_required")
     now = utcnow()
     article.status = "published"
     article.published_at = article.published_at or now
@@ -742,9 +764,192 @@ def publish_web_article(db: Session, article: WebArticle, *, actor_ref: str) -> 
         action="web_article.published",
         resource_type="web_article",
         resource_id=article.id,
-        actor_user_id=None,
-        details={"content_version": article.content_version, "actor_ref": actor_ref},
+        actor_user_id=owner_user_id,
+        details={
+            "content_version": article.content_version,
+            "actor_ref": actor_ref,
+            "editorial_decision": (
+                "root_owner_publication" if owner_editorial_decision else "standard_review"
+            ),
+            "independent_scientific_review": (
+                "not_attested" if owner_editorial_decision else "standard_review"
+            ),
+        },
     )
+
+
+def publish_existing_owner_article(
+    db: Session,
+    *,
+    article_id: str,
+    expected_content_hash: str,
+    expected_content_version: int,
+    actor_user_id: int,
+) -> WebArticle:
+    """One Root owner's exact-revision release of a previously ingested draft.
+
+    Hermes HMAC, scheduler and GitHub OAuth alone cannot call this operation.
+    A row lock keeps concurrent owner approvals and draft changes consistent.
+    """
+    if actor_user_id <= 0:
+        raise WebArticleError("owner_identity_required")
+    article = (
+        db.query(WebArticle).filter(WebArticle.id == article_id).with_for_update().one_or_none()
+    )
+    if article is None:
+        raise WebArticleError("article_not_found")
+    if (
+        article.content_hash != expected_content_hash
+        or article.content_version != expected_content_version
+    ):
+        raise WebArticleError("article_revision_conflict")
+    if article.status == "published":
+        # A replay must not misattribute another publication path or Root actor
+        # to this exact interactive Control Center approval.
+        last = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.action == "web_article.published",
+                AuditEvent.resource_type == "web_article",
+                AuditEvent.resource_id == article_id,
+            )
+            .order_by(AuditEvent.id.desc())
+            .first()
+        )
+        if (
+            last is None
+            or last.actor_user_id != actor_user_id
+            or not isinstance(last.details, dict)
+            or last.details.get("actor_ref") != "root_owner_control_center"
+            or last.details.get("content_version") != expected_content_version
+        ):
+            raise WebArticleError("article_already_published_by_other_path")
+        return article
+    if article.status not in {"draft", "review", "approved"}:
+        raise WebArticleError("article_transition_invalid")
+    revision = (
+        db.query(WebArticleRevision)
+        .filter(
+            WebArticleRevision.article_id == article_id,
+            WebArticleRevision.content_version == expected_content_version,
+        )
+        .one_or_none()
+    )
+    if revision is None:
+        raise WebArticleError("article_revision_missing")
+    if revision.status not in {"draft", "review", "approved"}:
+        raise WebArticleError("article_revision_status_invalid")
+    article.status = "approved"
+    revision.status = "approved"
+    publish_web_article(
+        db,
+        article,
+        actor_ref="root_owner_control_center",
+        owner_editorial_decision=True,
+        owner_user_id=actor_user_id,
+    )
+    return article
+
+
+def publish_owner_web_article(
+    db: Session,
+    proposal: HermesWebArticleProposal,
+    *,
+    actor_user_id: int,
+    generated_with_ai: bool,
+) -> WebArticle:
+    """Single authenticated owner operation: validate, version, publish and audit.
+
+    This does not turn pending science reviews into verified evidence.
+    The caller must first pass require_root_admin; no Hermes secret or candidate is needed.
+    """
+    if actor_user_id <= 0:
+        raise WebArticleError("owner_identity_required")
+    if any(
+        entry.review_status == "blocked" or entry.support_level == "does_not_support"
+        for entry in proposal.claim_source_matrix
+    ):
+        raise WebArticleError("claim_source_explicitly_blocked")
+
+    content_hash = _content_hash(_article_content_payload(proposal))
+    existing = db.query(WebArticle).filter(WebArticle.slug == proposal.slug).one_or_none()
+    if existing is not None:
+        if existing.content_hash != content_hash:
+            raise WebArticleError("slug_conflict")
+        if existing.status == "published":
+            return existing
+        if existing.status not in {"draft", "review", "approved"}:
+            raise WebArticleError("article_transition_invalid")
+        revision = (
+            db.query(WebArticleRevision)
+            .filter(
+                WebArticleRevision.article_id == existing.id,
+                WebArticleRevision.content_version == existing.content_version,
+            )
+            .one_or_none()
+        )
+        if revision is None:
+            raise WebArticleError("article_revision_missing")
+        existing.status = "approved"
+        revision.status = "approved"
+        publish_web_article(
+            db,
+            existing,
+            actor_ref="root_owner",
+            owner_editorial_decision=True,
+            owner_user_id=actor_user_id,
+        )
+        return existing
+
+    warnings = validate_article_proposal(proposal)
+    blockers = _review_blockers(proposal, warnings)
+    article = WebArticle(id=secrets.token_hex(16), candidate_id=None)
+    _assign_article_fields(
+        article,
+        proposal,
+        content_version=1,
+        research_version="owner-editorial-v1",
+        provider="owner",
+        model="manual-editorial",
+        prompt_version="owner-editorial-v1",
+        skill_version="yfc-editorial-v1",
+        status="approved",
+        blockers=blockers,
+    )
+    article.generated_with_ai = generated_with_ai
+    article.research_assistance = generated_with_ai
+    db.add(article)
+    db.flush()
+
+    db.add(
+        WebArticleRevision(
+            id=secrets.token_hex(16),
+            article_id=article.id,
+            content_version=1,
+            status="approved",
+            snapshot=_to_snapshot(
+                proposal,
+                article_schema_version=ARTICLE_SCHEMA_VERSION,
+                research_version="owner-editorial-v1",
+                provider="owner",
+                model="manual-editorial",
+                generated_with_ai=generated_with_ai,
+                editorial_decision="root_owner_publication",
+                independent_scientific_review="not_attested",
+                review_blockers=list(blockers),
+            ),
+            change_reason="root_owner_editorial_publication",
+        )
+    )
+    db.flush()
+    publish_web_article(
+        db,
+        article,
+        actor_ref="root_owner",
+        owner_editorial_decision=True,
+        owner_user_id=actor_user_id,
+    )
+    return article
 
 
 def public_article_path(slug: str) -> str:

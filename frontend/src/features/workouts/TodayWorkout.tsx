@@ -65,6 +65,11 @@ import { WarmupProposal } from './WarmupProposal';
 import { PlateCalculator } from './PlateCalculator';
 import { ExerciseSetupMemory } from './ExerciseSetupMemory';
 import { ActiveSessionSummary } from './ActiveSessionSummary';
+import {
+  hasDecimalScale,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 type WorkoutSet = Workout['exercises'][number]['sets'][number];
 type RirValue = NonNullable<WorkoutSet['rir']>;
@@ -193,7 +198,7 @@ function editingWorkoutField(): boolean {
 }
 
 function formatWorkoutNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
 }
 
 function RirContextualHelp() {
@@ -482,23 +487,30 @@ function WorkoutSetRow({
     startRest = immediate,
   ) => {
     if (completionInFlight.current) return false;
-    if (immediate) {
-      completionInFlight.current = true;
-      setCompleting(true);
-    }
     const nextReps = next.reps ?? reps;
     const nextWeight = next.weight ?? weight;
     const nextRir = next.rir === undefined ? rir : next.rir;
     const nextSetKind = next.setKind ?? setKind;
     const nextReachedFailure = next.reachedFailure ?? reachedFailure;
     const nextCompleted = next.completed ?? completed;
+    const parsedWeight = nextWeight.trim() === '' ? null : parseDecimalDraft(nextWeight);
+    if (
+      nextWeight.trim() !== '' &&
+      (parsedWeight == null || !hasDecimalScale(nextWeight, 2) || parsedWeight < 0)
+    ) {
+      return false;
+    }
+    if (immediate) {
+      completionInFlight.current = true;
+      setCompleting(true);
+    }
     try {
       const accepted = await enqueue(
         set.id,
         serverVersion,
         {
           actual_reps: nextReps === '' ? null : Number(nextReps),
-          actual_weight: nextWeight === '' ? null : Number(nextWeight),
+          actual_weight: parsedWeight,
           rir: nextRir,
           set_kind: nextSetKind,
           reached_failure: nextReachedFailure,
@@ -692,7 +704,7 @@ function WorkoutSetRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным подходом"
+          aria-label="Управление выполненным подходом"
         >
           {editingCompleted ? (
             <>
@@ -727,23 +739,15 @@ function WorkoutSetRow({
             </Button>
           )}
           {!editingCompleted && (
-            <details className="active-workout-set__more-actions">
-              <summary className="yfc-disclosure-summary">
-                Действия
-                <DisclosureIcon />
-              </summary>
-              <div className="active-workout-set__more-actions-body">
-                <Button
-                  type="button"
-                  disabled={disabled || completing}
-                  data-workout-action="reopen-completed"
-                  variant="secondary"
-                  onClick={() => void requestReopen()}
-                >
-                  Вернуть в работу
-                </Button>
-              </div>
-            </details>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}
@@ -828,9 +832,9 @@ function WorkoutSetRow({
             aria-label={`Вес, ${exerciseTitle}, подход ${set.set_number}`}
             enterKeyHint="next"
             inputMode="decimal"
-            type="number"
+            type="text"
             min="0"
-            step="0.5"
+            step="0.01"
             value={weight}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -1079,6 +1083,22 @@ function CardioWorkoutRow({
     const nextAverageHeartRate = next.averageHeartRate ?? averageHeartRate;
     const nextHeartRateZone = next.heartRateZone ?? heartRateZone;
     const nextCompleted = next.completed ?? completed;
+    const parsedDistance = nextDistance.trim() ? parseDecimalDraft(nextDistance) : null;
+    if (
+      nextDistance.trim() &&
+      (!isCompleteDecimalDraft(nextDistance) ||
+        !hasDecimalScale(nextDistance, 2) ||
+        parsedDistance == null ||
+        parsedDistance <= 0 ||
+        parsedDistance > 1000)
+    ) {
+      if (immediate) {
+        setValidation('Укажите дистанцию больше 0 и не больше 1000 км, до двух знаков.');
+        completionInFlight.current = false;
+        setCompleting(false);
+      }
+      return false;
+    }
     try {
       const accepted = await enqueue(
         set.id,
@@ -1087,7 +1107,7 @@ function CardioWorkoutRow({
           actual_reps: null,
           actual_weight: null,
           duration_minutes: nextDuration === '' ? null : Number(nextDuration),
-          distance_km: nextDistance === '' ? null : Number(nextDistance),
+          distance_km: parsedDistance,
           average_heart_rate_bpm: nextAverageHeartRate === '' ? null : Number(nextAverageHeartRate),
           heart_rate_zone: nextHeartRateZone === '' ? null : Number(nextHeartRateZone),
           rir: null,
@@ -1244,7 +1264,7 @@ function CardioWorkoutRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным кардио"
+          aria-label="Управление выполненным интервалом"
         >
           {editingCompleted ? (
             <>
@@ -1279,23 +1299,15 @@ function CardioWorkoutRow({
             </Button>
           )}
           {!editingCompleted && (
-            <details className="active-workout-set__more-actions">
-              <summary className="yfc-disclosure-summary">
-                Действия
-                <DisclosureIcon />
-              </summary>
-              <div className="active-workout-set__more-actions-body">
-                <Button
-                  type="button"
-                  disabled={disabled || completing}
-                  data-workout-action="reopen-completed"
-                  variant="secondary"
-                  onClick={() => void requestReopen()}
-                >
-                  Вернуть в работу
-                </Button>
-              </div>
-            </details>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}
@@ -1392,7 +1404,7 @@ function CardioWorkoutRow({
             aria-label={`Дистанция, ${exerciseTitle}`}
             enterKeyHint="done"
             inputMode="decimal"
-            type="number"
+            type="text"
             min="0.01"
             max="1000"
             step="0.01"

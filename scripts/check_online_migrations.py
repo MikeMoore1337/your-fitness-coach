@@ -11,7 +11,13 @@ import subprocess
 from pathlib import Path
 
 MIGRATION_ROOT = Path("backend/alembic/versions")
-ALLOWED_PHASES = {"expand", "backfill", "constraint_swap", "rest_unique_swap"}
+ALLOWED_PHASES = {
+    "expand",
+    "backfill",
+    "constraint_swap",
+    "rest_unique_swap",
+    "numeric_precision",
+}
 DESTRUCTIVE_CALLS = {
     "alter_column",
     "drop_column",
@@ -363,6 +369,17 @@ def _validate_upgrade_call_allowlist(path: Path, upgrade: ast.AST, phase: object
                     or (owner == "batch" and function.attr == "drop_constraint")
                     or (owner == "sa" and function.attr == "text")
                 )
+            elif phase == "numeric_precision":
+                allowed = (
+                    (
+                        owner == "op"
+                        and function.attr in {"execute", "get_bind", "batch_alter_table"}
+                    )
+                    or (owner == "batch" and function.attr == "alter_column")
+                    or (owner == "sa" and function.attr in SAFE_COLUMN_TYPES)
+                )
+        elif phase == "numeric_precision" and isinstance(function, ast.Name):
+            allowed = function.id == "_ensure_upgrade_safe"
         if _is_autocommit_block_call(call):
             allowed = True
         if not allowed:
@@ -716,9 +733,11 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses SQL execution outside the verified op.execute online contract"
             )
-        if phase in {"constraint_swap", "rest_unique_swap"} and not _is_in_postgresql_branch(
-            node, links
-        ):
+        if phase in {
+            "constraint_swap",
+            "rest_unique_swap",
+            "numeric_precision",
+        } and not _is_in_postgresql_branch(node, links):
             raise OnlineMigrationError(
                 f"{path} constraint_swap SQL must be gated to the PostgreSQL branch"
             )
@@ -767,6 +786,14 @@ def validate_added_migration(path: Path) -> None:
             raise OnlineMigrationError(
                 f"{path} uses op.{operation}, which is not allowlisted for rest_unique_swap"
             )
+        elif phase == "numeric_precision" and operation not in {
+            "execute",
+            "get_bind",
+            "batch_alter_table",
+        }:
+            raise OnlineMigrationError(
+                f"{path} uses op.{operation}, which is not allowlisted for numeric_precision"
+            )
 
     execute_statements: list[str] = []
     for node in _op_calls(upgrade):
@@ -786,6 +813,15 @@ def validate_added_migration(path: Path) -> None:
             raw_sql = node.args[0].value
             if phase in {"constraint_swap", "rest_unique_swap"}:
                 execute_statements.append(raw_sql)
+                continue
+            if phase == "numeric_precision":
+                sql = re.sub(r"\s+", " ", raw_sql).strip().upper()
+                if not sql.startswith(("SET LOCAL ", "ALTER TABLE ")) or re.search(
+                    r"\b(DROP|TRUNCATE|DELETE)\b", sql
+                ):
+                    raise OnlineMigrationError(
+                        f"{path} numeric_precision SQL must be bounded SET LOCAL or ALTER TABLE"
+                    )
                 continue
             sql = re.sub(r"\s+", " ", raw_sql).strip().upper()
             if re.search(r"\b(DROP|ALTER|TRUNCATE|DELETE)\b", sql):
