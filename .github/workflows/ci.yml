@@ -386,6 +386,20 @@ jobs:
           else
             python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
           fi
+      - name: Install cached WebKit shared-library prerequisite
+        if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
+        # On Ubuntu 24.04 the cached WebKit WPE binary requires
+        # libevent-2.1.so.7 from libevent-2.1-7t64; the full
+        # playwright --with-deps apt-update stage timed out after 25m.
+        # Keep real WebKit execution mandatory and bound this targeted
+        # system package install; failure remains a required CI failure.
+        run: |
+          if ! ldconfig -p | grep -Fq 'libevent-2.1.so.7'; then
+            sudo timeout -s KILL 120 env DEBIAN_FRONTEND=noninteractive \\
+              apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 \\
+              install -y --no-install-recommends libevent-2.1-7t64
+          fi
+          ldconfig -p | grep -F 'libevent-2.1.so.7'
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
