@@ -5,6 +5,7 @@ on:
     paths:
       - .github/workflows/incident-1249-production-recovery.yml
       - scripts/incident_1249_recovery.py
+      - scripts/incident_1249_recovery.py
       - tests/test_incident_1249_recovery.py
   # A single read-only diagnosis is triggered when this workflow first lands on protected master.
   push:
