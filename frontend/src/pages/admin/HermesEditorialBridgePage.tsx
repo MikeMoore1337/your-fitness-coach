@@ -46,6 +46,7 @@ export default function HermesEditorialBridgePage() {
   const grantedRef = useRef(false);
   const pendingRef = useRef<PublishRequest | null>(null);
   const busyRef = useRef(false);
+  const usedPublishIdsRef = useRef(new Set<string>());
   const grantExpiresRef = useRef(0);
   const publishDeadlineRef = useRef(0);
 
@@ -152,6 +153,12 @@ export default function HermesEditorialBridgePage() {
           respond(id, null, false);
           return;
         }
+        // One-use request IDs prevent re-prompting the owner with a replayed publish message.
+        if (usedPublishIdsRef.current.has(id) || usedPublishIdsRef.current.size >= 128) {
+          respond(id, null, false);
+          return;
+        }
+        usedPublishIdsRef.current.add(id);
         // Re-read the exact revision on YFC before displaying a second, local
         // confirmation. Hermes cannot trigger POST by sending a message alone.
         busyRef.current = true;
