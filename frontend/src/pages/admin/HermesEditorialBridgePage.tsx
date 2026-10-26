@@ -52,7 +52,7 @@ export default function HermesEditorialBridgePage() {
 
   const respond = useCallback((requestId: string, value: unknown, ok = true) => {
     send({ kind: 'response', nonce: nonceRef.current, request_id: requestId, ok,
-      ...(ok ? { data: value } : { error: 'yfc_request_unavailable' }) });
+      ...(ok ? { data: value } : { error: 'Недоступно' }) });
   }, [send]);
 
   useEffect(() => {
@@ -172,19 +172,19 @@ export default function HermesEditorialBridgePage() {
 
   if (!user?.is_root) return <main className="container">
     <section className="card"><h1>Доступ запрещён</h1>
-      <p>Необходима действующая Root-сессия YFC с подтверждённым Telegram ID.</p>
+      <p>Необходима действующая сессия владельца YFC с подтверждённым аккаунтом Telegram.</p>
     </section>
   </main>;
 
   return <main className="container" style={{ maxWidth: 660, paddingBlock: 32 }}>
     <section className="card stack" aria-label="Подтверждение редакции YFC">
-      <h1>Доступ Hermes к статьям YFC</h1>
-      <p>Ваша Root-сессия остаётся в YFC. Hermes не получает токены, пароли
+      <h1>Подтверждение доступа к статьям YFC</h1>
+      <p>Ваша сессия владельца остаётся в YFC. Другая система не получает токены, пароли
         или постоянные права публикации.</p>
-      {!window.opener && <p role="alert">Откройте эту страницу кнопкой в Hermes Control Center.</p>}
-      {window.opener && !connected && <p>Ожидаем защищённое соединение с Hermes.</p>}
+      {!window.opener && <p role="alert">Откройте эту страницу кнопкой в панели управления.</p>}
+      {window.opener && !connected && <p>Ожидаем защищённое соединение с панелью управления.</p>}
       {connected && !granted && <>
-        <p>Разрешить этой вкладке Hermes читать черновики и отправлять
+        <p>Разрешить вкладке, открывшей это окно, читать черновики и отправлять
           запросы на отдельное подтверждение публикации?</p>
         <button type="button" onClick={grant}>Разрешить просмотр черновиков</button>
       </>}
@@ -195,7 +195,7 @@ export default function HermesEditorialBridgePage() {
         <strong>{pending.title}</strong>
         <p>Версия {pending.version}</p>
         <code style={{ overflowWrap: 'anywhere' }}>{pending.contentHash}</code>
-        <p>Научная аттестация не заявлена. Проверьте полный текст и источники в Hermes.</p>
+        <p>Научная аттестация не заявлена. Проверьте полный текст и источники в панели управления.</p>
         <div className="toolbar wrap">
           <button type="button" disabled={working} onClick={() => void publish()}>
             {working ? 'Публикуем…' : 'Подтверждаю публикацию в YFC'}
