@@ -1,0 +1,136 @@
+name: Incident 1249 production environment recovery
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/incident-1249-production-recovery.yml
+      - scripts/incident_1249_recovery.py
+      - tests/test_incident_1249_recovery.py
+  # A single read-only diagnosis is triggered when this workflow first lands on protected master.
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/incident-1249-production-recovery.yml
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Inspect is read-only; fix_env applies one prevalidated env correction
+        type: choice
+        required: true
+        default: inspect
+        options:
+          - inspect
+          - fix_env
+      expected_env_sha256:
+        description: Exact SHA-256 from prior inspect run (required only for fix_env)
+        type: string
+        required: false
+      expected_key:
+        description: Line 30 environment key from prior inspect (required only for fix_env)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  test-recovery-helper:
+    name: Validate emergency recovery helper (no production credentials)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run sandboxed self-test
+        run: |
+          python3 -m py_compile scripts/incident_1249_recovery.py
+          python3 scripts/incident_1249_recovery.py --self-test
+
+  guarded-recovery:
+    if: github.event_name != 'pull_request'
+    name: Owner-gated production env inspection / narrowly scoped correction
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    env:
+      OPERATION: ${{ github.event_name == 'push' && 'inspect' || inputs.operation }}
+      EXPECTED_ENV_SHA256: ${{ inputs.expected_env_sha256 }}
+      EXPECTED_ENV_KEY: ${{ inputs.expected_key }}
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: '1337'
+      PROD_USER: yfc-deploy
+    steps:
+      - name: Require owner manual dispatch on protected master
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = refs/heads/master
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          else
+            test "$GITHUB_EVENT_NAME" = push
+            test "$OPERATION" = inspect
+          fi
+          case "$OPERATION" in
+            inspect)
+              test -z "$EXPECTED_ENV_SHA256"
+              test -z "$EXPECTED_ENV_KEY"
+              ;;
+            fix_env)
+              [[ "$EXPECTED_ENV_SHA256" =~ ^[0-9a-f]{64}$ ]]
+              [[ "$EXPECTED_ENV_KEY" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]
+              ;;
+            *) exit 2 ;;
+          esac
+
+      - name: Check out audited recovery implementation
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Run no-secret self-test
+        run: python3 scripts/incident_1249_recovery.py --self-test
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Execute explicit bounded operation on production
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o ConnectTimeout=10
+            -o ConnectionAttempts=1
+            -p "$PROD_PORT"
+          )
+          if [ "$OPERATION" = inspect ]; then
+            ssh "${SSH_ARGS[@]}" "$PROD_USER@$PROD_HOST" \
+              "python3 - inspect" \
+              < scripts/incident_1249_recovery.py
+          else
+            ssh "${SSH_ARGS[@]}" "$PROD_USER@$PROD_HOST" \
+              "python3 - fix_env '$EXPECTED_ENV_SHA256' '$EXPECTED_ENV_KEY'" \
+              < scripts/incident_1249_recovery.py
+          fi
