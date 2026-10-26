@@ -58,6 +58,7 @@ def test_inspect_redacts_environment_values(
     monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
+    monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
     recovery.ENV_FILE.write_bytes(broken_env("password(secret)"))
     recovery.ENV_FILE.chmod(0o600)
     report = recovery.inspect()
@@ -88,6 +89,7 @@ def test_readonly_diagnostic_reports_sanitized_next_parse_line(
     monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
+    monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
     original = ("SAFE=value\n" * 29 + "FIRST_KEY=hello(first)\nSECOND_KEY=hello(second)\n").encode()
     recovery.ENV_FILE.write_bytes(original)
     recovery.ENV_FILE.chmod(0o600)
@@ -112,6 +114,7 @@ def test_line_98_diagnostic_previews_only_literal_without_exposing_token(
     monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
+    monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
     original = (
         "SAFE=value\n" * 29
         + "OPEN_FOOD_FACTS_USER_AGENT=fitness(client)\n"
@@ -128,3 +131,36 @@ def test_line_98_diagnostic_previews_only_literal_without_exposing_token(
     assert report["line_30_and_98_literal_preview_error_line"] is None
     assert "token(other)" not in str(report)
     assert recovery.ENV_FILE.read_bytes() == original
+
+
+def test_stopped_runtime_probe_rejects_wrong_image_revision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from subprocess import CompletedProcess
+
+    baseline = "a" * 40
+    (tmp_path / "releases" / baseline).mkdir(parents=True)
+    monkeypatch.setattr(recovery, "APP_ROOT", tmp_path)
+
+    def fake_docker(args: list[str], **_kwargs: object) -> CompletedProcess[str]:
+        if args[:3] == ["docker", "ps", "-a"]:
+            service = args[args.index("--filter") + 1].rsplit("=", 1)[-1]
+            return CompletedProcess(args, 0, f"{service}-id\n", "")
+        if args[:3] == ["docker", "inspect", "--format"]:
+            service = args[-1].removesuffix("-id")
+            status = "running" if service in {"db", "edge"} else "exited"
+            image_id = "sha256:backend" if service in {"backend", "worker"} else "sha256:bot"
+            revision = ("b" * 40) if service == "bot" else baseline
+            return CompletedProcess(args, 0, f"{status}|{image_id}|{revision}|healthy\n", "")
+        if args[:3] == ["docker", "compose", "config"]:
+            return CompletedProcess(args, 0, "", "")
+        raise AssertionError("Unexpected read-only Docker call")
+
+    monkeypatch.setattr(recovery.subprocess, "run", fake_docker)
+    report = recovery.stopped_runtime_candidate_summary(baseline)
+    assert report["compose_config_valid"] is True
+    assert report["backend_worker_same_image"] is True
+    assert report["baseline_revision_verified"] is False
+    states = report["service_states"]
+    assert states["bot"]["oci_revision"] == "b" * 40
+    assert states["backend"]["oci_revision"] == baseline
