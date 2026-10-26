@@ -50,8 +50,9 @@ def test_dev_fixture_is_rich_idempotent_and_user_scoped() -> None:
         assert coach is not None and coach.is_coach and not coach.is_admin
         assert client is not None and not client.is_coach and not client.is_admin
         assert admin is not None and admin.is_coach and admin.is_admin
-        assert all(db.get(User, user_id).measurement_eligibility == "synthetic"
-                   for user_id in ids.values())
+        assert all(
+            db.get(User, user_id).measurement_eligibility == "synthetic" for user_id in ids.values()
+        )
         assert db.query(CoachClient).filter_by(coach_user_id=coach.id, status="active").count() == 3
         assert db.query(UserProgram).filter_by(user_id=client.id, is_active=True).count() == 1
         program = db.query(UserProgram).filter_by(user_id=client.id).one()
@@ -62,21 +63,39 @@ def test_dev_fixture_is_rich_idempotent_and_user_scoped() -> None:
         assert db.query(FoodDiaryEntry).filter_by(user_id=client.id).count() >= 300
         assert db.query(HydrationEntry).filter_by(user_id=client.id).count() == 175
         assert db.query(WeeklyCheckIn).filter_by(user_id=client.id).count() == 8
-        assert db.query(CoachBusinessSession).filter_by(
-            coach_user_id=coach.id, client_user_id=client.id
-        ).count() == 8
-        assert db.query(UserWorkout).filter(
-            UserWorkout.user_program_id == program.id,
-            UserWorkout.scheduled_date >= today_msk(),
-            UserWorkout.status == "planned",
-        ).count() >= 10
+        assert (
+            db.query(CoachBusinessSession)
+            .filter_by(coach_user_id=coach.id, client_user_id=client.id)
+            .count()
+            == 8
+        )
+        assert (
+            db.query(UserWorkout)
+            .filter(
+                UserWorkout.user_program_id == program.id,
+                UserWorkout.scheduled_date >= today_msk(),
+                UserWorkout.status == "planned",
+            )
+            .count()
+            >= 10
+        )
         measurements = db.query(BodyMeasurement).filter_by(user_id=client.id).all()
         assert any(round(m.weight_kg * 100) % 10 != 0 for m in measurements)
         assert any(m.measured_on < today_msk() - timedelta(days=60) for m in measurements)
 
-        tables = (User, CoachClient, UserProgram, UserWorkout, UserWorkoutSet,
-                  Food, FoodDiaryEntry, HydrationEntry, BodyMeasurement,
-                  WeeklyCheckIn, CoachBusinessSession)
+        tables = (
+            User,
+            CoachClient,
+            UserProgram,
+            UserWorkout,
+            UserWorkoutSet,
+            Food,
+            FoodDiaryEntry,
+            HydrationEntry,
+            BodyMeasurement,
+            WeeklyCheckIn,
+            CoachBusinessSession,
+        )
         before = tuple(db.query(table).count() for table in tables)
         seed_local_dev_data(db)
         db.flush()
@@ -118,14 +137,20 @@ def test_fixed_dev_roles_authorization_and_coach_tenant_scope(client, monkeypatc
     assert client.get("/api/v1/admin/users?q=2001").status_code == 401
 
     # No other synthetic user can log in, even though the coach manages them.
-    assert client.post(
-        "/api/v1/auth/dev-login",
-        json={"telegram_user_id": 2002, "is_coach": False},
-    ).status_code == 403
-    assert client.post(
-        "/api/v1/auth/dev-login",
-        json={"telegram_user_id": 2001, "is_coach": True, "is_admin": True},
-    ).status_code == 403
+    assert (
+        client.post(
+            "/api/v1/auth/dev-login",
+            json={"telegram_user_id": 2002, "is_coach": False},
+        ).status_code
+        == 403
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/dev-login",
+            json={"telegram_user_id": 2001, "is_coach": True, "is_admin": True},
+        ).status_code
+        == 403
+    )
 
 
 def test_fixed_dev_fixture_refuses_non_local_database(monkeypatch) -> None:
@@ -136,6 +161,5 @@ def test_fixed_dev_fixture_refuses_non_local_database(monkeypatch) -> None:
         "database_url",
         "postgresql+psycopg://yfc_dev:testing@remote.example/yfc_dev",
     )
-    with get_session_context() as db:
-        with pytest.raises(RuntimeError, match="isolated yfc_dev"):
-            maybe_seed_local_dev_data(db)
+    with get_session_context() as db, pytest.raises(RuntimeError, match="isolated yfc_dev"):
+        maybe_seed_local_dev_data(db)
