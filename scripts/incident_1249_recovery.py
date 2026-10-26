@@ -192,7 +192,9 @@ def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, objec
                     "docker",
                     "inspect",
                     "--format",
-                    '{{.State.Status}}|{{.Image}}|{{index .Config.Labels "org.opencontainers.image.revision"}}|{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}',
+                    "{{.State.Status}}|{{.Image}}|"
+                    '{{index .Config.Labels "org.opencontainers.image.revision"}}|'
+                    "{{if .State.Health}}{{.State.Health.Status}}{{else}}unknown{{end}}",
                     container_ids[0],
                 ],
                 capture_output=True,
@@ -213,7 +215,7 @@ def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, objec
                 "health": health,
                 "oci_revision": revision if GIT_SHA_RE.fullmatch(revision) else "UNVERIFIED",
             }
-        except (OSError, subprocess.SubprocessError):
+        except DOCKER_COMMAND_ERRORS:
             services[service] = {"available": False}
     report["service_states"] = services
     report["backend_worker_same_image"] = bool(
@@ -241,7 +243,7 @@ def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, objec
                 check=False,
             )
             report["compose_config_valid"] = parsed.returncode == 0
-    except (OSError, subprocess.SubprocessError):
+    except DOCKER_COMMAND_ERRORS:
         pass
     return report
 
