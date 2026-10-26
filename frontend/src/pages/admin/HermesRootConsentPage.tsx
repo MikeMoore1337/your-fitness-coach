@@ -13,6 +13,16 @@ export function readHermesPairingNonce(hash: string): string | null {
   return match ? match[1] : null;
 }
 
+export function canSendRootConsent(
+  isRoot: boolean,
+  hash: string,
+  hasOpener: boolean,
+  origin: string,
+): boolean {
+  return isRoot && readHermesPairingNonce(hash) !== null && hasOpener &&
+    origin === 'https://app.your-fitness-coach.ru';
+}
+
 /**
  * Explicit, owner-triggered, browser-only consent. The YFC backend checks Root
  * through an authenticated draft read before any short-lived access token is
@@ -22,9 +32,12 @@ export default function HermesRootConsentPage() {
   const { user } = useAuth();
   const [phase, setPhase] = useState<'ready' | 'sending' | 'complete' | 'error'>('ready');
   const nonce = readHermesPairingNonce(window.location.hash);
-  const valid =
-    user?.is_root === true && nonce !== null && window.opener !== null &&
-    window.location.origin === 'https://app.your-fitness-coach.ru';
+  const valid = canSendRootConsent(
+    user?.is_root === true,
+    window.location.hash,
+    window.opener !== null,
+    window.location.origin,
+  );
   const confirm = async () => {
     if (!valid || phase !== 'ready') return;
     setPhase('sending');
@@ -40,7 +53,6 @@ export default function HermesRootConsentPage() {
         HERMES_OWNER_ORIGIN,
       );
       setPhase('complete');
-      window.close();
     } catch {
       setPhase('error');
     }
