@@ -440,10 +440,14 @@ def _article_result(
 
 # Reuse the existing strictly HMAC-authenticated /hermes/articles/intake route.
 # No public candidate-provisioning endpoint or separate privileged credential.
-_I4_PRIMARY_SOURCE_HOSTS = frozenset({
-    "pmc.ncbi.nlm.nih.gov", "pubmed.ncbi.nlm.nih.gov",
-    "europepmc.org", "www.mdpi.com",
-})
+_I4_PRIMARY_SOURCE_HOSTS = frozenset(
+    {
+        "pmc.ncbi.nlm.nih.gov",
+        "pubmed.ncbi.nlm.nih.gov",
+        "europepmc.org",
+        "www.mdpi.com",
+    }
+)
 
 
 def _i4_candidate_receipt(proposal: HermesWebArticleProposal) -> tuple[str, str]:
@@ -470,9 +474,11 @@ def _i4_candidate_receipt(proposal: HermesWebArticleProposal) -> tuple[str, str]
         if (
             parsed.scheme != "https"
             or parsed.hostname not in _I4_PRIMARY_SOURCE_HOSTS
-            or parsed.username or parsed.password
+            or parsed.username
+            or parsed.password
             or parsed.port not in (None, 443)
-            or parsed.query or parsed.fragment
+            or parsed.query
+            or parsed.fragment
         ):
             raise WebArticleError("hermes_source_untrusted")
         urls.append(value)
@@ -480,10 +486,14 @@ def _i4_candidate_receipt(proposal: HermesWebArticleProposal) -> tuple[str, str]
     if len(set(urls)) != len(urls):
         raise WebArticleError("hermes_source_untrusted")
     canonical = json.dumps(
-        {"schema": "hermes-i4-autocandidate-v1",
-         "slug": proposal.slug,
-         "source_urls": sorted(urls)},
-        ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+        {
+            "schema": "hermes-i4-autocandidate-v1",
+            "slug": proposal.slug,
+            "source_urls": sorted(urls),
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
     )
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return digest[:32], "i4:" + digest
@@ -525,9 +535,9 @@ def accept_hermes_article_submission(
         raise WebArticleError("rate_limited")
     # Hermes HMAC authenticates the source, not human reviewers or scientific
     # status. It cannot assert a verified claim or impersonate an expert.
-    if (payload.article.domain_reviewer is not None
-            or any(item.review_status == "verified"
-                   for item in payload.article.claim_source_matrix)):
+    if payload.article.domain_reviewer is not None or any(
+        item.review_status == "verified" for item in payload.article.claim_source_matrix
+    ):
         raise WebArticleError("hermes_review_attestation_forbidden")
     candidate = db.get(WebArticleCandidate, payload.candidate_id)
     if candidate is None:
@@ -538,22 +548,32 @@ def accept_hermes_article_submission(
         if payload.candidate_id != expected_id:
             raise WebArticleError("candidate_missing")
         candidate = create_article_candidate(
-            db, source_kind="news_handoff", source_ref=source_ref,
-            candidate_id=expected_id, working_title=payload.article.title,
+            db,
+            source_kind="news_handoff",
+            source_ref=source_ref,
+            candidate_id=expected_id,
+            working_title=payload.article.title,
             primary_topic=payload.article.topics[0],
-            topics=payload.article.topics, article_kind=payload.article.article_kind,
+            topics=payload.article.topics,
+            article_kind=payload.article.article_kind,
             search_intent=payload.article.search_intent,
             primary_query=payload.article.primary_query,
             secondary_queries=payload.article.secondary_queries,
-            audience="general", risk_level=payload.article.risk_level,
+            audience="general",
+            risk_level=payload.article.risk_level,
             evidence_level=payload.article.evidence_level,
             signals=ArticleCandidateSignals(),
         )
         record_audit_event(
-            db, action="web_article.hermes_candidate_created",
-            resource_type="web_article_candidate", resource_id=candidate.id,
-            details={"source_kind": candidate.source_kind,
-                     "source_ref": source_ref, "status": "candidate"},
+            db,
+            action="web_article.hermes_candidate_created",
+            resource_type="web_article_candidate",
+            resource_id=candidate.id,
+            details={
+                "source_kind": candidate.source_kind,
+                "source_ref": source_ref,
+                "status": "candidate",
+            },
         )
     existing_article = (
         db.query(WebArticle).filter(WebArticle.slug == payload.article.slug).one_or_none()
