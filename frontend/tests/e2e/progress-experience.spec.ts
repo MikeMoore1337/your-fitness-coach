@@ -1260,6 +1260,221 @@ test('progress remains clear and free of horizontal overflow at supported widths
   expect(runtimeErrors).toEqual([]);
 });
 
+test('schedule card keeps one contour and only internal dividers across mobile states', async ({
+  page,
+}, testInfo) => {
+  const scheduleFixture = [
+    {
+      id: 1,
+      scheduled_date: '2030-01-01',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 1',
+      status: 'planned',
+      day_number: 1,
+      week_number: 1,
+    },
+    {
+      id: 2,
+      scheduled_date: '2030-01-08',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 2',
+      status: 'in_progress',
+      day_number: 2,
+      week_number: 2,
+    },
+    {
+      id: 3,
+      scheduled_date: '2030-01-15',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 3',
+      status: 'missed',
+      day_number: 3,
+      week_number: 3,
+    },
+    {
+      id: 4,
+      scheduled_date: '2030-01-22',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 4',
+      status: 'completed',
+      day_number: 4,
+      week_number: 4,
+    },
+    {
+      id: 5,
+      scheduled_date: '2030-01-29',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 5',
+      status: 'planned',
+      day_number: 5,
+      week_number: 5,
+    },
+    {
+      id: 6,
+      scheduled_date: '2030-02-05',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 6',
+      status: 'completed',
+      day_number: 6,
+      week_number: 6,
+    },
+    {
+      id: 7,
+      scheduled_date: '2030-02-12',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 7',
+      status: 'completed',
+      day_number: 7,
+      week_number: 7,
+    },
+    {
+      id: 8,
+      scheduled_date: '2030-02-19',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 8',
+      status: 'completed',
+      day_number: 8,
+      week_number: 8,
+    },
+  ];
+  const captureEvidence = process.env.CAPTURE_1228_EVIDENCE === '1';
+  const evidenceDir = resolve(
+    process.cwd(),
+    '..',
+    '.artifacts',
+    'tasks',
+    '1228',
+    'evidence',
+    'after',
+  );
+  if (captureEvidence && testInfo.project.name === 'chromium') {
+    await mkdir(evidenceDir, { recursive: true });
+  }
+  await mockProgress(page);
+  await page.route('**/api/v1/workouts/schedule', async (route) =>
+    route.fulfill({ json: scheduleFixture }),
+  );
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    for (const width of [320, 360, 393, 430] as const) {
+      await page.setViewportSize({ width, height: 932 });
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await page.goto('/app?section=programs');
+      const clientButton = page.getByRole('button', { name: 'Клиент' });
+      const planHeading = page.getByRole('heading', { name: 'План', exact: true });
+      await expect(clientButton.or(planHeading)).toBeVisible();
+      if (await clientButton.isVisible()) await clientButton.click();
+      await expect(planHeading).toBeVisible();
+
+      const card = page.locator('details.workout-schedule-card');
+      const cardSummary = card.locator(':scope > summary');
+      await expect(card).toHaveCount(1);
+      await expect(card).not.toHaveAttribute('open', '');
+      await expect(cardSummary).toBeVisible();
+      await expectTouchTargets(cardSummary);
+      if (width === 320 && colorScheme === 'light') {
+        await page.addStyleTag({ content: 'html { font-size: 125%; }' });
+      }
+      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+        await card.screenshot({
+          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-collapsed.png`),
+        });
+      }
+
+      await cardSummary.focus();
+      await expect(cardSummary).toBeFocused();
+      await cardSummary.press('Enter');
+      await expect(card).toHaveAttribute('open', '');
+      await expect(card.locator('.workout-context-row')).toHaveCount(8);
+
+      const body = card.locator(':scope > .card-disclosure__body');
+      const lists = card.locator('.workout-schedule-list');
+      const outerList = lists.nth(0);
+      const innerList = lists.nth(1);
+      const outerRows = outerList.locator(':scope > .workout-context-row');
+      const allWeeks = card.locator('details.workout-schedule-all');
+      const allWeeksSummary = allWeeks.locator(':scope > summary');
+
+      await expect(body).toHaveCSS('border-top-width', '1px');
+      await expect(lists).toHaveCount(2);
+      await expect(outerList).toHaveCSS('border-top-width', '0px');
+      await expect(outerList).toHaveCSS('margin-top', '0px');
+      await expect(outerRows).toHaveCount(4);
+      await expect(outerRows.first()).toHaveCSS('border-bottom-width', '1px');
+      await expect(outerRows.last()).toHaveCSS('border-bottom-width', '0px');
+      await expect(allWeeks).not.toHaveAttribute('open', '');
+      await expect(outerRows.first().locator('.workout-feedback-disclosure')).toHaveCSS(
+        'border-top-width',
+        '1px',
+      );
+
+      await allWeeksSummary.click();
+      await expect(allWeeks).toHaveAttribute('open', '');
+      await expect(innerList).toBeVisible();
+      const innerRows = innerList.locator(':scope > .workout-context-row');
+      await expect(innerRows).toHaveCount(4);
+      await expect(innerList).toHaveCSS('border-top-width', '0px');
+      await expect(innerRows.first()).toHaveCSS('border-bottom-width', '1px');
+      await expect(innerRows.last()).toHaveCSS('border-bottom-width', '0px');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 1 в расписании' }),
+      ).toContainText('Запланирована');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 2 в расписании' }),
+      ).toContainText('В процессе');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 3 в расписании' }),
+      ).toContainText('Нужно решить');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 4 в расписании' }),
+      ).toContainText('Завершена');
+      await expect(card.getByRole('button', { name: 'Изменить план' }).first()).toBeVisible();
+      await expect(card.getByRole('button', { name: 'Вернуться к тренировке' })).toBeVisible();
+      await expectTouchTargets(card.getByRole('button', { name: 'Изменить план' }));
+      await expectTouchTargets(card.getByRole('button', { name: 'Вернуться к тренировке' }));
+
+      const cardStyles = await card.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          borderStyles: [
+            style.borderTopStyle,
+            style.borderRightStyle,
+            style.borderBottomStyle,
+            style.borderLeftStyle,
+          ],
+          borderRadius: style.borderRadius,
+          overflow: style.overflow,
+        };
+      });
+      expect(cardStyles.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(cardStyles.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
+      expect(cardStyles.borderRadius).not.toBe('0px');
+      expect(cardStyles.overflow).toBe('visible');
+
+      await expectNoHorizontalOverflow(page);
+      await innerRows.last().scrollIntoViewIfNeeded();
+      await expectNoOverlap(innerRows.last(), page.locator('#appBottomNav'));
+      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+        await card.screenshot({
+          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-expanded.png`),
+        });
+      }
+
+      await allWeeksSummary.click();
+      await expect(allWeeks).not.toHaveAttribute('open', '');
+      await cardSummary.focus();
+      await cardSummary.press('Enter');
+      await expect(card).not.toHaveAttribute('open', '');
+    }
+  }
+});
+
 test('muscle workload groups use compact cards without changing analytics or drill-down', async ({
   page,
 }) => {
