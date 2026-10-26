@@ -2232,10 +2232,7 @@ test('#1189 iOS PWA delegates measurement keyboard focus and typing to the nativ
   const chest = diary.getByLabel('Грудь, см');
   const waist = diary.getByLabel('Талия, см');
   await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
-  await expect(page.locator('html')).toHaveAttribute(
-    'data-yfc-measurement-pwa',
-    'true',
-  );
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-measurement-pwa', 'true');
 
   await page.evaluate(() => {
     const root = window as Window & { __yfc1189ScrollCalls?: number };
