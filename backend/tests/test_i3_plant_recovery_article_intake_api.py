@@ -14,7 +14,7 @@ from pydantic import SecretStr
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import SessionLocal
-from fitminiapp_api.models.news import WebArticle
+from fitminiapp_api.models.news import WebArticle, WebArticleCandidate
 from fitminiapp_api.schemas.articles import HermesWebArticleIntakeRequest
 from fitminiapp_api.services.news_hermes import hermes_signature
 from fitminiapp_api.services.web_articles import (
@@ -22,6 +22,7 @@ from fitminiapp_api.services.web_articles import (
     WebArticleError,
     create_article_candidate,
     publish_web_article,
+    _i4_candidate_receipt,
 )
 
 ARTICLE_FIXTURE = Path(__file__).parent / "fixtures" / "i3_plant_recovery_editorial_draft.json"
@@ -124,3 +125,95 @@ def test_real_route_accepts_i3_draft_but_never_publishes(client, monkeypatch) ->
     slug = payload.article.slug
     public = client.get(f"/api/v1/public/articles/{slug}")
     assert public.status_code == 404
+
+
+def _i4_signed_request():
+    req = _request("0" * 32)
+    cid, ref = _i4_candidate_receipt(req.article)
+    return req.model_copy(update={
+        "candidate_id": cid, "research_version": "i4-reviewed-v1",
+        "idempotency_key": "i4-auto-test-unique-idempotency-20261026",
+        "request_nonce": "i4-auto-test-unique-nonce-20261026",
+    }), ref
+
+
+def _i4_auth(monkeypatch):
+    monkeypatch.setattr(settings, "hermes_intake_enabled", True)
+    monkeypatch.setattr(settings, "hermes_intake_key_id", TEST_KEY_ID)
+    monkeypatch.setattr(settings, "hermes_intake_shared_secret", SecretStr(TEST_SECRET))
+
+
+def _i4_post(client, req):
+    body = req.model_dump_json().encode("utf-8")
+    return client.post("/api/v1/hermes/articles/intake", content=body,
+                       headers=_headers(body, nonce=req.request_nonce))
+
+
+def test_i4_signed_new_candidate_provisioning_and_no_publication(client, monkeypatch):
+    _i4_auth(monkeypatch)
+    req, ref = _i4_signed_request()
+    body = req.model_dump_json().encode("utf-8")
+    headers = _headers(body, nonce=req.request_nonce)
+    invalid = client.post("/api/v1/hermes/articles/intake", content=body,
+                          headers={**headers, "X-Hermes-Signature": "0" * 64})
+    assert invalid.status_code == 403
+    with SessionLocal() as db:
+        assert db.get(WebArticleCandidate, req.candidate_id) is None
+    first = _i4_post(client, req)
+    assert first.status_code == 200, first.text
+    answer = first.json()
+    assert answer["status"] == "accepted"
+    assert answer["article_status"] == "draft"
+    with SessionLocal() as db:
+        candidate = db.get(WebArticleCandidate, req.candidate_id)
+        article = db.get(WebArticle, answer["article_id"])
+        assert candidate is not None and article is not None
+        assert candidate.source_ref == ref
+        assert candidate.source_kind == "news_handoff"
+        assert candidate.status == article.status == "draft"
+        assert all(row["review_status"] == "pending" for row in article.claim_source_matrix)
+    second = _i4_post(client, req)
+    assert second.status_code == 200 and second.json()["status"] == "duplicate"
+    assert second.json()["article_id"] == answer["article_id"]
+    assert client.get(f"/api/v1/public/articles/{req.article.slug}").status_code == 404
+
+
+def test_i4_reject_unknown_candidate_forged_claim_and_unsafe_source(client, monkeypatch):
+    _i4_auth(monkeypatch)
+    req, ref = _i4_signed_request()
+    bad = req.model_copy(update={"candidate_id": "f" * 32})
+    res = _i4_post(client, bad)
+    assert res.status_code == 422 and res.json()["detail"] == "candidate_missing"
+    proposal = req.article.model_copy(deep=True)
+    proposal.claim_source_matrix[0].review_status = "verified"
+    forged = req.model_copy(update={"candidate_id": _candidate_id(),
+                                    "article": proposal})
+    res = _i4_post(client, forged)
+    assert res.status_code == 422
+    assert res.json()["detail"] == "hermes_review_attestation_forbidden"
+    untrusted = req.article.model_copy(deep=True)
+    untrusted.sources[0].url = "https://untrusted.invalid/article"
+    bad = req.model_copy(update={"candidate_id": "e" * 32, "article": untrusted})
+    res = _i4_post(client, bad)
+    assert res.status_code == 422
+    assert res.json()["detail"] == "hermes_source_untrusted"
+    with SessionLocal() as db:
+        assert db.get(WebArticleCandidate, req.candidate_id) is None
+
+
+def test_i4_signed_replay_with_new_nonce_cannot_overwrite_slug(client, monkeypatch):
+    _i4_auth(monkeypatch)
+    req, ref = _i4_signed_request()
+    original = _i4_post(client, req)
+    assert original.status_code == 200, original.text
+    second = req.model_copy(update={
+        "idempotency_key": "i4-second-idempotency-key-20261026",
+        "request_nonce": "i4-second-nonce-for-same-slug-20261026",
+    })
+    denied = _i4_post(client, second)
+    assert denied.status_code == 409 and denied.json()["detail"] == "slug_conflict"
+    with SessionLocal() as db:
+        original_article = db.get(WebArticle, original.json()["article_id"])
+        assert original_article is not None
+        assert original_article.status == "draft"
+        assert original_article.content_version == 1
