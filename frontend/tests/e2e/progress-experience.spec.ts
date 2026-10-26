@@ -2208,6 +2208,73 @@ test('#1189 keeps measurement inputs visible in a keyboard-sized viewport', asyn
   }
 });
 
+test('#1189 iOS PWA delegates measurement keyboard focus and typing to the native viewport', async ({
+  page,
+}) => {
+  // Mirror the already accepted active-workout #1099 standalone PWA harness.
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query: string) => {
+      const result = original(query);
+      if (query === '(display-mode: standalone)') {
+        Object.defineProperty(result, 'matches', { configurable: true, value: true });
+      }
+      return result;
+    };
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+  });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  const weight = diary.getByLabel('Вес, кг');
+  const chest = diary.getByLabel('Грудь, см');
+  const waist = diary.getByLabel('Талия, см');
+  await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute(
+    'data-yfc-measurement-pwa-focus-placement',
+    'true',
+  );
+
+  await page.evaluate(() => {
+    const root = window as Window & { __yfc1189ScrollCalls?: number };
+    const original = window.scrollBy.bind(window);
+    root.__yfc1189ScrollCalls = 0;
+    window.scrollBy = (x: number | ScrollToOptions, y?: number) => {
+      root.__yfc1189ScrollCalls = (root.__yfc1189ScrollCalls ?? 0) + 1;
+      if (typeof x === 'number') return original(x, y ?? 0);
+      return original(x);
+    };
+    document.documentElement.setAttribute('data-yfc-keyboard', 'visible');
+  });
+
+  // Native focus may pan the page; application-owned scrollBy must not pan it again.
+  // The viewport simulates an opened numeric keyboard, not a physical iOS keyboard.
+  for (const width of [393, 320]) {
+    await page.setViewportSize({ width, height: 440 });
+    await weight.fill('75.25');
+    await chest.fill('102');
+    await waist.fill('84');
+    await weight.press('Backspace');
+    await weight.press('5');
+    await expect(weight).toHaveValue('75.25');
+    await expect(chest).toHaveValue('102');
+    await expect(waist).toHaveValue('84');
+    await expect(weight).toBeFocused();
+    await expect(weight).toHaveCSS('scroll-margin-block-start', '0px');
+    await expect(diary.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'static');
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __yfc1189ScrollCalls?: number }).__yfc1189ScrollCalls,
+      ),
+    ).toBe(0);
+  }
+});
+
 test('quick measurement can return without losing an unsaved draft', async ({ page }) => {
   await mockProgress(page);
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
