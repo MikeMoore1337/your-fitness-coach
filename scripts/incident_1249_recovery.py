@@ -241,6 +241,17 @@ def self_test() -> None:
     candidate = candidate_fix(prefix + b"TEST_KEY=thing(hello)\n", "TEST_KEY")
     assert candidate.splitlines()[29] == b"TEST_KEY='thing(hello)'"
     assert bash_valid(candidate)
+    extra = candidate_fix(
+        prefix + b"TEST_KEY=thing(hello)\nNEXT_KEY=other(value)\n", "TEST_KEY"
+    )
+    assert bash_valid(extra)
+    assert extra.splitlines()[30] == b"NEXT_KEY='other(value)'"
+    try:
+        candidate_fix(prefix + b"TEST_KEY=thing(hello)\n" + b"EXTRA=other(value)\n" * 4, "TEST_KEY")
+    except RecoveryError:
+        pass
+    else:
+        raise AssertionError("more than three additional corrections must be rejected")
     try:
         candidate_fix(prefix + b"TEST_KEY=$(echo hello)\n", "TEST_KEY")
     except RecoveryError:
