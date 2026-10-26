@@ -1,6 +1,11 @@
 name: Incident 1249 production environment recovery
 
 on:
+  # A single read-only diagnosis is triggered when this workflow first lands on protected master.
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/incident-1249-production-recovery.yml
   workflow_dispatch:
     inputs:
       operation:
@@ -34,7 +39,7 @@ jobs:
     timeout-minutes: 15
     environment: production
     env:
-      OPERATION: ${{ inputs.operation }}
+      OPERATION: ${{ github.event_name == 'push' && 'inspect' || inputs.operation }}
       EXPECTED_ENV_SHA256: ${{ inputs.expected_env_sha256 }}
       EXPECTED_ENV_KEY: ${{ inputs.expected_key }}
       PROD_HOST: 77.91.90.171
@@ -45,9 +50,13 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          test "$GITHUB_EVENT_NAME" = workflow_dispatch
-          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
           test "$GITHUB_REF" = refs/heads/master
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          else
+            test "$GITHUB_EVENT_NAME" = push
+            test "$OPERATION" = inspect
+          fi
           case "$OPERATION" in
             inspect)
               test -z "$EXPECTED_ENV_SHA256"
