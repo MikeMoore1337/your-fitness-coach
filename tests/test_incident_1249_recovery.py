@@ -59,6 +59,7 @@ def test_inspect_redacts_environment_values(
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
     monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
+    monkeypatch.setattr(recovery, "local_baseline_image_summary", lambda _rev: {})
     recovery.ENV_FILE.write_bytes(broken_env("password(secret)"))
     recovery.ENV_FILE.chmod(0o600)
     report = recovery.inspect()
@@ -90,6 +91,7 @@ def test_readonly_diagnostic_reports_sanitized_next_parse_line(
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
     monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
+    monkeypatch.setattr(recovery, "local_baseline_image_summary", lambda _rev: {})
     original = ("SAFE=value\n" * 29 + "FIRST_KEY=hello(first)\nSECOND_KEY=hello(second)\n").encode()
     recovery.ENV_FILE.write_bytes(original)
     recovery.ENV_FILE.chmod(0o600)
@@ -115,6 +117,7 @@ def test_line_98_diagnostic_previews_only_literal_without_exposing_token(
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
     monkeypatch.setattr(recovery, "container_summary", lambda: {})
     monkeypatch.setattr(recovery, "stopped_runtime_candidate_summary", lambda _rev: {})
+    monkeypatch.setattr(recovery, "local_baseline_image_summary", lambda _rev: {})
     original = (
         "SAFE=value\n" * 29
         + "OPEN_FOOD_FACTS_USER_AGENT=fitness(client)\n"
@@ -164,3 +167,29 @@ def test_stopped_runtime_probe_rejects_wrong_image_revision(
     states = report["service_states"]
     assert states["bot"]["oci_revision"] == "b" * 40
     assert states["backend"]["oci_revision"] == baseline
+
+
+def test_baseline_image_probe_requires_both_verified_immutable_images(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+    from subprocess import CompletedProcess
+
+    revision = "a" * 40
+
+    def fake_inspect(args: list[str], **_kwargs: object) -> CompletedProcess[str]:
+        assert args[:3] == ["docker", "image", "inspect"]
+        kind = "bot" if "-bot:" in args[3] else "backend"
+        observed_revision = "b" * 40 if kind == "bot" else revision
+        record = [{
+            "Config": {"Labels": {"org.opencontainers.image.revision": observed_revision}},
+            "RepoTags": [args[3]],
+            "RepoDigests": ["ghcr.io/example@sha256:" + "f" * 64],
+        }]
+        return CompletedProcess(args, 0, json.dumps(record), "")
+
+    monkeypatch.setattr(recovery.subprocess, "run", fake_inspect)
+    report = recovery.local_baseline_image_summary(revision)
+    assert report["available_for_restore"] is False
+    assert report["images"]["backend"]["revision_verified"] is True
+    assert report["images"]["bot"]["revision_verified"] is False
