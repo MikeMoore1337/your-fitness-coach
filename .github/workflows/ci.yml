@@ -375,7 +375,17 @@ jobs:
         run: echo "CI_CACHE package=playwright-mobile hit=${{ steps.mobile-playwright-cache.outputs.cache-hit }}"
       - name: Install mobile Chromium and WebKit
         working-directory: frontend
-        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+        # A Playwright browser cache hit already contains browser binaries.
+        # Running --with-deps also invokes unbounded apt on hosted runners;
+        # the I4 PR #1241 hit the 25-minute job timeout there despite a
+        # 364 MB browser cache hit. Keep actual browser/E2E tests mandatory:
+        # do not skip installation checks or shared regression execution.
+        run: |
+          if [ "${{ steps.mobile-playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install chromium webkit
+          else
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+          fi
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
