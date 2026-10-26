@@ -8053,6 +8053,20 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-height: 48px;
 }
 
+/* Match the active workout's standalone PWA focus ownership (#1099).
+   The native iOS keyboard positions the field; no app scroll offsets or anchoring. */
+html[data-yfc-measurement-pwa-focus-placement='true']
+  #appContent
+  .measurement-diary__form input:focus {
+  scroll-margin-block: 0px;
+}
+html[data-yfc-measurement-pwa-focus-placement='true']:has(#appContent .measurement-diary__form) {
+  scroll-padding-block: 0px;
+}
+html[data-yfc-measurement-pwa-focus-placement='true'] .measurement-diary__form {
+  overflow-anchor: none;
+}
+
 .measurement-diary__save-dock {
   display: grid;
   margin-top: 8px;
@@ -8530,8 +8544,7 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     min-width: 0;
   }
 
-  /* A sticky save action competes with native iOS keyboard scrolling and can hide
-     the active measurement input. Keep the form's normal flow while typing. */
+  /* Keep the keyboard from competing with the save action, as in active workout. */
   html[data-yfc-keyboard='visible'] .measurement-diary__save-dock {
     position: static;
   }
