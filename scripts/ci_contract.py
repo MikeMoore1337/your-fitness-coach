@@ -1026,12 +1026,22 @@ def write_router_outputs(decision: Mapping[str, object], destination: Path) -> N
     outputs = decision.get("outputs")
     if not isinstance(outputs, Mapping):
         raise CIContractError("Router decision has no outputs mapping")
+    # A one-off initial master->dev bootstrap can change thousands of files.
+    # GitHub caps a job's outputs at 1 MiB (approximated in UTF-16); do not
+    # export a megabyte of diagnostic paths. Scope classification above still
+    # receives the complete diff and always runs its conservative checks.
+    paths = decision["paths"]
+    serialized_paths = json.dumps(paths, ensure_ascii=False, separators=(",", ":"))
+    if len(serialized_paths.encode("utf-16-le")) > 16_384:
+        serialized_paths = json.dumps(
+            [f"__paths_truncated__:{len(paths)}"], separators=(",", ":")
+        )
     lines = [
         f"profile={decision['profile']}",
         f"required_groups={json.dumps(decision['required_groups'], ensure_ascii=False, separators=(',', ':'))}",
         f"required_jobs={json.dumps(decision['required_jobs'], ensure_ascii=False, separators=(',', ':'))}",
         f"skipped_groups={json.dumps(decision['skipped_groups'], ensure_ascii=False, separators=(',', ':'))}",
-        f"changed_paths={json.dumps(decision['paths'], ensure_ascii=False, separators=(',', ':'))}",
+        f"changed_paths={serialized_paths}",
     ]
     for key, value in outputs.items():
         lines.append(f"{key}={'true' if value else 'false'}")
