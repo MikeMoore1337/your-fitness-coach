@@ -403,6 +403,7 @@ jobs:
           missing="$(ldd "$HOME/.cache/ms-playwright/webkit-2336/minibrowser-wpe/bin/MiniBrowser" | grep 'not found' || true)"
           if [ -n "$missing" ]; then
             printf 'WEBKIT_SYSTEM_DEPENDENCY_MISSING=YES\n'
+            printf 'WEBKIT_MISSING_LIBS=%s\n' "$(printf '%s\n' "$missing" | sed -E 's/^[[:space:]]+//; s/ => not found$//' | paste -sd, -)"
             exit 1
           fi
       - name: Run shared mobile regression group
