@@ -3782,3 +3782,209 @@ test('тренер быстро переходит между программо
   await expect(assignmentContext.nth(1)).toHaveValue('701');
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
 });
+
+function issue1229Template(source: 'own' | 'trainer' | 'foreign' | 'none') {
+  const assigned = source !== 'none';
+  return {
+    ...previewTemplates()[0],
+    title: source === 'own' ? 'Моя активная программа' : 'Активная программа',
+    is_example: false,
+    is_public: false,
+    owner_user_id: source === 'own' ? 1 : source === 'foreign' ? 77 : null,
+    created_by_user_id: source === 'own' ? 1 : 99,
+    is_assigned_to_current_user: assigned,
+    is_active_for_current_user: assigned,
+    assigned_by_user_id: source === 'trainer' ? 99 : null,
+    assigned_by_full_name: source === 'trainer' ? 'Тренер Анна' : null,
+    assigned_program_id: assigned ? 501 : null,
+    assigned_program_status: assigned ? 'active' : null,
+    assigned_program_start_date: assigned ? '2030-01-01' : null,
+    assigned_program_duration_weeks: assigned ? 4 : null,
+    current_revision_number: assigned ? 1 : null,
+    can_edit: source === 'own',
+  };
+}
+
+test('Issue #1229 keeps active deletion full-width, confirmable and single-submit', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const activeTemplate = issue1229Template('own');
+  let deleted = false;
+  let deleteRequests = 0;
+  let releaseDelete!: () => void;
+
+  await mockApi(page);
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({ json: deleted ? [] : [activeTemplate] }),
+  );
+  await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/programs/assigned/501', (route) => {
+    deleteRequests += 1;
+    return new Promise<void>((resolve) => {
+      releaseDelete = () => {
+        deleted = true;
+        void route.fulfill({ status: 204, body: '' }).then(() => resolve());
+      };
+    });
+  });
+  await page.goto('/app?section=programs&view=manage');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const activeSection = page.locator('section.program-active');
+  const deleteButton = activeSection.getByRole('button', {
+    name: 'Удалить программу',
+    exact: true,
+  });
+  const sharePanel = activeSection.getByRole('region', { name: 'Поделиться программой' });
+  await expect(activeSection).toBeVisible();
+  await expect(sharePanel).toBeVisible();
+  await expect(activeSection.locator('details.program-danger-menu')).toHaveCount(0);
+  await expect(deleteButton).toHaveAttribute('type', 'button');
+
+  const setTheme = async (theme: 'dark' | 'light') => {
+    await page.locator('html').evaluate((element, value) => {
+      element.setAttribute('data-color-scheme', value);
+    }, theme);
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+  };
+  const evidenceDir = process.env.ISSUE_1229_EVIDENCE_DIR;
+  if (evidenceDir) mkdirSync(evidenceDir, { recursive: true });
+  for (const width of [320, 360, 393, 430]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const theme of ['dark', 'light'] as const) {
+      await setTheme(theme);
+      await expect(deleteButton).toBeVisible();
+      const [deleteBox, shareButtonBox, sectionBox] = await Promise.all([
+        deleteButton.boundingBox(),
+        sharePanel.getByRole('button', { name: 'Поделиться программой' }).boundingBox(),
+        activeSection.boundingBox(),
+      ]);
+      expect(deleteBox).not.toBeNull();
+      expect(shareButtonBox).not.toBeNull();
+      expect(sectionBox).not.toBeNull();
+      expect(Math.abs(deleteBox!.x - shareButtonBox!.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs(deleteBox!.width - shareButtonBox!.width)).toBeLessThanOrEqual(1);
+      const contentWidth = await activeSection.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return (
+          element.clientWidth -
+          Number.parseFloat(style.paddingLeft) -
+          Number.parseFloat(style.paddingRight)
+        );
+      });
+      expect(Math.abs(deleteBox!.width - contentWidth)).toBeLessThanOrEqual(1);
+      expect(deleteBox!.height).toBeGreaterThanOrEqual(44);
+      if (evidenceDir) {
+        await page.screenshot({
+          path: path.join(evidenceDir, `after-${theme}-${width}.png`),
+          animations: 'disabled',
+          fullPage: true,
+        });
+      }
+    }
+  }
+
+  await deleteButton.scrollIntoViewIfNeeded();
+  const dockGeometry = await page.evaluate(() => {
+    const target = document.querySelector<HTMLElement>('.program-active__delete-action');
+    const dock = document.querySelector<HTMLElement>('#appBottomNav');
+    const targetBox = target?.getBoundingClientRect();
+    const dockBox = dock?.getBoundingClientRect();
+    const dockStyle = dock ? getComputedStyle(dock) : null;
+    return {
+      targetBottom: targetBox?.bottom ?? null,
+      dockTop: dockBox?.top ?? null,
+      dockVisible: Boolean(
+        dockBox &&
+        dockBox.width > 0 &&
+        dockBox.height > 0 &&
+        dockStyle?.display !== 'none' &&
+        dockStyle?.visibility !== 'hidden',
+      ),
+    };
+  });
+  if (dockGeometry.dockVisible) {
+    expect(dockGeometry.targetBottom).toBeLessThanOrEqual((dockGeometry.dockTop ?? 0) + 1);
+  }
+  await deleteButton.click();
+  const confirmation = page.getByRole('dialog', { name: 'Удалить текущую программу?' });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText(
+    'История выполненных тренировок и сам шаблон программы сохранятся.',
+  );
+  await confirmation.getByRole('button', { name: 'Отмена' }).click();
+  await expect(confirmation).toHaveCount(0);
+  expect(deleteRequests).toBe(0);
+
+  await deleteButton.click();
+  await confirmation.getByRole('button', { name: 'Удалить программу' }).click();
+  await expect(deleteButton).toBeDisabled();
+  await deleteButton.dispatchEvent('click');
+  await expect.poll(() => deleteRequests).toBe(1);
+  releaseDelete();
+  await expect(page.getByRole('heading', { name: 'План ещё не выбран' })).toBeVisible();
+  await expect(page.getByRole('status')).toContainText('Программа удалена');
+});
+
+test('Issue #1229 keeps the active delete action after a server error', async ({ page }) => {
+  await mockApi(page);
+  const activeTemplate = issue1229Template('trainer');
+  await page.route('**/api/v1/programs/templates/mine', (route) =>
+    route.fulfill({ json: [activeTemplate] }),
+  );
+  await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+  await page.route('**/api/v1/programs/assigned/501', (route) =>
+    route.fulfill({ status: 500, json: { detail: 'Не удалось удалить программу' } }),
+  );
+  await page.goto('/app?section=programs&view=manage');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const activeSection = page.locator('section.program-active');
+  await activeSection.getByRole('button', { name: 'Удалить программу', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Удалить текущую программу?' });
+  await confirmation.getByRole('button', { name: 'Удалить программу' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Сервис временно недоступен. Попробуйте ещё раз.',
+  );
+  await expect(activeSection.getByRole('button', { name: 'Удалить программу' })).toBeEnabled();
+});
+
+test('Issue #1229 preserves share permissions and the no-assignment state', async ({ browser }) => {
+  const assertSource = async (source: 'trainer' | 'foreign' | 'none') => {
+    const page = await browser.newPage();
+    await mockApi(page);
+    await page.route('**/api/v1/programs/templates/mine', (route) =>
+      route.fulfill({ json: [issue1229Template(source)] }),
+    );
+    await page.route('**/api/v1/shares', (route) => route.fulfill({ json: [] }));
+
+    await page.goto('/app?section=programs&view=manage');
+    await page.getByRole('button', { name: 'Клиент' }).click();
+    const activeSection = page.locator('section.program-active');
+    await expect(activeSection).toBeVisible();
+    if (source === 'none') {
+      await expect(
+        activeSection.getByRole('heading', { name: 'План ещё не выбран' }),
+      ).toBeVisible();
+      await expect(
+        activeSection.getByRole('button', { name: 'Удалить программу', exact: true }),
+      ).toHaveCount(0);
+    } else {
+      await expect(
+        activeSection.getByRole('heading', { name: 'Активная программа' }),
+      ).toBeVisible();
+      await expect(
+        activeSection.getByRole('region', { name: 'Поделиться программой' }),
+      ).toHaveCount(0);
+      await expect(
+        activeSection.getByRole('button', { name: 'Удалить программу', exact: true }),
+      ).toBeVisible();
+    }
+    await page.close();
+  };
+
+  await assertSource('trainer');
+  await assertSource('foreign');
+  await assertSource('none');
+});
