@@ -248,6 +248,60 @@ test('an unplanned day keeps the first factual cardio entry compact but availabl
   await expect(duration).toBeVisible();
 });
 
+test('cardio date and time stays inside its card on narrow Mobile Web and TMA screens', async ({
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await Promise.all([
+    installPlatformApi(mobilePage, { browserSession: true, cardioState: 'empty' }),
+    installPlatformApi(tmaPage, { cardioState: 'empty' }),
+  ]);
+  await Promise.all([
+    mobilePage.goto('/app?section=today&cardio=1'),
+    tmaPage.goto('/app?section=today&cardio=1'),
+  ]);
+
+  for (const page of [mobilePage, tmaPage]) {
+    const card = page.locator('.cardio-log--quick');
+    const date = card.getByLabel('Дата и время');
+    await expect(date).toHaveAttribute('type', 'datetime-local');
+    await date.fill('2026-10-26T14:00');
+    await expect(date).toHaveValue('2026-10-26T14:00');
+
+    for (const width of [320, 360, 390, 430]) {
+      await page.setViewportSize({ width, height: 844 });
+      if (page === tmaPage) await tma.setViewport(844, 844);
+
+      const geometry = await date.evaluate((input) => {
+        const field = input.closest('.ui-field');
+        const card = input.closest('.cardio-log');
+        if (!field || !card) throw new Error('Cardio date field or card is missing');
+        const control = input.getBoundingClientRect();
+        const fieldBox = field.getBoundingClientRect();
+        const cardBox = card.getBoundingClientRect();
+        return {
+          left: control.left,
+          right: control.right,
+          fieldLeft: fieldBox.left,
+          fieldRight: fieldBox.right,
+          cardRight: cardBox.right,
+          cardOverflow: card.scrollWidth - card.clientWidth,
+          pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+
+      expect(geometry.left).toBeGreaterThanOrEqual(geometry.fieldLeft - 1);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.fieldRight + 1);
+      expect(geometry.right).toBeLessThanOrEqual(geometry.cardRight + 1);
+      expect(geometry.right).toBeLessThanOrEqual(width + 1);
+      expect(geometry.cardOverflow).toBeLessThanOrEqual(1);
+      expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+      await expect(date).toHaveValue('2026-10-26T14:00');
+    }
+  }
+});
+
 test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior', async ({
   mobilePage,
   tma,
