@@ -79,3 +79,27 @@ def test_candidate_rejects_more_than_three_additional_lines() -> None:
     original = broken_env() + b"OTHER_AGENT=another(contact@example.org)\n" * 4
     with pytest.raises(recovery.RecoveryError, match="too many additional"):
         recovery.candidate_fix(original, "EXPECTED_KEY")
+
+
+def test_readonly_diagnostic_reports_sanitized_next_parse_line(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(recovery, "APP_ROOT", tmp_path)
+    monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
+    monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
+    monkeypatch.setattr(recovery, "container_summary", lambda: {})
+    original = ("SAFE=value\n" * 29 + "FIRST_KEY=hello(first)\nSECOND_KEY=hello(second)\n").encode()
+    recovery.ENV_FILE.write_bytes(original)
+    recovery.ENV_FILE.chmod(0o600)
+
+    report = recovery.inspect()
+    assert report["env_bash_syntax_valid"] is False
+    assert report["bash_parse_error_line"] == 30
+    assert report["bash_parse_error_key"] == "FIRST_KEY"
+    assert report["line_30_preview_error_line"] == 31
+    assert report["line_30_preview_error_key"] == "SECOND_KEY"
+    assert report["bounded_preview_bash_valid"] is True
+    assert report["bounded_preview_error_line"] is None
+    assert "hello(first)" not in str(report)
+    assert "hello(second)" not in str(report)
+    assert recovery.ENV_FILE.read_bytes() == original
