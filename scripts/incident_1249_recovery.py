@@ -152,7 +152,7 @@ def _quote_simple_assignment(line: str, required_key: str | None = None) -> tupl
     key, value = match.groups()
     if not value or not any(char in value for char in "()"):
         return None
-    if any(char in value for char in "\\\\$`\u0022\u0027;&|<>#"):
+    if any(char in value for char in (chr(92), chr(36), chr(96), chr(34), chr(39), ";", "&", "|", "<", ">", "#")):
         raise RecoveryError(f"complex shell syntax at assignment for {key}; manual review required")
     return f"{key}={shlex.quote(value)}{suffix}", key
 
