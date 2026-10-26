@@ -306,6 +306,9 @@ def telegram_init_auth(
     payload: TelegramInitRequest,
     db: Session = Depends(get_db),
 ):
+    if settings.dev_auth_fixed_accounts_only:
+        raise HTTPException(status_code=403, detail="Telegram-вход отключён для DEV")
+
     init_data = payload.init_data.strip()
     if not init_data:
         raise HTTPException(status_code=400, detail="init_data is required")
@@ -1195,6 +1198,23 @@ def dev_login(
 ):
     if not settings.enable_dev_auth:
         raise HTTPException(status_code=403, detail="Dev-вход отключён")
+
+    # Browser testing through a private Tailscale link must not permit arbitrary
+    # identities or client-assigned roles. Keep flexible test fixture behavior
+    # when this opt-in setting is disabled.
+    if settings.dev_auth_fixed_accounts_only:
+        allowed_roles = {
+            2001: (False, False),  # Client
+            1002: (True, False),  # Coach
+            1001: (True, True),  # Admin / local Root
+        }
+        expected_roles = allowed_roles.get(payload.telegram_user_id)
+        if (
+            settings.app_env != "dev"
+            or expected_roles is None
+            or (payload.is_coach, payload.is_admin) != expected_roles
+        ):
+            raise HTTPException(status_code=403, detail="DEV-аккаунт не разрешён")
 
     username = normalize_telegram_username(payload.username) if payload.username else None
     user = db.query(User).filter(User.telegram_user_id == payload.telegram_user_id).first()
