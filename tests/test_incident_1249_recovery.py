@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from scripts import incident_1249_recovery as recovery
 
 
@@ -52,7 +51,9 @@ def test_repair_requires_prior_checksum_and_preserves_private_backup(
         recovery.fix_env(recovery.checksum(original), "EXPECTED_KEY")
 
 
-def test_inspect_redacts_environment_values(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_inspect_redacts_environment_values(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(recovery, "APP_ROOT", tmp_path)
     monkeypatch.setattr(recovery, "ENV_FILE", tmp_path / ".env")
     monkeypatch.setattr(recovery, "MARKER", tmp_path / "marker")
