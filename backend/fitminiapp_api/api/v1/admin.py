@@ -19,6 +19,7 @@ from fitminiapp_api.schemas.admin import (
 from fitminiapp_api.schemas.articles import (
     OwnerArticleReviewDetail,
     OwnerArticleReviewRow,
+    OwnerExistingDraftPublishRequest,
     OwnerWebArticlePublishRequest,
     OwnerWebArticlePublishResponse,
 )
@@ -40,6 +41,7 @@ from fitminiapp_api.services.editorial_inbox import (
 )
 from fitminiapp_api.services.web_articles import (
     WebArticleError,
+    publish_existing_owner_article,
     publish_owner_web_article,
 )
 
@@ -180,6 +182,40 @@ def admin_article_draft_detail(
     if result is None:
         raise HTTPException(status_code=404, detail="article_not_found")
     return result
+
+
+@router.post("/articles/drafts/publish", response_model=OwnerWebArticlePublishResponse)
+def admin_publish_existing_article(
+    payload: OwnerExistingDraftPublishRequest,
+    current_user: User = Depends(require_root_admin),
+) -> OwnerWebArticlePublishResponse:
+    """Root-only explicit confirmation of an exact existing draft revision."""
+    try:
+        with get_session_context() as db:
+            article = publish_existing_owner_article(
+                db,
+                article_id=payload.article_id,
+                expected_content_hash=payload.expected_content_hash,
+                expected_content_version=payload.expected_content_version,
+                actor_user_id=current_user.id,
+            )
+            return OwnerWebArticlePublishResponse(
+                article_id=article.id,
+                slug=article.slug,
+                article_status="published",
+                content_version=article.content_version,
+                canonical_url=article.canonical_url,
+                editorial_decision="root_owner_publication",
+                scientific_verification="not_attested",
+            )
+    except WebArticleError as exc:
+        if exc.code == "article_not_found":
+            raise HTTPException(status_code=404, detail=exc.code) from exc
+        if exc.code == "article_revision_conflict":
+            raise HTTPException(status_code=409, detail=exc.code) from exc
+        raise HTTPException(status_code=422, detail=exc.code) from exc
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="article_conflict") from exc
 
 
 @router.post("/articles/publish", response_model=OwnerWebArticlePublishResponse)
