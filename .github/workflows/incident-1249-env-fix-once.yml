@@ -1,0 +1,118 @@
+name: Incident 1249 one-time production env syntax repair
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/incident-1249-env-fix-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  one-time-fix:
+    name: Compare-and-swap repair of exact line 30 (no container mutation)
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 15
+    env:
+      PROD_HOST: 77.91.90.171
+      PROD_PORT: '1337'
+      PROD_USER: yfc-deploy
+      BASELINE_REVISION: 0e6aa0376f672f4b598f92ccf1a48f704e3de8e8
+      EXPECTED_ENV_SHA256: 8f53745d9f6dbf84adeea0486bee634957a4e4dc461c85a9f22a540ec850f983
+      EXPECTED_ENV_KEY: OPEN_FOOD_FACTS_USER_AGENT
+    steps:
+      - name: Require owner protected-master push
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_EVENT_NAME" = push
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          test "$GITHUB_REPOSITORY" = "$GITHUB_REPOSITORY_OWNER/your-fitness-coach"
+
+      - name: Check out trusted audited helper
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          persist-credentials: false
+
+      - name: Validate repair helper without production secrets
+        run: python3 scripts/incident_1249_recovery.py --self-test
+
+      - name: Configure strict production SSH
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+
+      - name: Verify exact observed env, baseline, and stopped runtime
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -p "$PROD_PORT")
+          ssh "${SSH_ARGS[@]}" "$PROD_USER@$PROD_HOST" \
+            "python3 - inspect" < scripts/incident_1249_recovery.py > preflight.json
+          jq -e --arg hash "$EXPECTED_ENV_SHA256" --arg key "$EXPECTED_ENV_KEY" --arg rev "$BASELINE_REVISION" '
+            .env_sha256 == $hash and
+            .line_30_key == $key and
+            .env_bash_syntax_valid == false and
+            .env_private == true and
+            .env_owner_is_operator == true and
+            .baseline_revision == $rev and
+            .current_release_relative == $rev and
+            .baseline_deployment_marker_matches == true and
+            .baseline_release_exists == true and
+            .compose_service_states.backend.running == 0 and
+            .compose_service_states.worker.running == 0 and
+            .compose_service_states.bot.running == 0
+          ' preflight.json >/dev/null
+          echo 'INCIDENT_1249_PRE_REPAIR=PASS'
+
+      - name: Apply only the validated line 30 syntax correction
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -p "$PROD_PORT")
+          ssh "${SSH_ARGS[@]}" "$PROD_USER@$PROD_HOST" \
+            "python3 - fix_env '$EXPECTED_ENV_SHA256' '$EXPECTED_ENV_KEY'" \
+            < scripts/incident_1249_recovery.py > repair.json
+          jq -e --arg key "$EXPECTED_ENV_KEY" '
+            .operation == "fix_env" and
+            .env_bash_syntax_valid == true and
+            .backup_created == true and
+            .key == $key and
+            .containers_started == false
+          ' repair.json >/dev/null
+          echo 'INCIDENT_1249_ENV_REPAIR=PASS'
+
+      - name: Verify repaired env and unchanged release baseline
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SSH_ARGS=(-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=10 -p "$PROD_PORT")
+          ssh "${SSH_ARGS[@]}" "$PROD_USER@$PROD_HOST" \
+            "python3 - inspect" < scripts/incident_1249_recovery.py > after.json
+          jq -e --arg rev "$BASELINE_REVISION" --arg before "$EXPECTED_ENV_SHA256" '
+            .env_bash_syntax_valid == true and
+            .env_sha256 != $before and
+            .baseline_revision == $rev and
+            .current_release_relative == $rev and
+            .baseline_deployment_marker_matches == true and
+            .compose_service_states.backend.running == 0 and
+            .compose_service_states.worker.running == 0 and
+            .compose_service_states.bot.running == 0
+          ' after.json >/dev/null
+          echo 'INCIDENT_1249_POST_REPAIR=PASS'
