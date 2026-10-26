@@ -20,9 +20,9 @@ from fitminiapp_api.services.news_hermes import hermes_signature
 from fitminiapp_api.services.web_articles import (
     ArticleCandidateSignals,
     WebArticleError,
+    _i4_candidate_receipt,
     create_article_candidate,
     publish_web_article,
-    _i4_candidate_receipt,
 )
 
 ARTICLE_FIXTURE = Path(__file__).parent / "fixtures" / "i3_plant_recovery_editorial_draft.json"
@@ -130,11 +130,14 @@ def test_real_route_accepts_i3_draft_but_never_publishes(client, monkeypatch) ->
 def _i4_signed_request():
     req = _request("0" * 32)
     cid, ref = _i4_candidate_receipt(req.article)
-    return req.model_copy(update={
-        "candidate_id": cid, "research_version": "i4-reviewed-v1",
-        "idempotency_key": "i4-auto-test-unique-idempotency-20261026",
-        "request_nonce": "i4-auto-test-unique-nonce-20261026",
-    }), ref
+    return req.model_copy(
+        update={
+            "candidate_id": cid,
+            "research_version": "i4-reviewed-v1",
+            "idempotency_key": "i4-auto-test-unique-idempotency-20261026",
+            "request_nonce": "i4-auto-test-unique-nonce-20261026",
+        }
+    ), ref
 
 
 def _i4_auth(monkeypatch):
@@ -145,8 +148,11 @@ def _i4_auth(monkeypatch):
 
 def _i4_post(client, req):
     body = req.model_dump_json().encode("utf-8")
-    return client.post("/api/v1/hermes/articles/intake", content=body,
-                       headers=_headers(body, nonce=req.request_nonce))
+    return client.post(
+        "/api/v1/hermes/articles/intake",
+        content=body,
+        headers=_headers(body, nonce=req.request_nonce),
+    )
 
 
 def test_i4_signed_new_candidate_provisioning_and_no_publication(client, monkeypatch):
@@ -154,8 +160,11 @@ def test_i4_signed_new_candidate_provisioning_and_no_publication(client, monkeyp
     req, ref = _i4_signed_request()
     body = req.model_dump_json().encode("utf-8")
     headers = _headers(body, nonce=req.request_nonce)
-    invalid = client.post("/api/v1/hermes/articles/intake", content=body,
-                          headers={**headers, "X-Hermes-Signature": "0" * 64})
+    invalid = client.post(
+        "/api/v1/hermes/articles/intake",
+        content=body,
+        headers={**headers, "X-Hermes-Signature": "0" * 64},
+    )
     assert invalid.status_code == 403
     with SessionLocal() as db:
         assert db.get(WebArticleCandidate, req.candidate_id) is None
@@ -180,14 +189,13 @@ def test_i4_signed_new_candidate_provisioning_and_no_publication(client, monkeyp
 
 def test_i4_reject_unknown_candidate_forged_claim_and_unsafe_source(client, monkeypatch):
     _i4_auth(monkeypatch)
-    req, ref = _i4_signed_request()
+    req, _ = _i4_signed_request()
     bad = req.model_copy(update={"candidate_id": "f" * 32})
     res = _i4_post(client, bad)
     assert res.status_code == 422 and res.json()["detail"] == "candidate_missing"
     proposal = req.article.model_copy(deep=True)
     proposal.claim_source_matrix[0].review_status = "verified"
-    forged = req.model_copy(update={"candidate_id": _candidate_id(),
-                                    "article": proposal})
+    forged = req.model_copy(update={"candidate_id": _candidate_id(), "article": proposal})
     res = _i4_post(client, forged)
     assert res.status_code == 422
     assert res.json()["detail"] == "hermes_review_attestation_forbidden"
@@ -203,13 +211,15 @@ def test_i4_reject_unknown_candidate_forged_claim_and_unsafe_source(client, monk
 
 def test_i4_signed_replay_with_new_nonce_cannot_overwrite_slug(client, monkeypatch):
     _i4_auth(monkeypatch)
-    req, ref = _i4_signed_request()
+    req, _ = _i4_signed_request()
     original = _i4_post(client, req)
     assert original.status_code == 200, original.text
-    second = req.model_copy(update={
-        "idempotency_key": "i4-second-idempotency-key-20261026",
-        "request_nonce": "i4-second-nonce-for-same-slug-20261026",
-    })
+    second = req.model_copy(
+        update={
+            "idempotency_key": "i4-second-idempotency-key-20261026",
+            "request_nonce": "i4-second-nonce-for-same-slug-20261026",
+        }
+    )
     denied = _i4_post(client, second)
     assert denied.status_code == 409 and denied.json()["detail"] == "slug_conflict"
     with SessionLocal() as db:
