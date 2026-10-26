@@ -2056,6 +2056,22 @@ body:has(.daily-wellbeing-card.card-disclosure[open]) .app-quick-add-trigger--fl
   padding: 8px 4px;
   cursor: pointer;
 }
+
+/* Card body already supplies the header separator; the schedule list owns only internal dividers. */
+.app-section--programs .workout-schedule-card {
+  border: 1px solid var(--v2-border);
+  border-radius: var(--v2-region-radius);
+  background: var(--v2-surface);
+}
+
+.app-section--programs .workout-schedule-list {
+  border-top: 0;
+}
+
+.app-section--programs .workout-schedule-list > .workout-context-row:last-of-type {
+  border-bottom: 0;
+}
+
 @media (max-width: 680px) {
   .app-section--programs .program-history {
     gap: 16px;
