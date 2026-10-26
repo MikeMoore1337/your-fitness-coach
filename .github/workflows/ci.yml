@@ -394,7 +394,7 @@ jobs:
         # Keep real WebKit execution mandatory and bound this targeted
         # system package install; failure remains a required CI failure.
         run: |
-            sudo timeout -s KILL 150 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends libevent-2.1-7t64 libopus0 libvpx9 libwoff1 libharfbuzz-icu0 libhyphen0 libflite1 libenchant-2-2 libmanette-0.2-0 libgles2 libjpeg-turbo8 libwebp7 libwebpdemux2 libgstreamer-gl1.0-0
+          sudo timeout -s KILL 150 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends libevent-2.1-7t64 libopus0 libvpx9 libwoff1 libharfbuzz-icu0 libhyphen0 libflite1 libenchant-2-2 libmanette-0.2-0 libgles2 libjpeg-turbo8 libwebp7 libwebpdemux2 libgstreamer-gl1.0-0
           ldconfig -p | grep -F 'libevent-2.1.so.7'
           ldconfig -p | grep -F 'libopus.so.0'
           # Detect any remaining native WebKit prerequisites before running
