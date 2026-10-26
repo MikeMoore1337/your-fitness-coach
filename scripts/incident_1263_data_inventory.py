@@ -14,8 +14,7 @@ import os
 import re
 import stat
 import subprocess
-import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 APP_ROOT = Path("/srv/yfc/fit-mini-app")
@@ -65,7 +64,7 @@ def inventory_archives() -> list[dict[str, object]]:
                     "date": path.name[len("backup-") : len("backup-") + 10],
                     "location": "published" if directory != BACKUP_ROOT else "backup_root",
                     "size_bytes": info.st_size,
-                    "mtime_utc": datetime.fromtimestamp(info.st_mtime, timezone.utc).isoformat(),
+                    "mtime_utc": datetime.fromtimestamp(info.st_mtime, UTC).isoformat(),
                     "readable": os.access(path, os.R_OK),
                 }
                 if entry["readable"]:
@@ -84,7 +83,8 @@ def inventory_archives() -> list[dict[str, object]]:
                             raw = json.loads(manifest.read_text(encoding="utf-8"))
                             entry["manifest_match"] = (
                                 isinstance(raw, dict)
-                                and raw.get("archive_sha256", "")[:16] == entry.get("sha256_prefix", "!")
+                                and raw.get("archive_sha256", "")[:16]
+                                == entry.get("sha256_prefix", "!")
                                 and raw.get("archive_size_bytes") == info.st_size
                                 and raw.get("archive_name") == path.name
                             )
@@ -94,7 +94,7 @@ def inventory_archives() -> list[dict[str, object]]:
                                 and isinstance(raw.get("schema_revision", ""), str)
                                 else None
                             )
-                    except (OSError, ValueError):
+                    except OSError, ValueError:
                         entry["manifest_match"] = False
                 items.append(entry)
             except OSError:
@@ -113,11 +113,7 @@ def database_counts() -> dict[str, object]:
     counts: dict[str, int | None] = {}
     for table in TABLES:
         # Identifiers are code-defined, not user or environment input.
-        query = (
-            "SELECT COUNT(*) FROM public." + table
-            if table.isidentifier()
-            else "SELECT 0"
-        )
+        query = "SELECT COUNT(*) FROM public." + table if table.isidentifier() else "SELECT 0"
         cmd = [
             "docker",
             "exec",
@@ -133,7 +129,7 @@ def database_counts() -> dict[str, object]:
             result = run(cmd)
             value = result.stdout.strip()
             counts[table] = int(value) if result.returncode == 0 and value.isdigit() else None
-        except (OSError, subprocess.TimeoutExpired):
+        except OSError, subprocess.TimeoutExpired:
             counts[table] = None
     return {"database_available": True, "counts": counts}
 
@@ -151,8 +147,16 @@ def main() -> int:
         }
         print(json.dumps(result, sort_keys=True))
         return 0
-    except (OSError, subprocess.SubprocessError) as exc:
-        print(json.dumps({"task": "1263-data-recovery", "status": "BLOCKED", "error_type": type(exc).__name__}))
+    except OSError, subprocess.SubprocessError as exc:
+        print(
+            json.dumps(
+                {
+                    "task": "1263-data-recovery",
+                    "status": "BLOCKED",
+                    "error_type": type(exc).__name__,
+                }
+            )
+        )
         return 2
 
 
