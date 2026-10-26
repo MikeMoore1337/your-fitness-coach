@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { resolveExerciseMediaFrame } from './exerciseMediaFraming';
 
 type VideoSource = {
   url: string;
@@ -57,6 +58,7 @@ export function ExerciseGuideVideo({
   const shouldLoad = expanded || visible || typeof IntersectionObserver === 'undefined';
 
   if (!preferredSource) return null;
+  const frame = resolveExerciseMediaFrame(preferredSource);
 
   return (
     <video
@@ -73,6 +75,9 @@ export function ExerciseGuideVideo({
       onError={onError}
       aria-hidden="true"
       data-media-mode="video"
+      data-media-frame={frame.policy}
+      data-media-source-ratio={frame.sourceRatio ?? undefined}
+      style={{ objectPosition: frame.objectPosition }}
     />
   );
 }

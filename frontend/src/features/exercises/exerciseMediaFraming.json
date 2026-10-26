@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "default_strategy": "cover",
+  "default_object_position": "50% 50%",
+  "overrides": {
+    "battle-rope": {
+      "object_position": "32% 50%",
+      "reason": "Сохраняет человека, рукояти и начало обеих канатов в трёх проверенных фазах."
+    },
+    "cable-crunch": {
+      "object_position": "36% 50%",
+      "reason": "Приближает человека и трос, сохраняя блок справа как ориентир техники."
+    },
+    "cable-pushdown": {
+      "object_position": "38% 50%",
+      "reason": "Сохраняет корпус, рукоять и верхнюю часть блока без бессмысленного пустого края."
+    },
+    "close-grip-lat-pulldown": {
+      "object_position": "58% 50%",
+      "reason": "Сохраняет спортсмена, рукоять и направляющие тренажёра в кадре."
+    },
+    "donkey-calf-raise": {
+      "object_position": "34% 50%",
+      "reason": "Сохраняет спортсмена, платформу и опорную часть тренажёра."
+    },
+    "incline-bench-press": {
+      "object_position": "46% 50%",
+      "reason": "Сохраняет спортсмена, скамью, гриф и стойки в начале, середине и конце движения."
+    },
+    "overhead-triceps-extension": {
+      "object_position": "34% 50%",
+      "reason": "Сохраняет тело, рукоять, трос и траекторию к блоку."
+    },
+    "reverse-grip-lat-pulldown": {
+      "object_position": "58% 50%",
+      "reason": "Удерживает спортсмена и рукоять в центре при сохранении направляющих."
+    },
+    "single-arm-cable-triceps-extension": {
+      "object_position": "64% 50%",
+      "reason": "Сохраняет спортсмена, рабочую руку и трос; пустая часть слева не занимает квадрат."
+    },
+    "straight-arm-pulldown": {
+      "object_position": "64% 50%",
+      "reason": "Сохраняет спортсмена, рукоять и кабельную траекторию."
+    },
+    "woodchopper": {
+      "object_position": "56% 50%",
+      "reason": "Сохраняет спортсмена, рукоять и диагональную траекторию к блоку."
+    }
+  },
+  "exceptions": {
+    "plank": {
+      "strategy": "contain-exception",
+      "reason": "Корпус и конечности проходят почти через всю ширину кадра; любой квадратный фрагмент теряет голову или стопы на start/middle/end.",
+      "evidence": "evidence/motion-review/focal-candidates.png + evidence/motion-review/video-frames-3.png"
+    },
+    "push-up": {
+      "strategy": "contain-exception",
+      "reason": "Полная линия тела шире безопасного 56,25% фрагмента; cover теряет стопы или голову в зависимости от object-position.",
+      "evidence": "evidence/motion-review/focal-candidates.png + evidence/motion-review/video-frames-3.png"
+    },
+    "reverse-crunch": {
+      "strategy": "contain-exception",
+      "reason": "Движение меняет крайние точки тела по ширине; один квадрат не сохраняет голову и стопы во всех фазах.",
+      "evidence": "evidence/motion-review/focal-candidates.png + evidence/motion-review/video-frames-3.png"
+    },
+    "side-plank": {
+      "strategy": "contain-exception",
+      "reason": "Полная боковая линия тела выходит за любой безопасный квадратный фрагмент; crop обрезает голову или ноги.",
+      "evidence": "evidence/motion-review/focal-candidates.png + evidence/motion-review/video-frames-4.png"
+    }
+  }
+}
