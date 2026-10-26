@@ -131,10 +131,7 @@ async function assertMobileShellGeometry(page: Page): Promise<void> {
   await expectUiAuditClean(page, 'mobile shared shell', { checkTouchTargets: true });
 }
 
-test('@critical cardio native datetime stays within iPhone cards in light and dark', async (
-  { browser },
-  testInfo,
-) => {
+test('@critical cardio datetime fits iPhone WebKit and Chromium', async ({ browser }, testInfo) => {
   test.setTimeout(120_000);
   const filledDate = '2026-10-26T14:00';
 
