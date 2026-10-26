@@ -219,8 +219,7 @@ def stopped_runtime_candidate_summary(baseline_revision: str) -> dict[str, objec
             services[service] = {"available": False}
     report["service_states"] = services
     report["backend_worker_same_image"] = bool(
-        image_ids.get("backend")
-        and image_ids.get("backend") == image_ids.get("worker")
+        image_ids.get("backend") and image_ids.get("backend") == image_ids.get("worker")
     )
     report["baseline_revision_verified"] = bool(
         GIT_SHA_RE.fullmatch(baseline_revision)
