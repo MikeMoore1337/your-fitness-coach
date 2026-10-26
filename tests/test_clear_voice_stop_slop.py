@@ -2,6 +2,7 @@
 
 Synthetic fixtures do not prove model-output quality, medical claims or a live release.
 """
+
 from __future__ import annotations
 
 import importlib.util
