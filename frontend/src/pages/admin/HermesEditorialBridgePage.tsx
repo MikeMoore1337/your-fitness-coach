@@ -3,6 +3,8 @@ import { useAuth } from '../../app/AuthProvider';
 import { api } from '../../shared/api/client';
 
 const PROTOCOL = 'yfc-owner-editorial-bridge-v1';
+const GRANT_TTL_MS = 10 * 60_000;
+const CONFIRM_TTL_MS = 120_000;
 const HERMES_ORIGIN = 'https://hermes.mikemoore.top';
 const HEX32 = /^[0-9a-f]{32}$/;
 const HEX64 = /^[0-9a-f]{64}$/;
@@ -44,6 +46,8 @@ export default function HermesEditorialBridgePage() {
   const grantedRef = useRef(false);
   const pendingRef = useRef<PublishRequest | null>(null);
   const busyRef = useRef(false);
+  const grantExpiresRef = useRef(0);
+  const publishDeadlineRef = useRef(0);
 
   const send = useCallback((message: Record<string, unknown>) => {
     if (!window.opener || window.opener.closed) return;
@@ -70,6 +74,16 @@ export default function HermesEditorialBridgePage() {
         return;
       }
       if (m.nonce !== nonceRef.current || !grantedRef.current) return;
+      if (Date.now() > grantExpiresRef.current) {
+        grantedRef.current = false;
+        send({ kind: 'revoked', nonce: nonceRef.current });
+        setGranted(false);
+        setConnected(false);
+        setPending(null);
+        pendingRef.current = null;
+        nonceRef.current = null;
+        return;
+      }
       if (m.kind === 'disconnect') {
         grantedRef.current = false;
         nonceRef.current = null;
@@ -126,7 +140,14 @@ export default function HermesEditorialBridgePage() {
             title: article.title
           };
           pendingRef.current = request;
+          publishDeadlineRef.current = Date.now() + CONFIRM_TTL_MS;
           setPending(request);
+          window.setTimeout(() => {
+            if (pendingRef.current?.requestId !== id) return;
+            pendingRef.current = null;
+            setPending(null);
+            respond(id, null, false);
+          }, CONFIRM_TTL_MS);
         }).catch(() => respond(id, null, false))
           .finally(() => { busyRef.current = false; });
       }
@@ -138,6 +159,7 @@ export default function HermesEditorialBridgePage() {
   const grant = () => {
     if (!user?.is_root || !nonceRef.current) return;
     grantedRef.current = true;
+    grantExpiresRef.current = Date.now() + GRANT_TTL_MS;
     setGranted(true);
     send({ kind: 'granted', nonce: nonceRef.current });
   };
@@ -145,6 +167,13 @@ export default function HermesEditorialBridgePage() {
   const publish = async () => {
     const current = pendingRef.current;
     if (!current || !user?.is_root || !grantedRef.current || working) return;
+    if (Date.now() > publishDeadlineRef.current ||
+        Date.now() > grantExpiresRef.current) {
+      pendingRef.current = null; setPending(null);
+      respond(current.requestId, null, false);
+      setError('Время подтверждения истекло. Запросите новое подтверждение.');
+      return;
+    }
     setWorking(true); setError('');
     // This is a second explicit Root-owned click IN YFC, not a Hermes
     // background call or a bearer delegated to another origin.
