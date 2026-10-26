@@ -230,6 +230,16 @@ jobs:
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
         run: python scripts/ci_contract.py run-group frontend-checks
+      - name: I4 Prettier diagnostics on failed checks
+        if: failure() && matrix.lane == 'checks'
+        working-directory: frontend
+        run: |
+          npx prettier --write src/pages/admin/HermesEditorialBridgePage.tsx src/shared/auth/oauthRecovery.ts src/shared/auth/redirects.ts tests/unit/shared/auth/redirects.test.ts
+          for f in src/pages/admin/HermesEditorialBridgePage.tsx src/shared/auth/oauthRecovery.ts src/shared/auth/redirects.ts tests/unit/shared/auth/redirects.test.ts; do
+            printf 'I4_FORMAT_BEGIN:%s\n' "$f"
+            base64 -w 76 "$f"
+            printf '\nI4_FORMAT_END:%s\n' "$f"
+          done
       - name: Run shared frontend unit group
         if: matrix.lane == 'unit'
         run: python scripts/ci_contract.py run-group frontend-unit
