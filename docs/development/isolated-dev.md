@@ -30,6 +30,26 @@
 
 `stop` сохраняет данные, `reset` удаляет тома **только** отдельного проекта `yfc-dev`. Не путать с production `docker-compose.yml`.
 
+## Диагностика запуска (Windows)
+
+Если Compose собрал образы и PostgreSQL стала Healthy, но скрипт не дождался `/health/ready`, сначала проверьте контейнеры и HTTP-статус без удаления базы:
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yml ps -a
+docker compose --env-file .env.dev -f compose.dev.yml logs --tail 100 backend setup
+curl.exe -i --max-time 10 http://127.0.0.1:18080/health/live
+curl.exe -i --max-time 10 http://127.0.0.1:18080/health/ready
+```
+
+`/health/live` проверяет HTTP-сервер, а `/health/ready` дополнительно выполняет `SELECT 1` в локальной PostgreSQL. Если сервер отвечает внутри контейнера, но не с Windows, проверить привязку порта:
+
+```powershell
+docker compose --env-file .env.dev -f compose.dev.yml port backend 8000
+docker compose --env-file .env.dev -f compose.dev.yml exec -T backend python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read().decode())"
+```
+
+Сценарий сброса тестовой базы для этой диагностики **не нужен**.
+
 ## 2. Реальный iPhone: приватный HTTPS через Tailscale Serve
 
 Tailscale Serve обеспечивает доступ **только устройствам в вашей приватной сети Tailscale** (tailnet), в отличие от публичного Tailscale Funnel. Для личного использования доступен бесплатный тариф. Не требуется дополнительный VPS, общедоступный IP или проброс портов роутера.
@@ -66,7 +86,7 @@ tailscale serve status
 
 ## 4. Изоляция и доставка
 
-`compose.dev.yml` - отдельный Compose project `yfc-dev`, база PostgreSQL 16, свой Docker volume, собственные ключи, сеть и отдельный образ. Bot и worker не запускаются, PWA выключена. У приложения нет публичных портов. Существующий pipeline автоматически выпускает проверенные изменения из `master` в production, поэтому **сначала** локально проверяем PR, только **потом** объединяем PR с `master`.
+`compose.dev.yml` - отдельный Compose project `yfc-dev`, база PostgreSQL 16, свой Docker volume, собственные ключи, сеть и отдельный образ. PostgreSQL и setup подключены исключительно к закрытой `dev_internal` сети. Backend дополнительно подключён к отдельной мостовой сети `dev_access`, необходимой Docker Desktop для доступа к опубликованному localhost-порту. Bot и worker не запускаются, PWA выключена. У приложения нет публичных портов. Существующий pipeline автоматически выпускает проверенные изменения из `master` в production, поэтому **сначала** локально проверяем PR, только **потом** объединяем PR с `master`.
 
 Сначала ожидается работающий Docker Engine на Windows; Windows-native Hermes BRC и Remote Desktop Commander при последней проверке не были подключены, поэтому работа DEV на реальном ПК не подтверждена.
 
