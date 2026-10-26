@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 import pytest
-from pydantic import SecretStr
+from pydantic import HttpUrl, SecretStr
 
 from fitminiapp_api.core.config import settings
 from fitminiapp_api.db.session import SessionLocal
@@ -200,7 +200,7 @@ def test_i4_reject_unknown_candidate_forged_claim_and_unsafe_source(client, monk
     assert res.status_code == 422
     assert res.json()["detail"] == "hermes_review_attestation_forbidden"
     untrusted = req.article.model_copy(deep=True)
-    untrusted.sources[0].url = "https://untrusted.invalid/article"
+    untrusted.sources[0].url = HttpUrl("https://untrusted.invalid/article")
     bad = req.model_copy(update={"candidate_id": "e" * 32, "article": untrusted})
     res = _i4_post(client, bad)
     assert res.status_code == 422
