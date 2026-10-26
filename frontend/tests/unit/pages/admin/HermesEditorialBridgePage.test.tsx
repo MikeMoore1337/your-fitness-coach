@@ -18,11 +18,7 @@ const NONCE = 'a'.repeat(64);
 const ARTICLE = 'b'.repeat(32);
 const HASH = 'c'.repeat(64);
 
-function deliver(
-  kind: string,
-  overrides: Record<string, unknown> = {},
-  origin = ORIGIN,
-): void {
+function deliver(kind: string, overrides: Record<string, unknown> = {}, origin = ORIGIN): void {
   act(() => {
     window.dispatchEvent(
       new MessageEvent('message', {
