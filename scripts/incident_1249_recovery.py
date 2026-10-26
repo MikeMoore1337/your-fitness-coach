@@ -25,6 +25,9 @@ MARKER = APP_ROOT / ".artifacts/operations/deployments/last-successful-revision"
 KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+ENV_READ_ERRORS = (OSError, UnicodeError)
+DOCKER_COMMAND_ERRORS = (OSError, subprocess.SubprocessError)
+SYMLINK_ERRORS = (OSError, ValueError)
 
 
 class RecoveryError(RuntimeError):
@@ -97,7 +100,7 @@ def container_summary() -> dict[str, object]:
                 "running": sum(s == "running" for s in states),
                 "exited": sum(s == "exited" for s in states),
             }
-        except (OSError, subprocess.SubprocessError):  # fmt: skip (Python 3.12 and 3.14 compatible)
+        except DOCKER_COMMAND_ERRORS:
             output[name] = {"available": False}
     return output
 
@@ -106,14 +109,14 @@ def inspect() -> dict[str, object]:
     data, info = env_data()
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
-    except (OSError, UnicodeError):  # fmt: skip (Python 3.12 and 3.14 compatible)
+    except ENV_READ_ERRORS:
         baseline = ""
     current = APP_ROOT / "current"
     link_target = ""
     if current.is_symlink():
         try:
             link_target = str(current.resolve(strict=True).relative_to(APP_ROOT / "releases"))
-        except (OSError, ValueError):  # fmt: skip (Python 3.12 and 3.14 compatible)
+        except SYMLINK_ERRORS:
             link_target = "untrusted"
     release_path = APP_ROOT / "releases" / baseline
     deployment_sha = ""
