@@ -10,7 +10,7 @@ export const HERMES_OWNER_ORIGIN = 'https://hermes.mikemoore.top';
 
 export function readHermesPairingNonce(hash: string): string | null {
   const match = /^#nonce=([0-9a-f]{64})$/.exec(hash);
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 export function canSendRootConsent(
