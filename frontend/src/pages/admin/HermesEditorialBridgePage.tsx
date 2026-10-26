@@ -162,6 +162,17 @@ export default function HermesEditorialBridgePage() {
     grantExpiresRef.current = Date.now() + GRANT_TTL_MS;
     setGranted(true);
     send({ kind: 'granted', nonce: nonceRef.current });
+    const deadline = grantExpiresRef.current;
+    window.setTimeout(() => {
+      if (!grantedRef.current || grantExpiresRef.current !== deadline) return;
+      grantedRef.current = false;
+      send({ kind: 'revoked', nonce: nonceRef.current });
+      nonceRef.current = null;
+      pendingRef.current = null;
+      setConnected(false);
+      setGranted(false);
+      setPending(null);
+    }, GRANT_TTL_MS);
   };
 
   const publish = async () => {
