@@ -2166,6 +2166,45 @@ test('#1190 saves body measurements with hundredths without HTML step mismatch',
   ).toBeVisible();
 });
 
+test('#1189 keeps measurement inputs visible in a keyboard-sized viewport', async ({ page }) => {
+  await mockProgress(page);
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  const weight = diary.getByLabel('Вес, кг');
+  const waist = diary.getByLabel('Талия, см');
+  const saveDock = diary.locator('.measurement-diary__save-dock');
+
+  // Reduced viewport is a browser regression fixture, not a real iOS keyboard.
+  for (const width of [320, 393]) {
+    await page.setViewportSize({ width, height: 440 });
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-yfc-keyboard', 'visible');
+    });
+
+    await weight.fill('72.34');
+    await expect(weight).toBeFocused();
+    await expect(saveDock).toHaveCSS('position', 'static');
+    const before = await page.evaluate(() => window.scrollY);
+    await weight.press('Backspace');
+    await weight.press('4');
+    const after = await page.evaluate(() => window.scrollY);
+    expect(Math.abs(after - before)).toBeLessThanOrEqual(2);
+
+    await waist.fill('71.23');
+    await expect(waist).toBeFocused();
+    const visible = await waist.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const top = window.visualViewport?.offsetTop ?? 0;
+      const bottom = top + (window.visualViewport?.height ?? window.innerHeight);
+      return rect.top >= top - 1 && rect.bottom <= bottom + 1;
+    });
+    expect(visible).toBe(true);
+    await expect(diary.getByRole('button', { name: 'Сохранить замер' })).toBeAttached();
+  }
+});
+
 test('quick measurement can return without losing an unsaved draft', async ({ page }) => {
   await mockProgress(page);
   await page.emulateMedia({ reducedMotion: 'reduce', colorScheme: 'light' });
