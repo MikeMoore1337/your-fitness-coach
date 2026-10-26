@@ -49,7 +49,7 @@ feature/* --PR + required checks--> protected dev (GitHub)
 Set-Location D:\Pet-projects\yfc-dev
 git status --short                    # должен быть пустым
 git fetch origin dev
-git switch -C dev --track origin/dev  # только для отдельной локальной копии DEV
+git switch -c dev --track origin/dev  # только если локальной ветки dev ещё нет
 .\scripts\dev.ps1 -Action start
 py -3.14 scripts/verify_dev_roles.py
 ```
