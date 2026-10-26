@@ -91,7 +91,9 @@ def maybe_seed_local_dev_data(db: Session) -> None:
         seed_local_dev_data(db)
 
 
-def _user(db: Session, telegram_id: int, *, name: str, coach: bool = False, admin: bool = False) -> User:
+def _user(
+    db: Session, telegram_id: int, *, name: str, coach: bool = False, admin: bool = False
+) -> User:
     user = db.query(User).filter_by(telegram_user_id=telegram_id).one_or_none()
     if user is None:
         user = User(telegram_user_id=telegram_id, username=f"dev_{telegram_id}")
@@ -136,7 +138,9 @@ def _coach_links(db: Session, coach_id: int, client_ids: list[int]) -> None:
             )
 
 
-def _program_history(db: Session, *, client_id: int, coach_id: int, template: ProgramTemplate, today: date) -> None:
+def _program_history(
+    db: Session, *, client_id: int, coach_id: int, template: ProgramTemplate, today: date
+) -> None:
     if db.query(UserProgram).filter_by(user_id=client_id).first():
         return
     start = today - timedelta(days=today.weekday() + 10 * 7)
@@ -173,7 +177,8 @@ def _program_history(db: Session, *, client_id: int, coach_id: int, template: Pr
                 completion_feedback="as_expected" if completed else None,
                 completion_note=(
                     "Жим ногами можно прибавить. Сравнить вес в каждом подходе на следующей неделе."
-                    if completed and day_index == 1 else None
+                    if completed and day_index == 1
+                    else None
                 ),
             )
             db.add(workout)
@@ -196,14 +201,21 @@ def _program_history(db: Session, *, client_id: int, coach_id: int, template: Pr
                 db.add(item)
                 db.flush()
                 for set_index in range(1, source.prescribed_sets + 1):
-                    weight = Decimal("20.25") + Decimal(exercise_index * 9) + Decimal(week) * Decimal("1.25") + Decimal(set_index - 1) * Decimal("2.50")
+                    weight = (
+                        Decimal("20.25")
+                        + Decimal(exercise_index * 9)
+                        + Decimal(week) * Decimal("1.25")
+                        + Decimal(set_index - 1) * Decimal("2.50")
+                    )
                     is_cardio = metric == "cardio"
                     db.add(
                         UserWorkoutSet(
                             workout_exercise_id=item.id,
                             set_number=set_index,
                             actual_weight=float(weight) if completed and not is_cardio else None,
-                            actual_reps=(8 + (set_index % 3)) if completed and not is_cardio else None,
+                            actual_reps=(8 + (set_index % 3))
+                            if completed and not is_cardio
+                            else None,
                             duration_minutes=20 if completed and is_cardio else None,
                             rir="2" if completed and not is_cardio else None,
                             set_kind="working",
@@ -216,9 +228,11 @@ def _measurements(db: Session, user_id: int, today: date, *, base_weight: Decima
     existing = db.query(BodyMeasurement).filter_by(user_id=user_id).first()
     if existing is not None:
         return
-    definition = db.query(BodyMeasurementDefinition).filter_by(
-        user_id=user_id, normalized_label="шея"
-    ).one_or_none()
+    definition = (
+        db.query(BodyMeasurementDefinition)
+        .filter_by(user_id=user_id, normalized_label="шея")
+        .one_or_none()
+    )
     if definition is None:
         definition = BodyMeasurementDefinition(
             user_id=user_id, label="Шея", normalized_label="шея", unit="cm"
@@ -254,17 +268,26 @@ def _nutrition(db: Session, *, user_id: int, coach_id: int, today: date, days: i
     if not db.query(NutritionTarget).filter_by(user_id=user_id).first():
         db.add(
             NutritionTarget(
-                user_id=user_id, assigned_by_user_id=coach_id,
-                effective_from=start, source="trainer", goal="muscle_gain",
-                calories=2500, protein_g=160, fat_g=80, carbs_g=285,
+                user_id=user_id,
+                assigned_by_user_id=coach_id,
+                effective_from=start,
+                source="trainer",
+                goal="muscle_gain",
+                calories=2500,
+                protein_g=160,
+                fat_g=80,
+                carbs_g=285,
                 note="Учебная цель для локального DEV, не рекомендация.",
             )
         )
     if not db.query(HydrationGoal).filter_by(user_id=user_id).first():
         db.add(
             HydrationGoal(
-                user_id=user_id, status="enabled", target_ml=2500,
-                source="manual", method_version=FIXTURE_VERSION,
+                user_id=user_id,
+                status="enabled",
+                target_ml=2500,
+                source="manual",
+                method_version=FIXTURE_VERSION,
                 effective_from=start,
             )
         )
@@ -274,9 +297,13 @@ def _nutrition(db: Session, *, user_id: int, coach_id: int, today: date, days: i
         for name, energy, protein, fat, carbs, fibre in FOOD_SPECS:
             db.add(
                 Food(
-                    name=name, owner_user_id=user_id, food_type="user",
-                    provenance="user", legacy_provenance="user",
-                    trust_level="verified", catalog_quality="private",
+                    name=name,
+                    owner_user_id=user_id,
+                    food_type="user",
+                    provenance="user",
+                    legacy_provenance="user",
+                    trust_level="verified",
+                    catalog_quality="private",
                     status="active",
                     nutrition_basis_kind="per_100_g",
                     nutrition_basis_amount=Decimal("100"),
@@ -304,15 +331,22 @@ def _nutrition(db: Session, *, user_id: int, coach_id: int, today: date, days: i
         for delta in range(days):
             diary_day = start + timedelta(days=delta)
             for meal_type, products in MEAL_SPECS:
-                for index, (food_index, grams) in enumerate(products):
-                    food = foods[(food_index + (delta % 3 if meal_type == "dinner" else 0)) % len(foods)]
+                for food_index, grams in products:
+                    food = foods[
+                        (food_index + (delta % 3 if meal_type == "dinner" else 0)) % len(foods)
+                    ]
                     qty = Decimal(grams) + Decimal(delta % 4) * Decimal("2.25")
                     db.add(
                         FoodDiaryEntry(
-                            user_id=user_id, food_id=food.id,
-                            diary_date=diary_day, meal_type=meal_type,
-                            entry_kind="food", nutrition_source="internal",
-                            amount=qty, amount_unit="g", weight_g=qty,
+                            user_id=user_id,
+                            food_id=food.id,
+                            diary_date=diary_day,
+                            meal_type=meal_type,
+                            entry_kind="food",
+                            nutrition_source="internal",
+                            amount=qty,
+                            amount_unit="g",
+                            weight_g=qty,
                             food_name=food.name,
                             energy_kcal_per_100g=food.energy_kcal_per_100g,
                             protein_g_per_100g=food.protein_g_per_100g,
@@ -326,26 +360,34 @@ def _nutrition(db: Session, *, user_id: int, coach_id: int, today: date, days: i
                     )
             # Leave today open for hands-on testing of input/edit/copy.
             if diary_day < today:
-                db.add(FoodDiaryDayStatus(
-                    user_id=user_id, diary_date=diary_day,
-                    status="complete" if delta % 7 != 0 else "incomplete"
-                ))
+                db.add(
+                    FoodDiaryDayStatus(
+                        user_id=user_id,
+                        diary_date=diary_day,
+                        status="complete" if delta % 7 != 0 else "incomplete",
+                    )
+                )
 
     if not db.query(HydrationEntry).filter_by(user_id=user_id).first():
         for delta in range(days):
             diary_day = start + timedelta(days=delta)
             for index, volume in enumerate((250, 350, 500, 300, 450)):
                 token = f"{FIXTURE_VERSION}:water:{user_id}:{diary_day}:{index}"
-                db.add(HydrationEntry(
-                    user_id=user_id, diary_date=diary_day,
-                    occurred_at=datetime.combine(
-                        diary_day, time(8 + index * 3, 10), tzinfo=UTC
-                    ),
-                    timezone=TIMEZONE, beverage_type="water",
-                    source="manual", volume_ml=volume,
-                    request_key=token,
-                    payload_fingerprint=sha256(token.encode()).hexdigest(),
-                ))
+                db.add(
+                    HydrationEntry(
+                        user_id=user_id,
+                        diary_date=diary_day,
+                        occurred_at=datetime.combine(
+                            diary_day, time(8 + index * 3, 10), tzinfo=UTC
+                        ),
+                        timezone=TIMEZONE,
+                        beverage_type="water",
+                        source="manual",
+                        volume_ml=volume,
+                        request_key=token,
+                        payload_fingerprint=sha256(token.encode()).hexdigest(),
+                    )
+                )
 
 
 def _check_ins(db: Session, *, user_id: int, today: date) -> None:
@@ -356,37 +398,46 @@ def _check_ins(db: Session, *, user_id: int, today: date) -> None:
         week_start = monday - timedelta(weeks=index)
         db.add(
             WeeklyCheckIn(
-                user_id=user_id, week_start=week_start,
+                user_id=user_id,
+                week_start=week_start,
                 week_end=week_start + timedelta(days=6),
                 submitted_on=week_start + timedelta(days=6),
-                timezone=TIMEZONE, status="completed",
+                timezone=TIMEZONE,
+                status="completed",
                 summary_version=FIXTURE_VERSION,
                 summary={
                     "training": {"planned_workouts": 3, "completed_workouts": 3},
                     "nutrition": {"logged_days": 7, "complete_days": 6},
                     "weight_trend": {"latest_value": 78.2 + index * 0.17},
                 },
-                training_load=2 + (index % 3), recovery=3 + (index % 2),
-                hunger=3, adherence_difficulty=2,
+                training_load=2 + (index % 3),
+                recovery=3 + (index % 2),
+                hunger=3,
+                adherence_difficulty=2,
                 note="Синтетический еженедельный отчёт для панели тренера.",
             )
         )
 
 
 def _crm(db: Session, *, coach_id: int, client_id: int, today: date) -> None:
-    if db.query(CoachBusinessSession).filter_by(
-        coach_user_id=coach_id, client_user_id=client_id
-    ).first():
+    if (
+        db.query(CoachBusinessSession)
+        .filter_by(coach_user_id=coach_id, client_user_id=client_id)
+        .first()
+    ):
         return
     for week_back in range(6, -2, -1):
         scheduled = today - timedelta(days=week_back * 7)
         token = f"{FIXTURE_VERSION}:session:{client_id}:{week_back}"
         db.add(
             CoachBusinessSession(
-                coach_user_id=coach_id, client_user_id=client_id,
+                coach_user_id=coach_id,
+                client_user_id=client_id,
                 idempotency_key=token,
                 starts_at_utc=datetime.combine(scheduled, time(16, 0)),
-                timezone=TIMEZONE, duration_minutes=60, format="gym",
+                timezone=TIMEZONE,
+                duration_minutes=60,
+                format="gym",
                 status="completed" if week_back >= 0 else "scheduled",
                 private_note="Синтетическая заметка тренера: проверить план и прогрессию.",
             )
@@ -406,24 +457,28 @@ def seed_local_dev_data(db: Session) -> None:
     db.flush()
     _coach_links(db, coach.id, [client.id, *[row.id for row in extra_clients]])
     templates = (
-        db.query(ProgramTemplate)
-        .filter_by(is_public=True)
-        .order_by(ProgramTemplate.slug)
-        .all()
+        db.query(ProgramTemplate).filter_by(is_public=True).order_by(ProgramTemplate.slug).all()
     )
     three_day = [item for item in templates if len(item.days) >= 3]
     if not three_day:
         raise RuntimeError("DEV fixtures require a three-day seeded program template")
     for index, trainee in enumerate([client, *extra_clients]):
         template = three_day[index % len(three_day)]
-        _program_history(db, client_id=trainee.id, coach_id=coach.id, template=template, today=today)
+        _program_history(
+            db, client_id=trainee.id, coach_id=coach.id, template=template, today=today
+        )
         _measurements(
-            db, trainee.id, today,
+            db,
+            trainee.id,
+            today,
             base_weight=Decimal("78.25") - Decimal(index * 5),
         )
         _nutrition(
-            db, user_id=trainee.id, coach_id=coach.id,
-            today=today, days=35 if index == 0 else 14,
+            db,
+            user_id=trainee.id,
+            coach_id=coach.id,
+            today=today,
+            days=35 if index == 0 else 14,
         )
         _check_ins(db, user_id=trainee.id, today=today)
         _crm(db, coach_id=coach.id, client_id=trainee.id, today=today)
