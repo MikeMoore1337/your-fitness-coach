@@ -168,9 +168,9 @@ export function Diary({
   useEffect(() => {
     if (!isPwaStandalone() || isTelegramSurface()) return;
     const root = document.documentElement;
-    root.dataset.yfcMeasurementPwaFocusPlacement = 'true';
+    root.dataset.yfcMeasurementPwa = 'true';
     return () => {
-      delete root.dataset.yfcMeasurementPwaFocusPlacement;
+      delete root.dataset.yfcMeasurementPwa;
     };
   }, []);
   const timeZone = clientId
