@@ -1,6 +1,11 @@
 name: Incident 1249 production environment recovery
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/incident-1249-production-recovery.yml
+      - scripts/incident_1249_recovery.py
+      - tests/test_incident_1249_recovery.py
   # A single read-only diagnosis is triggered when this workflow first lands on protected master.
   push:
     branches: [master]
@@ -33,7 +38,23 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test-recovery-helper:
+    name: Validate emergency recovery helper (no production credentials)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run sandboxed self-test
+        run: |
+          python3 -m py_compile scripts/incident_1249_recovery.py
+          python3 scripts/incident_1249_recovery.py --self-test
+
   guarded-recovery:
+    if: github.event_name != 'pull_request'
     name: Owner-gated production env inspection / narrowly scoped correction
     runs-on: ubuntu-latest
     timeout-minutes: 15
