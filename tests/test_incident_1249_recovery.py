@@ -170,7 +170,7 @@ def test_stopped_runtime_probe_rejects_wrong_image_revision(
 
 
 def test_baseline_image_probe_requires_both_verified_immutable_images(
-    monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import json
     from subprocess import CompletedProcess
@@ -181,11 +181,13 @@ def test_baseline_image_probe_requires_both_verified_immutable_images(
         assert args[:3] == ["docker", "image", "inspect"]
         kind = "bot" if "-bot:" in args[3] else "backend"
         observed_revision = "b" * 40 if kind == "bot" else revision
-        record = [{
-            "Config": {"Labels": {"org.opencontainers.image.revision": observed_revision}},
-            "RepoTags": [args[3]],
-            "RepoDigests": ["ghcr.io/example@sha256:" + "f" * 64],
-        }]
+        record = [
+            {
+                "Config": {"Labels": {"org.opencontainers.image.revision": observed_revision}},
+                "RepoTags": [args[3]],
+                "RepoDigests": ["ghcr.io/example@sha256:" + "f" * 64],
+            }
+        ]
         return CompletedProcess(args, 0, json.dumps(record), "")
 
     monkeypatch.setattr(recovery.subprocess, "run", fake_inspect)
