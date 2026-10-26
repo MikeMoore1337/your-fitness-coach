@@ -1,4 +1,10 @@
-const SAFE_AUTH_PATHS = new Set(['/app', '/app/report', '/coach', '/admin', '/admin/hermes-bridge']);
+const SAFE_AUTH_PATHS = new Set([
+  '/app',
+  '/app/report',
+  '/coach',
+  '/admin',
+  '/admin/hermes-bridge',
+]);
 const SAFE_JOIN_PATH = /^\/join\/[A-Za-z0-9_-]{20,128}$/;
 const SAFE_SHARE_PATH = /^\/share\/[A-Za-z0-9_-]{43}$/;
 const INTERNAL_AUTH_ORIGIN = 'https://your-fitness-coach.invalid';
