@@ -110,6 +110,7 @@ def test_fixed_dev_roles_authorization_and_coach_tenant_scope(client, monkeypatc
         other_id = db.query(User.id).filter_by(telegram_user_id=2002).scalar()
 
     monkeypatch.setattr(settings, "dev_auth_fixed_accounts_only", True)
+    monkeypatch.setattr(settings, "app_env", "dev")
     monkeypatch.setattr(settings, "admin_telegram_user_ids", "1001")
     client_headers = _login(client, 2001, False)
     coach_headers = _login(client, 1002, True)
