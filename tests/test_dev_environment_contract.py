@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -18,6 +20,17 @@ def test_dev_compose_is_separate_from_production() -> None:
     assert "fitminiapp_bot_polling_lock" not in source
     assert "\n  bot:" not in source
     assert "\n  worker:" not in source
+
+    # The backend uses a standard host-facing bridge for Windows Docker Desktop,
+    # while the database and setup remain isolated from that bridge.
+    config = yaml.safe_load(source)
+    services = config["services"]
+    assert services["db"]["networks"] == ["dev_internal"]
+    assert services["setup"]["networks"] == ["dev_internal"]
+    assert services["backend"]["networks"] == ["dev_internal", "dev_access"]
+    assert config["networks"]["dev_internal"]["internal"] is True
+    assert config["networks"]["dev_access"]["driver"] == "bridge"
+    assert services["backend"]["ports"][0].startswith("127.0.0.1:")
 
 
 def test_dev_secret_config_is_not_committed() -> None:
