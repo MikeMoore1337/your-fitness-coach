@@ -65,3 +65,17 @@ def test_inspect_redacts_environment_values(
     assert report["line_30_key"] == "EXPECTED_KEY"
     assert "password" not in str(report)
     assert "secret" not in str(report)
+
+
+def test_candidate_can_repair_two_simple_parenthesized_assignments() -> None:
+    original = broken_env() + b"SECOND_AGENT=another(contact@example.org)\n"
+    corrected = recovery.candidate_fix(original, "EXPECTED_KEY")
+    assert recovery.bash_valid(corrected)
+    assert corrected.splitlines()[29] == b"EXPECTED_KEY='something(else)'"
+    assert corrected.splitlines()[30] == b"SECOND_AGENT='another(contact@example.org)'"
+
+
+def test_candidate_rejects_more_than_three_additional_lines() -> None:
+    original = broken_env() + b"OTHER_AGENT=another(contact@example.org)\n" * 4
+    with pytest.raises(recovery.RecoveryError, match="too many additional"):
+        recovery.candidate_fix(original, "EXPECTED_KEY")
