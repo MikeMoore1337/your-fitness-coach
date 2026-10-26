@@ -19,8 +19,10 @@ import { difficultyLabels } from './exerciseOrdering';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { Icon } from '../../shared/ui/Icon';
 import { IconButton } from '../../shared/ui/common';
+import { localizedEquipmentDisplayLabel } from '../../shared/equipmentLabels';
 
 export type ExercisePickerExercise = ExerciseSearchItem & {
+  equipment_ids?: Exercise['equipment_ids'];
   metric_type?: Exercise['metric_type'] | null;
   difficulty_level?: Exercise['difficulty_level'];
   is_custom?: boolean;
@@ -157,7 +159,8 @@ export function SearchableExercisePicker({
                   <span className="exercise-picker__meta">
                     <small>
                       {exercise.primary_muscle || 'Все мышцы'} ·{' '}
-                      {exercise.equipment || 'Без оборудования'}
+                      {localizedEquipmentDisplayLabel(exercise.equipment_ids, exercise.equipment) ??
+                        'Без оборудования'}
                     </small>
                     {exercise.difficulty_level && (
                       <span className="badge">{difficultyLabels[exercise.difficulty_level]}</span>
@@ -349,7 +352,10 @@ export function SearchableExercisePicker({
                             <strong>{exercise.title}</strong>
                             <small>
                               {exercise.primary_muscle || 'Все мышцы'} ·{' '}
-                              {exercise.equipment || 'Без оборудования'}
+                              {localizedEquipmentDisplayLabel(
+                                exercise.equipment_ids,
+                                exercise.equipment,
+                              ) ?? 'Без оборудования'}
                               {exercise.difficulty_level
                                 ? ` · ${difficultyLabels[exercise.difficulty_level]}`
                                 : ''}

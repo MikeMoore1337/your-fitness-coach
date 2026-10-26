@@ -306,7 +306,7 @@ const customHistory: ExerciseHistory = {
   progression_events: [],
 };
 
-function renderGuide() {
+function renderGuide(exercise: Exercise = fullExercise) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
@@ -314,8 +314,8 @@ function renderGuide() {
     <QueryClientProvider client={queryClient}>
       <NavigationProvider>
         <ExerciseGuideDialog
-          exerciseId={fullExercise.id}
-          exerciseTitle={fullExercise.title}
+          exerciseId={exercise.id}
+          exerciseTitle={exercise.title}
           onClose={vi.fn()}
         />
       </NavigationProvider>
@@ -370,5 +370,25 @@ describe('ExerciseGuideDialog', () => {
     expect(screen.getByText('Резиновая лента')).toBeVisible();
     expect(screen.queryByText('Всё тело')).not.toBeInTheDocument();
     expect(screen.queryByText('Без оборудования')).not.toBeInTheDocument();
+  });
+
+  it('localizes a legacy technical equipment value in the details fallback', async () => {
+    const rawLegacyExercise: Exercise = {
+      ...customExercise,
+      equipment: 'barbell',
+      equipment_ids: ['barbell'],
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const path = String(input);
+      if (path.endsWith('/history')) {
+        return new Response(JSON.stringify(customHistory), { status: 200 });
+      }
+      return new Response(JSON.stringify(rawLegacyExercise), { status: 200 });
+    });
+    renderGuide(rawLegacyExercise);
+
+    expect(await screen.findByRole('heading', { name: 'Оборудование' })).toBeVisible();
+    expect(screen.getByText('Штанга')).toBeVisible();
+    expect(screen.queryByText('barbell')).not.toBeInTheDocument();
   });
 });

@@ -704,7 +704,7 @@ function WorkoutSetRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным подходом"
+          aria-label="Управление выполненным подходом"
         >
           {editingCompleted ? (
             <>
@@ -739,23 +739,15 @@ function WorkoutSetRow({
             </Button>
           )}
           {!editingCompleted && (
-            <details className="active-workout-set__more-actions">
-              <summary className="yfc-disclosure-summary">
-                Действия
-                <DisclosureIcon />
-              </summary>
-              <div className="active-workout-set__more-actions-body">
-                <Button
-                  type="button"
-                  disabled={disabled || completing}
-                  data-workout-action="reopen-completed"
-                  variant="secondary"
-                  onClick={() => void requestReopen()}
-                >
-                  Вернуть в работу
-                </Button>
-              </div>
-            </details>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}
@@ -1272,7 +1264,7 @@ function CardioWorkoutRow({
       {completed && (
         <div
           className="active-workout-set__completed-actions app-action-group"
-          aria-label="Действия с выполненным кардио"
+          aria-label="Управление выполненным интервалом"
         >
           {editingCompleted ? (
             <>
@@ -1307,23 +1299,15 @@ function CardioWorkoutRow({
             </Button>
           )}
           {!editingCompleted && (
-            <details className="active-workout-set__more-actions">
-              <summary className="yfc-disclosure-summary">
-                Действия
-                <DisclosureIcon />
-              </summary>
-              <div className="active-workout-set__more-actions-body">
-                <Button
-                  type="button"
-                  disabled={disabled || completing}
-                  data-workout-action="reopen-completed"
-                  variant="secondary"
-                  onClick={() => void requestReopen()}
-                >
-                  Вернуть в работу
-                </Button>
-              </div>
-            </details>
+            <Button
+              type="button"
+              disabled={disabled || completing}
+              data-workout-action="reopen-completed"
+              variant="secondary"
+              onClick={() => void requestReopen()}
+            >
+              Вернуть в работу
+            </Button>
           )}
         </div>
       )}

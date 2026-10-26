@@ -140,6 +140,8 @@ jobs:
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
       - name: Run shared quality group
         run: python scripts/ci_contract.py run-group quality
+      - name: GEO read-only adapter offline contract tests
+        run: python -m pytest -o filterwarnings=error tests/test_geo_readonly_audit.py -q
 
   policy:
     name: Delivery policy
