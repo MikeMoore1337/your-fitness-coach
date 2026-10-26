@@ -3481,6 +3481,9 @@ details:not([open]) > :not(summary) {
   justify-content: flex-start;
   flex-wrap: wrap;
 }
+.program-active__delete-action {
+  width: 100%;
+}
 .app-section--programs .program-active__empty .program-wizard__anchor.button-link {
   border-color: transparent;
   background: var(--v2-lime);
