@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from urllib.parse import urlencode
 
-SAFE_AUTH_PATHS = frozenset({"/app", "/coach", "/admin"})
+SAFE_AUTH_PATHS = frozenset({"/app", "/coach", "/admin", "/admin/hermes-bridge"})
 TRAINER_INTENT_PATH = "/app?trainer_intent=1"
 SAFE_JOIN_PATH = re.compile(r"/join/[A-Za-z0-9_-]{20,128}\Z")
 AUTH_ERROR_CODES = frozenset(
