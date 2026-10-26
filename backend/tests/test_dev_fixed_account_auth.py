@@ -5,6 +5,7 @@ from fitminiapp_api.core.config import settings
 
 def test_fixed_dev_logins_only_allow_the_three_roles(client, monkeypatch):
     monkeypatch.setattr(settings, "dev_auth_fixed_accounts_only", True)
+    monkeypatch.setattr(settings, "admin_telegram_user_ids", "1001")
 
     fixtures = (
         (2001, False, False),
@@ -17,6 +18,13 @@ def test_fixed_dev_logins_only_allow_the_three_roles(client, monkeypatch):
             json={"telegram_user_id": user_id, "is_coach": coach, "is_admin": admin},
         )
         assert login.status_code == 200
+        token = login.json()["access_token"]
+        me = client.get(
+            "/api/v1/me", headers={"Authorization": f"Bearer {token}"}
+        )
+        assert me.status_code == 200
+        assert me.json()["is_coach"] is coach
+        assert me.json()["is_root"] is (user_id == 1001)
 
     disallowed = (
         (9000000, True, True),
