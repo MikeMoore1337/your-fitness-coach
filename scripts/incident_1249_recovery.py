@@ -142,7 +142,7 @@ def inspect() -> dict[str, object]:
     bounded_preview_valid: bool | None = None
     key = safe_line_key(data)
     if key and not bash_valid(data):
-        try:
+        with suppress(RecoveryError, UnicodeError, IndexError):
             lines = data.decode("utf-8").splitlines(keepends=True)
             simple = _quote_simple_assignment(lines[29], key)
             if simple is not None:
@@ -151,8 +151,6 @@ def inspect() -> dict[str, object]:
             preview = candidate_fix(data, key, require_valid_bash=False)
             bounded_preview_valid = bash_valid(preview)
             bounded_error_line = bash_parse_error_line(preview)
-        except (RecoveryError, UnicodeError, IndexError):
-            pass
     try:
         baseline = MARKER.read_text(encoding="ascii").strip()
     except ENV_READ_ERRORS:
