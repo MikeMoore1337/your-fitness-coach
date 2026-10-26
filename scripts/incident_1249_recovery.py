@@ -143,9 +143,7 @@ def inspect() -> dict[str, object]:
     }
 
 
-def _quote_simple_assignment(
-    line: str, required_key: str | None = None
-) -> tuple[str, str] | None:
+def _quote_simple_assignment(line: str, required_key: str | None = None) -> tuple[str, str] | None:
     suffix = "\r\n" if line.endswith("\r\n") else ("\n" if line.endswith("\n") else "")
     raw = line[: -len(suffix)] if suffix else line
     match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
@@ -195,6 +193,7 @@ def candidate_fix(data: bytes, expected_key: str) -> bytes:
         raise RecoveryError("bounded parenthesis correction did not produce valid Bash syntax")
     return proposed
 
+
 def fix_env(expected_hash: str, expected_key: str) -> dict[str, object]:
     if not SHA_RE.fullmatch(expected_hash) or not KEY_RE.fullmatch(expected_key):
         raise RecoveryError("invalid expected checksum or key")
@@ -243,9 +242,7 @@ def self_test() -> None:
     candidate = candidate_fix(prefix + b"TEST_KEY=thing(hello)\n", "TEST_KEY")
     assert candidate.splitlines()[29] == b"TEST_KEY='thing(hello)'"
     assert bash_valid(candidate)
-    extra = candidate_fix(
-        prefix + b"TEST_KEY=thing(hello)\nNEXT_KEY=other(value)\n", "TEST_KEY"
-    )
+    extra = candidate_fix(prefix + b"TEST_KEY=thing(hello)\nNEXT_KEY=other(value)\n", "TEST_KEY")
     assert bash_valid(extra)
     assert extra.splitlines()[30] == b"NEXT_KEY='other(value)'"
     try:
