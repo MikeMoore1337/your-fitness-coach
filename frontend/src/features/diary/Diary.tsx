@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -17,6 +17,7 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { invalidateMeasurementMutation, queryKeys } from '../../shared/queryKeys';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { isPwaStandalone, isTelegramSurface } from '../../shared/pwa/pwaRuntime';
 import {
   decimalDraftFromValue,
   isCompleteDecimalDraft,
@@ -44,6 +45,9 @@ function draftString(value: string | number | null | undefined): string {
 }
 
 function keepFocusedMeasurementVisible(input: HTMLInputElement): void {
+  // As with workout weight/reps (#1099), iOS standalone PWA owns focus placement.
+  // A scripted scroll races native keyboard panning and jumps the entire form.
+  if (isPwaStandalone() && !isTelegramSurface()) return;
   requestAnimationFrame(() => {
     if (document.activeElement !== input) return;
     const viewport = window.visualViewport;
@@ -161,6 +165,14 @@ export function Diary({
   const { toast, confirm } = useFeedback();
   const formRef = useRef<HTMLFormElement>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isPwaStandalone() || isTelegramSurface()) return;
+    const root = document.documentElement;
+    root.dataset.yfcMeasurementPwa = 'true';
+    return () => {
+      delete root.dataset.yfcMeasurementPwa;
+    };
+  }, []);
   const timeZone = clientId
     ? clientTimeZone || detectedTimeZone()
     : user?.profile?.timezone || detectedTimeZone();
@@ -436,7 +448,6 @@ export function Diary({
                       ...form,
                       [key]: e.target.value,
                     });
-                    keepFocusedMeasurementVisible(e.currentTarget);
                   }}
                 />
               </label>
@@ -459,7 +470,6 @@ export function Diary({
                     onFocus={(e) => keepFocusedMeasurementVisible(e.currentTarget)}
                     onChange={(e) => {
                       setCustomValue(definition.id, e.target.value);
-                      keepFocusedMeasurementVisible(e.currentTarget);
                     }}
                   />
                 </label>
