@@ -1033,9 +1033,7 @@ def write_router_outputs(decision: Mapping[str, object], destination: Path) -> N
     paths = decision["paths"]
     serialized_paths = json.dumps(paths, ensure_ascii=False, separators=(",", ":"))
     if len(serialized_paths.encode("utf-16-le")) > 16_384:
-        serialized_paths = json.dumps(
-            [f"__paths_truncated__:{len(paths)}"], separators=(",", ":")
-        )
+        serialized_paths = json.dumps([f"__paths_truncated__:{len(paths)}"], separators=(",", ":"))
     lines = [
         f"profile={decision['profile']}",
         f"required_groups={json.dumps(decision['required_groups'], ensure_ascii=False, separators=(',', ':'))}",
