@@ -11,6 +11,7 @@ BASELINE = "0e6aa0376f672f4b598f92ccf1a48f704e3de8e8"
 REPO = "ghcr.io/mikemoore1337/your-fitness-coach"
 REVISION_LABEL = "org.opencontainers.image.revision"
 REVISION_RE = re.compile(r"^[0-9a-f]{1,64}$")
+IMAGE_METADATA_ERRORS = (ValueError, AttributeError, TypeError)
 
 
 class ProbeError(RuntimeError):
@@ -39,13 +40,12 @@ def inspect_image(kind: str) -> dict[str, object]:
             "has_repo_digest": bool(
                 isinstance(repo_digests, list)
                 and any(
-                    isinstance(value, str)
-                    and re.search(r"@sha256:[0-9a-f]{64}$", value)
+                    isinstance(value, str) and re.search(r"@sha256:[0-9a-f]{64}$", value)
                     for value in repo_digests
                 )
             ),
         }
-    except (ValueError, AttributeError, TypeError):
+    except IMAGE_METADATA_ERRORS:
         raise ProbeError("malformed image inspection result") from None
 
 
@@ -73,7 +73,9 @@ def inspect_database() -> dict[str, object]:
     return {
         "accessible": bool(revisions),
         "db_running_count": 1,
-        "migration_revisions": revisions if all(REVISION_RE.fullmatch(r) for r in revisions) else [],
+        "migration_revisions": revisions
+        if all(REVISION_RE.fullmatch(r) for r in revisions)
+        else [],
     }
 
 
