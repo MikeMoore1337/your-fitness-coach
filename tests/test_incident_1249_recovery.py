@@ -151,9 +151,7 @@ def test_stopped_runtime_probe_rejects_wrong_image_revision(
             status = "running" if service in {"db", "edge"} else "exited"
             image_id = "sha256:backend" if service in {"backend", "worker"} else "sha256:bot"
             revision = ("b" * 40) if service == "bot" else baseline
-            return CompletedProcess(
-                args, 0, f"{status}|{image_id}|{revision}|healthy\n", ""
-            )
+            return CompletedProcess(args, 0, f"{status}|{image_id}|{revision}|healthy\n", "")
         if args[:3] == ["docker", "compose", "config"]:
             return CompletedProcess(args, 0, "", "")
         raise AssertionError("Unexpected read-only Docker call")
