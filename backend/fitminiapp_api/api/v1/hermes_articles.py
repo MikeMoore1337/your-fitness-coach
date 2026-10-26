@@ -31,6 +31,9 @@ _CONFLICT_CODES = {
 _CLIENT_ERROR_CODES = {
     "candidate_missing",
     "candidate_not_ready",
+    "hermes_candidate_not_allowed",
+    "hermes_source_untrusted",
+    "hermes_review_attestation_forbidden",
     "cta_contains_unallowed_fields",
     "cta_copy_invalid",
     "cta_destination_invalid",

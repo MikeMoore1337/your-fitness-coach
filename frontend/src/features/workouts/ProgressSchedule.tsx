@@ -131,7 +131,11 @@ export function SchedulePanel({
     />
   );
   return (
-    <Card title="Расписание" description="Ближайшие тренировки · календарь на восемь недель">
+    <Card
+      className="workout-schedule-card"
+      title="Расписание"
+      description="Ближайшие тренировки · календарь на восемь недель"
+    >
       {schedule.isLoading ? (
         <LoadingState />
       ) : schedule.error ? (
@@ -142,7 +146,7 @@ export function SchedulePanel({
       ) : !schedule.data?.length ? (
         <EmptyState title="Активного расписания пока нет" />
       ) : (
-        <div className="list-grid top-gap">
+        <div className="list-grid workout-schedule-list">
           {primary.map(row)}
           {remaining.length > 0 && (
             <details className="workout-schedule-all">
@@ -150,7 +154,7 @@ export function SchedulePanel({
                 Все восемь недель · ещё {remaining.length}
                 <DisclosureIcon />
               </summary>
-              <div className="list-grid">{remaining.map(row)}</div>
+              <div className="list-grid workout-schedule-list">{remaining.map(row)}</div>
             </details>
           )}
         </div>

@@ -5260,12 +5260,12 @@ body:has(.standalone-page--design-v2) {
   color: var(--v2-success-text);
 }
 
-.app-section--design-v2 :where(.list-grid, .program-template-grid, .exercise-catalog-list) {
+.app-section--design-v2 :where(.list-grid, .exercise-catalog-list) {
   gap: 0;
   border-top: 1px solid var(--v2-border);
 }
 
-.app-section--design-v2 :where(.list-row, .program-template-card, .exercise-catalog-item) {
+.app-section--design-v2 :where(.list-row, .exercise-catalog-item) {
   padding: var(--v2-space-4) 0;
   border: 0;
   border-bottom: 1px solid var(--v2-border);

@@ -183,3 +183,50 @@ npm run build
 indexing, реального Telegram Mini App, физического устройства, live Hermes/provider,
 внешней SEO-учётной записи или production публикации. Эти проверки выполняются только
 отдельным явно разрешённым release-процессом.
+
+
+## I4 #599: резервирование кандидата из того же подписанного draft intake
+
+HMAC `POST /api/v1/hermes/articles/intake` не расширяет привилегий.
+Если заранее созданного `candidate_id` ещё нет, **только** полноценный
+валидированный `HermesWebArticleProposal` научного формата
+`evidence_review/research_update` с минимум двумя **разными**
+allowlisted HTTPS-первоисточниками может создать candidate **атомарно**
+с первым `draft` через тот же существующий endpoint/DB transaction.
+Отдельного публичного endpoint кандидатов, нового ключа или пути
+публикации не добавляется. Предыдущие Root/manual кандидаты сохраняют
+совместимость. Изменённые slug/version, повтор с другим nonce,
+неизвестные подписи и непроверенные ссылки отклоняются.
+
+Идентификатор для нового signed-auto кандидата должен совпадать с
+проверяемым сервером SHA-256, первые 32 hex-символа:
+
+```text
+json_string = JSON(sorted_keys, compact_separators) {
+    "schema": "hermes-i4-autocandidate-v1",
+    "slug": proposal.slug,
+    "source_urls": sorted([str(source.url) for source in proposal.sources])
+}
+candidate_id = SHA256(UTF8(json_string))[:32]
+source_ref = "i4:" + SHA256(UTF8(json_string))
+```
+
+Существующий allowlisted `source_kind=news_handoff` используется как
+внешний research/news handoff, без миграции БД. Появившийся кандидат
+остаётся только в `draft`, а ревизия в Root editorial inbox.
+Список доменов для этого узкого режима:
+`pmc.ncbi.nlm.nih.gov`, `pubmed.ncbi.nlm.nih.gov`,
+`europepmc.org`, `www.mdpi.com`; без userinfo, query, fragment,
+нестандартных портов и повторов. Наличие ссылки **не доказывает**
+качество источника: научные замечания и фактическая публикация
+остаются исключительно за человеком.
+
+HMAC-отправитель не имеет права представляться квалифицированным
+рецензентом и повышать `review_status=verified` самостоятельно:
+такие запросы отвергаются даже с валидной подписью. Статусы
+`pending` не меняются. Для auto-candidate также запрещены
+`high/critical`, искусственные `domain_reviewer`, заявленные
+`high/moderate` certainty и публикация. Невалидные попытки дают
+ограниченный 422/409, без привилегий. Автозапуск/подписание реальных
+материалов без проверенного полного текста и разрешения на deployment
+по-прежнему запрещены.

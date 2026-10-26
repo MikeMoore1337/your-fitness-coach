@@ -1,0 +1,118 @@
+name: Incident 1249 guarded restoration of proven baseline
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/incident-1249-restore-baseline.yml
+      - scripts/incident_1249_restore_baseline.py
+      - tests/test_incident_1249_restore_baseline.py
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/incident-1249-restore-baseline.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: |
+          python3 -m py_compile scripts/incident_1249_restore_baseline.py
+          python3 -m unittest discover -s tests -p 'test_incident_1249_restore_baseline.py' -v
+
+  restore:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 30
+    steps:
+      - name: Require owner protected master and unmodified migration source
+        run: |
+          set -Eeuo pipefail
+          test "$GITHUB_REF" = refs/heads/master
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify no backend/database schema changes since durable baseline
+        run: |
+          set -Eeuo pipefail
+          git cat-file -e 0e6aa0376f672f4b598f92ccf1a48f704e3de8e8^{commit}
+          git diff --quiet 0e6aa0376f672f4b598f92ccf1a48f704e3de8e8 HEAD -- backend bot backend/alembic
+          echo 'INCIDENT_1249_SCHEMA_CODE_DELTA=NONE'
+      - name: Configure trusted production SSH access
+        env:
+          PROD_SSH_KEY: ${{ secrets.PROD_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          set -Eeuo pipefail
+          test -n "$PROD_SSH_KEY"
+          test -n "$PROD_SSH_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$PROD_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+      - name: Independent read-only preflight on live host
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -p 1337 yfc-deploy@77.91.90.171 \
+            "python3 - preflight" < scripts/incident_1249_restore_baseline.py > preflight.json
+          jq -e '.incident == 1249 and .preflight == "PASS" and .application_mutation == false' preflight.json >/dev/null
+          echo 'INCIDENT_1249_BASELINE_PREFLIGHT=PASS'
+      - name: Restore only the three existing baseline application consumers
+        run: |
+          set -Eeuo pipefail
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+            -o ConnectTimeout=10 -p 1337 yfc-deploy@77.91.90.171 \
+            "python3 - restore" < scripts/incident_1249_restore_baseline.py > restore.json
+          jq -e '.operation == "restore" and .expected_revision == "0e6aa0376f672f4b598f92ccf1a48f704e3de8e8" and (.started_services == ["backend", "worker", "bot"]) and .application_mutation == true' restore.json >/dev/null
+          echo 'INCIDENT_1249_BASELINE_APPLICATION_START=PASS'
+      - name: Verify exact runtime provenance and Telegram polling ownership
+        run: |
+          set -Eeuo pipefail
+          success=0
+          for attempt in $(seq 1 18); do
+            if ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=10 -p 1337 yfc-deploy@77.91.90.171 \
+              "python3 - snapshot --app-root '/srv/yfc/fit-mini-app'" \
+              < scripts/production_provenance.py > proof.json; then
+              if jq -e --arg sha "0e6aa0376f672f4b598f92ccf1a48f704e3de8e8" '
+                .recorded_revision == $sha and
+                .runtime_revision == $sha and
+                .runtime_uniform == true and
+                .database.consistent == true and
+                .services.backend.health == "healthy" and
+                .services.worker.health == "healthy" and
+                .services.bot.status == "running" and
+                .services.bot.polling_owner.verified == true and
+                .services.bot.runtime_markers.polling_file_lock_acquired == true and
+                .services.bot.runtime_markers.telegram_polling_started == true and
+                ((.errors | length) == 0)
+              ' proof.json >/dev/null; then
+                success=1
+                break
+              fi
+            fi
+            sleep 5
+          done
+          test "$success" -eq 1
+          echo 'INCIDENT_1249_BASELINE_PROVENANCE_AND_BOT=PASS'
+      - name: Verify public application and SEO smoke
+        run: |
+          set -Eeuo pipefail
+          python3 scripts/check_deployment.py https://app.your-fitness-coach.ru --expected-environment prod
+          python3 scripts/check_seo_surface.py https://your-fitness-coach.ru --timeout 15
+          echo 'INCIDENT_1249_RECOVERY_SMOKE=PASS'
