@@ -2253,6 +2253,9 @@ test('#1189 iOS PWA delegates measurement keyboard focus and typing to the nativ
     await weight.fill('75.25');
     await chest.fill('102');
     await waist.fill('84');
+    // `fill` does not guarantee the caret position across browser engines.
+    // Put it at the end before exercising a delete-and-retype sequence.
+    await weight.press('End');
     await weight.press('Backspace');
     await weight.press('5');
     await expect(weight).toHaveValue('75.25');
