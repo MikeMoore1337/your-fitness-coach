@@ -28,6 +28,7 @@ GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 ENV_READ_ERRORS = (OSError, UnicodeError)
 DOCKER_COMMAND_ERRORS = (OSError, subprocess.SubprocessError)
 SYMLINK_ERRORS = (OSError, ValueError)
+IMAGE_READ_ERRORS = (OSError, subprocess.SubprocessError, ValueError, TypeError)
 
 
 class RecoveryError(RuntimeError):
@@ -282,7 +283,7 @@ def local_baseline_image_summary(revision: str) -> dict[str, object]:
                 ),
                 "exact_tag_present": ref in tags,
             }
-        except (OSError, subprocess.SubprocessError, ValueError, TypeError):
+        except IMAGE_READ_ERRORS:
             images[kind] = {"present": False}
     result["images"] = images
     result["available_for_restore"] = all(
