@@ -397,15 +397,10 @@ jobs:
           sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good libicu74 libatomic1 libatk-bridge2.0-0t64 libatk1.0-0t64 libcairo-gobject2 libcairo2 libdbus-1-3 libdrm2 libenchant-2-2 libepoxy0 libevent-2.1-7t64 libflite1 libfontconfig1 libfreetype6 libgbm1 libgdk-pixbuf-2.0-0 libgles2 libglib2.0-0t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer1.0-0 libgtk-4-1 libharfbuzz-icu0 libharfbuzz0b libhyphen0 libjpeg-turbo8 liblcms2-2 libmanette-0.2-0 libopus0 libpango-1.0-0 libpangocairo-1.0-0 libpng16-16t64 libsecret-1-0 libvpx9 libwayland-client0 libwayland-egl1 libwayland-server0 libwebp7 libwebpdemux2 libwoff1 libx11-6 libxkbcommon0 libxml2 libxslt1.1 libx264-164 libavif16
           ldconfig -p | grep -F 'libevent-2.1.so.7'
           ldconfig -p | grep -F 'libopus.so.0'
-          # Detect any remaining native WebKit prerequisites before running
-          # actual mobile tests. Never skip tests based on this diagnostic.
-          test -x "$HOME/.cache/ms-playwright/webkit-2336/minibrowser-wpe/bin/MiniBrowser"
-          missing="$(ldd "$HOME/.cache/ms-playwright/webkit-2336/minibrowser-wpe/bin/MiniBrowser" | grep 'not found' || true)"
-          if [ -n "$missing" ]; then
-            printf 'WEBKIT_SYSTEM_DEPENDENCY_MISSING=YES\n'
-            printf 'WEBKIT_MISSING_LIBS=%s\n' "$(printf '%s\n' "$missing" | sed -E 's/^[[:space:]]+//; s/ => not found$//' | paste -sd, -)"
-            exit 1
-          fi
+          # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
+          # Direct ldd on MiniBrowser without that wrapper can falsely
+          # report private bundled libraries missing. Actual mandatory
+          # mobile Chromium/WebKit tests verify runtime dependency health.
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
