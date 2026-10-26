@@ -143,7 +143,9 @@ def inspect() -> dict[str, object]:
     }
 
 
-def _quote_simple_assignment(line: str, required_key: str | None = None) -> tuple[str, str] | None:
+def _quote_simple_assignment(
+    line: str, required_key: str | None = None
+) -> tuple[str, str] | None:
     suffix = "\r\n" if line.endswith("\r\n") else ("\n" if line.endswith("\n") else "")
     raw = line[: -len(suffix)] if suffix else line
     match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)=(.*)", raw)
@@ -152,7 +154,8 @@ def _quote_simple_assignment(line: str, required_key: str | None = None) -> tupl
     key, value = match.groups()
     if not value or not any(char in value for char in "()"):
         return None
-    if any(char in value for char in (chr(92), chr(36), chr(96), chr(34), chr(39), ";", "&", "|", "<", ">", "#")):
+    unsafe = (chr(92), chr(36), chr(96), chr(34), chr(39), ";", "&", "|", "<", ">", "#")
+    if any(char in value for char in unsafe):
         raise RecoveryError(f"complex shell syntax at assignment for {key}; manual review required")
     return f"{key}={shlex.quote(value)}{suffix}", key
 
