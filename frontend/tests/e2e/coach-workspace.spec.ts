@@ -2196,6 +2196,59 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
   }
 });
 
+test('#1276 preserves Telegram host safe-area across personal and Coach OS', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    viewport: { width: 393, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+    reducedMotion: 'reduce',
+  });
+  try {
+    const page = await context.newPage();
+    await installTelegramHarness(page, {
+      platform: 'ios',
+      colorScheme: 'dark',
+      safeAreaInset: { top: 16, right: 0, bottom: 20, left: 0 },
+      contentSafeAreaInset: { top: 0, right: 0, bottom: 8, left: 0 },
+    });
+    await mockCoachWorkspace(page, { attention: 'actionable' });
+    const dock = page.locator('#appBottomNav');
+    const measure = async () =>
+      dock.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        return {
+          bottom: window.innerHeight - box.bottom,
+          bottomInset: Number.parseFloat(getComputedStyle(element).bottom),
+          navHeight: box.height,
+          pageWidth: document.documentElement.scrollWidth,
+          pagePaddingBottom: Number.parseFloat(getComputedStyle(document.body).paddingBottom),
+        };
+      });
+
+    await page.goto('/app?section=programs');
+    await expect(dock.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
+    const personal = await measure();
+    expect(personal.bottomInset).toBeGreaterThanOrEqual(20);
+    await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
+    const trainerChoice = page.getByRole('button', { name: 'Тренер', exact: true });
+    if (await trainerChoice.isVisible()) await trainerChoice.click();
+    await expect(page).toHaveURL(/\/coach/);
+    await expect(dock.locator('.app-bottom-nav__quick-add')).toHaveCount(0);
+    const coach = await measure();
+    expect(Math.abs(coach.bottom - personal.bottom)).toBeLessThanOrEqual(2);
+    expect(Math.abs(coach.bottomInset - personal.bottomInset)).toBeLessThanOrEqual(2);
+    expect(coach.pagePaddingBottom).toBeGreaterThanOrEqual(coach.navHeight);
+    expect(coach.pageWidth).toBeLessThanOrEqual(393);
+    await page.getByRole('link', { name: 'Для себя', exact: true }).click();
+    const returned = await measure();
+    expect(Math.abs(returned.bottom - personal.bottom)).toBeLessThanOrEqual(2);
+  } finally {
+    await context.close();
+  }
+});
+
 test('Stage 1 сохраняет trainer-first entry и явное переключение рабочего контекста', async ({
   page,
 }) => {
