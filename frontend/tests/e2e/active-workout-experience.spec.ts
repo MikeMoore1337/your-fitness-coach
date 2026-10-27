@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { activeWorkoutRestStorageKey } from '../../src/shared/userScopedStorage';
 import { emptyHydrationDay } from './fixtures/platform-api';
 import { expectSelectedChoice } from './fixtures/selected-state';
 import {
@@ -6823,16 +6824,12 @@ test.describe('#914 rest timer pointer lifecycle', () => {
         const beforeScroll = await page.evaluate(() => scrollY);
         await page.screenshot({ path: testInfo.outputPath('timer.png') });
         const deadline = () =>
-          page.evaluate(() =>
-            JSON.parse(
-              localStorage.getItem(
-                Object.keys(localStorage).find(
-                  (key) => key.includes('rest') && key.endsWith('42'),
-                )!,
-              )!,
-            ),
+          page.evaluate(
+            (key) => JSON.parse(localStorage.getItem(key)!),
+            activeWorkoutRestStorageKey(7, 42),
           );
         let expectedDeadline = await deadline();
+        expect(expectedDeadline).toEqual(expect.any(Number));
         for (const extra of [30, 60]) {
           const button = context.panel.getByRole('button', { name: `+${extra} сек` });
           const box = (await button.boundingBox())!;
