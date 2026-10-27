@@ -2162,7 +2162,7 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
       await page.getByRole('link', { name: 'В кабинет тренера', exact: true }).click();
       const trainerChoice = page.getByRole('button', { name: 'Тренер', exact: true });
       if (await trainerChoice.isVisible()) await trainerChoice.click();
-      await expect(page).toHaveURL(/\\/coach/);
+      await expect(page).toHaveURL(/\/coach/);
       const coachNav = page.getByRole('navigation', { name: 'Основная навигация' });
       await expect(coachNav.locator('.app-bottom-nav__quick-add')).toHaveCount(0);
       for (const name of ['Сегодня', 'Клиенты', 'Программы', 'Ещё']) {
@@ -2188,7 +2188,7 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
         });
       }
       await page.getByRole('link', { name: 'Для себя', exact: true }).click();
-      await expect(page).toHaveURL(/\\/app\\?section=today/);
+      await expect(page).toHaveURL(/\/app\?section=today/);
       const returned = await dockGeometry();
       expect(Math.abs(personal.bottomGap - returned.bottomGap)).toBeLessThanOrEqual(2);
     }
