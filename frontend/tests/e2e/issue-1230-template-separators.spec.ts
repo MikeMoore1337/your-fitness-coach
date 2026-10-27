@@ -136,7 +136,7 @@ test.describe('Issue #1230: ready-template separators', () => {
           expect(snapshot.grid.borderTopStyle).toBe('none');
           expect(Number.parseFloat(snapshot.grid.gap)).toBeGreaterThan(0);
           expect(snapshot.actionsBorder).toEqual({ top: '0px', bottom: '0px' });
-          expect(snapshot.dangerMenuBorder).toEqual({ top: '0px', bottom: '0px' });
+          expect(snapshot.dangerMenuBorder).toBeNull();
           expect(snapshot.cards).toHaveLength(count);
           for (const card of snapshot.cards) {
             expect(card.borderTopWidth).toBe('1px');
