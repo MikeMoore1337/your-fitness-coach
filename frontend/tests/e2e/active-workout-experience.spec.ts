@@ -1514,12 +1514,11 @@ test.describe('#1099 standalone PWA keyboard path', () => {
           const rest = document.querySelector('.active-workout-rest')?.getBoundingClientRect();
           const safeTop = Math.max(viewport.offsetTop, rest?.bottom ?? viewport.offsetTop);
           const overlap = Math.max(0, safeTop - input.getBoundingClientRect().top);
-          if (overlap > 0)
+          if (overlap > 0) {
+            const nativeTop = Math.max(0, scrollY - overlap);
             (window as Window & { __yfc1099NativeScrollTo?: typeof window.scrollTo })
-              .__yfc1099NativeScrollTo!({
-                top: Math.max(0, scrollY - overlap),
-                behavior: 'instant',
-              });
+              .__yfc1099NativeScrollTo!({ top: nativeTop, behavior: 'instant' });
+          }
         });
         await settleViewport(page);
       }
