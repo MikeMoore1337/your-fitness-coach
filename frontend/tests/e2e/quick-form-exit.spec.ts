@@ -265,11 +265,11 @@ test('quick measurement protects editing and unrelated history deletion without 
   );
   await diary.getByRole('button', { name: 'Сохранить изменения' }).click();
   expect((await saved).postDataJSON()).not.toHaveProperty('editingDate');
-  await expect(rows.filter({ hasText: '80.5 кг' })).toHaveCount(1);
+  await expect(rows.filter({ hasText: '80,5 кг' })).toHaveCount(1);
   await expect(rows).toHaveCount(3);
   expect(api.measurementSaveCalls()).toBe(1);
   await page.reload();
-  await expect(rows.filter({ hasText: '80.5 кг' })).toHaveCount(1);
+  await expect(rows.filter({ hasText: '80,5 кг' })).toHaveCount(1);
   await expect(diary.getByLabel('Вес, кг')).toHaveValue('');
 });
 

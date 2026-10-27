@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
@@ -284,8 +285,9 @@ def reconcile_current_measurement_state(
 
     target = get_current_nutrition_target(db, owner.id)
     if target is not None and target.source == "calculated" and target.weight_kg is not None:
-        minimum_change = max(0.5, target.weight_kg * 0.01)
-        if abs(weight_kg - target.weight_kg) < minimum_change:
+        target_weight_kg = float(target.weight_kg)
+        minimum_change = max(0.5, target_weight_kg * 0.01)
+        if abs(float(weight_kg) - target_weight_kg) < minimum_change:
             return False
     return recalculate_nutrition_target(
         db,
@@ -329,14 +331,14 @@ def _custom_changes(
     owner_user_id: int,
     existing: BodyMeasurement | None,
     changes: dict[str, object],
-) -> dict[int, float | None]:
+) -> dict[int, Decimal | None]:
     raw_values = changes.get("custom_values")
     if raw_values is None:
         return {}
     if not isinstance(raw_values, list):
         raise MeasurementError("Некорректные пользовательские показатели")
 
-    requested: dict[int, float | None] = {}
+    requested: dict[int, Decimal | None] = {}
     for raw_value in raw_values:
         if not isinstance(raw_value, dict):
             raise MeasurementError("Некорректный пользовательский показатель")
@@ -346,11 +348,13 @@ def _custom_changes(
         if definition_id in requested:
             raise MeasurementError("Показатель замера указан несколько раз")
         value = raw_value.get("value")
-        if value is not None and (not isinstance(value, (int, float)) or value <= 0 or value > 300):
+        if value is not None and (
+            not isinstance(value, (int, float, Decimal)) or value <= 0 or value > 300
+        ):
             raise MeasurementError(
                 "Значение пользовательского показателя должно быть от 0 до 300 см"
             )
-        requested[definition_id] = float(value) if value is not None else None
+        requested[definition_id] = Decimal(str(value)) if value is not None else None
 
     definitions = (
         db.query(BodyMeasurementDefinition)
@@ -430,7 +434,7 @@ def sync_current_weight_to_diary(db: Session, owner: User, weight_kg: float) -> 
         db,
         owner_user_id=owner.id,
         measured_on=today_for_user(owner),
-        changes={"weight_kg": weight_kg},
+        changes={"weight_kg": Decimal(str(weight_kg))},
     )
 
 

@@ -440,6 +440,12 @@ describe('ProgressSchedule', () => {
       fireEvent.click(screen.getByText('Расписание'));
       expect(screen.getByText('Занятие 1')).toBeVisible();
       expect(screen.getAllByRole('article', { name: /^Тренировка Занятие/ })).toHaveLength(count);
+      expect(screen.getByRole('heading', { name: 'Расписание' }).closest('details')).toHaveClass(
+        'workout-schedule-card',
+      );
+      const scheduleLists = [...document.querySelectorAll('.workout-schedule-list')];
+      expect(scheduleLists).toHaveLength(count > 4 ? 2 : 1);
+      expect(scheduleLists[0]).not.toHaveClass('top-gap');
       if (count > 4) {
         expect(
           screen.getByRole('article', { name: 'Тренировка Занятие 12 в расписании' }),

@@ -493,9 +493,17 @@ def _serialize_workout(workout: UserWorkout, db: Session, current_user: User) ->
                         "id": set_item.id,
                         "set_number": set_item.set_number,
                         "actual_reps": set_item.actual_reps,
-                        "actual_weight": set_item.actual_weight,
+                        "actual_weight": (
+                            float(set_item.actual_weight)
+                            if set_item.actual_weight is not None
+                            else None
+                        ),
                         "duration_minutes": set_item.duration_minutes,
-                        "distance_km": set_item.distance_km,
+                        "distance_km": (
+                            float(set_item.distance_km)
+                            if set_item.distance_km is not None
+                            else None
+                        ),
                         "average_heart_rate_bpm": set_item.average_heart_rate_bpm,
                         "heart_rate_zone": set_item.heart_rate_zone,
                         "rir": set_item.rir,
@@ -1555,7 +1563,7 @@ def workout_history(
                 "started_at": item.started_at.isoformat() if item.started_at else None,
                 "completed_at": item.completed_at.isoformat() if item.completed_at else None,
                 "completed_sets": len(completed_sets),
-                "volume_kg": round(volume_kg, 1),
+                "volume_kg": round(volume_kg, 2),
                 "completion_feedback": item.completion_feedback,
                 "completion_note": item.completion_note,
                 "rest_sessions": rest_by_workout.get(item.id, []),

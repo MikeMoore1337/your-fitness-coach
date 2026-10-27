@@ -161,7 +161,7 @@ test('AI Coach stays hidden in active workout and completion on mocked TMA', asy
   await expectAiCoachHidden(tmaPage, requests);
 
   await tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await tmaPage.getByLabel('Вес, Приседания, подход 1').fill('40');
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
   await expect(tmaPage.getByText('Синхронизировано')).toBeVisible();
   await tmaPage.getByRole('button', { name: 'Завершить тренировку' }).click();

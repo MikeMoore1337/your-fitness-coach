@@ -71,7 +71,7 @@ test('V9-05 keeps the active session summary collapsed until the user opens it',
   await adaptationDialog.locator('.workout-adaptation-dialog__close').click();
   await expectTouchTargets(summary.locator('button'));
 
-  const weight = page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = page.getByLabel('Вес, Приседания, подход 1');
   await summary.getByRole('button', { name: 'К текущему подходу' }).click();
   await expect(weight).toBeFocused();
   await expect(page.locator('[data-workout-set-id="201"]')).toHaveAttribute('aria-current', 'step');
@@ -109,7 +109,7 @@ test('V12-01 starts a new workout collapsed and keeps the choice and inputs thro
   await expect(details).toBeHidden();
 
   await toggle.click();
-  const weight = page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = page.getByLabel('Вес, Приседания, подход 1');
   await weight.fill('82');
   await expect(weight).toHaveValue('82');
   await api.setOffline(true);

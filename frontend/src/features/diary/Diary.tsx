@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
 import type {
@@ -17,6 +17,12 @@ import { DateInput } from '../../shared/ui/PickerInput';
 import { invalidateMeasurementMutation, queryKeys } from '../../shared/queryKeys';
 import { productEventSurface, trackCoreProductEvent } from '../../shared/analytics/productEvents';
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
+import { isPwaStandalone, isTelegramSurface } from '../../shared/pwa/pwaRuntime';
+import {
+  decimalDraftFromValue,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 const measurementFields = [
   'weight_kg',
@@ -27,19 +33,73 @@ const measurementFields = [
   'thigh_cm',
 ] as const;
 
-function hasMeasurementValues(form: BodyMeasurementSave): boolean {
+type MeasurementField = (typeof measurementFields)[number];
+type DiaryDraft = Omit<BodyMeasurementSave, MeasurementField | 'custom_values'> &
+  Partial<Record<MeasurementField, string | number | null>> & {
+    editingDate?: string;
+    custom_values?: Array<{ definition_id: number; value?: string | number | null }>;
+  };
+
+function draftString(value: string | number | null | undefined): string {
+  return typeof value === 'string' ? value : decimalDraftFromValue(value);
+}
+
+function keepFocusedMeasurementVisible(input: HTMLInputElement): void {
+  // As with workout weight/reps (#1099), iOS standalone PWA owns focus placement.
+  // A scripted scroll races native keyboard panning and jumps the entire form.
+  if (isPwaStandalone() && !isTelegramSurface()) return;
+  requestAnimationFrame(() => {
+    if (document.activeElement !== input) return;
+    const viewport = window.visualViewport;
+    const offset = viewport?.offsetTop ?? 0;
+    const top = offset + 12;
+    const bottom = offset + (viewport?.height ?? window.innerHeight) - 12;
+    const bounds = input.getBoundingClientRect();
+
+    // Only correct actual clipping; leave natural keyboard focus and manual scrolling alone.
+    if (bounds.top < top) {
+      window.scrollBy(0, bounds.top - top);
+    } else if (bounds.bottom > bottom) {
+      window.scrollBy(0, bounds.bottom - bottom);
+    }
+  });
+}
+
+function formatMeasurementValue(value: number): string {
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
+}
+
+function validatedDraftNumber(
+  value: string | number | null | undefined,
+  limits: { min: number; max: number },
+): number | null | typeof Number.NaN {
+  const draft = draftString(value);
+  if (!draft.trim()) return null;
+  if (!isCompleteDecimalDraft(draft)) return Number.NaN;
+  const parsed = parseDecimalDraft(draft);
+  return parsed == null || parsed < limits.min || parsed > limits.max ? Number.NaN : parsed;
+}
+
+function hasMeasurementValues(form: DiaryDraft): boolean {
   return (
-    measurementFields.some((key) => form[key] != null) ||
+    measurementFields.some((key) => draftString(form[key]).trim() !== '') ||
     Boolean(form.note?.trim()) ||
-    Boolean(form.custom_values?.some((value) => value.value != null))
+    Boolean(form.custom_values?.some((value) => draftString(value.value).trim() !== ''))
   );
 }
 
-function matchesMeasurement(form: BodyMeasurementSave, record: BodyMeasurement): boolean {
-  const customValues = (form.custom_values ?? []).filter((value) => value.value != null);
+function matchesMeasurement(form: DiaryDraft, record: BodyMeasurement): boolean {
+  const customValues = (form.custom_values ?? [])
+    .map((value) => ({
+      definition_id: value.definition_id,
+      value: parseDecimalDraft(draftString(value.value)),
+    }))
+    .filter((value) => value.value != null);
   return (
     form.measured_on === record.measured_on &&
-    measurementFields.every((key) => (form[key] ?? null) === (record[key] ?? null)) &&
+    measurementFields.every(
+      (key) => parseDecimalDraft(draftString(form[key])) === (record[key] ?? null),
+    ) &&
     (form.note?.trim() || '') === (record.note?.trim() || '') &&
     customValues.length === (record.custom_values ?? []).length &&
     customValues.every((value) =>
@@ -48,6 +108,41 @@ function matchesMeasurement(form: BodyMeasurementSave, record: BodyMeasurement):
       ),
     )
   );
+}
+
+function buildMeasurementPayload(
+  form: DiaryDraft,
+  limits: Record<MeasurementField, { min: number; max: number }>,
+): { payload: BodyMeasurementSave | null; error: string | null } {
+  const payload: BodyMeasurementSave = {
+    measured_on: form.measured_on,
+    note: form.note,
+    custom_values: [],
+  };
+  for (const key of measurementFields) {
+    const raw = draftString(form[key]);
+    const value = validatedDraftNumber(raw, limits[key]);
+    if (raw.trim() && !Number.isFinite(value)) {
+      return {
+        payload: null,
+        error: 'Проверьте значения замера: используйте число до двух знаков.',
+      };
+    }
+    payload[key] = value;
+  }
+  payload.custom_values = [];
+  for (const item of form.custom_values ?? []) {
+    const raw = draftString(item.value);
+    const value = validatedDraftNumber(raw, { min: 0.1, max: 300 });
+    if (raw.trim() && !Number.isFinite(value)) {
+      return {
+        payload: null,
+        error: 'Проверьте пользовательские показатели: используйте число до двух знаков.',
+      };
+    }
+    payload.custom_values.push({ definition_id: item.definition_id, value });
+  }
+  return { payload, error: null };
 }
 
 export function Diary({
@@ -70,6 +165,14 @@ export function Diary({
   const { toast, confirm } = useFeedback();
   const formRef = useRef<HTMLFormElement>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isPwaStandalone() || isTelegramSurface()) return;
+    const root = document.documentElement;
+    root.dataset.yfcMeasurementPwa = 'true';
+    return () => {
+      delete root.dataset.yfcMeasurementPwa;
+    };
+  }, []);
   const timeZone = clientId
     ? clientTimeZone || detectedTimeZone()
     : user?.profile?.timezone || detectedTimeZone();
@@ -77,10 +180,10 @@ export function Diary({
   const draftKey = measurementDraftStorageKey(
     clientId ? `client_${clientId}` : `user_${user?.id ?? 'me'}`,
   );
-  const [form, setForm, clearDraft] = usePersistentState<
-    BodyMeasurementSave & { editingDate?: string }
-  >(draftKey, { measured_on: dateInputValue(new Date(), timeZone) });
-  const { editingDate, ...measurement } = form;
+  const [form, setForm, clearDraft] = usePersistentState<DiaryDraft>(draftKey, {
+    measured_on: dateInputValue(new Date(), timeZone),
+  });
+  const { editingDate } = form;
   const base = clientId
     ? `/api/v1/coach/clients/${clientId}/measurements`
     : '/api/v1/workouts/diary';
@@ -212,25 +315,23 @@ export function Diary({
     setForm({
       editingDate: item.measured_on,
       measured_on: item.measured_on,
-      weight_kg: item.weight_kg,
-      chest_cm: item.chest_cm,
-      waist_cm: item.waist_cm,
-      hips_cm: item.hips_cm,
-      biceps_cm: item.biceps_cm,
-      thigh_cm: item.thigh_cm,
+      weight_kg: decimalDraftFromValue(item.weight_kg),
+      chest_cm: decimalDraftFromValue(item.chest_cm),
+      waist_cm: decimalDraftFromValue(item.waist_cm),
+      hips_cm: decimalDraftFromValue(item.hips_cm),
+      biceps_cm: decimalDraftFromValue(item.biceps_cm),
+      thigh_cm: decimalDraftFromValue(item.thigh_cm),
       note: item.note,
       custom_values: (item.custom_values ?? []).map((value) => ({
         definition_id: value.definition_id,
-        value: value.value,
+        value: decimalDraftFromValue(value.value),
       })),
     });
-    requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView?.({ block: 'center' });
-      formRef.current?.querySelector<HTMLInputElement>('input')?.focus();
-    });
+    // Do not force-scroll a long measurement form while iOS is positioning its keyboard.
+    // Let the user focus the intended input; the browser keeps it in the visual viewport.
   };
   const activeDefinitions = (definitions.data ?? []).filter((definition) => !definition.archived);
-  const setCustomValue = (definitionId: number, value: number | null) => {
+  const setCustomValue = (definitionId: number, value: string) => {
     const customValues = (form.custom_values ?? []).filter(
       (item) => item.definition_id !== definitionId,
     );
@@ -300,7 +401,12 @@ export function Diary({
           onSubmit={(e) => {
             e.preventDefault();
             if (mutation.isPending) return;
-            mutation.mutate({ path: base, method: 'POST', body: measurement });
+            const result = buildMeasurementPayload(form, numericLimits);
+            if (result.error || !result.payload) {
+              setSubmitError(result.error);
+              return;
+            }
+            mutation.mutate({ path: base, method: 'POST', body: result.payload });
           }}
         >
           <div className="form-grid diary-form-grid">
@@ -329,19 +435,20 @@ export function Diary({
                   }
                 </span>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   enterKeyHint={key === 'thigh_cm' ? 'done' : 'next'}
-                  step="0.1"
+                  step="0.01"
                   min={numericLimits[key].min}
                   max={numericLimits[key].max}
-                  value={form[key] ?? ''}
-                  onChange={(e) =>
+                  value={draftString(form[key])}
+                  onFocus={(e) => keepFocusedMeasurementVisible(e.currentTarget)}
+                  onChange={(e) => {
                     setForm({
                       ...form,
-                      [key]: e.target.value === '' ? null : Number(e.target.value),
-                    })
-                  }
+                      [key]: e.target.value,
+                    });
+                  }}
                 />
               </label>
             ))}
@@ -354,18 +461,16 @@ export function Diary({
                   <span>{definition.label}, см</span>
                   <input
                     aria-label={`${definition.label}, см`}
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step="0.1"
+                    step="0.01"
                     min={0.1}
                     max={300}
-                    value={currentValue ?? ''}
-                    onChange={(e) =>
-                      setCustomValue(
-                        definition.id,
-                        e.target.value === '' ? null : Number(e.target.value),
-                      )
-                    }
+                    value={draftString(currentValue)}
+                    onFocus={(e) => keepFocusedMeasurementVisible(e.currentTarget)}
+                    onChange={(e) => {
+                      setCustomValue(definition.id, e.target.value);
+                    }}
                   />
                 </label>
               );
@@ -568,10 +673,10 @@ export function Diary({
                         .filter((key) => item[key] != null)
                         .map(
                           (key) =>
-                            `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${item[key]} ${key === 'weight_kg' ? 'кг' : 'см'}`,
+                            `${{ weight_kg: 'Вес', chest_cm: 'Грудь', waist_cm: 'Талия', hips_cm: 'Бёдра', biceps_cm: 'Окружность плеча', thigh_cm: 'Окружность бедра' }[key]}: ${formatMeasurementValue(item[key]!)} ${key === 'weight_kg' ? 'кг' : 'см'}`,
                         ),
                       ...(item.custom_values ?? []).map(
-                        (value) => `${value.label}: ${value.value} см`,
+                        (value) => `${value.label}: ${formatMeasurementValue(value.value)} см`,
                       ),
                     ].join(' · ')}
                   </p>

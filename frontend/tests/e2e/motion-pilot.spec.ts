@@ -344,7 +344,7 @@ test('workout confirmation and Nutrition add keep final production state immedia
   await page.goto('/app?section=today');
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await page.getByLabel('Вес, Приседания, подход 1').fill('40');
   await expect.poll(() => platformApi.setPatchCalls()).toBeGreaterThan(0);
   await expect(page.locator('.active-workout-sync')).toContainText('Синхронизировано');
   await armWorkoutMotionEvidence(page);

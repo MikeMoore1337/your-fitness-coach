@@ -214,6 +214,10 @@ describe('ExerciseGuideMedia', () => {
 
     expect(screen.getByText(/Изображение показывает положение/)).toBeVisible();
     const image = screen.getByAltText('Пример: конечное положение усилия');
+    expect(image.closest('.exercise-media-picture')).toBeInTheDocument();
+    expect(image.closest('.exercise-guide-image__frame')).toHaveClass(
+      'exercise-guide-image__frame',
+    );
     expect(image).toHaveAttribute('loading', 'lazy');
     expect(image).toHaveAttribute('decoding', 'async');
     expect(image).toHaveAttribute(
@@ -221,6 +225,18 @@ describe('ExerciseGuideMedia', () => {
       expect.stringContaining('concentric_end-1280w.webp 1280w'),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps the expanded technique media inside the dedicated square surface', () => {
+    render(<ExerciseGuideMedia items={media} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Увеличить: Фаза усилия' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Увеличенное изображение: Фаза усилия' });
+    expect(dialog.querySelector('.exercise-lightbox__media')).toBeInTheDocument();
+    expect(
+      dialog.querySelector('.exercise-lightbox__media > .exercise-media-picture'),
+    ).toBeInTheDocument();
   });
 
   it('selects the large source only after opening and preserves keyboard-accessible navigation', () => {

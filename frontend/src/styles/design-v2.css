@@ -5260,12 +5260,12 @@ body:has(.standalone-page--design-v2) {
   color: var(--v2-success-text);
 }
 
-.app-section--design-v2 :where(.list-grid, .program-template-grid, .exercise-catalog-list) {
+.app-section--design-v2 :where(.list-grid, .exercise-catalog-list) {
   gap: 0;
   border-top: 1px solid var(--v2-border);
 }
 
-.app-section--design-v2 :where(.list-row, .program-template-card, .exercise-catalog-item) {
+.app-section--design-v2 :where(.list-row, .exercise-catalog-item) {
   padding: var(--v2-space-4) 0;
   border: 0;
   border-bottom: 1px solid var(--v2-border);
@@ -9113,6 +9113,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .cardio-form__core,
 .cardio-form__optional-fields {
   display: grid;
+  min-width: 0;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: start;
   gap: var(--v2-space-3);
@@ -9121,6 +9122,23 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
 .cardio-form :where(.ui-field, .ui-input, .ui-select, textarea) {
   min-width: 0;
   width: 100%;
+}
+
+/* iOS WebKit gives datetime-local an intrinsic minimum width wider than narrow cards. */
+.cardio-form input[type='datetime-local'] {
+  box-sizing: border-box;
+  display: block;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  inline-size: 100%;
+}
+
+.cardio-form input[type='datetime-local']::-webkit-date-and-time-value {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  inline-size: 100%;
+  margin: 0;
+  text-align: start;
 }
 
 .cardio-form textarea {
@@ -9381,7 +9399,7 @@ body.public-shell-mode:has(.public-shell.public-shell--design-v2) {
   .cardio-form__optional-fields,
   .cardio-session-row__facts,
   .cardio-summary-strip {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .cardio-form__optional-fields > .ui-field:last-child {

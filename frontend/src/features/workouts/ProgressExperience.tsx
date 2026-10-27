@@ -102,7 +102,7 @@ function formatDate(value: string, withYear = false): string {
 function formatChange(change: number | null | undefined, unit: string): string {
   if (change == null) return 'Пока без динамики';
   const sign = change > 0 ? '+' : '';
-  return `${sign}${formatNumber(change)} ${unit}`;
+  return `${sign}${formatNumber(change, 2)} ${unit}`;
 }
 
 function trendInterpretationText(
@@ -204,7 +204,7 @@ function ProgressTrendRows({
         <li key={trend.metric}>
           <span>{bodyMetricLabel(trend)}</span>
           <strong>
-            {formatNumber(trend.latest_value)} {bodyMetricUnit(trend)}
+            {formatNumber(trend.latest_value, 2)} {bodyMetricUnit(trend)}
           </strong>
           <small>{formatChange(trend.change, bodyMetricUnit(trend))}</small>
         </li>
@@ -243,7 +243,7 @@ function ProgressTrendPanel({
         </div>
         {selectedTrend && (
           <strong className="progress-trend-panel__value">
-            {formatNumber(selectedTrend.latest_value)} {bodyMetricUnit(selectedTrend)}
+            {formatNumber(selectedTrend.latest_value, 2)} {bodyMetricUnit(selectedTrend)}
             <small>{formatChange(selectedTrend.change, bodyMetricUnit(selectedTrend))}</small>
           </strong>
         )}
@@ -602,7 +602,7 @@ function SummaryOverview({
 }) {
   const weight = summary.body.trends.find((trend) => trend.metric === 'weight_kg');
   const confirmedNutritionDays = summary.nutrition.complete_days + summary.nutrition.fasted_days;
-  const latestWeight = weight ? `${formatNumber(weight.latest_value)} кг` : 'Мало данных';
+  const latestWeight = weight ? `${formatNumber(weight.latest_value, 2)} кг` : 'Мало данных';
   const bodyState = weight ? 'populated' : 'sparse';
   const trainingState =
     summary.training.planned_workouts > 0 || summary.training.completed_workouts > 0
@@ -665,7 +665,7 @@ function SummaryOverview({
                   ? 'Недоступно'
                   : summary.nutrition.average_calories == null
                     ? 'Мало данных'
-                    : `${formatNumber(summary.nutrition.average_calories, 0)} ккал`
+                    : `${formatNumber(summary.nutrition.average_calories, 2)} ккал`
               }
             />
             <ProgressMetricCard
@@ -780,7 +780,7 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
                 ? exercise.uses_bodyweight_equipment
                   ? 'Собственный вес'
                   : 'Вес не записан'
-                : `до ${formatNumber(exercise.max_external_load_kg)} кг`}
+                : `до ${formatNumber(exercise.max_external_load_kg, 2)} кг`}
             </span>
             <DisclosureIcon />
           </summary>
@@ -817,7 +817,7 @@ function ExerciseHistory({ analytics }: { analytics: TrainingAnalytics }) {
                         value={
                           set.external_load_kg == null
                             ? '—'
-                            : `${formatNumber(set.external_load_kg)} кг`
+                            : `${formatNumber(set.external_load_kg, 2)} кг`
                         }
                       />
                       <SetValue label="Повторы" value={set.reps} />
@@ -946,7 +946,9 @@ function BodyChart({ trend }: { trend: BodyTrend }) {
   return (
     <TimeSeriesChart
       ariaLabel={`${bodyMetricLabel(trend)}: ${trend.points
-        .map((point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value)} ${unit}`)
+        .map(
+          (point) => `${formatDate(point.measured_on)} — ${formatNumber(point.value, 2)} ${unit}`,
+        )
         .join(', ')}`}
       metric={bodyMetricLabel(trend)}
       period={`${formatDate(trend.first_measured_on)} — ${formatDate(trend.latest_measured_on)}`}
@@ -956,6 +958,7 @@ function BodyChart({ trend }: { trend: BodyTrend }) {
         value: point.value,
       }))}
       unit={unit}
+      valueFractionDigits={2}
       valueLabel="Замер"
     />
   );
@@ -1056,7 +1059,7 @@ function BodySection({
               <div key={key}>
                 <dt>{label}</dt>
                 <dd>
-                  {value == null ? '—' : formatNumber(value)} <small>{unit}</small>
+                  {value == null ? '—' : formatNumber(value, 2)} <small>{unit}</small>
                 </dd>
               </div>
             ))}
@@ -1224,7 +1227,7 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
                 <dd>
                   {nutrition.target_calories == null
                     ? 'Цель не задана'
-                    : `${formatNumber(nutrition.target_calories, 0)} ккал`}
+                    : `${formatNumber(nutrition.target_calories, 2)} ккал`}
                 </dd>
               </div>
               <div>
@@ -1271,12 +1274,12 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               <strong>
                 {nutrition.average_calories == null
                   ? '—'
-                  : `${formatNumber(nutrition.average_calories, 0)} ккал`}
+                  : `${formatNumber(nutrition.average_calories, 2)} ккал`}
               </strong>
               <small>
                 {nutrition.target_calories == null
                   ? 'Цель не задана'
-                  : `цель ${formatNumber(nutrition.target_calories, 0)} ккал`}
+                  : `цель ${formatNumber(nutrition.target_calories, 2)} ккал`}
               </small>
             </div>
             <div>
@@ -1284,12 +1287,12 @@ function NutritionSection({ isStale, summary }: { isStale?: boolean; summary: Pr
               <strong>
                 {nutrition.average_protein_g == null
                   ? '—'
-                  : `${formatNumber(nutrition.average_protein_g, 0)} г`}
+                  : `${formatNumber(nutrition.average_protein_g, 2)} г`}
               </strong>
               <small>
                 {nutrition.target_protein_g == null
                   ? 'Цель не задана'
-                  : `цель ${formatNumber(nutrition.target_protein_g, 0)} г`}
+                  : `цель ${formatNumber(nutrition.target_protein_g, 2)} г`}
               </small>
             </div>
             <div>

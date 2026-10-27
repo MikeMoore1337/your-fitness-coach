@@ -131,6 +131,73 @@ async function assertMobileShellGeometry(page: Page): Promise<void> {
   await expectUiAuditClean(page, 'mobile shared shell', { checkTouchTargets: true });
 }
 
+test('@critical cardio datetime fits iPhone WebKit and Chromium', async ({ browser }, testInfo) => {
+  test.setTimeout(120_000);
+  const filledDate = '2026-10-26T14:00';
+
+  for (const theme of ['light', 'dark'] as const) {
+    for (const platform of ['browser', 'telegram'] as const) {
+      const page = await browser.newPage({
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        locale: 'ru-RU',
+        timezoneId: 'Europe/Moscow',
+      });
+      try {
+        const { tma } = await preparePage(page, theme, platform, { cardioState: 'empty' });
+        await page.goto('/app?section=today&cardio=1');
+        await waitForSurface(page, 'today');
+
+        const card = page.locator('.cardio-log--quick');
+        const date = card.getByLabel('Дата и время');
+        await expect(date).toHaveAttribute('type', 'datetime-local');
+        await date.fill(filledDate);
+
+        for (const width of [320, 360, 390, 430]) {
+          await page.setViewportSize({ width, height: 844 });
+          if (tma) await tma.setViewport(844, 844);
+
+          const geometry = await date.evaluate((input) => {
+            const field = input.closest('.ui-field');
+            const card = input.closest('.cardio-log');
+            if (!field || !card) throw new Error('Cardio date card geometry is missing');
+            const inputRect = input.getBoundingClientRect();
+            const fieldRect = field.getBoundingClientRect();
+            const cardRect = card.getBoundingClientRect();
+            return {
+              inputLeft: inputRect.left,
+              inputRight: inputRect.right,
+              fieldLeft: fieldRect.left,
+              fieldRight: fieldRect.right,
+              cardRight: cardRect.right,
+              cardOverflow: card.scrollWidth - card.clientWidth,
+              pageOverflow:
+                document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            };
+          });
+          expect(geometry.inputLeft).toBeGreaterThanOrEqual(geometry.fieldLeft - 1);
+          expect(geometry.inputRight).toBeLessThanOrEqual(geometry.fieldRight + 1);
+          expect(geometry.inputRight).toBeLessThanOrEqual(geometry.cardRight + 1);
+          expect(geometry.inputRight).toBeLessThanOrEqual(width + 1);
+          expect(geometry.cardOverflow).toBeLessThanOrEqual(1);
+          expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+          await expect(date).toHaveValue(filledDate);
+
+          if (width === 390) {
+            await card.screenshot({
+              path: testInfo.outputPath(`cardio-${platform}-${theme}-390.png`),
+              ...screenshotOptions,
+            });
+          }
+        }
+      } finally {
+        await page.close();
+      }
+    }
+  }
+});
+
 for (const theme of ['light', 'dark'] as const) {
   test(`@critical mobile core surfaces keep the ${theme} visual contract`, async ({ page }) => {
     await preparePage(page, theme);
@@ -301,18 +368,13 @@ test('@critical active workout keeps the current set primary across mobile width
     );
     await expectUiAuditClean(page, 'active workout current set', { checkTouchTargets: true });
 
-    const numberInputs = currentSet.locator('input[type="number"]:visible');
-    await expect(numberInputs).toHaveCount(2);
-    expect(
-      await numberInputs.evaluateAll((inputs) =>
-        inputs.map((input) => (input as HTMLInputElement).type),
-      ),
-    ).toEqual(['number', 'number']);
+    const weightInput = currentSet.getByRole('textbox', { name: /Вес, .*подход 1/ });
+    const repsInput = currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ });
+    await expect(currentSet.locator('input:visible')).toHaveCount(2);
+    await expect(weightInput).toHaveAttribute('inputmode', 'decimal');
+    await expect(repsInput).toHaveAttribute('inputmode', 'numeric');
 
-    for (const input of [
-      currentSet.getByRole('spinbutton', { name: /Вес, .*подход 1/ }),
-      currentSet.getByRole('spinbutton', { name: /Повторы, .*подход 1/ }),
-    ]) {
+    for (const input of [weightInput, repsInput]) {
       await input.focus();
       await expect(input).toBeInViewport();
       await expect(page.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');

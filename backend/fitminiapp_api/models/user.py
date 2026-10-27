@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, time
+from decimal import Decimal
 
 from sqlalchemy import (
     BIGINT,
@@ -9,11 +10,11 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
-    Float,
     ForeignKey,
     Index,
     Integer,
     LargeBinary,
+    Numeric,
     String,
     Text,
     Time,
@@ -132,8 +133,8 @@ class UserProfile(Base):
     sex: Mapped[str | None] = mapped_column(String(16), nullable=True)
     goal: Mapped[str | None] = mapped_column(String(32), nullable=True)
     level: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    height_cm: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    height_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     workouts_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cardio_trainings_per_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     resting_heart_rate: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -212,12 +213,12 @@ class BodyMeasurement(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     measured_on: Mapped[date] = mapped_column(Date, nullable=False, index=True)
-    weight_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
-    chest_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    waist_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    hips_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    biceps_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
-    thigh_cm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    weight_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    chest_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    waist_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    hips_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    biceps_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    thigh_cm: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
     custom_values: Mapped[list[BodyMeasurementCustomValue]] = relationship(
@@ -302,7 +303,7 @@ class BodyMeasurementCustomValue(Base):
         ForeignKey("body_measurement_definitions.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    value: Mapped[float] = mapped_column(Float, nullable=False)
+    value: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=now_msk_naive)
 
     measurement: Mapped[BodyMeasurement] = relationship(

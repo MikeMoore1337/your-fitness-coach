@@ -17,6 +17,11 @@ import { TrainingPreferencesForm } from './TrainingPreferencesForm';
 import { Icon } from '../../shared/ui/Icon';
 import { AccountAvatar } from '../../shared/account/AccountIdentity';
 import { AvatarSettings } from './AvatarSettings';
+import {
+  decimalDraftFromValue,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
 
 const emptyProfile: UserProfileUpdate = {
   full_name: '',
@@ -51,6 +56,40 @@ function profileFormFromUser(user: User | null | undefined): UserProfileUpdate {
         timezone: user.profile.timezone,
       }
     : emptyProfile;
+}
+
+type ProfileFormDraft = Omit<UserProfileUpdate, 'height_cm' | 'weight_kg'> & {
+  height_cm: string;
+  weight_kg: string;
+};
+
+type ProfileNumericPayload = Omit<UserProfileUpdate, 'height_cm' | 'weight_kg'> & {
+  height_cm?: number | null;
+  weight_kg?: number | null;
+};
+
+function profileDraftFromUser(user: User | null | undefined): ProfileFormDraft {
+  const profile = profileFormFromUser(user);
+  return {
+    ...profile,
+    height_cm: decimalDraftFromValue(profile.height_cm),
+    weight_kg: decimalDraftFromValue(profile.weight_kg),
+  };
+}
+
+function decimalDraftValue(value: string | number | null | undefined): number | null {
+  const draft = typeof value === 'string' ? value : decimalDraftFromValue(value);
+  if (!draft.trim()) return null;
+  if (!isCompleteDecimalDraft(draft)) return Number.NaN;
+  return parseDecimalDraft(draft) ?? Number.NaN;
+}
+
+function profilePayloadFromDraft(form: ProfileFormDraft): ProfileNumericPayload {
+  return {
+    ...form,
+    height_cm: decimalDraftValue(form.height_cm),
+    weight_kg: decimalDraftValue(form.weight_kg),
+  };
 }
 
 const cardioRecommendationDescriptions = {
@@ -115,7 +154,7 @@ function rangeError(
   return undefined;
 }
 
-export function validateProfileForm(form: UserProfileUpdate): ProfileFieldErrors {
+export function validateProfileForm(form: ProfileNumericPayload): ProfileFieldErrors {
   return {
     birth_date: birthDateError(form.birth_date),
     goal: form.goal ? undefined : 'Выберите основную цель.',
@@ -152,16 +191,17 @@ export function ProfileForm() {
   const queryClient = useQueryClient();
   const [avatarEditorOpen, setAvatarEditorOpen] = useState(false);
   const [validationErrors, setValidationErrors] = useState<ProfileFieldErrors>({});
-  const [form, setForm, clearDraft] = usePersistentState<UserProfileUpdate>(
+  const [form, setForm, clearDraft] = usePersistentState<ProfileFormDraft>(
     profileDraftStorageKey(user?.id ?? 'anonymous'),
-    () => profileFormFromUser(user),
+    () => profileDraftFromUser(user),
   );
   const [persistedSnapshot, setPersistedSnapshot] = useState(() =>
-    JSON.stringify(profileFormFromUser(user)),
+    JSON.stringify(profileDraftFromUser(user)),
   );
+  const normalizedForm = profilePayloadFromDraft(form);
   const formIsDirty = JSON.stringify(form) !== persistedSnapshot;
   const formIsValid =
-    !Object.values(validateProfileForm(form)).some(Boolean) &&
+    !Object.values(validateProfileForm(normalizedForm)).some(Boolean) &&
     isBodyPriorityComplete(form.body_priority);
   const timezoneOptions = getTimezoneOptions(form.timezone);
   const validBirthDate = Boolean(form.birth_date) && !birthDateError(form.birth_date);
@@ -174,9 +214,9 @@ export function ProfileForm() {
       api<ApiSchemas['HeartRatePreviewResponse']>('/api/v1/me/profile/heart-rates/preview', {
         method: 'POST',
         body: {
-          birth_date: form.birth_date,
-          resting_heart_rate: form.resting_heart_rate,
-          goal: form.goal,
+          birth_date: normalizedForm.birth_date,
+          resting_heart_rate: normalizedForm.resting_heart_rate,
+          goal: normalizedForm.goal,
         },
       }),
     enabled: validBirthDate && validRestingHeartRate,
@@ -189,7 +229,8 @@ export function ProfileForm() {
   earliestBirthDate.setFullYear(earliestBirthDate.getFullYear() - 100);
 
   const mutation = useMutation({
-    mutationFn: () => api<User>('/api/v1/me/profile', { method: 'PATCH', body: form }),
+    mutationFn: (payload: UserProfileUpdate) =>
+      api<User>('/api/v1/me/profile', { method: 'PATCH', body: payload }),
     onSuccess: async () => {
       setPersistedSnapshot(JSON.stringify(form));
       clearDraft();
@@ -215,15 +256,22 @@ export function ProfileForm() {
       : 'Используется нейтральный emoji';
   const displayName =
     user?.profile?.full_name || user?.first_name || user?.username || 'Пользователь';
-  const updateField = <Key extends keyof UserProfileUpdate>(
+  const updateField = <Key extends keyof ProfileFormDraft>(
     key: Key,
-    value: UserProfileUpdate[Key],
+    value: ProfileFormDraft[Key],
   ) => {
-    const nextForm = { ...form, [key]: value };
+    const nextForm = { ...form, [key]: value } as ProfileFormDraft;
     setForm(nextForm);
+    const draftIsIncomplete =
+      (key === 'height_cm' || key === 'weight_kg') &&
+      typeof value === 'string' &&
+      value.trim() !== '' &&
+      !isCompleteDecimalDraft(value);
     setValidationErrors((current) => ({
       ...current,
-      [key]: validateProfileForm(nextForm)[key as keyof ProfileFieldErrors],
+      [key]: draftIsIncomplete
+        ? undefined
+        : validateProfileForm(profilePayloadFromDraft(nextForm))[key as keyof ProfileFieldErrors],
     }));
     mutation.reset();
   };
@@ -247,7 +295,7 @@ export function ProfileForm() {
           aria-busy={mutation.isPending}
           onSubmit={(event) => {
             event.preventDefault();
-            const errors = validateProfileForm(form);
+            const errors = validateProfileForm(normalizedForm);
             setValidationErrors(errors);
             const firstInvalidField = Object.entries(errors).find(([, message]) => message)?.[0];
             if (firstInvalidField) {
@@ -260,7 +308,7 @@ export function ProfileForm() {
               toast('Выберите хотя бы одну приоритетную мышечную группу', 'error');
               return;
             }
-            mutation.mutate();
+            mutation.mutate(normalizedForm);
           }}
         >
           <section className="profile-form-section" aria-labelledby="profile-personal-title">
@@ -472,17 +520,17 @@ export function ProfileForm() {
                 <input
                   id="profile-height_cm"
                   aria-label="Рост, см"
-                  type="number"
-                  inputMode="numeric"
+                  type="text"
+                  inputMode="decimal"
                   min="100"
                   max="250"
-                  step="1"
-                  value={form.height_cm ?? ''}
+                  step="0.01"
+                  value={form.height_cm}
                   aria-invalid={Boolean(validationErrors.height_cm)}
                   aria-describedby={
                     validationErrors.height_cm ? 'profile-height_cm-error' : undefined
                   }
-                  onChange={(event) => updateField('height_cm', numberValue(event.target.value))}
+                  onChange={(event) => updateField('height_cm', event.target.value)}
                 />
                 {validationErrors.height_cm && (
                   <small className="field-error" id="profile-height_cm-error" role="alert">
@@ -495,17 +543,17 @@ export function ProfileForm() {
                 <input
                   id="profile-weight_kg"
                   aria-label="Вес, кг"
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   min="20"
                   max="350"
-                  step="0.1"
-                  value={form.weight_kg ?? ''}
+                  step="0.01"
+                  value={form.weight_kg}
                   aria-invalid={Boolean(validationErrors.weight_kg)}
                   aria-describedby={
                     validationErrors.weight_kg ? 'profile-weight_kg-error' : undefined
                   }
-                  onChange={(event) => updateField('weight_kg', numberValue(event.target.value))}
+                  onChange={(event) => updateField('weight_kg', event.target.value)}
                 />
                 {validationErrors.weight_kg && (
                   <small className="field-error" id="profile-weight_kg-error" role="alert">

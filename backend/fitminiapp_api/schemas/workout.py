@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -129,7 +130,9 @@ class WorkoutSetCreate(BaseModel):
     workout_exercise_id: int
     set_number: int
     actual_reps: int | None = None
-    actual_weight: float | None = None
+    actual_weight: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
     set_kind: SetKind | None = "working"
     reached_failure: bool | None = None
@@ -138,9 +141,13 @@ class WorkoutSetCreate(BaseModel):
 
 class WorkoutSetUpdate(BaseModel):
     actual_reps: int | None = Field(default=None, ge=0)
-    actual_weight: float | None = Field(default=None, ge=0)
+    actual_weight: Decimal | None = Field(
+        default=None, ge=0, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
     duration_minutes: int | None = Field(default=None, ge=1, le=600)
-    distance_km: float | None = Field(default=None, gt=0, le=1000, allow_inf_nan=False)
+    distance_km: Decimal | None = Field(
+        default=None, gt=0, le=1000, max_digits=7, decimal_places=2, allow_inf_nan=False
+    )
     average_heart_rate_bpm: int | None = Field(default=None, ge=30, le=250)
     heart_rate_zone: int | None = Field(default=None, ge=1, le=5)
     rir: RirValue | None = Field(default=None, description=RIR_DESCRIPTION)
@@ -391,13 +398,20 @@ class WorkoutAdaptationApplyResponse(BaseModel):
 
 
 class WarmupProposalRow(BaseModel):
-    weight_kg: float = Field(gt=0, le=1000, allow_inf_nan=False)
+    weight_kg: Decimal = Field(gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False)
     reps: int = Field(ge=1, le=30)
+
+
+class WarmupProposalRowResponse(BaseModel):
+    weight_kg: float
+    reps: int
 
 
 class WarmupProposalPreviewRequest(BaseModel):
     target_set_id: int = Field(ge=1)
-    working_weight_kg: float = Field(gt=0, le=1000, allow_inf_nan=False)
+    working_weight_kg: Decimal = Field(
+        gt=0, le=1000, max_digits=6, decimal_places=2, allow_inf_nan=False
+    )
 
 
 class WarmupProposalPreviewResponse(BaseModel):
@@ -406,7 +420,7 @@ class WarmupProposalPreviewResponse(BaseModel):
     workout_exercise_id: int
     ruleset_version: str
     working_weight_kg: float
-    rows: list[WarmupProposalRow]
+    rows: list[WarmupProposalRowResponse]
     max_rows: int = Field(ge=1)
     state_token: str | None = Field(default=None, min_length=64, max_length=64)
     proposal_token: str | None = Field(default=None, min_length=64, max_length=64)
@@ -899,7 +913,9 @@ class WorkoutTimelineItem(BaseModel):
 
 class BodyMeasurementCustomValueSave(BaseModel):
     definition_id: int = Field(ge=1)
-    value: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
+    value: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
 
 
 class BodyMeasurementDefinitionCreate(BaseModel):
@@ -937,12 +953,24 @@ class BodyMeasurementCustomValueResponse(BaseModel):
 
 class BodyMeasurementSave(BaseModel):
     measured_on: date | None = None
-    weight_kg: float | None = Field(default=None, ge=20, le=350, allow_inf_nan=False)
-    chest_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    waist_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    hips_cm: float | None = Field(default=None, gt=0, le=300, allow_inf_nan=False)
-    biceps_cm: float | None = Field(default=None, gt=0, le=150, allow_inf_nan=False)
-    thigh_cm: float | None = Field(default=None, gt=0, le=200, allow_inf_nan=False)
+    weight_kg: Decimal | None = Field(
+        default=None, ge=20, le=350, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    chest_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    waist_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    hips_cm: Decimal | None = Field(
+        default=None, gt=0, le=300, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    biceps_cm: Decimal | None = Field(
+        default=None, gt=0, le=150, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
+    thigh_cm: Decimal | None = Field(
+        default=None, gt=0, le=200, max_digits=5, decimal_places=2, allow_inf_nan=False
+    )
     note: str | None = Field(default=None, max_length=500)
     custom_values: list[BodyMeasurementCustomValueSave] = Field(default_factory=list, max_length=32)
 

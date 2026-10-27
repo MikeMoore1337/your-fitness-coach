@@ -92,7 +92,7 @@ def _payload(candidate_id: str, *, risk_level: str = "low") -> HermesWebArticleI
                         "source_ids": ["source-guideline", "source-review"],
                         "support_level": "supports",
                         "limitations": "Источники не определяют индивидуальную программу.",
-                        "review_status": "verified",
+                        "review_status": "pending",
                     }
                 ],
                 "author": {"name": "Your Fitness Coach", "type": "Organization"},
@@ -166,6 +166,13 @@ def test_candidate_score_keeps_opportunity_separate_from_approval() -> None:
     )
     assert result["score"] < 60
     assert "risk_review_cost_requires_manual_path" in result["reasons"]
+
+
+def _simulate_explicit_human_claim_review(article: WebArticle) -> None:
+    """Test-only human approval, never part of Hermes HMAC ingestion."""
+    article.claim_source_matrix = [
+        {**row, "review_status": "verified"} for row in article.claim_source_matrix
+    ]
 
 
 def test_hermes_article_intake_is_idempotent_and_creates_draft(db_session) -> None:
@@ -284,6 +291,7 @@ def test_publish_requires_approval_and_update_preserves_revision(db_session) -> 
     with pytest.raises(WebArticleError, match="article_not_approved"):
         publish_web_article(db_session, article, actor_ref="owner")
 
+    _simulate_explicit_human_claim_review(article)
     article.status = "approved"
     publish_web_article(db_session, article, actor_ref="owner")
     assert article.status == "published"
@@ -329,6 +337,7 @@ def test_publish_requires_approval_and_update_preserves_revision(db_session) -> 
     assert old_revision.status == "published"
     assert old_revision.snapshot["title"] == payload.article.title
 
+    _simulate_explicit_human_claim_review(article)
     article.status = "approved"
     publish_web_article(db_session, article, actor_ref="owner")
     assert article.status == "published"
@@ -343,6 +352,7 @@ def test_archive_and_retract_preserve_article_history(db_session) -> None:
     result = accept_hermes_article_submission(db_session, payload, payload_hash=payload_hash)
     article = db_session.get(WebArticle, result.article_id)
     assert article is not None
+    _simulate_explicit_human_claim_review(article)
     article.status = "approved"
     publish_web_article(db_session, article, actor_ref="owner")
 

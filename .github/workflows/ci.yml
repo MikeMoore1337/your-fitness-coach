@@ -2,9 +2,10 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
+    types: [opened, reopened, ready_for_review, synchronize, edited]
   push:
-    branches: [master]
+    # Run post-merge quality on staging without invoking production deploy.
+    branches: [master, dev]
   schedule:
     # Europe/Moscow: daily at 05:17.
     - cron: "17 2 * * *"
@@ -227,6 +228,16 @@ jobs:
         run: |
           uv sync --locked --no-default-groups --extra backend
           echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+      - name: Validate one-time dev bootstrap lime baseline
+        if: matrix.lane == 'checks' && github.event_name == 'pull_request' && github.event.pull_request.number == 1267
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python scripts/ci_contract.py bootstrap-lime-base >> "$GITHUB_ENV"
       - name: Run shared frontend checks group
         if: matrix.lane == 'checks'
         run: python scripts/ci_contract.py run-group frontend-checks
@@ -251,7 +262,7 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_smoke == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -335,7 +346,7 @@ jobs:
     needs: scope-router
     if: needs.scope-router.result == 'success' && needs.scope-router.outputs.run_frontend_mobile_regression == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       CI_TIMING_FILE: ${{ github.workspace }}/.artifacts/runtime/ci/mobile-regression-timing.jsonl
       ALLURE_RESULTS_DIR: ${{ needs.scope-router.outputs.run_scheduled_report == 'true' && format('{0}/.artifacts/runtime/tests/allure-results/frontend-mobile-regression', github.workspace) || '' }}
@@ -375,7 +386,32 @@ jobs:
         run: echo "CI_CACHE package=playwright-mobile hit=${{ steps.mobile-playwright-cache.outputs.cache-hit }}"
       - name: Install mobile Chromium and WebKit
         working-directory: frontend
-        run: python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+        # A Playwright browser cache hit already contains browser binaries.
+        # Running --with-deps also invokes unbounded apt on hosted runners;
+        # the I4 PR #1241 hit the 25-minute job timeout there despite a
+        # 364 MB browser cache hit. Keep actual browser/E2E tests mandatory:
+        # do not skip installation checks or shared regression execution.
+        run: |
+          if [ "${{ steps.mobile-playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install chromium webkit
+          else
+            python ../scripts/ci_timing.py --group frontend-mobile-regression --command playwright-install -- npx playwright install --with-deps chromium webkit
+          fi
+      - name: Install cached WebKit shared-library prerequisite
+        if: steps.mobile-playwright-cache.outputs.cache-hit == 'true'
+        # On Ubuntu 24.04 the cached WebKit WPE binary requires
+        # libevent-2.1.so.7 from libevent-2.1-7t64; the full
+        # playwright --with-deps apt-update stage timed out after 25m.
+        # Keep real WebKit execution mandatory and bound this targeted
+        # system package install; failure remains a required CI failure.
+        run: |
+          sudo timeout -s KILL 180 env DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=15 install -y --no-install-recommends gstreamer1.0-libav gstreamer1.0-plugins-bad gstreamer1.0-plugins-base gstreamer1.0-plugins-good libicu74 libatomic1 libatk-bridge2.0-0t64 libatk1.0-0t64 libcairo-gobject2 libcairo2 libdbus-1-3 libdrm2 libenchant-2-2 libepoxy0 libevent-2.1-7t64 libflite1 libfontconfig1 libfreetype6 libgbm1 libgdk-pixbuf-2.0-0 libgles2 libglib2.0-0t64 libgstreamer-gl1.0-0 libgstreamer-plugins-bad1.0-0 libgstreamer-plugins-base1.0-0 libgstreamer1.0-0 libgtk-4-1 libharfbuzz-icu0 libharfbuzz0b libhyphen0 libjpeg-turbo8 liblcms2-2 libmanette-0.2-0 libopus0 libpango-1.0-0 libpangocairo-1.0-0 libpng16-16t64 libsecret-1-0 libvpx9 libwayland-client0 libwayland-egl1 libwayland-server0 libwebp7 libwebpdemux2 libwoff1 libx11-6 libxkbcommon0 libxml2 libxslt1.1 libx264-164 libavif16
+          ldconfig -p | grep -F 'libevent-2.1.so.7'
+          ldconfig -p | grep -F 'libopus.so.0'
+          # The bundled WebKit wrapper sets its own LD_LIBRARY_PATH.
+          # Direct ldd on MiniBrowser without that wrapper can falsely
+          # report private bundled libraries missing. Actual mandatory
+          # mobile Chromium/WebKit tests verify runtime dependency health.
       - name: Run shared mobile regression group
         run: python scripts/ci_contract.py run-group frontend-mobile-regression
       - name: Upload mobile regression evidence
@@ -1349,6 +1385,20 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
+      # The required "checks" result must deny direct feature->master PRs.
+      # Same-repository dev is the sole normal production promotion source.
+      - name: Require accepted dev promotion for master PR
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'master'
+        env:
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          if [ "$PR_HEAD_REF" != dev ] || [ "$PR_HEAD_REPO" != "$REPOSITORY" ]; then
+            echo "::error::Direct PR to master forbidden. Merge into dev, test on private Windows DEV, then promote dev to master."
+            exit 1
+          fi
       - name: Verify required result set
         env:
           EVENT_NAME: ${{ github.event_name }}

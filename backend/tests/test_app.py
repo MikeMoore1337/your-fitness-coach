@@ -3862,6 +3862,7 @@ def test_public_one_rep_max_serves_canonical_seo_fallback_without_private_routes
     ("method", "path"),
     [
         ("GET", "/app"),
+        ("GET", "/admin/hermes-bridge"),
         ("GET", "/login"),
         ("GET", "/join/abcdefghijklmnopqrstuvwxyz"),
     ],
@@ -4508,12 +4509,36 @@ def test_public_fallback_replaces_the_built_vite_marker_without_stale_landing_co
     assert '<main class="seo-fallback">' not in private
 
 
+def test_i4_hermes_editorial_popup_is_html_not_fastapi_json_404(client):
+    """A real popup navigates directly; client-side routing alone is insufficient."""
+    response = client.get(
+        "/admin/hermes-bridge",
+        headers={"Host": "app.your-fitness-coach.ru"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+    assert response.headers["x-robots-tag"] == "noindex, nofollow"
+    assert '<div id="root"></div>' in response.text
+    assert '"detail":"Not Found"' not in response.text
+
+    # A SPA shell is public HTML, not a Root API or an implicit owner grant.
+    # All backend article reads/writes still enforce require_root_admin.
+    denied = client.get("/api/v1/admin/articles/drafts?limit=25&offset=0")
+    assert denied.status_code in {401, 403}
+    assert client.post("/admin/hermes-bridge").status_code == 405
+    assert client.get("/admin/hermes-bridge/unexpected").status_code == 404
+
+
 @pytest.mark.parametrize(
     "path",
     [
         "/app",
         "/app/report?period=days_30",
         "/admin",
+        "/admin/hermes-bridge",
         "/coach",
         "/login",
         "/verify-email",

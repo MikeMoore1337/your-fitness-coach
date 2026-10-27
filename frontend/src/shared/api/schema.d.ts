@@ -7094,7 +7094,7 @@ export interface components {
             /** Definition Id */
             definition_id: number;
             /** Value */
-            value?: number | null;
+            value?: number | string | null;
         };
         /** BodyMeasurementDefinitionCreate */
         BodyMeasurementDefinitionCreate: {
@@ -7181,17 +7181,17 @@ export interface components {
             /** Measured On */
             measured_on?: string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Chest Cm */
-            chest_cm?: number | null;
+            chest_cm?: number | string | null;
             /** Waist Cm */
-            waist_cm?: number | null;
+            waist_cm?: number | string | null;
             /** Hips Cm */
-            hips_cm?: number | null;
+            hips_cm?: number | string | null;
             /** Biceps Cm */
-            biceps_cm?: number | null;
+            biceps_cm?: number | string | null;
             /** Thigh Cm */
-            thigh_cm?: number | null;
+            thigh_cm?: number | string | null;
             /** Note */
             note?: string | null;
             /** Custom Values */
@@ -7685,7 +7685,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes: number;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -7764,7 +7764,7 @@ export interface components {
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */
@@ -13440,9 +13440,9 @@ export interface components {
              */
             sex: "male" | "female";
             /** Weight Kg */
-            weight_kg: number;
+            weight_kg: number | string;
             /** Height Cm */
-            height_cm: number;
+            height_cm: number | string;
             /** Age */
             age: number;
             /** Daily Routine */
@@ -17034,9 +17034,9 @@ export interface components {
             /** Level */
             level?: ("beginner" | "intermediate" | "advanced") | null;
             /** Height Cm */
-            height_cm?: number | null;
+            height_cm?: number | string | null;
             /** Weight Kg */
-            weight_kg?: number | null;
+            weight_kg?: number | string | null;
             /** Workouts Per Week */
             workouts_per_week?: number | null;
             /** Cardio Trainings Per Week */
@@ -17114,7 +17114,7 @@ export interface components {
             /** Target Set Id */
             target_set_id: number;
             /** Working Weight Kg */
-            working_weight_kg: number;
+            working_weight_kg: number | string;
             /** Rows */
             rows: components["schemas"]["WarmupProposalRow"][];
             /** State Token */
@@ -17143,7 +17143,7 @@ export interface components {
             /** Target Set Id */
             target_set_id: number;
             /** Working Weight Kg */
-            working_weight_kg: number;
+            working_weight_kg: number | string;
         };
         /** WarmupProposalPreviewResponse */
         WarmupProposalPreviewResponse: {
@@ -17161,7 +17161,7 @@ export interface components {
             /** Working Weight Kg */
             working_weight_kg: number;
             /** Rows */
-            rows: components["schemas"]["WarmupProposalRow"][];
+            rows: components["schemas"]["WarmupProposalRowResponse"][];
             /** Max Rows */
             max_rows: number;
             /** State Token */
@@ -17173,6 +17173,13 @@ export interface components {
         };
         /** WarmupProposalRow */
         WarmupProposalRow: {
+            /** Weight Kg */
+            weight_kg: number | string;
+            /** Reps */
+            reps: number;
+        };
+        /** WarmupProposalRowResponse */
+        WarmupProposalRowResponse: {
             /** Weight Kg */
             weight_kg: number;
             /** Reps */
@@ -18338,11 +18345,11 @@ export interface components {
             /** Actual Reps */
             actual_reps?: number | null;
             /** Actual Weight */
-            actual_weight?: number | null;
+            actual_weight?: number | string | null;
             /** Duration Minutes */
             duration_minutes?: number | null;
             /** Distance Km */
-            distance_km?: number | null;
+            distance_km?: number | string | null;
             /** Average Heart Rate Bpm */
             average_heart_rate_bpm?: number | null;
             /** Heart Rate Zone */

@@ -69,7 +69,7 @@ async function completeWorkout(page: Page) {
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
   const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await page.getByLabel('Вес, Приседания, подход 1').fill('40');
   await valuesPatch;
   await Promise.all([
     waitForSetPatch(page, 201, true),
@@ -436,7 +436,7 @@ test('full Pulse completion motion exposes facts immediately and settles within 
   await page.getByRole('button', { name: 'Начать тренировку' }).click();
   const valuesPatch = waitForSetPatch(page, 201, false);
   await page.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await page.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await page.getByLabel('Вес, Приседания, подход 1').fill('40');
   await valuesPatch;
   await Promise.all([
     waitForSetPatch(page, 201, true),

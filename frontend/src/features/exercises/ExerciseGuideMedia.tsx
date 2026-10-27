@@ -5,6 +5,7 @@ import { Icon } from '../../shared/ui/Icon';
 import { useModalA11y } from '../../shared/ui/useModalA11y';
 import { usePrefersReducedMotion } from './ExerciseMediaAsset';
 import { ExerciseGuideVideo } from './ExerciseGuideVideo';
+import { resolveExerciseMediaFrame } from './exerciseMediaFraming';
 
 type GuideMediaItem = ExerciseGuide['media'][number];
 
@@ -50,6 +51,7 @@ function MediaPicture({
       (left, right) => right.width - left.width || left.mime_type.localeCompare(right.mime_type),
     )
     .at(0)?.url;
+  const frame = resolveExerciseMediaFrame({ url: src, width, height });
   const image = (
     <img
       src={largest ?? src}
@@ -61,6 +63,9 @@ function MediaPicture({
       loading={loading}
       decoding="async"
       data-media-mode={mode}
+      data-media-frame={frame.policy}
+      data-media-source-ratio={frame.sourceRatio ?? undefined}
+      style={{ objectPosition: frame.objectPosition }}
       onError={onError}
     />
   );
@@ -192,7 +197,6 @@ export function ExerciseGuideMedia({
               {failed ? (
                 <div
                   className="exercise-guide-image__frame exercise-guide-image__fallback"
-                  style={{ aspectRatio: `${item.width} / ${item.height}` }}
                   role="img"
                   aria-label={item.alt}
                 >
@@ -201,7 +205,6 @@ export function ExerciseGuideMedia({
               ) : (
                 <button
                   className="exercise-guide-image__frame"
-                  style={{ aspectRatio: `${item.width} / ${item.height}` }}
                   type="button"
                   aria-label={`Увеличить: ${item.phase}`}
                   onClick={() => {
@@ -274,35 +277,37 @@ export function ExerciseGuideMedia({
             </button>
           )}
           <figure>
-            {activeItemUsesVideo ? (
-              <ExerciseGuideVideo
-                sources={activeItem.video_sources ?? []}
-                poster={activeItem.poster}
-                expanded
-                onError={() =>
-                  setFailedVideoUrls((current) => new Set(current).add(activeItem.url))
-                }
-              />
-            ) : (
-              <MediaPicture
-                src={activeItemDisplayUrl ?? ''}
-                sources={activeItemSources}
-                sizes={lightboxSizes}
-                alt={activeItem.alt}
-                width={
-                  activeItemUsesPoster
-                    ? (activeItem.poster_width ?? activeItem.width)
-                    : activeItem.width
-                }
-                height={
-                  activeItemUsesPoster
-                    ? (activeItem.poster_height ?? activeItem.height)
-                    : activeItem.height
-                }
-                mode={activeItemUsesPoster ? 'static-poster' : activeItem.type}
-                onError={() => markImageError(activeItem, activeItemDisplayUrl ?? '')}
-              />
-            )}
+            <div className="exercise-lightbox__media">
+              {activeItemUsesVideo ? (
+                <ExerciseGuideVideo
+                  sources={activeItem.video_sources ?? []}
+                  poster={activeItem.poster}
+                  expanded
+                  onError={() =>
+                    setFailedVideoUrls((current) => new Set(current).add(activeItem.url))
+                  }
+                />
+              ) : (
+                <MediaPicture
+                  src={activeItemDisplayUrl ?? ''}
+                  sources={activeItemSources}
+                  sizes={lightboxSizes}
+                  alt={activeItem.alt}
+                  width={
+                    activeItemUsesPoster
+                      ? (activeItem.poster_width ?? activeItem.width)
+                      : activeItem.width
+                  }
+                  height={
+                    activeItemUsesPoster
+                      ? (activeItem.poster_height ?? activeItem.height)
+                      : activeItem.height
+                  }
+                  mode={activeItemUsesPoster ? 'static-poster' : activeItem.type}
+                  onError={() => markImageError(activeItem, activeItemDisplayUrl ?? '')}
+                />
+              )}
+            </div>
             <figcaption>{activeItem.phase}</figcaption>
           </figure>
           {availableItemsCount > 1 && (

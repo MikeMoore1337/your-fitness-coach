@@ -99,7 +99,7 @@ describe('Diary measurement guidance', () => {
     expect(apiMock.mock.calls.filter(([, options]) => options?.method === 'POST')).toHaveLength(1);
     expect(onExit).not.toHaveBeenCalled();
     resolveSave();
-    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue(null));
+    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue(''));
   });
 
   it('keeps a dirty editing draft on cancelled exit and restores its edit context on re-entry', async () => {
@@ -115,7 +115,7 @@ describe('Diary measurement guidance', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Вернуться без сохранения?' });
     expect(dialog).toHaveTextContent('останутся в черновике на этом устройстве');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(74.6);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('74.6');
     expect(onExit).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Вернуться' }));
@@ -128,7 +128,7 @@ describe('Diary measurement guidance', () => {
     expect(await screen.findByRole('heading', { name: 'Изменить замер' })).toBeVisible();
     expect(screen.getByLabelText('Дата')).toHaveValue(row.measured_on);
     expect(screen.getByLabelText('Дата')).toBeDisabled();
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(74.6);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('74.6');
     expect(apiMock.mock.calls.every(([, options]) => !options?.method)).toBe(true);
   });
 
@@ -183,12 +183,12 @@ describe('Diary measurement guidance', () => {
         { name: 'Отмена' },
       ),
     );
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(72);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('72');
     fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Открыть замер' }),
     );
-    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue(74.2));
+    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue('74.2'));
   });
 
   it('preserves the draft and date when deleting a historical record with confirmation', async () => {
@@ -214,7 +214,7 @@ describe('Diary measurement guidance', () => {
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Удалить' }),
     );
     await screen.findByText('Замеров пока нет');
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(72);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('72');
     expect(screen.getByLabelText('Дата')).toHaveValue('2026-08-19');
     expect(apiMock.mock.calls.filter(([, options]) => options?.method === 'DELETE')).toHaveLength(
       1,
@@ -235,7 +235,7 @@ describe('Diary measurement guidance', () => {
     expect(dialog).toHaveTextContent('будут потеряны');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
     expect(onExit).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(72);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('72');
   });
 
   it('clears only the deleted editing draft after explaining the loss of its unsaved changes', async () => {
@@ -257,13 +257,13 @@ describe('Diary measurement guidance', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Удалить замер?' });
     expect(dialog).toHaveTextContent('Несохранённые изменения этого замера также будут удалены.');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Отмена' }));
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(73);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('73');
     expect(rows).toHaveLength(2);
     fireEvent.click(screen.getAllByRole('button', { name: 'Удалить' })[0]!);
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Удалить' }),
     );
-    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue(null));
+    await waitFor(() => expect(screen.getByLabelText('Вес, кг')).toHaveValue(''));
     expect(screen.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
     expect(rows).toEqual([{ id: 6, measured_on: '2026-08-19', weight_kg: 74.3 }]);
   });
@@ -300,10 +300,10 @@ describe('Diary measurement guidance', () => {
     });
     renderDiary({ embedded: true });
 
-    expect(await screen.findByText(/Вес: 74\.2 кг · Талия: 81\.4 см/)).toBeVisible();
+    expect(await screen.findByText(/Вес: 74,2 кг · Талия: 81,4 см/)).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
     expect(screen.getByRole('heading', { name: 'Изменить замер' })).toBeVisible();
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(74.2);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('74.2');
     fireEvent.change(screen.getByLabelText('Вес, кг'), { target: { value: '74.6' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
 
@@ -353,10 +353,10 @@ describe('Diary measurement guidance', () => {
 
     renderDiary({ embedded: true });
 
-    expect(await screen.findByLabelText('Живот, см')).toHaveValue(null);
+    expect(await screen.findByLabelText('Живот, см')).toHaveValue('');
     expect(screen.getByText('Живот: 86 см')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Изменить' }));
-    expect(await screen.findByLabelText('Живот, см')).toHaveValue(86);
+    expect(await screen.findByLabelText('Живот, см')).toHaveValue('86');
     fireEvent.change(screen.getByLabelText('Живот, см'), { target: { value: '85.5' } });
     fireEvent.click(screen.getByRole('button', { name: 'Сохранить изменения' }));
 
@@ -388,7 +388,7 @@ describe('Diary measurement guidance', () => {
     expect(await screen.findByText(/Введённые значения сохранены/)).toHaveTextContent(
       'Сеть временно недоступна',
     );
-    expect(screen.getByLabelText('Вес, кг')).toHaveValue(73.8);
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('73.8');
   });
 
   it('refetches personal progress after a measurement mutation', async () => {

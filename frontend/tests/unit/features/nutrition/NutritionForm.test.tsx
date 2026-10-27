@@ -78,8 +78,8 @@ describe('NutritionForm', () => {
     renderForm();
 
     expect(screen.getByRole('combobox', { name: /^Цель/ })).toHaveValue('fat_loss');
-    expect(screen.getByRole('spinbutton', { name: 'Рост, см' })).toHaveValue(182);
-    expect(screen.getByRole('spinbutton', { name: 'Вес, кг' })).toHaveValue(83);
+    expect(screen.getByLabelText('Рост, см')).toHaveValue('182');
+    expect(screen.getByLabelText('Вес, кг')).toHaveValue('83');
   });
 
   it('adds and removes separately configured cardio trainings', () => {

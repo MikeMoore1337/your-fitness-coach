@@ -11,7 +11,7 @@ type WorkoutExercise = Workout['exercises'][number];
 type WorkoutSet = WorkoutExercise['sets'][number];
 
 function formatNumber(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toFixed(1).replace(/\.0$/, '');
+  return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(value);
 }
 
 function formatSetResult(

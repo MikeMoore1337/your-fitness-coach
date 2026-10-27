@@ -1260,6 +1260,221 @@ test('progress remains clear and free of horizontal overflow at supported widths
   expect(runtimeErrors).toEqual([]);
 });
 
+test('schedule card keeps one contour and only internal dividers across mobile states', async ({
+  page,
+}, testInfo) => {
+  const scheduleFixture = [
+    {
+      id: 1,
+      scheduled_date: '2030-01-01',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 1',
+      status: 'planned',
+      day_number: 1,
+      week_number: 1,
+    },
+    {
+      id: 2,
+      scheduled_date: '2030-01-08',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 2',
+      status: 'in_progress',
+      day_number: 2,
+      week_number: 2,
+    },
+    {
+      id: 3,
+      scheduled_date: '2030-01-15',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 3',
+      status: 'missed',
+      day_number: 3,
+      week_number: 3,
+    },
+    {
+      id: 4,
+      scheduled_date: '2030-01-22',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 4',
+      status: 'completed',
+      day_number: 4,
+      week_number: 4,
+    },
+    {
+      id: 5,
+      scheduled_date: '2030-01-29',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 5',
+      status: 'planned',
+      day_number: 5,
+      week_number: 5,
+    },
+    {
+      id: 6,
+      scheduled_date: '2030-02-05',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 6',
+      status: 'completed',
+      day_number: 6,
+      week_number: 6,
+    },
+    {
+      id: 7,
+      scheduled_date: '2030-02-12',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 7',
+      status: 'completed',
+      day_number: 7,
+      week_number: 7,
+    },
+    {
+      id: 8,
+      scheduled_date: '2030-02-19',
+      scheduled_time: '18:30:00',
+      title: 'ДЕНЬ 8',
+      status: 'completed',
+      day_number: 8,
+      week_number: 8,
+    },
+  ];
+  const captureEvidence = process.env.CAPTURE_1228_EVIDENCE === '1';
+  const evidenceDir = resolve(
+    process.cwd(),
+    '..',
+    '.artifacts',
+    'tasks',
+    '1228',
+    'evidence',
+    'after',
+  );
+  if (captureEvidence && testInfo.project.name === 'chromium') {
+    await mkdir(evidenceDir, { recursive: true });
+  }
+  await mockProgress(page);
+  await page.route('**/api/v1/workouts/schedule', async (route) =>
+    route.fulfill({ json: scheduleFixture }),
+  );
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    for (const width of [320, 360, 393, 430] as const) {
+      await page.setViewportSize({ width, height: 932 });
+      await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+      await page.goto('/app?section=programs');
+      const clientButton = page.getByRole('button', { name: 'Клиент' });
+      const planHeading = page.getByRole('heading', { name: 'План', exact: true });
+      await expect(clientButton.or(planHeading)).toBeVisible();
+      if (await clientButton.isVisible()) await clientButton.click();
+      await expect(planHeading).toBeVisible();
+
+      const card = page.locator('details.workout-schedule-card');
+      const cardSummary = card.locator(':scope > summary');
+      await expect(card).toHaveCount(1);
+      await expect(card).not.toHaveAttribute('open', '');
+      await expect(cardSummary).toBeVisible();
+      await expectTouchTargets(cardSummary);
+      if (width === 320 && colorScheme === 'light') {
+        await page.addStyleTag({ content: 'html { font-size: 125%; }' });
+      }
+      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+        await card.screenshot({
+          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-collapsed.png`),
+        });
+      }
+
+      await cardSummary.focus();
+      await expect(cardSummary).toBeFocused();
+      await cardSummary.press('Enter');
+      await expect(card).toHaveAttribute('open', '');
+      await expect(card.locator('.workout-context-row')).toHaveCount(8);
+
+      const body = card.locator(':scope > .card-disclosure__body');
+      const lists = card.locator('.workout-schedule-list');
+      const outerList = lists.nth(0);
+      const innerList = lists.nth(1);
+      const outerRows = outerList.locator(':scope > .workout-context-row');
+      const allWeeks = card.locator('details.workout-schedule-all');
+      const allWeeksSummary = allWeeks.locator(':scope > summary');
+
+      await expect(body).toHaveCSS('border-top-width', '1px');
+      await expect(lists).toHaveCount(2);
+      await expect(outerList).toHaveCSS('border-top-width', '0px');
+      await expect(outerList).toHaveCSS('margin-top', '0px');
+      await expect(outerRows).toHaveCount(4);
+      await expect(outerRows.first()).toHaveCSS('border-bottom-width', '1px');
+      await expect(outerRows.last()).toHaveCSS('border-bottom-width', '0px');
+      await expect(allWeeks).not.toHaveAttribute('open', '');
+      await expect(outerRows.first().locator('.workout-feedback-disclosure')).toHaveCSS(
+        'border-top-width',
+        '1px',
+      );
+
+      await allWeeksSummary.click();
+      await expect(allWeeks).toHaveAttribute('open', '');
+      await expect(innerList).toBeVisible();
+      const innerRows = innerList.locator(':scope > .workout-context-row');
+      await expect(innerRows).toHaveCount(4);
+      await expect(innerList).toHaveCSS('border-top-width', '0px');
+      await expect(innerRows.first()).toHaveCSS('border-bottom-width', '1px');
+      await expect(innerRows.last()).toHaveCSS('border-bottom-width', '0px');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 1 в расписании' }),
+      ).toContainText('Запланирована');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 2 в расписании' }),
+      ).toContainText('В процессе');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 3 в расписании' }),
+      ).toContainText('Нужно решить');
+      await expect(
+        card.getByRole('article', { name: 'Тренировка ДЕНЬ 4 в расписании' }),
+      ).toContainText('Завершена');
+      await expect(card.getByRole('button', { name: 'Изменить план' }).first()).toBeVisible();
+      await expect(card.getByRole('button', { name: 'Вернуться к тренировке' })).toBeVisible();
+      await expectTouchTargets(card.getByRole('button', { name: 'Изменить план' }));
+      await expectTouchTargets(card.getByRole('button', { name: 'Вернуться к тренировке' }));
+
+      const cardStyles = await card.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          borderWidths: [
+            style.borderTopWidth,
+            style.borderRightWidth,
+            style.borderBottomWidth,
+            style.borderLeftWidth,
+          ],
+          borderStyles: [
+            style.borderTopStyle,
+            style.borderRightStyle,
+            style.borderBottomStyle,
+            style.borderLeftStyle,
+          ],
+          borderRadius: style.borderRadius,
+          overflow: style.overflow,
+        };
+      });
+      expect(cardStyles.borderWidths).toEqual(['1px', '1px', '1px', '1px']);
+      expect(cardStyles.borderStyles).toEqual(['solid', 'solid', 'solid', 'solid']);
+      expect(cardStyles.borderRadius).not.toBe('0px');
+      expect(cardStyles.overflow).toBe('visible');
+
+      await expectNoHorizontalOverflow(page);
+      await innerRows.last().scrollIntoViewIfNeeded();
+      await expectNoOverlap(innerRows.last(), page.locator('#appBottomNav'));
+      if (captureEvidence && testInfo.project.name === 'chromium' && [320, 430].includes(width)) {
+        await card.screenshot({
+          path: resolve(evidenceDir, `schedule-${colorScheme}-${width}-expanded.png`),
+        });
+      }
+
+      await allWeeksSummary.click();
+      await expect(allWeeks).not.toHaveAttribute('open', '');
+      await cardSummary.focus();
+      await cardSummary.press('Enter');
+      await expect(card).not.toHaveAttribute('open', '');
+    }
+  }
+});
+
 test('muscle workload groups use compact cards without changing analytics or drill-down', async ({
   page,
 }) => {
@@ -2046,7 +2261,7 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   await expect(body.locator('.progress-measurement-editor')).not.toHaveAttribute('open');
   await body.locator('.progress-measurement-editor > summary').click();
   await expect(
-    body.locator('.measurement-diary').getByText(/Вес: 69\.1 кг · Талия: 72\.5 см/),
+    body.locator('.measurement-diary').getByText(/Вес: 69,1 кг · Талия: 72,5 см/),
   ).toBeVisible();
   await expect(body.getByText(/разовое изменение не считаем трендом/)).toBeVisible();
   await expect(body.locator('.progress-body-guidance')).toHaveCSS('display', 'none');
@@ -2100,9 +2315,9 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   );
   await body.getByRole('button', { name: 'Сохранить замер' }).click();
   await createRequest;
-  await expect(body.getByText(/Вес: 68\.7 кг · Талия: 71\.9 см/)).toBeVisible();
+  await expect(body.getByText(/Вес: 68,7 кг · Талия: 71,9 см/)).toBeVisible();
 
-  const todayRow = body.locator('.measurement-history__row').filter({ hasText: '68.7 кг' });
+  const todayRow = body.locator('.measurement-history__row').filter({ hasText: '68,7 кг' });
   await todayRow.getByRole('button', { name: 'Изменить' }).click();
   await expect(body.getByRole('heading', { name: 'Изменить замер' })).toBeVisible();
   await body.getByLabel('Вес, кг').fill('68.5');
@@ -2111,8 +2326,8 @@ test('measurements keep priority context, units, mobile order and add/edit histo
   );
   await body.getByRole('button', { name: 'Сохранить изменения' }).click();
   await editRequest;
-  await expect(body.getByText(/Вес: 68\.5 кг · Талия: 71\.9 см/)).toBeVisible();
-  await expect(body.getByText(/Вес: 68\.7 кг/)).not.toBeAttached();
+  await expect(body.getByText(/Вес: 68,5 кг · Талия: 71,9 см/)).toBeVisible();
+  await expect(body.getByText(/Вес: 68,7 кг/)).not.toBeAttached();
 
   const save = body.getByRole('button', { name: 'Сохранить замер' });
   expect((await save.boundingBox())?.height).toBeGreaterThanOrEqual(48);
@@ -2123,6 +2338,156 @@ test('measurements keep priority context, units, mobile order and add/edit histo
       ),
     )
     .toBe(true);
+});
+
+test('#1190 saves body measurements with hundredths without HTML step mismatch', async ({
+  page,
+}) => {
+  await mockProgress(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
+  const weight = diary.getByLabel('Вес, кг');
+  const waist = diary.getByLabel('Талия, см');
+  await expect(weight).toHaveAttribute('step', '0.01');
+  await expect(waist).toHaveAttribute('step', '0.01');
+  await weight.fill('72.34');
+  await waist.fill('71.23');
+  expect(
+    await weight.evaluate((element) => (element as HTMLInputElement).validity.stepMismatch),
+  ).toBe(false);
+  expect(
+    await waist.evaluate((element) => (element as HTMLInputElement).validity.stepMismatch),
+  ).toBe(false);
+
+  const sent = page.waitForResponse(
+    (response) =>
+      response.url().endsWith('/workouts/diary') && response.request().method() === 'POST',
+  );
+  await diary.getByRole('button', { name: 'Сохранить замер' }).click();
+  const response = await sent;
+  expect(response.status()).toBe(200);
+  const request = response.request();
+  expect(request.postDataJSON()).toMatchObject({ weight_kg: 72.34, waist_cm: 71.23 });
+  expect(await response.json()).toMatchObject({ weight_kg: 72.34, waist_cm: 71.23 });
+  await expect(diary.getByText(/Вес: 72,34 кг · Талия: 71,23 см/)).toBeVisible();
+
+  await page.goto('/app?section=progress&focus=measurements');
+  await expect(
+    page.locator('#measurement-diary').getByText(/Вес: 72,34 кг · Талия: 71,23 см/),
+  ).toBeVisible();
+});
+
+test('#1189 keeps measurement inputs visible in a keyboard-sized viewport', async ({ page }) => {
+  await mockProgress(page);
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  const weight = diary.getByLabel('Вес, кг');
+  const waist = diary.getByLabel('Талия, см');
+  const saveDock = diary.locator('.measurement-diary__save-dock');
+
+  // Reduced viewport is a browser regression fixture, not a real iOS keyboard.
+  for (const width of [320, 393]) {
+    await page.setViewportSize({ width, height: 440 });
+    await page.evaluate(() => {
+      document.documentElement.setAttribute('data-yfc-keyboard', 'visible');
+    });
+
+    await weight.fill('72.34');
+    await expect(weight).toBeFocused();
+    await expect(saveDock).toHaveCSS('position', 'static');
+    // Scrolling once to keep the focused field visible is correct native behavior.
+    // A fixed window.scrollY assertion wrongly rejects a legitimate 320px focus correction.
+    const inVisualViewport = async (input: typeof weight) =>
+      input.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const top = window.visualViewport?.offsetTop ?? 0;
+        const bottom = top + (window.visualViewport?.height ?? window.innerHeight);
+        return rect.top >= top - 1 && rect.bottom <= bottom + 1;
+      });
+
+    await weight.press('Backspace');
+    await weight.press('4');
+    await expect(weight).toHaveValue('72.34');
+    await expect.poll(() => inVisualViewport(weight), { timeout: 2000 }).toBe(true);
+
+    await waist.fill('71.23');
+    await expect(waist).toBeFocused();
+    await expect.poll(() => inVisualViewport(waist), { timeout: 2000 }).toBe(true);
+    await expect(diary.getByRole('button', { name: 'Сохранить замер' })).toBeAttached();
+  }
+});
+
+test('#1189 iOS PWA delegates measurement keyboard focus and typing to the native viewport', async ({
+  page,
+}) => {
+  // Mirror the already accepted active-workout #1099 standalone PWA harness.
+  await page.addInitScript(() => {
+    const original = window.matchMedia.bind(window);
+    window.matchMedia = (query: string) => {
+      const result = original(query);
+      if (query === '(display-mode: standalone)') {
+        Object.defineProperty(result, 'matches', { configurable: true, value: true });
+      }
+      return result;
+    };
+    Object.defineProperty(navigator, 'standalone', { configurable: true, value: true });
+  });
+  await mockProgress(page);
+  await page.goto('/app?section=progress&focus=measurements');
+  await page.getByRole('button', { name: 'Клиент' }).click();
+
+  const diary = page.locator('#measurement-diary');
+  const weight = diary.getByLabel('Вес, кг');
+  const chest = diary.getByLabel('Грудь, см');
+  const waist = diary.getByLabel('Талия, см');
+  await expect(diary.getByRole('heading', { name: 'Новый замер' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-yfc-measurement-pwa', 'true');
+
+  await page.evaluate(() => {
+    const root = window as Window & { __yfc1189ScrollCalls?: number };
+    const original = window.scrollBy.bind(window);
+    root.__yfc1189ScrollCalls = 0;
+    window.scrollBy = (x: number | ScrollToOptions = {}, y?: number) => {
+      root.__yfc1189ScrollCalls = (root.__yfc1189ScrollCalls ?? 0) + 1;
+      if (typeof x === 'number') return original(x, y ?? 0);
+      return original(x);
+    };
+    document.documentElement.setAttribute('data-yfc-keyboard', 'visible');
+  });
+
+  // Native focus may pan the page; application-owned scrollBy must not pan it again.
+  // The viewport simulates an opened numeric keyboard, not a physical iOS keyboard.
+  for (const width of [393, 320]) {
+    await page.setViewportSize({ width, height: 440 });
+    await weight.fill('75.25');
+    await chest.fill('102');
+    await waist.fill('84');
+    // `fill` does not guarantee the caret position across browser engines.
+    // Put it at the end before exercising a delete-and-retype sequence.
+    await weight.press('End');
+    await weight.press('Backspace');
+    await weight.press('5');
+    await expect(weight).toHaveValue('75.25');
+    await expect(chest).toHaveValue('102');
+    await expect(waist).toHaveValue('84');
+    await expect(weight).toBeFocused();
+    await expect(weight).toHaveCSS('scroll-margin-block-start', '0px');
+    await expect(diary.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'static');
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())),
+    );
+    expect(
+      await page.evaluate(
+        () => (window as Window & { __yfc1189ScrollCalls?: number }).__yfc1189ScrollCalls,
+      ),
+    ).toBe(0);
+  }
 });
 
 test('quick measurement can return without losing an unsaved draft', async ({ page }) => {

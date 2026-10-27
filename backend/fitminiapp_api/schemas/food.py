@@ -46,20 +46,34 @@ def validate_gtin(value: str | None) -> str | None:
 
 
 class FoodNutrientsInput(BaseModel):
-    energy_kcal_per_100g: Decimal | None = Field(default=None, ge=0, le=1000)
-    protein_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    fat_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    carbs_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    fiber_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
+    energy_kcal_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    protein_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    fat_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    carbs_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    fiber_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
 
 
 class FoodValuesInput(FoodNutrientsInput):
     name: str = Field(min_length=1, max_length=256)
     brand: str | None = Field(default=None, max_length=128)
     barcode: str | None = None
-    standard_serving_amount: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    standard_serving_amount: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     standard_serving_unit: ServingUnit | None = None
-    standard_serving_weight_g: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    standard_serving_weight_g: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
 
     @field_validator("name")
     @classmethod
@@ -112,14 +126,24 @@ class ExternalFoodImportSource(ExternalFoodSource):
 
 
 class UserFoodCreate(FoodValuesInput):
-    energy_kcal_per_100g: Decimal = Field(ge=0, le=1000)
-    protein_g_per_100g: Decimal = Field(ge=0, le=100)
-    fat_g_per_100g: Decimal = Field(ge=0, le=100)
-    carbs_g_per_100g: Decimal = Field(ge=0, le=100)
+    energy_kcal_per_100g: Decimal = Field(
+        ge=0, le=1000, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    protein_g_per_100g: Decimal = Field(
+        ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    fat_g_per_100g: Decimal = Field(
+        ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    carbs_g_per_100g: Decimal = Field(
+        ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
     external_source: ExternalFoodImportSource | None = None
     classification: FoodClassification = "personal"
     nutrition_basis_kind: NutritionBasisKind = "per_100_g"
-    nutrition_basis_amount: Decimal = Field(default=Decimal("100"), gt=0, max_digits=10)
+    nutrition_basis_amount: Decimal = Field(
+        default=Decimal("100"), gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     nutrition_basis_unit: Literal["g", "ml", "serving"] = "g"
 
     @model_validator(mode="after")
@@ -138,16 +162,32 @@ class UserFoodUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=256)
     brand: str | None = Field(default=None, max_length=128)
     barcode: str | None = None
-    energy_kcal_per_100g: Decimal | None = Field(default=None, ge=0, le=1000)
-    protein_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    fat_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    carbs_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    fiber_g_per_100g: Decimal | None = Field(default=None, ge=0, le=100)
-    standard_serving_amount: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    energy_kcal_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=1000, max_digits=10, decimal_places=2, allow_inf_nan=False
+    )
+    protein_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    fat_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    carbs_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    fiber_g_per_100g: Decimal | None = Field(
+        default=None, ge=0, le=100, max_digits=8, decimal_places=3, allow_inf_nan=False
+    )
+    standard_serving_amount: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     standard_serving_unit: ServingUnit | None = None
-    standard_serving_weight_g: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    standard_serving_weight_g: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     nutrition_basis_kind: NutritionBasisKind | None = None
-    nutrition_basis_amount: Decimal | None = Field(default=None, gt=0, max_digits=10)
+    nutrition_basis_amount: Decimal | None = Field(
+        default=None, gt=0, max_digits=10, decimal_places=3, allow_inf_nan=False
+    )
     nutrition_basis_unit: Literal["g", "ml", "serving"] | None = None
 
     @field_validator("name")

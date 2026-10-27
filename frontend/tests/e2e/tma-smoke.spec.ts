@@ -248,6 +248,73 @@ test('an unplanned day keeps the first factual cardio entry compact but availabl
   await expect(duration).toBeVisible();
 });
 
+test('cardio date and time stays inside its card on narrow Mobile Web and TMA screens', async ({
+  mobilePage,
+  tma,
+  tmaPage,
+}) => {
+  await Promise.all([
+    installPlatformApi(mobilePage, { browserSession: true, cardioState: 'empty' }),
+    installPlatformApi(tmaPage, { cardioState: 'empty' }),
+  ]);
+  await Promise.all([
+    mobilePage.goto('/app?section=today&cardio=1'),
+    tmaPage.goto('/app?section=today&cardio=1'),
+  ]);
+
+  for (const page of [mobilePage, tmaPage]) {
+    const card = page.locator('.cardio-log--quick');
+    const date = card.getByLabel('Дата и время');
+    await expect(date).toHaveAttribute('type', 'datetime-local');
+    await date.fill('2026-10-26T14:00');
+    await expect(date).toHaveValue('2026-10-26T14:00');
+
+    for (const theme of ['light', 'dark'] as const) {
+      if (page === tmaPage) {
+        await tma.setTheme(theme);
+      } else {
+        await page.evaluate((value) => {
+          localStorage.setItem('app-theme', value);
+          window.dispatchEvent(new CustomEvent('yfc-theme-preference-change'));
+        }, theme);
+      }
+      await expect(page.locator('html')).toHaveAttribute('data-color-scheme', theme);
+
+      for (const width of [320, 360, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 });
+        if (page === tmaPage) await tma.setViewport(844, 844);
+
+        const geometry = await date.evaluate((input) => {
+          const field = input.closest('.ui-field');
+          const card = input.closest('.cardio-log');
+          if (!field || !card) throw new Error('Cardio date field or card is missing');
+          const control = input.getBoundingClientRect();
+          const fieldBox = field.getBoundingClientRect();
+          const cardBox = card.getBoundingClientRect();
+          return {
+            left: control.left,
+            right: control.right,
+            fieldLeft: fieldBox.left,
+            fieldRight: fieldBox.right,
+            cardRight: cardBox.right,
+            cardOverflow: card.scrollWidth - card.clientWidth,
+            pageOverflow:
+              document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          };
+        });
+
+        expect(geometry.left).toBeGreaterThanOrEqual(geometry.fieldLeft - 1);
+        expect(geometry.right).toBeLessThanOrEqual(geometry.fieldRight + 1);
+        expect(geometry.right).toBeLessThanOrEqual(geometry.cardRight + 1);
+        expect(geometry.right).toBeLessThanOrEqual(width + 1);
+        expect(geometry.cardOverflow).toBeLessThanOrEqual(1);
+        expect(geometry.pageOverflow).toBeLessThanOrEqual(1);
+        await expect(date).toHaveValue('2026-10-26T14:00');
+      }
+    }
+  }
+});
+
 test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior', async ({
   mobilePage,
   tma,
@@ -328,6 +395,29 @@ test('cardio quick log keeps retry, editing and shared Mobile Web/TMA behavior',
   await savedTmaRow.getByText('Действия с записью', { exact: true }).click();
   await savedTmaRow.getByRole('button', { name: 'Изменить' }).click();
   const editForm = tmaCardio.locator('.cardio-session-row--editing');
+  const editDate = editForm.getByLabel('Дата и время');
+  await expect(editDate).toHaveAttribute('type', 'datetime-local');
+  const originalDate = await editDate.inputValue();
+  await editDate.fill(originalDate);
+  for (const width of [320, 360, 390, 430]) {
+    await tmaPage.setViewportSize({ width, height: 844 });
+    await tma.setViewport(844, 844);
+    const geometry = await editDate.evaluate((input) => {
+      const field = input.closest('.ui-field');
+      const card = input.closest('.cardio-session-row');
+      if (!field || !card) throw new Error('Editing cardio date field/card missing');
+      return {
+        right: input.getBoundingClientRect().right,
+        fieldRight: field.getBoundingClientRect().right,
+        cardRight: card.getBoundingClientRect().right,
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(geometry.right).toBeLessThanOrEqual(geometry.fieldRight + 1);
+    expect(geometry.right).toBeLessThanOrEqual(geometry.cardRight + 1);
+    expect(geometry.overflow).toBeLessThanOrEqual(1);
+    await expect(editDate).toHaveValue(originalDate);
+  }
   await editForm.getByLabel('Длительность, мин').fill('40');
   await editForm.getByRole('button', { name: 'Сохранить изменения' }).click();
   await expect.poll(() => tmaApi.cardioSaveCalls()).toBe(3);
@@ -1244,7 +1334,8 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tmaBody.getByLabel('Вес, кг').focus();
   await expect(tmaPage.locator('html')).toHaveAttribute('data-yfc-keyboard', 'visible');
   await expect(tmaPage.locator('#appBottomNav')).toBeHidden();
-  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'sticky');
+  // #1189: avoid a sticky save bar overlapping focused input on the iOS keyboard.
+  await expect(tmaBody.locator('.measurement-diary__save-dock')).toHaveCSS('position', 'static');
   await tma.setTheme('dark');
   await tma.setActive(false);
   await tma.setActive(true);
@@ -1270,7 +1361,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   for (const currentPage of [tmaPage, mobilePage]) {
     const body = currentPage.locator('#progress-body');
     await expect(
-      body.locator('.measurement-diary').getByText(/Вес: 74\.2 кг · Окружность плеча: 31\.6 см/),
+      body.locator('.measurement-diary').getByText(/Вес: 74,2 кг · Окружность плеча: 31,6 см/),
     ).toBeVisible();
     const singlePointHints = body.getByText(
       'Одна точка сохраняет факт, но ещё не показывает направление изменений.',
@@ -1280,11 +1371,11 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
     const noTrendStates = body.getByText('Пока без динамики', { exact: true });
     await expect(noTrendStates).toHaveCount(2);
     for (const state of await noTrendStates.all()) await expect(state).toBeVisible();
-    const row = body.locator('.measurement-history__row').filter({ hasText: '74.2 кг' });
+    const row = body.locator('.measurement-history__row').filter({ hasText: '74,2 кг' });
     await row.getByRole('button', { name: 'Изменить' }).click();
     await body.getByLabel('Вес, кг').fill('74.6');
     await body.getByRole('button', { name: 'Сохранить изменения' }).click();
-    await expect(body.getByText(/Вес: 74\.6 кг · Окружность плеча: 31\.6 см/)).toBeVisible();
+    await expect(body.getByText(/Вес: 74,6 кг · Окружность плеча: 31,6 см/)).toBeVisible();
     await expectNoHorizontalOverflow(currentPage);
     await expectTouchTargets(body.locator('.measurement-history__actions .ui-button'));
   }
@@ -1302,7 +1393,7 @@ test('measurement add, edit, history and insufficient trend keep Mobile Web and 
   await tma.setViewport(844, 844);
   const toastClose = tmaPage.getByRole('button', { name: 'Закрыть сообщение' });
   if (await toastClose.isVisible()) await toastClose.click();
-  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74.6 кг' });
+  const editedRow = tmaBody.locator('.measurement-history__row').filter({ hasText: '74,6 кг' });
   await editedRow.evaluate((element) => element.scrollIntoView({ block: 'center' }));
   await tmaPage.screenshot({
     path: '../.artifacts/screenshots/task-60/tma-390x844-dark.png',
@@ -2034,7 +2125,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
   const reps = tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' });
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await reps.fill('8');
   await weight.fill('40');
   await tma.setTheme('dark');
@@ -2061,9 +2152,7 @@ test('active workout starts, logs offline and resumes once after reconnect and r
   await expect(
     tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }),
   ).toHaveValue('8');
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '40',
-  );
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('40');
   await expectNoHorizontalOverflow(tmaPage);
 });
 
@@ -2131,7 +2220,7 @@ test('progression guidance applies a configured step once, stays optional and ma
   api.setOffline(true);
   await setNetworkOffline(tmaPage, true);
   await tmaGuidance.getByRole('button', { name: 'Применить 42,5 кг' }).dblclick();
-  const weight = tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' });
+  const weight = tmaPage.getByLabel('Вес, Приседания, подход 1');
   await expect(weight).toHaveValue('42.5');
   await expect(
     tmaPage.getByRole('alert').getByText('Сохранено на устройстве', { exact: true }),
@@ -2152,9 +2241,7 @@ test('progression guidance applies a configured step once, stays optional and ma
     .getByRole('region', { name: 'Что делать сейчас?' })
     .getByRole('button', { name: 'Что делать сейчас?' })
     .click();
-  await expect(tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' })).toHaveValue(
-    '42.5',
-  );
+  await expect(tmaPage.getByLabel('Вес, Приседания, подход 1')).toHaveValue('42.5');
   await expect(tmaPage.getByRole('button', { name: 'Вес подставлен' })).toBeDisabled();
   expect(api.setPatchCalls()).toBe(1);
 
@@ -2314,7 +2401,7 @@ test('completion summary survives finish retry, feedback error, reload and TMA l
   await tmaPage.goto('/app');
   await tmaPage.getByRole('button', { name: 'Начать тренировку' }).click();
   await tmaPage.getByRole('spinbutton', { name: 'Повторы, Приседания, подход 1' }).fill('8');
-  await tmaPage.getByRole('spinbutton', { name: 'Вес, Приседания, подход 1' }).fill('40');
+  await tmaPage.getByLabel('Вес, Приседания, подход 1').fill('40');
   await tmaPage.getByRole('button', { name: 'Завершить: Приседания, подход 1' }).click();
   await expect(tmaPage.getByText('Синхронизировано')).toBeVisible();
   await tmaPage.getByRole('button', { name: 'Завершить тренировку' }).click();

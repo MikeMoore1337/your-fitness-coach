@@ -1942,13 +1942,14 @@ details:not([open]) > :not(summary) {
 }
 .exercise-guide-image {
   width: 100%;
-  border-color: color-mix(in srgb, var(--border) 78%, transparent);
+  border: 0;
   box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 8%, transparent);
 }
 .exercise-guide-image__frame {
   position: relative;
   display: block;
   width: 100%;
+  aspect-ratio: 1;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -1957,9 +1958,13 @@ details:not([open]) > :not(summary) {
   cursor: zoom-in;
   overflow: hidden;
 }
+.exercise-guide-image__frame:hover,
+.exercise-guide-image__frame:focus-visible {
+  background: var(--bg-soft);
+}
 .exercise-guide-image__frame:hover img,
 .exercise-guide-image__frame:focus-visible img {
-  transform: scale(1.025);
+  transform: none;
 }
 .exercise-guide-image__frame img {
   display: block;
@@ -1967,6 +1972,26 @@ details:not([open]) > :not(summary) {
   height: 100%;
   object-fit: contain;
   transition: transform var(--motion-state) var(--motion-ease);
+}
+.exercise-guide-image__frame img[data-media-frame='filled-square'],
+.exercise-guide-image__frame .exercise-guide-video[data-media-frame='filled-square'],
+.exercise-lightbox__media img[data-media-frame='filled-square'],
+.exercise-lightbox__media .exercise-guide-video[data-media-frame='filled-square'],
+.active-workout-exercise__media img[data-media-frame='filled-square'],
+.active-workout-exercise__media video[data-media-frame='filled-square'] {
+  object-fit: cover;
+}
+.exercise-guide-image__frame img[data-media-frame='contain-exception'],
+.exercise-guide-image__frame .exercise-guide-video[data-media-frame='contain-exception'],
+.exercise-lightbox__media img[data-media-frame='contain-exception'],
+.exercise-lightbox__media .exercise-guide-video[data-media-frame='contain-exception'],
+.active-workout-exercise__media img[data-media-frame='contain-exception'],
+.active-workout-exercise__media video[data-media-frame='contain-exception'] {
+  object-fit: contain;
+}
+.exercise-guide-image__frame > .exercise-media-picture {
+  width: 100%;
+  height: 100%;
 }
 .exercise-guide-image__frame .exercise-guide-video {
   display: block;
@@ -2284,25 +2309,28 @@ details:not([open]) > :not(summary) {
 .exercise-lightbox figure {
   position: relative;
   z-index: 1;
+  width: min(100%, calc(100dvh - 125px), 1000px);
   max-width: min(100%, 1000px);
   max-height: 100%;
   margin: 0;
   text-align: center;
 }
-.exercise-lightbox img {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100dvh - 125px);
-  margin: auto;
-  border-radius: var(--radius-control);
-  object-fit: contain;
-}
-.exercise-lightbox .exercise-guide-video {
-  display: block;
-  max-width: 100%;
-  max-height: calc(100dvh - 125px);
+.exercise-lightbox__media {
   width: 100%;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--bg-soft);
+}
+.exercise-lightbox__media > .exercise-media-picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.exercise-lightbox__media img,
+.exercise-lightbox__media .exercise-guide-video {
+  display: block;
+  width: 100%;
+  height: 100%;
   margin: auto;
   border-radius: var(--radius-control);
   object-fit: contain;
@@ -3452,6 +3480,9 @@ details:not([open]) > :not(summary) {
 .program-active__actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+}
+.program-active__delete-action {
+  width: 100%;
 }
 .app-section--programs .program-active__empty .program-wizard__anchor.button-link {
   border-color: transparent;
@@ -4859,10 +4890,15 @@ button.today-text-link {
 }
 .active-workout-exercise__media {
   width: min(280px, 100%);
+  aspect-ratio: 1;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--bg-soft);
+}
+.active-workout-exercise__media > .exercise-media-picture {
+  width: 100%;
+  height: 100%;
 }
 .active-workout-exercise__media img,
 .active-workout-exercise__media video,
@@ -4887,6 +4923,7 @@ button.today-text-link {
 }
 .active-workout-exercise__media--blocked {
   width: 100%;
+  aspect-ratio: auto;
 }
 .active-workout-set {
   display: grid;
@@ -8019,6 +8056,18 @@ body:has(#appBottomNav) .toast:not(.hidden) {
   min-height: 48px;
 }
 
+/* Match the active workout's standalone PWA focus ownership (#1099).
+   The native iOS keyboard positions the field; no app scroll offsets or anchoring. */
+html[data-yfc-measurement-pwa='true'] .measurement-diary__form input:focus {
+  scroll-margin-block: 0px;
+}
+html[data-yfc-measurement-pwa='true'] {
+  scroll-padding-block: 0px;
+}
+html[data-yfc-measurement-pwa='true'] .measurement-diary__form {
+  overflow-anchor: none;
+}
+
 .measurement-diary__save-dock {
   display: grid;
   margin-top: 8px;
@@ -8496,13 +8545,9 @@ body:has(#appBottomNav) .toast:not(.hidden) {
     min-width: 0;
   }
 
+  /* Keep the keyboard from competing with the save action, as in active workout. */
   html[data-yfc-keyboard='visible'] .measurement-diary__save-dock {
-    position: sticky;
-    z-index: 2;
-    bottom: max(6px, var(--yfc-layout-safe-bottom, env(safe-area-inset-bottom, 0px)));
-    padding-top: 12px;
-    background: var(--card-bg);
-    box-shadow: 0 -12px 20px var(--card-bg);
+    position: static;
   }
 
   .progress-fact-strip > div {

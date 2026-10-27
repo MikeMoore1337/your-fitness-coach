@@ -540,20 +540,14 @@ export function TemplatesList({
                   <PublicProgramSharePanel template={activeTemplate} />
                 )}
                 {activeTemplate.assigned_program_id != null && (
-                  <details className="program-danger-menu">
-                    <summary className="yfc-disclosure-summary">
-                      Другие действия
-                      <DisclosureIcon />
-                    </summary>
-                    <button
-                      type="button"
-                      className="btn-danger"
-                      disabled={deleteAssignedMutation.isPending}
-                      onClick={() => void deleteActiveProgram()}
-                    >
-                      Удалить программу
-                    </button>
-                  </details>
+                  <button
+                    type="button"
+                    className="btn-danger program-active__delete-action"
+                    disabled={deleteAssignedMutation.isPending}
+                    onClick={() => void deleteActiveProgram()}
+                  >
+                    Удалить программу
+                  </button>
                 )}
               </>
             )}

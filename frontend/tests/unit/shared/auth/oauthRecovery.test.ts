@@ -12,6 +12,9 @@ describe('oauthRecovery', () => {
   });
 
   it('builds a provider retry link with only an allowlisted next path', () => {
+    expect(oauthStartHref('google', '/admin/hermes-bridge')).toBe(
+      '/api/v1/auth/oauth/google/start?next=%2Fadmin%2Fhermes-bridge',
+    );
     expect(oauthStartHref('GOOGLE', '/coach')).toBe(
       '/api/v1/auth/oauth/google/start?next=%2Fcoach',
     );

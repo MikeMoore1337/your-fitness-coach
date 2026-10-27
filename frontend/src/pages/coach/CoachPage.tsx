@@ -69,6 +69,12 @@ import {
 import { useTelegramOverlayBackButton } from '../../shared/telegram/useTelegramOverlayBackButton';
 import { useRuntime, useRuntimeCapabilities } from '../../shared/runtime/runtime';
 import {
+  decimalDraftFromValue,
+  hasDecimalScale,
+  isCompleteDecimalDraft,
+  parseDecimalDraft,
+} from '../../shared/numeric/decimalDraft';
+import {
   BodyPriorityPicker,
   isBodyPriorityComplete,
 } from '../../features/profile/BodyPriorityPicker';
@@ -103,19 +109,22 @@ async function loadCoachClientSummaries(): Promise<TrainerClientProgressList> {
   return { ...firstPage, items };
 }
 
-type ClientProfileDraft = Pick<
-  Client,
-  | 'full_name'
-  | 'birth_date'
-  | 'goal'
-  | 'level'
-  | 'height_cm'
-  | 'weight_kg'
-  | 'workouts_per_week'
-  | 'cardio_trainings_per_week'
-  | 'resting_heart_rate'
-  | 'body_priority'
-> & { training_preferences: TrainingPreferencesDraft };
+type ClientProfileDraft = Omit<
+  Pick<
+    Client,
+    | 'full_name'
+    | 'birth_date'
+    | 'goal'
+    | 'level'
+    | 'height_cm'
+    | 'weight_kg'
+    | 'workouts_per_week'
+    | 'cardio_trainings_per_week'
+    | 'resting_heart_rate'
+    | 'body_priority'
+  >,
+  'height_cm' | 'weight_kg'
+> & { height_cm: string; weight_kg: string; training_preferences: TrainingPreferencesDraft };
 
 function clientProfileDraft(client: Client): ClientProfileDraft {
   return {
@@ -123,13 +132,26 @@ function clientProfileDraft(client: Client): ClientProfileDraft {
     birth_date: client.birth_date,
     goal: client.goal,
     level: client.level,
-    height_cm: client.height_cm,
-    weight_kg: client.weight_kg,
+    height_cm: decimalDraftFromValue(client.height_cm),
+    weight_kg: decimalDraftFromValue(client.weight_kg),
     workouts_per_week: client.workouts_per_week,
     cardio_trainings_per_week: client.cardio_trainings_per_week,
     resting_heart_rate: client.resting_heart_rate,
     body_priority: client.body_priority,
     training_preferences: trainingPreferencesDraft(client.training_preferences),
+  };
+}
+
+function clientProfilePayload(form: ClientProfileDraft) {
+  const decimalValue = (value: string): number | null => {
+    if (!value.trim()) return null;
+    if (!isCompleteDecimalDraft(value) || !hasDecimalScale(value, 2)) return Number.NaN;
+    return parseDecimalDraft(value) ?? Number.NaN;
+  };
+  return {
+    ...form,
+    height_cm: decimalValue(form.height_cm),
+    weight_kg: decimalValue(form.weight_kg),
   };
 }
 
@@ -192,6 +214,7 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
     client.training_preferences?.updated_at ?? null,
     serverDraft,
   );
+  const normalizedForm = clientProfilePayload(form);
   const validBirthDate = /^\d{4}-\d{2}-\d{2}$/.test(form.birth_date ?? '');
   const validRestingHeartRate =
     form.resting_heart_rate == null ||
@@ -223,16 +246,16 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
       api<Client>(`/api/v1/coach/clients/${client.id}/profile`, {
         method: 'PATCH',
         body: {
-          full_name: form.full_name,
-          birth_date: form.birth_date ?? null,
-          goal: form.goal || null,
-          level: form.level || null,
-          height_cm: form.height_cm ?? null,
-          weight_kg: form.weight_kg ?? null,
-          workouts_per_week: form.workouts_per_week ?? null,
-          cardio_trainings_per_week: form.cardio_trainings_per_week ?? null,
-          resting_heart_rate: form.resting_heart_rate ?? null,
-          body_priority: form.body_priority ?? null,
+          full_name: normalizedForm.full_name,
+          birth_date: normalizedForm.birth_date ?? null,
+          goal: normalizedForm.goal || null,
+          level: normalizedForm.level || null,
+          height_cm: normalizedForm.height_cm,
+          weight_kg: normalizedForm.weight_kg,
+          workouts_per_week: normalizedForm.workouts_per_week ?? null,
+          cardio_trainings_per_week: normalizedForm.cardio_trainings_per_week ?? null,
+          resting_heart_rate: normalizedForm.resting_heart_rate ?? null,
+          body_priority: normalizedForm.body_priority ?? null,
           training_preferences: form.training_preferences,
         },
       }),
@@ -252,6 +275,19 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
       className="stack"
       onSubmit={(e) => {
         e.preventDefault();
+        const invalidDecimal =
+          (form.height_cm.trim() &&
+            (!Number.isFinite(normalizedForm.height_cm) ||
+              normalizedForm.height_cm! < 100 ||
+              normalizedForm.height_cm! > 250)) ||
+          (form.weight_kg.trim() &&
+            (!Number.isFinite(normalizedForm.weight_kg) ||
+              normalizedForm.weight_kg! < 20 ||
+              normalizedForm.weight_kg! > 350));
+        if (invalidDecimal) {
+          toast('Укажите рост от 100 до 250 см и вес от 20 до 350 кг.', 'error');
+          return;
+        }
         if (!isBodyPriorityComplete(form.body_priority)) {
           toast('Выберите хотя бы одну приоритетную мышечную группу', 'error');
           return;
@@ -322,22 +358,25 @@ function ClientProfileEditor({ client, readOnly = false }: { client: Client; rea
           <label className="field">
             <span>Рост, см</span>
             <input
-              type="number"
+              inputMode="decimal"
+              type="text"
               min="100"
               max="250"
-              value={form.height_cm ?? ''}
-              onChange={(e) => setForm({ ...form, height_cm: numberValue(e.target.value) })}
+              step="0.01"
+              value={form.height_cm}
+              onChange={(e) => setForm({ ...form, height_cm: e.target.value })}
             />
           </label>
           <label className="field">
             <span>Вес, кг</span>
             <input
-              type="number"
+              inputMode="decimal"
+              type="text"
               min="20"
               max="350"
-              step="0.1"
-              value={form.weight_kg ?? ''}
-              onChange={(e) => setForm({ ...form, weight_kg: numberValue(e.target.value) })}
+              step="0.01"
+              value={form.weight_kg}
+              onChange={(e) => setForm({ ...form, weight_kg: e.target.value })}
             />
           </label>
           <label className="field">

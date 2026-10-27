@@ -30,6 +30,7 @@ import {
   Select,
 } from '../../shared/ui/common';
 import { useFeedback } from '../../shared/ui/FeedbackProvider';
+import { parseDecimalDraft } from '../../shared/numeric/decimalDraft';
 
 type CardioActivityType = CardioSession['activity_type'];
 type CardioStatus = CardioSession['status'];
@@ -111,7 +112,7 @@ function draftFromSession(session: CardioSession): CardioDraft {
 }
 
 function optionalNumber(value: string): number | null {
-  return value.trim() === '' ? null : Number(value.replace(',', '.'));
+  return value.trim() === '' ? null : (parseDecimalDraft(value) ?? Number.NaN);
 }
 
 function draftErrors(draft: CardioDraft): Record<string, string> {
@@ -122,7 +123,13 @@ function draftErrors(draft: CardioDraft): Record<string, string> {
   if (!Number.isInteger(duration) || duration < 1 || duration > 600) {
     errors.duration = 'Укажите длительность от 1 до 600 минут.';
   }
-  if (distance != null && (!Number.isFinite(distance) || distance <= 0 || distance > 1000)) {
+  if (
+    distance != null &&
+    (!Number.isFinite(distance) ||
+      distance <= 0 ||
+      distance > 1000 ||
+      (draft.distance.trim() !== '' && !/^[-+]?\d+(?:[.,]\d{1,2})?$/.test(draft.distance.trim())))
+  ) {
     errors.distance = 'Укажите дистанцию больше 0 и не больше 1000 км.';
   }
   if (
@@ -357,7 +364,7 @@ function CardioSessionForm({
               min="0.01"
               max="1000"
               step="0.01"
-              type="number"
+              type="text"
               value={draft.distance}
               onChange={(event) => update('distance', event.target.value)}
             />

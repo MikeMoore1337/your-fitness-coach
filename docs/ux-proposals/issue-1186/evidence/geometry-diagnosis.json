@@ -1,0 +1,27 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "fixture": "current active/guide media selector contract with a 16:9 poster",
+  "result": {
+    "picture": {
+      "surface_width": 282,
+      "surface_height": 830,
+      "media_width": 280,
+      "media_height": 828,
+      "delta": 548
+    },
+    "direct": {
+      "surface_width": 282,
+      "surface_height": 282,
+      "media_width": 280,
+      "media_height": 280,
+      "delta": 0
+    }
+  },
+  "interpretation": {
+    "picture": "ISSUE: intrinsic height leaks through the unconstrained picture wrapper",
+    "direct": "PASS: direct media receives the square aspect-ratio rule"
+  }
+}
