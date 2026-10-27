@@ -94,18 +94,20 @@ export function PlateCalculator({ disabled, initialTargetWeight }: PlateCalculat
 
       <fieldset className="active-workout-plate-inventory">
         <legend>Доступные блины на сторону</legend>
-        <Button
-          className="active-workout-helper-chip"
-          disabled={disabled}
-          type="button"
-          variant="secondary"
-          onClick={() => setInventoryDraft(createInventoryDraft())}
-        >
-          Сбросить
-        </Button>
         <p className="active-workout-helper-muted">
           Укажите количество каждого размера. Это временный расчёт только на текущем устройстве.
         </p>
+        <div className="active-workout-plate-inventory__reset">
+          <Button
+            className="active-workout-helper-chip"
+            disabled={disabled}
+            type="button"
+            variant="secondary"
+            onClick={() => setInventoryDraft(createInventoryDraft())}
+          >
+            Сбросить
+          </Button>
+        </div>
         <div className="active-workout-plate-inventory__grid">
           {inventoryDraft.map((entry, index) => (
             <label key={entry.weight}>
