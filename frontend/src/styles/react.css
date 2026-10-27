@@ -5120,6 +5120,7 @@ button.today-text-link {
 }
 .active-workout-set__controls.has-rir {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: var(--yfc-current-set-row-gap, 10px);
 }
 .active-workout-set__rir-row,
 .active-workout-set__controls.has-rir > .active-workout-set__done {
@@ -5128,25 +5129,18 @@ button.today-text-link {
 .active-workout-set__rir-row {
   min-width: 0;
 }
-/* #1272: later active sets need the additional vertical clearance when
-   a preceding set has completed and the fixed rest timer is visible.
-   Preserve the first-set 390px visual baseline and 44px touch targets. */
+/* #1272: compact post-completion controls to stay between timer and dock.
+   First set keeps its approved visual baseline; every button stays >=44px. */
 @media (max-width: 899px) {
-  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir {
-    row-gap: 4px;
-  }
-  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir .active-workout-input input,
-  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-set__controls.has-rir .active-workout-set__done,
-  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-rir__options button {
-    min-height: 44px;
-  }
-  .active-workout-exercise__sets > .active-workout-set.is-current:not(:first-child) .active-workout-rir legend {
-    margin-bottom: 2px;
+  .active-workout-set.is-current:not(:first-child) {
+    --yfc-current-set-control-height: 44px;
+    --yfc-current-set-row-gap: 0px;
+    --yfc-current-set-label-gap: 0px;
   }
 }
 .active-workout-input {
   display: grid;
-  gap: 6px;
+  gap: var(--yfc-current-set-label-gap, 6px);
   min-width: 0;
 }
 .active-workout-input > span,
@@ -5175,7 +5169,7 @@ button.today-text-link {
 }
 .active-workout-set.is-current .active-workout-input input,
 .active-workout-set.is-current .active-workout-set__done {
-  min-height: 56px;
+  min-height: var(--yfc-current-set-control-height, 56px);
 }
 .active-workout-set.is-current .active-workout-input input {
   font-size: 1.22rem;
@@ -5233,7 +5227,7 @@ button.today-text-link {
   border: 0;
 }
 .active-workout-rir legend {
-  margin-bottom: 6px;
+  margin-bottom: var(--yfc-current-set-label-gap, 6px);
   color: var(--muted);
   font-size: 0.72rem;
   font-weight: 800;
@@ -5245,7 +5239,7 @@ button.today-text-link {
 }
 .active-workout-rir__options button {
   min-width: 0;
-  min-height: 48px;
+  min-height: var(--yfc-current-set-control-height, 48px);
   padding: 6px;
   border: 1px solid var(--border);
   background: var(--surface);
