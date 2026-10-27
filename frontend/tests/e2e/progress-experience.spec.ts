@@ -1390,7 +1390,7 @@ test('schedule card keeps one contour and only internal dividers across mobile s
           borderWidths,
           radius: style.borderTopLeftRadius,
           contrastDistance: foreground.reduce(
-            (sum, channel, index) => sum + Math.abs(channel - background[index]),
+            (sum, channel, index) => sum + Math.abs(channel - (background[index] ?? 0)),
             0,
           ),
         };
