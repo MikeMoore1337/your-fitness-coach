@@ -3,7 +3,9 @@
 Graphify используется только как локальный индекс кода для навигации, архитектурных вопросов и
 impact analysis. Он не входит в runtime Your Fitness Coach и не является источником истины.
 
-Поддерживаемая версия: `graphifyy==0.9.63`.
+Поддерживаемая версия: `graphifyy==0.9.97` - [официальный выпуск v0.9.97 от 27.10.2026](https://github.com/Graphify-Labs/graphify/releases/tag/v0.9.97) из основной ветки upstream `v8`.
+
+Для версии `v8` проверены исходные опции CLI `extract . --code-only --no-cluster`, переменные `GRAPHIFY_OUT` и `GRAPHIFY_QUERY_LOG`. Совместимость с фактической машиной Windows/Codex Desktop нельзя считать подтверждённой до живого запуска. Обновление версии не устанавливает новый Graphify skill, hook или MCP.
 
 ## Обычный запуск
 
@@ -18,7 +20,7 @@ python scripts/graphify_yfc.py bootstrap
 
 1. ищет `graphify` в `PATH` и в каталоге `uv tool dir --bin`;
 2. проверяет точную поддерживаемую версию;
-3. при отсутствии Graphify устанавливает `graphifyy==0.9.63` через `uv tool install`;
+3. при отсутствии Graphify устанавливает `graphifyy==0.9.97` через `uv tool install`;
 4. при другой версии переустанавливает pinned-версию;
 5. при отсутствии graph строит code-only AST graph;
 6. при существующем graph повторяет code-only `extract`, который использует manifest/cache для инкрементальной обработки.
@@ -48,8 +50,8 @@ Graphify не нужен.
 Обычно этот раздел не нужен, потому что bootstrap выполняет установку сам.
 
 ```bash
-uv tool install "graphifyy==0.9.63"
-uv tool install --force "graphifyy==0.9.63"
+uv tool install "graphifyy==0.9.97"
+uv tool install --force "graphifyy==0.9.97"
 uv tool uninstall graphifyy
 ```
 
@@ -82,3 +84,7 @@ python scripts/graphify_yfc.py path "FastAPI" "health"
 - Перед изменением кода проверяйте реальные source/tests/migrations/docs. При stale, ambiguous или
   incomplete graph переходите к исходникам.
 - Не запускайте bootstrap для каждой мелкой правки и не расширяйте scope задачи по результатам graph.
+
+## Проверка после перехода на новую версию
+
+На рабочем Windows/Codex Desktop (а не только в CI) выполнить `python scripts/graphify_yfc.py bootstrap` дважды. Первый запуск должен переустановить поддерживаемый CLI при расхождении версии, следующий - повторно обработать существующий граф. Затем выполнить `query`, `path`, `explain` на реальных символах backend и frontend, проверить `git status`, что нет `graphify-out/`, индексации секретов, `.artifacts/` и платных API-вызовов. Если smoke не проходит, откатить pin и переустановить предыдущую версию `graphifyy==0.9.63`; не удалять пользовательские данные и не изменять runtime приложения.

@@ -12,7 +12,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 GRAPHIFY_OUTPUT = REPOSITORY_ROOT / ".artifacts" / "shared" / "graphify"
 GRAPHIFY_GRAPH = GRAPHIFY_OUTPUT / "graph.json"
-SUPPORTED_GRAPHIFY_VERSION = "0.9.63"
+SUPPORTED_GRAPHIFY_VERSION = "0.9.97"
 INSTALL_SPEC = f"graphifyy=={SUPPORTED_GRAPHIFY_VERSION}"
 INSTALL_COMMAND = f"uv tool install {INSTALL_SPEC}"
 
