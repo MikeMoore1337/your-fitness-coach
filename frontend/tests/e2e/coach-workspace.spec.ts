@@ -2147,6 +2147,9 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
       await page.goto('/app?section=programs');
       await page.evaluate((theme) => localStorage.setItem('app-theme', theme), scheme);
       await page.reload();
+      // A fresh trainer-capable session can show the workspace chooser before personal navigation.
+      const clientChoice = page.getByRole('button', { name: 'Клиент', exact: true });
+      if (await clientChoice.isVisible()) await clientChoice.click();
       const personalNav = page.getByRole('navigation', { name: 'Основная навигация' });
       await expect(personalNav.getByRole('link', { name: 'План', exact: true })).toBeVisible();
       await expect(personalNav.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
