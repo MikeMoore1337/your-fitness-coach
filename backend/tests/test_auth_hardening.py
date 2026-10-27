@@ -1,23 +1,29 @@
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
+from hashlib import sha256
 from http.cookies import SimpleCookie
-from urllib.parse import parse_qs, urlparse
+from unittest.mock import Mock
+from urllib.parse import parse_qs, quote, urlparse
 from uuid import uuid4
 
 import jwt
 import pytest
 from fastapi import Request, Response
+from httpx import HTTPError
 from starlette.testclient import TestClient
 
 from fitminiapp_api.api.v1 import auth as auth_api
 from fitminiapp_api.api.v1.auth import issue_token_pair
 from fitminiapp_api.core.config import settings
+from fitminiapp_api.core.logging_config import JsonFormatter
 from fitminiapp_api.db.session import engine, get_session_context
 from fitminiapp_api.main import app
 from fitminiapp_api.models.audit import AuditEvent
 from fitminiapp_api.models.auth_identity import AuthActionToken, AuthIdentity
 from fitminiapp_api.models.token import RefreshToken
 from fitminiapp_api.models.user import User
+from fitminiapp_api.services import oauth_login
 from fitminiapp_api.services.auth_redirects import auth_error_redirect, safe_auth_next_path
 from fitminiapp_api.services.jwt import ALGORITHM, decode_token, hash_token
 from fitminiapp_api.services.oauth_login import get_or_create_oauth_user
@@ -104,6 +110,149 @@ class _FakeGoogleClient:
     async def authorize_access_token(self, request):
         del request
         return {"userinfo": self.claims}
+
+
+@pytest.fixture
+def configured_google(monkeypatch):
+    monkeypatch.setattr(settings, "enable_web_auth", True)
+    monkeypatch.setattr(settings, "google_oauth_client_id", "google-client")
+    monkeypatch.setattr(settings, "google_oauth_client_secret", "google-secret")
+    factory = Mock(
+        return_value=_FakeGoogleClient({"sub": "codeql-google", "is_admin": True, "is_coach": True})
+    )
+    monkeypatch.setattr(oauth_login.oauth, "create_client", factory)
+    return factory
+
+
+@pytest.mark.parametrize(
+    "provider",
+    ["google\r\nforged-event", "google.evil.example", "google?next=evil.example", "google\\evil"],
+)
+@pytest.mark.parametrize(
+    ("method", "suffix", "status"),
+    [
+        ("GET", "start", 303),
+        ("GET", "link/start", 404),
+        ("GET", "callback", 404),
+        ("POST", "callback", 404),
+    ],
+)
+def test_codeql_untrusted_provider_cannot_reach_oauth_sinks(
+    client, configured_google, caplog, provider, method, suffix, status
+):
+    response = client.request(
+        method,
+        f"/api/v1/auth/oauth/{quote(provider, safe='')}/{suffix}",
+        params={"token": "synthetic-link-secret"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == status
+    configured_google.assert_not_called()
+    assert not [record for record in caplog.records if record.name == auth_api.__name__]
+    assert settings.refresh_cookie_name not in response.headers.get("set-cookie", "")
+    if suffix == "start":
+        assert response.headers["location"] == "/login?next=%2Fapp&auth_error=unavailable"
+
+
+@pytest.mark.parametrize(
+    ("method", "stage"), [("GET", "start"), ("GET", "callback"), ("POST", "callback")]
+)
+def test_codeql_oauth_failures_log_only_safe_metadata(
+    client, configured_google, monkeypatch, caplog, method, stage
+):
+    caplog.set_level(logging.INFO, logger="app.http")
+    secret = "synthetic-password-token\r\nforged-event"
+    fake = configured_google.return_value
+    if stage == "start":
+
+        async def fail_start(_redirect_uri):
+            raise HTTPError(secret)
+
+        monkeypatch.setattr(fake, "create_authorization_url", fail_start)
+        params = {}
+    else:
+        started = client.get("/api/v1/auth/oauth/google/start", follow_redirects=False)
+        state = parse_qs(urlparse(started.headers["location"]).query)["state"][0]
+        params = {"state": state, "error": secret, "code": "synthetic-code-secret"}
+
+    response = client.request(
+        method,
+        f"/api/v1/auth/oauth/%20GOOGLE%20/{stage}",
+        **{"params" if method == "GET" else "data": params},
+        headers={"X-Request-ID": "synthetic-request-secret/invalid"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    error = "unavailable" if stage == "start" else "provider_failure"
+    assert response.headers["location"] == (
+        f"/login?next=%2Fapp&auth_error={error}&oauth_provider=google"
+    )
+    records = [record for record in caplog.records if record.name == auth_api.__name__]
+    assert len(records) == 1
+    record = records[0]
+    assert record.provider == "google"
+    assert record.reason == "provider_failure"
+    assert record.exc_info is None
+    rendered = JsonFormatter(service="backend").format(record)
+    assert "\n" not in rendered and "\r" not in rendered
+    observed = repr(record.__dict__) + rendered + response.text + repr(dict(response.headers))
+    observed += repr([entry.__dict__ for entry in caplog.records if entry.name == "app.http"])
+    for value in (
+        "synthetic-password-token",
+        "forged-event",
+        "synthetic-code-secret",
+        "synthetic-request-secret",
+    ):
+        assert value not in observed
+    if stage == "callback":
+        assert state not in observed
+        assert record.transaction_hash_prefix == sha256(state.encode()).hexdigest()[:12]
+
+
+@pytest.mark.parametrize("method", ["GET", "POST"])
+def test_codeql_link_redirect_stays_local_and_preserves_roles(client, configured_google, method):
+    headers = _login(client, 9_110_069)
+    user_id = client.get("/api/v1/me", headers=headers).json()["id"]
+    created = client.post("/api/v1/me/auth/oauth-link/google", headers=headers)
+    started = client.get(created.json()["oauth_url"], follow_redirects=False)
+    assert started.status_code == 302
+    state = parse_qs(urlparse(started.headers["location"]).query)["state"][0]
+    response = client.request(
+        method,
+        "/api/v1/auth/oauth/%20GOOGLE%20/callback",
+        **{"params" if method == "GET" else "data": {"state": state, "code": "test-code"}},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"] == "/app?auth_linked=google"
+    assert not urlparse(response.headers["location"]).netloc
+    assert settings.refresh_cookie_name not in response.headers.get("set-cookie", "")
+    with get_session_context() as db:
+        user = db.get(User, user_id)
+        assert user is not None and not user.is_admin and not user.is_coach
+        identity = db.query(AuthIdentity).filter(AuthIdentity.provider == "google").one()
+        assert identity.user_id == user_id
+
+
+@pytest.mark.parametrize("invalidity", ["forged_signature", "expired"])
+def test_codeql_oauth_triage_preserves_access_token_validation(client, invalidity):
+    headers = _login(client, 9_110_070)
+    raw_token = headers["Authorization"].removeprefix("Bearer ")
+    claims = jwt.decode(raw_token, settings.secret_key, algorithms=[ALGORITHM])
+    signing_key = settings.secret_key
+    if invalidity == "forged_signature":
+        signing_key = "synthetic-forged-key-at-least-thirty-two-characters"
+    else:
+        claims["exp"] = datetime.now(UTC).timestamp() - 60
+    token = jwt.encode(claims, signing_key, algorithm=ALGORITHM)
+
+    response = client.get("/api/v1/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+    assert token not in response.text
+    assert client.get("/api/v1/me", headers=headers).status_code == 200
 
 
 def test_oauth_link_is_bound_to_owner_session_and_is_one_time(client, monkeypatch):
