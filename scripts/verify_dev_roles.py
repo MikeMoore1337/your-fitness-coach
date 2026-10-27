@@ -14,7 +14,7 @@ BASE = "http://127.0.0.1:18080"
 
 
 def _request(
-    path: str, *, token: str | None = None, payload: dict | None = None
+    path: str, *, token: str | None = None, payload: dict | None = None, method: str | None = None
 ) -> tuple[int, object]:
     if not path.startswith("/") or "//" in path:
         raise ValueError("only same-origin relative paths are supported")
@@ -24,7 +24,7 @@ def _request(
         headers["Content-Type"] = "application/json"
     if token is not None:
         headers["Authorization"] = f"Bearer {token}"
-    request = Request(BASE + path, data=data, headers=headers)
+    request = Request(BASE + path, data=data, headers=headers, method=method)
     try:
         with urlopen(request, timeout=8) as response:
             return response.status, json.load(response)
@@ -60,6 +60,16 @@ def main() -> int:
     client = _login(2001, coach=False)
     trainer = _login(1002, coach=True)
     root = _login(1001, coach=True, admin=True)
+    for token, method, payload in (
+        (client, "POST", {"accepted_terms": True}),
+        (trainer, "DELETE", None),
+        (root, "DELETE", None),
+    ):
+        status, _ = _request(
+            "/api/v1/me/trainer-capability", token=token, method=method, payload=payload
+        )
+        if status != 403:
+            raise AssertionError("fixed DEV role can be changed through the profile API")
     for name, token, expected_coach, expected_root in (
         ("client", client, False, False),
         ("trainer", trainer, True, False),
@@ -101,6 +111,7 @@ def main() -> int:
     print("PASS | Client cannot use trainer or Root functions")
     print("PASS | Trainer cannot use Root functions")
     print("PASS | Unauthorized and escalated DEV logins denied")
+    print("PASS | Fixed DEV roles cannot be changed through the profile API")
     print("LOCAL_DEV_ROLE_SMOKE=PASS | no tokens printed")
     return 0
 
