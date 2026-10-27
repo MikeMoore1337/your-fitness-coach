@@ -541,7 +541,9 @@ describe('TemplatesList editing', () => {
         name: 'Скрыть',
       }),
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('Сбой удаления шаблона');
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Сервис временно недоступен. Попробуйте ещё раз.',
+    );
     await waitFor(() => expect(hideButton).not.toBeDisabled());
     fireEvent.click(hideButton);
     fireEvent.click(
