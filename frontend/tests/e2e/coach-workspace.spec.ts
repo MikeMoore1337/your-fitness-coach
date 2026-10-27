@@ -2144,12 +2144,12 @@ test('#1276 uses the same iOS dock baseline in personal and Coach OS workspaces'
     for (const width of [320, 360, 393, 430] as const) {
       await page.setViewportSize({ width, height: 844 });
       await page.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
-      await page.goto('/app?section=programs');
+      // The existing coach mock has verified personal nutrition routing; use it to isolate dock geometry.
+      await page.goto('/app?section=nutrition');
       await page.evaluate((theme) => localStorage.setItem('app-theme', theme), scheme);
       await page.reload();
-      // A fresh trainer-capable session can show the workspace chooser before personal navigation.
-      const clientChoice = page.getByRole('button', { name: 'Клиент', exact: true });
-      if (await clientChoice.isVisible()) await clientChoice.click();
+      await expect(page).toHaveURL(/\/app\?section=nutrition/);
+      await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toBeVisible();
       const personalNav = page.getByRole('navigation', { name: 'Основная навигация' });
       await expect(personalNav.getByRole('link', { name: 'План', exact: true })).toBeVisible();
       await expect(personalNav.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
@@ -2230,7 +2230,8 @@ test('#1276 preserves Telegram host safe-area across personal and Coach OS', asy
         };
       });
 
-    await page.goto('/app?section=programs');
+    await page.goto('/app?section=nutrition');
+    await expect(page.getByRole('link', { name: 'В кабинет тренера', exact: true })).toBeVisible();
     await expect(dock.locator('.app-bottom-nav__quick-add')).toHaveCount(1);
     const personal = await measure();
     expect(personal.bottomInset).toBeGreaterThanOrEqual(20);
