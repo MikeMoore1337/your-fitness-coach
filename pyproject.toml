@@ -20,7 +20,7 @@ backend = [
     "pydantic-settings",
     "pydantic",
     "alembic",
-    "authlib",
+    "authlib>=1.9.1,<2",
     "cryptography",
     "PyJWT",
     "pwdlib[argon2]",
